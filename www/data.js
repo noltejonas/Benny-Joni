@@ -20,6 +20,7 @@
       ],
       challenges: [],
       sets: [],
+      reactions: [],
     };
   }
   function saveDemo(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
@@ -129,17 +130,36 @@
         const s = loadDemo();
         const catById = Object.fromEntries(s.categories.map(c => [c.id, c]));
         const chById = Object.fromEntries(s.challenges.map(c => [c.id, c]));
+        const reactions = s.reactions || [];
+        const reactionsBySet = {};
+        for (const r of reactions) (reactionsBySet[r.set_id] ||= []).push(r);
         return [...s.sets]
           .sort((a,b) => b.created_at.localeCompare(a.created_at))
           .slice(0, limit)
           .map(set => {
             const ch = chById[set.challenge_id];
             const cat = ch ? catById[ch.category_id] : null;
-            return { ...set, category: cat, challenge: ch };
+            return { ...set, category: cat, challenge: ch, reactions: reactionsBySet[set.id] || [] };
           });
       },
       async getAllSets() {
         return [...loadDemo().sets];
+      },
+      async addReaction({ set_id, athlete, emoji }) {
+        const s = loadDemo();
+        s.reactions = s.reactions || [];
+        if (s.reactions.find(r => r.set_id === set_id && r.athlete === athlete && r.emoji === emoji)) {
+          return null; // already exists, no-op
+        }
+        const r = { id: uid(), set_id, athlete, emoji, created_at: new Date().toISOString() };
+        s.reactions.push(r);
+        saveDemo(s); emit();
+        return r;
+      },
+      async removeReaction({ set_id, athlete, emoji }) {
+        const s = loadDemo();
+        s.reactions = (s.reactions || []).filter(r => !(r.set_id === set_id && r.athlete === athlete && r.emoji === emoji));
+        saveDemo(s); emit();
       },
       // ── Rotation plan ─────────────────────────────────────────────────
       async getPlanSlots() {
@@ -191,6 +211,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_challenges' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_slots' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rotation_config' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, emit)
       .subscribe();
 
     return {
@@ -276,7 +297,7 @@
       },
       async recentFeed(limit=50) {
         const { data, error } = await client.from('sets')
-          .select('*, challenge:challenge_id(*, category:category_id(*))')
+          .select('*, challenge:challenge_id(*, category:category_id(*)), reactions(id, athlete, emoji)')
           .order('created_at', { ascending: false })
           .limit(limit);
         if (error) throw error;
@@ -284,6 +305,7 @@
           ...s,
           category: s.challenge?.category,
           challenge: s.challenge,
+          reactions: s.reactions || [],
         }));
       },
       async getAllSets() {
@@ -293,6 +315,25 @@
           .range(0, 9999);
         if (error) throw error;
         return data || [];
+      },
+      async addReaction(payload) {
+        const { data, error } = await client.from('reactions')
+          .insert(payload)
+          .select()
+          .single();
+        if (error) {
+          if (error.code === '23505') return null; // unique violation, already exists
+          throw error;
+        }
+        emit();
+        return data;
+      },
+      async removeReaction({ set_id, athlete, emoji }) {
+        const { error } = await client.from('reactions')
+          .delete()
+          .match({ set_id, athlete, emoji });
+        if (error) throw error;
+        emit();
       },
       // ── Rotation plan ─────────────────────────────────────────────────
       async getPlanSlots() {

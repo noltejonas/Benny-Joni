@@ -359,7 +359,7 @@ function _HomeScreenOld_unused({ api, me, challenge, category, sets, layout, onS
 }
 
 // ─── SETUP WEEK ─────────────────────────────────────────────────────────────
-function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved, onAddCategory }) {
+function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved, onDeleted, onAddCategory }) {
   const [catId, setCatId] = useState(existing?.category_id || categories[0]?.id || '');
   const [target, setTarget] = useState(existing?.target_reps || 100);
   const [chosenBy, setChosenBy] = useState(existing?.chosen_by || me);
@@ -368,6 +368,22 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
   const [newCatEmoji, setNewCatEmoji] = useState('💪');
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function deleteChallenge() {
+    if (!existing?.id) return;
+    const cat = categories.find(c => c.id === existing.category_id);
+    if (!confirm(`„${cat?.name || 'Challenge'}" wirklich aus dieser Woche entfernen? Bisher geloggte Sätze bleiben erhalten.`)) return;
+    setDeleting(true);
+    try {
+      await api.deleteChallenge(existing.id);
+      onDeleted?.();
+    } catch (e) {
+      alert(e.message || 'Fehler beim Löschen');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function save() {
     if (!catId) return;
@@ -495,6 +511,11 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
           {saving ? '…' : 'Speichern'}
         </button>
       </div>
+      {existing?.id &&
+        <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={deleteChallenge} disabled={deleting}>
+          {deleting ? '…' : '🗑 Challenge aus dieser Woche entfernen'}
+        </button>
+      }
     </>);
 
 }
@@ -651,7 +672,66 @@ function WeekRecap({ recap }) {
   );
 }
 
-function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet }) {
+function ReactionBar({ set, me, onToggle, onPick }) {
+  const reactions = set.reactions || [];
+  // Gruppieren nach emoji: { emoji, count, byMe }
+  const grouped = {};
+  for (const r of reactions) {
+    const g = grouped[r.emoji] ||= { emoji: r.emoji, count: 0, byMe: false };
+    g.count++;
+    if (r.athlete === me) g.byMe = true;
+  }
+  const pills = Object.values(grouped);
+  return (
+    <div className="feed-reactions">
+      {pills.map(p => (
+        <button
+          key={p.emoji}
+          className={`reaction-pill ${p.byMe ? 'mine' : ''}`}
+          onClick={() => onToggle?.(set, p.emoji)}
+          aria-label={`${p.emoji} ${p.count}`}>
+          <span className="reaction-emoji">{p.emoji}</span>
+          <span className="reaction-count mono">{p.count}</span>
+        </button>
+      ))}
+      <button className="reaction-add" aria-label="Reaktion hinzufügen" onClick={() => onPick?.(set)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><line x1="18" y1="6" x2="18" y2="10"/><line x1="16" y1="8" x2="20" y2="8"/></svg>
+      </button>
+    </div>
+  );
+}
+
+function EmojiPickerSheet({ onPick, onClose }) {
+  const [val, setVal] = useState('');
+  const submit = () => {
+    const e = val.trim();
+    if (!e) return;
+    onPick?.(e);
+  };
+  return (
+    <>
+      <h2 className="title" style={{ marginBottom: 4 }}>Reaktion hinzufügen</h2>
+      <div className="subtitle" style={{ marginBottom: 20, fontSize: 14 }}>
+        Tippe einen Emoji ein (iOS-Tastatur 🌐 → Emoji)
+      </div>
+      <input
+        className="input input-lg"
+        type="text"
+        value={val}
+        autoFocus
+        placeholder="z. B. 🔥"
+        style={{ textAlign: 'center', fontSize: 32 }}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
+      <div className="btn-row" style={{ marginTop: 24 }}>
+        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        <button className="btn" onClick={submit} disabled={!val.trim()}>Hinzufügen</button>
+      </div>
+    </>
+  );
+}
+
+function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji }) {
   const [editId, setEditId] = React.useState(null);
   const [editVal, setEditVal] = React.useState('');
   if (feed.length === 0) {
@@ -684,6 +764,7 @@ function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet }) {
             <div className="feed-meta">
               {formatRelative(s.created_at)}{s.note ? ` · „${s.note}"` : ''}
             </div>
+            <ReactionBar set={s} me={me} onToggle={onToggleReaction} onPick={onPickEmoji} />
           </div>
           {editing ? (
             <div className="feed-edit">
@@ -1304,4 +1385,4 @@ function MiniStat({ label, benny, jonas }) {
   );
 }
 
-Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, StatsChart, FullscreenChart, ChartFullscreen, HistoryView, computeAthleteStats, MiniStat });
+Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, StatsChart, FullscreenChart, ChartFullscreen, HistoryView, computeAthleteStats, MiniStat, EmojiPickerSheet });
