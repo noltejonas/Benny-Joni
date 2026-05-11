@@ -146,51 +146,73 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </button>
             </div>
-            {layout==='rings' && (
-              <div className="tug-section">
-                <div className="tug-labels">
-                  <div className="tug-side benny">
-                    <div className="tug-who"><img src="uploads/benny.jpg" alt="Benny" className="tug-avatar"/>Benny</div>
-                    <div className="tug-reps mono">{bennyDone}</div>
-                    <div className={`tug-foot mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div>
+            {celebration.getPersistentStyle(ch) === 'trophy' ? (
+              <div className="pm-trophy-hero">
+                <div className="pm-trophy-icon">🏆</div>
+                <div className="pm-trophy-title">ZIEL ERREICHT</div>
+                <div className="pm-trophy-sub">{cat?.emoji} {cat?.name} • Diese Woche</div>
+                <div className="pm-trophy-stats">
+                  <div>
+                    <div className="pm-trophy-stat-v">{total.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-l">Reps</div>
                   </div>
-                  <div className="tug-side jonas">
-                    <div className="tug-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="tug-avatar"/></div>
-                    <div className="tug-reps mono">{jonasDone}</div>
-                    <div className={`tug-foot mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div>
+                  <div>
+                    <div className="pm-trophy-stat-v">{bennyDone.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-l">Benny</div>
                   </div>
-                </div>
-                <div className="tug-bar">
-                  <div className="tug-fill benny" style={{width:`${Math.min(100, (bennyDone/ch.target_reps)*100)}%`}}/>
-                  <div className="tug-fill jonas" style={{width:`${Math.min(100, (jonasDone/ch.target_reps)*100)}%`}}/>
-                  <div className="tug-mid" aria-hidden="true"/>
-                  <div className="tug-total mono">
-                    <span className="tug-total-now">{total}</span>
-                    <span className="tug-total-of"> / {ch.target_reps}</span>
+                  <div>
+                    <div className="pm-trophy-stat-v">{jonasDone.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-l">Jonas</div>
                   </div>
                 </div>
               </div>
-            )}
-            {layout==='bar' && <>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:12}}>
-                <div className="display mono" style={{fontSize:44,lineHeight:1}}>{pctInt}%</div>
-                <div className="subtitle mono">{total} / {ch.target_reps}</div></div>
-              <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct*100}%`}}/></div>
-              <div className="subtitle" style={{fontSize:13,fontWeight:500}}>{remaining>0?`Noch ${remaining} Reps`:'🎉 Ziel erreicht!'}</div></>}
-            {layout==='numeric' && <div style={{textAlign:'center',marginTop:12}}>
-              <div className="big-number mono" style={{fontSize:72}}>{pctInt}%</div>
-              <div className="of mono">{total} / {ch.target_reps} Reps</div>
-              <div style={{marginTop:8,fontSize:13,color:'var(--text-2)'}}>{remaining>0?`Noch ${remaining}`:'🎉 Ziel erreicht'}</div></div>}
-            {layout!=='rings' && <div className="split-row">
-              <div className="split-cell benny">
-                <div className="who"><img src="uploads/benny.jpg" alt="Benny" className="cell-avatar"/>Benny</div>
-                <div className="v mono">{bennyDone}<span className="owe-of"> / {fairShare}</span></div>
-                <div className={`owe mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div></div>
-              <div className="split-cell jonas">
-                <div className="who"><img src="uploads/jonas.jpg" alt="Jonas" className="cell-avatar"/>Jonas</div>
-                <div className="v mono">{jonasDone}<span className="owe-of"> / {fairShare}</span></div>
-                <div className={`owe mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div></div>
-            </div>}
+            ) : (<>
+              {layout==='rings' && (
+                <div className="tug-section">
+                  <div className="tug-labels">
+                    <div className="tug-side benny">
+                      <div className="tug-who"><img src="uploads/benny.jpg" alt="Benny" className="tug-avatar"/>Benny</div>
+                      <div className="tug-reps mono">{bennyDone}</div>
+                      <div className={`tug-foot mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div>
+                    </div>
+                    <div className="tug-side jonas">
+                      <div className="tug-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="tug-avatar"/></div>
+                      <div className="tug-reps mono">{jonasDone}</div>
+                      <div className={`tug-foot mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div>
+                    </div>
+                  </div>
+                  <div className="tug-bar">
+                    <div className="tug-fill benny" style={{width:`${Math.min(100, (bennyDone/ch.target_reps)*100)}%`}}/>
+                    <div className="tug-fill jonas" style={{width:`${Math.min(100, (jonasDone/ch.target_reps)*100)}%`}}/>
+                    <div className="tug-mid" aria-hidden="true"/>
+                    <div className="tug-total mono">
+                      <span className="tug-total-now">{total}</span>
+                      <span className="tug-total-of"> / {ch.target_reps}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {layout==='bar' && <>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:12}}>
+                  <div className="display mono" style={{fontSize:44,lineHeight:1}}>{pctInt}%</div>
+                  <div className="subtitle mono">{total} / {ch.target_reps}</div></div>
+                <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct*100}%`}}/></div>
+                <div className="subtitle" style={{fontSize:13,fontWeight:500}}>{remaining>0?`Noch ${remaining} Reps`:'🎉 Ziel erreicht!'}</div></>}
+              {layout==='numeric' && <div style={{textAlign:'center',marginTop:12}}>
+                <div className="big-number mono" style={{fontSize:72}}>{pctInt}%</div>
+                <div className="of mono">{total} / {ch.target_reps} Reps</div>
+                <div style={{marginTop:8,fontSize:13,color:'var(--text-2)'}}>{remaining>0?`Noch ${remaining}`:'🎉 Ziel erreicht'}</div></div>}
+              {layout!=='rings' && <div className="split-row">
+                <div className="split-cell benny">
+                  <div className="who"><img src="uploads/benny.jpg" alt="Benny" className="cell-avatar"/>Benny</div>
+                  <div className="v mono">{bennyDone}<span className="owe-of"> / {fairShare}</span></div>
+                  <div className={`owe mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div></div>
+                <div className="split-cell jonas">
+                  <div className="who"><img src="uploads/jonas.jpg" alt="Jonas" className="cell-avatar"/>Jonas</div>
+                  <div className="v mono">{jonasDone}<span className="owe-of"> / {fairShare}</span></div>
+                  <div className={`owe mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div></div>
+              </div>}
+            </>)}
             <button className="btn" style={{marginTop:16}} onClick={() => onLogChallenge(ch)}>+ Satz für {cat?.name} loggen</button>
             <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} />
           </div></div>
