@@ -1704,3 +1704,39 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   color: #ffd700;
   text-shadow: 0 0 12px rgba(255,215,0,0.6);
 }
+
+/* Style B: Sparkle-Float */
+.hero-card.pm-sparkle {
+  background: linear-gradient(135deg, #1c1c1e 0%, #2a1a3e 50%, #1c1c1e 100%);
+  position: relative;
+  overflow: hidden;
+}
+.pm-sparkle-stars {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.pm-sparkle-star {
+  position: absolute;
+  width: 4px; height: 4px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #fff, 0 0 12px #ffbe0b;
+  animation: pm-sparkle-drift linear infinite;
+  opacity: 0;
+}
+@keyframes pm-sparkle-drift {
+  0%   { transform: translateY(120px) scale(0); opacity: 0; }
+  20%  { opacity: 1; transform: translateY(80px) scale(1); }
+  80%  { opacity: 1; }
+  100% { transform: translateY(-20px) scale(0); opacity: 0; }
+}
+.hero-card.pm-sparkle > * { position: relative; z-index: 1; }
+.hero-card.pm-sparkle .ziel-erreicht-status {
+  background: linear-gradient(90deg, #ffbe0b, #ff006e, #ffbe0b);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: pm-gold-slide 3s linear infinite;
+}

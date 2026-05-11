@@ -62,6 +62,33 @@ function useCelebration(challenges, allSets, me, categories) {
   return { pendingCelebration, dismissCurrent, getPersistentStyle };
 }
 
+function SparkleLayer({ active }) {
+  const { useEffect, useRef } = React;
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const intervalId = setInterval(() => {
+      // Only spawn while the card is visible (saves CPU when swiped away)
+      const rect = container.getBoundingClientRect();
+      const visible = rect.bottom > 0 && rect.top < window.innerHeight;
+      if (!visible) return;
+      const s = document.createElement('div');
+      s.className = 'pm-sparkle-star';
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.animationDuration = (3 + Math.random() * 3) + 's';
+      container.appendChild(s);
+      setTimeout(() => s.remove(), 7000);
+    }, 300);
+    return () => clearInterval(intervalId);
+  }, [active]);
+
+  if (!active) return null;
+  return <div className="pm-sparkle-stars" ref={containerRef} />;
+}
+
 // Component: 5-second fullscreen celebration overlay.
 // Implementation grows over Tasks 4–7.
 function CelebrationOverlay({ category, targetReps, onDone }) {

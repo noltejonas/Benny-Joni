@@ -134,6 +134,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         const jonasOwed = Math.max(0, fairShare - jonasDone);
         return (
           <div key={ch.id} className="challenge-slide"><div className={`hero-card ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
+            <SparkleLayer active={celebration.getPersistentStyle(ch) === 'sparkle'} />
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:22,fontWeight:800,letterSpacing:'-0.03em'}}>
