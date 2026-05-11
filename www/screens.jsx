@@ -89,6 +89,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     onAddGoal = onSetup; onEditChallenge = () => onSetup?.(); onLogChallenge = () => onLog?.();
   }
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+  const celebration = useCelebration(challenges, allSets, me, categories);
 
   if (!challenges.length) {
     return (
@@ -116,6 +117,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
   return (
+    <>
     <div className={`layout-${layout} home-swiper-wrap`}>
       <div className="challenge-swiper" ref={scrollerRef}>
       {challenges.map(ch => {
@@ -203,6 +205,14 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         </div>
       )}
     </div>
+    {celebration.pendingCelebration && (
+      <CelebrationOverlay
+        category={celebration.pendingCelebration.category}
+        targetReps={celebration.pendingCelebration.challenge.target_reps}
+        onDone={celebration.dismissCurrent}
+      />
+    )}
+    </>
   );
 }
 function _HomeScreenOld_unused({ api, me, challenge, category, sets, layout, onSetup, onLog, onSwitchUser }) {
@@ -722,11 +732,15 @@ function StatsChart({ benny, jonas, days, accent, accent3 }) {
   );
 }
 
+// Shared between FullscreenChart and ChartFullscreen's scrubber math.
+// Changing this value updates both the rendered chart and the touch-to-data-index mapping.
+const FULLSCREEN_PAD_X = 44;
+
 function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, vh }) {
   // Viewport-driven sizing. vw/vh are the body container's pixel size.
   const W = Math.max(300, vw);
   const H = Math.max(200, vh);
-  const PAD_X = 44;
+  const PAD_X = FULLSCREEN_PAD_X;
   const PAD_Y = 32;
   const maxV = Math.max(1, ...benny.map(d => d.reps), ...jonas.map(d => d.reps));
   const xStep = (W - PAD_X * 2) / Math.max(1, days - 1);
@@ -802,7 +816,7 @@ function ChartFullscreen({
   onClose,
 }) {
   const [activeIdx, setActiveIdx] = useState(null);
-  const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const [bodySize, setBodySize] = useState({ w: 0, h: 0 });
   const bodyRef = React.useRef(null);
 
   // Body scroll lock while fullscreen is open.
@@ -812,15 +826,16 @@ function ChartFullscreen({
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  // Track viewport changes (rotation, browser resize).
+  // Measure the body container; ResizeObserver handles window/orientation changes
+  // automatically because .chart-fs is position:fixed inset:0 and the body is flex:1.
   useEffect(() => {
-    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
-    };
+    const el = bodyRef.current;
+    if (!el) return;
+    const update = () => setBodySize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // Reset scrubber when range changes (series length changes -> activeIdx may be out of bounds).
@@ -835,11 +850,9 @@ function ChartFullscreen({
     const el = bodyRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    // Account for the SVG's internal PAD_X (must match FullscreenChart's PAD_X = 44).
-    const PAD_X = 44;
-    const innerW = rect.width - PAD_X * 2;
+    const innerW = rect.width - FULLSCREEN_PAD_X * 2;
     if (innerW <= 0) return;
-    const xLocal = e.clientX - rect.left - PAD_X;
+    const xLocal = e.clientX - rect.left - FULLSCREEN_PAD_X;
     const ratio = Math.max(0, Math.min(1, xLocal / innerW));
     const idx = Math.round(ratio * (totalDays - 1));
     setActiveIdx(Math.max(0, Math.min(totalDays - 1, idx)));
@@ -850,17 +863,6 @@ function ChartFullscreen({
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  // Body container dimensions for the chart (set via ref measurement).
-  const [bodySize, setBodySize] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    if (!bodyRef.current) return;
-    const el = bodyRef.current;
-    const update = () => setBodySize({ w: el.clientWidth, h: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [vp.w, vp.h]);
 
   return (
     <div className="chart-fs">
@@ -883,7 +885,10 @@ function ChartFullscreen({
       <div
         className="chart-fs-body"
         ref={bodyRef}
-        onPointerDown={handlePointer}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          handlePointer(e);
+        }}
         onPointerMove={(e) => { if (e.buttons) handlePointer(e); }}
       >
         <FullscreenChart
@@ -923,32 +928,28 @@ function HistoryScreen({ challenges, categories, allSets }) {
     return m;
   }, [allSets]);
 
-  // Streak: aufeinanderfolgende Wochen, in denen BEIDE Athleten in JEDER Challenge der Woche
-  // ihr Per-Person-Ziel erreicht haben. Die laufende Woche bricht den Streak nicht — sie zählt
-  // erst, sobald beide das Ziel gehit haben.
+  // Streak: aufeinanderfolgende Tage (Local Time) mit mindestens einem geloggten Satz.
+  // Wenn heute noch nichts geloggt ist, wird gestern als Start genommen (Grace-Tag), damit
+  // der Streak nicht morgens auf 0 fällt, bevor jemand den Tag startet.
   const streak = useMemo(() => {
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const byWeek = {};
-    for (const ch of challenges) (byWeek[ch.week_start] ||= []).push(ch);
-    const weeks = Object.keys(byWeek).sort((a, b) => b.localeCompare(a));
+    const localDay = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const days = new Set();
+    for (const x of allSets) days.add(localDay(new Date(x.created_at)));
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    if (!days.has(localDay(cursor))) cursor.setDate(cursor.getDate() - 1);
     let s = 0;
-    for (const week of weeks) {
-      const chs = byWeek[week];
-      const allHit = chs.every(ch => {
-        const sets = setsByCh[ch.id] || [];
-        const bT = sets.filter(x => x.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
-        const jT = sets.filter(x => x.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
-        return bT >= ch.target_reps && jT >= ch.target_reps;
-      });
-      const weekEnd = new Date(week + 'T00:00:00');
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      const isActive = weekEnd.toISOString().slice(0, 10) > todayIso;
-      if (allHit) s++;
-      else if (isActive) continue;
-      else break;
+    while (days.has(localDay(cursor))) {
+      s++;
+      cursor.setDate(cursor.getDate() - 1);
     }
     return s;
-  }, [challenges, setsByCh]);
+  }, [allSets]);
 
   const totalReps = allSets.reduce((s, x) => s + x.reps, 0);
   const weeksDone = challenges.filter((ch) => {
