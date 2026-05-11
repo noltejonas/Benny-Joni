@@ -243,6 +243,9 @@ body {
   font-weight: 600;
 }
 .btn-danger { background: var(--danger); color: #fff; }
+.btn-danger-ghost { width: 100%; background: transparent; color: var(--danger); border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent); border-radius: 999px; padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btn-danger-ghost:hover { background: color-mix(in oklab, var(--danger) 10%, transparent); }
+.btn-danger-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-row { display: flex; gap: 10px; }
 
@@ -1591,4 +1594,78 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   0%, 30% { opacity: 0; }
   50%     { opacity: 0.8; }
   100%    { opacity: 0.5; }
+}
+
+/* === Celebration particle layers === */
+.cel-shockwave {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 40px; height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  border: 4px solid currentColor;
+  box-shadow: 0 0 24px currentColor, inset 0 0 24px currentColor;
+  z-index: 6;
+  pointer-events: none;
+  animation: cel-shockwave 1.6s ease-out forwards;
+}
+@keyframes cel-shockwave {
+  0%   { transform: scale(0.1); opacity: 1; border-width: 6px; }
+  100% { transform: scale(28); opacity: 0; border-width: 1px; }
+}
+
+.cel-firework-trail {
+  position: absolute;
+  width: 3px;
+  background: linear-gradient(180deg, transparent, currentColor);
+  z-index: 3;
+  transform-origin: bottom center;
+  pointer-events: none;
+  animation: cel-fw-rise 0.5s ease-out forwards;
+}
+@keyframes cel-fw-rise {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.cel-firework-particle {
+  position: absolute;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor, 0 0 24px currentColor, 0 0 36px currentColor;
+  z-index: 3;
+  pointer-events: none;
+  animation: cel-fw-explode 2s cubic-bezier(.2,.7,.6,1) forwards;
+}
+@keyframes cel-fw-explode {
+  0%   { transform: translate(0, 0) scale(0.4); opacity: 1; }
+  20%  { transform: translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.5)) scale(1.2); opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 80px)) scale(0.5); opacity: 0; }
+}
+
+.cel-confetti {
+  position: absolute;
+  top: -30px;
+  z-index: 4;
+  pointer-events: none;
+  animation: cel-confetti-fall linear forwards;
+}
+@keyframes cel-confetti-fall {
+  0%   { transform: translateY(-30px) rotate(0deg) rotateY(0deg); }
+  100% { transform: translateY(110vh) rotate(1080deg) rotateY(900deg); opacity: 0.6; }
+}
+
+.cel-giant-emoji {
+  position: absolute;
+  top: -80px;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 0 12px rgba(255,190,11,0.9));
+  animation: cel-giant-fall linear forwards;
+}
+@keyframes cel-giant-fall {
+  0%   { transform: translateY(-80px) rotate(0deg) scale(0.4); opacity: 0; }
+  10%  { transform: translateY(0) rotate(120deg) scale(1); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(900deg) scale(0.9); opacity: 0.8; }
 }

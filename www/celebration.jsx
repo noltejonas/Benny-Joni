@@ -69,6 +69,141 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
   const [skipping, setSkipping] = useState(false);
 
   useEffect(() => {
+    const overlay = document.querySelector('.celebration-overlay');
+    if (!overlay) return;
+    const colors = ['#ff006e','#fb5607','#ffbe0b','#8338ec','#3a86ff','#06d6a0','#ef476f','#ffd60a','#ff00ff','#00ffff','#ff3399','#33ff99','#a855f7'];
+    const emojis = ['💪','🔥','⚡','🏆','💯','🚀','⭐','🎉'];
+    const intervals = [];
+    const timeouts = [];
+
+    function pickColor() { return colors[Math.floor(Math.random() * colors.length)]; }
+    function pickEmoji() { return emojis[Math.floor(Math.random() * emojis.length)]; }
+
+    function fireShockwave() {
+      const sw = document.createElement('div');
+      sw.className = 'cel-shockwave';
+      sw.style.color = pickColor();
+      overlay.appendChild(sw);
+      const t = setTimeout(() => sw.remove(), 1700);
+      timeouts.push(t);
+    }
+
+    function fireFirework(centerOnly = false) {
+      const w = overlay.clientWidth, h = overlay.clientHeight;
+      const cx = centerOnly ? w / 2 : 60 + Math.random() * (w - 120);
+      const cy = centerOnly ? h / 2 : 60 + Math.random() * (h * 0.55);
+      const color = pickColor();
+
+      const trail = document.createElement('div');
+      trail.className = 'cel-firework-trail';
+      trail.style.color = color;
+      trail.style.left = cx + 'px';
+      trail.style.top = cy + 'px';
+      trail.style.height = (h - cy) + 'px';
+      overlay.appendChild(trail);
+      const tt = setTimeout(() => trail.remove(), 600);
+      timeouts.push(tt);
+
+      const burstT = setTimeout(() => {
+        const burstSize = 36 + Math.floor(Math.random() * 24);
+        for (let i = 0; i < burstSize; i++) {
+          const p = document.createElement('div');
+          p.className = 'cel-firework-particle';
+          p.style.color = color;
+          p.style.left = cx + 'px';
+          p.style.top = cy + 'px';
+          const angle = (i / burstSize) * Math.PI * 2 + Math.random() * 0.15;
+          const speed = 90 + Math.random() * 120;
+          p.style.setProperty('--dx', Math.cos(angle) * speed + 'px');
+          p.style.setProperty('--dy', Math.sin(angle) * speed + 'px');
+          p.style.animationDuration = (1.7 + Math.random() * 0.9) + 's';
+          overlay.appendChild(p);
+          const rt = setTimeout(() => p.remove(), 2600);
+          timeouts.push(rt);
+        }
+      }, 500);
+      timeouts.push(burstT);
+    }
+
+    function spawnConfetti() {
+      const w = overlay.clientWidth;
+      const c = document.createElement('div');
+      c.className = 'cel-confetti';
+      c.style.left = Math.random() * w + 'px';
+      const shape = Math.random();
+      if (shape < 0.55) {
+        c.style.background = pickColor();
+        c.style.width = (5 + Math.random() * 8) + 'px';
+        c.style.height = (10 + Math.random() * 14) + 'px';
+      } else if (shape < 0.8) {
+        c.style.background = pickColor();
+        c.style.width = c.style.height = (8 + Math.random() * 7) + 'px';
+        c.style.borderRadius = '50%';
+      } else {
+        c.textContent = pickEmoji();
+        c.style.fontSize = '22px';
+      }
+      c.style.animationDuration = (2 + Math.random() * 2) + 's';
+      overlay.appendChild(c);
+      const t = setTimeout(() => c.remove(), 4500);
+      timeouts.push(t);
+    }
+
+    function spawnGiantEmoji() {
+      const w = overlay.clientWidth;
+      const e = document.createElement('div');
+      e.className = 'cel-giant-emoji';
+      e.textContent = pickEmoji();
+      e.style.left = Math.random() * w + 'px';
+      e.style.fontSize = (40 + Math.random() * 36) + 'px';
+      e.style.animationDuration = (2.5 + Math.random() * 1.5) + 's';
+      overlay.appendChild(e);
+      const t = setTimeout(() => e.remove(), 4500);
+      timeouts.push(t);
+    }
+
+    // Initial burst
+    setTimeout(fireShockwave, 100);
+    setTimeout(fireShockwave, 300);
+    setTimeout(fireShockwave, 500);
+    setTimeout(() => fireFirework(true), 200);
+
+    intervals.push(setInterval(fireFirework, 350));
+    intervals.push(setInterval(spawnConfetti, 50));
+    intervals.push(setInterval(spawnGiantEmoji, 400));
+
+    // Counter animation (0 → targetReps, easeOutCubic over 1400 ms starting at 700 ms)
+    const counterEl = overlay.querySelector('.cel-counter-num');
+    const target = parseInt(counterEl?.dataset.target || '0', 10);
+    let rafId;
+    const COUNT_DELAY = 700;
+    const COUNT_DURATION = 1400;
+    const startTime = performance.now();
+    function tickCounter() {
+      if (!counterEl) return;
+      const elapsed = performance.now() - startTime;
+      let v;
+      if (elapsed < COUNT_DELAY) v = 0;
+      else if (elapsed < COUNT_DELAY + COUNT_DURATION) {
+        const p = (elapsed - COUNT_DELAY) / COUNT_DURATION;
+        const eased = 1 - Math.pow(1 - p, 3);
+        v = Math.round(eased * target);
+      } else v = target;
+      counterEl.textContent = v.toLocaleString('de-DE');
+      if (elapsed < COUNT_DELAY + COUNT_DURATION) {
+        rafId = requestAnimationFrame(tickCounter);
+      }
+    }
+    rafId = requestAnimationFrame(tickCounter);
+
+    return () => {
+      intervals.forEach(clearInterval);
+      timeouts.forEach(clearTimeout);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  useEffect(() => {
     const t = setTimeout(() => setSkipping(true), 5000);
     return () => clearTimeout(t);
   }, []);
