@@ -1796,3 +1796,37 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   font-weight: 700;
   margin-top: 2px;
 }
+
+/* ============================================================ */
+/* Reduced motion — strip the most jarring effects              */
+/* ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .celebration-overlay {
+    animation: none;
+  }
+  .cel-flashbang,
+  .cel-strobe,
+  .cel-laser-beam,
+  .cel-giant-emoji,
+  .cel-shockwave {
+    display: none !important;
+  }
+  .cel-hero-text {
+    animation: cel-hero-fade-in 0.5s ease-out forwards !important;
+  }
+  @keyframes cel-hero-fade-in {
+    0%   { opacity: 0; transform: scale(0.95); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .cel-halo {
+    animation-duration: 12s !important;
+  }
+  .cel-confetti {
+    animation-duration: 1.5s !important;
+  }
+  .hero-card.pm-gold,
+  .hero-card.pm-sparkle .pm-sparkle-star,
+  .pm-trophy-icon {
+    animation: none !important;
+  }
+}
