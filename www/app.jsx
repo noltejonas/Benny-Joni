@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle */
+/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, EmojiPickerSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // User edits these to point to their Supabase project. Empty = demo mode.
