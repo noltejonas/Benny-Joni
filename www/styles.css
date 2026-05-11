@@ -1669,3 +1669,38 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   10%  { transform: translateY(0) rotate(120deg) scale(1); opacity: 1; }
   100% { transform: translateY(110vh) rotate(900deg) scale(0.9); opacity: 0.8; }
 }
+
+/* ============================================================ */
+/* Persistent Stolz-Modus — applied to .hero-card when pct>=1   */
+/* ============================================================ */
+
+/* Style A: Gold-Glow */
+.hero-card.pm-gold {
+  background: linear-gradient(180deg, #1c1c1e 0%, #2a2210 100%);
+  border: 2px solid #ffbe0b;
+  animation: pm-gold-breath 2.6s ease-in-out infinite;
+}
+@keyframes pm-gold-breath {
+  0%, 100% {
+    box-shadow: 0 0 18px 0 rgba(255,190,11,0.35), inset 0 0 32px 0 rgba(255,190,11,0.12);
+    border-color: #b8860b;
+  }
+  50% {
+    box-shadow: 0 0 32px 4px rgba(255,190,11,0.7), inset 0 0 48px 0 rgba(255,190,11,0.28);
+    border-color: #ffd700;
+  }
+}
+.hero-card.pm-gold .progress-bar-fill,
+.hero-card.pm-gold .tug-fill {
+  background: linear-gradient(90deg, #ffbe0b, #ffd700, #ffbe0b) !important;
+  background-size: 200% 100% !important;
+  animation: pm-gold-slide 2s linear infinite;
+}
+@keyframes pm-gold-slide {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.hero-card.pm-gold .ziel-erreicht-status {
+  color: #ffd700;
+  text-shadow: 0 0 12px rgba(255,215,0,0.6);
+}
