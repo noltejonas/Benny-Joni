@@ -162,11 +162,11 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
       timeouts.push(t);
     }
 
-    // Initial burst
-    setTimeout(fireShockwave, 100);
-    setTimeout(fireShockwave, 300);
-    setTimeout(fireShockwave, 500);
-    setTimeout(() => fireFirework(true), 200);
+    // Initial burst (push to timeouts array so cleanup can cancel them if unmount happens early)
+    timeouts.push(setTimeout(fireShockwave, 100));
+    timeouts.push(setTimeout(fireShockwave, 300));
+    timeouts.push(setTimeout(fireShockwave, 500));
+    timeouts.push(setTimeout(() => fireFirework(true), 200));
 
     intervals.push(setInterval(fireFirework, 350));
     intervals.push(setInterval(spawnConfetti, 50));
