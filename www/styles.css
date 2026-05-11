@@ -1387,3 +1387,208 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 /* Scrubber visuals inside the SVG */
 .chart-scrubber-line { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
 .chart-scrubber-dot { stroke: var(--bg); stroke-width: 2.5; }
+
+/* ============================================================ */
+/* Celebration Overlay — fullscreen takeover when goal reached  */
+/* ============================================================ */
+.celebration-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  overflow: hidden;
+  background: linear-gradient(180deg, #08081a 0%, #1a0a2e 100%);
+  isolation: isolate;
+  opacity: 1;
+  transition: opacity 0.6s ease-out;
+  animation: cel-stage-shake 5s ease-out;
+  cursor: pointer;
+}
+.celebration-overlay.is-skipping { opacity: 0; pointer-events: none; }
+
+@keyframes cel-stage-shake {
+  0%   { transform: translate(0, 0); }
+  1%   { transform: translate(-12px, 8px) rotate(-1.5deg); }
+  2%   { transform: translate(10px, -10px) rotate(1.5deg); }
+  3%   { transform: translate(-8px, 6px) rotate(-1deg); }
+  4%   { transform: translate(8px, -4px) rotate(1deg); }
+  5%   { transform: translate(-6px, 4px) rotate(-0.6deg); }
+  6%   { transform: translate(4px, -2px) rotate(0.6deg); }
+  8%   { transform: translate(0, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+.cel-flashbang {
+  position: absolute; inset: 0; z-index: 50;
+  background: #fff;
+  pointer-events: none;
+  animation: cel-flashbang 0.25s ease-out forwards;
+}
+@keyframes cel-flashbang {
+  0%   { opacity: 0; background: #fff; }
+  20%  { opacity: 1; background: #fff; }
+  60%  { opacity: 0.6; background: #ffbe0b; }
+  100% { opacity: 0; }
+}
+
+.cel-laser-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,0,255,0.6), transparent 45%),
+    radial-gradient(circle at 70% 80%, rgba(0,255,255,0.6), transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(255,190,11,0.4), transparent 60%);
+  animation: cel-laser-pulse 0.45s ease-in-out infinite;
+}
+@keyframes cel-laser-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+.cel-strobe {
+  position: absolute; inset: 0; z-index: 1;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: cel-strobe 0.4s steps(1, end) infinite;
+}
+@keyframes cel-strobe {
+  0%   { background: radial-gradient(circle at 20% 30%, #ff006e, transparent 60%); }
+  25%  { background: radial-gradient(circle at 80% 30%, #00ffff, transparent 60%); }
+  50%  { background: radial-gradient(circle at 50% 70%, #ffbe0b, transparent 60%); }
+  75%  { background: radial-gradient(circle at 30% 80%, #8338ec, transparent 60%); }
+  100% { background: radial-gradient(circle at 70% 50%, #06d6a0, transparent 60%); }
+}
+
+.cel-laser-beam {
+  position: absolute;
+  top: var(--top);
+  width: 240%;
+  height: 5px;
+  left: -70%;
+  background: linear-gradient(90deg, transparent 0%, var(--color) 35%, #fff 50%, var(--color) 65%, transparent 100%);
+  filter: blur(1.2px) drop-shadow(0 0 14px var(--color)) drop-shadow(0 0 28px var(--color));
+  rotate: var(--angle);
+  translate: -120% 0;
+  animation: cel-laser-streak var(--dur) ease-out infinite;
+  animation-delay: var(--delay);
+  z-index: 2;
+}
+@keyframes cel-laser-streak {
+  0%   { translate: -130% 0; opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { translate: 0% 0; opacity: 1; }
+  100% { translate: 130% 0; opacity: 0; }
+}
+
+.cel-hero-wrap {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+  perspective: 800px;
+  padding: 20px;
+  text-align: center;
+}
+.cel-hero-stage {
+  position: relative;
+  width: 0; height: 0;
+}
+.cel-hero-text {
+  color: #fff;
+  font-weight: 900;
+  font-size: clamp(48px, 14vw, 96px);
+  letter-spacing: -0.05em;
+  line-height: 0.88;
+  text-shadow:
+    0 0 16px #fff,
+    0 0 36px #ffbe0b,
+    0 0 70px #ff006e,
+    0 0 110px #8338ec,
+    0 6px 24px rgba(0,0,0,0.7);
+  animation: cel-hero-mega 5s ease-out;
+  white-space: nowrap;
+  position: relative;
+  z-index: 11;
+}
+@keyframes cel-hero-mega {
+  0%   { transform: scale(0.05) rotateX(-90deg) rotate(-20deg); opacity: 0; }
+  4%   { transform: scale(1.6) rotateX(0) rotate(6deg); opacity: 1; }
+  8%   { transform: scale(0.88) rotate(-3deg); }
+  12%  { transform: scale(1.08) rotate(2deg); }
+  16%  { transform: scale(0.96) rotate(-1deg); }
+  20%  { transform: scale(1.02) rotate(0); }
+  24%  { transform: scale(1) rotate(0); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.cel-halo {
+  position: absolute;
+  left: 0; top: 0;
+  font-size: 36px;
+  filter: drop-shadow(0 0 8px #ffbe0b);
+  animation: cel-halo-orbit 4s linear infinite;
+}
+.cel-halo-1 { animation-delay: 0s; }
+.cel-halo-2 { animation-delay: -1s; }
+.cel-halo-3 { animation-delay: -2s; }
+.cel-halo-4 { animation-delay: -3s; }
+@keyframes cel-halo-orbit {
+  from { transform: rotate(0deg) translateX(170px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(170px) rotate(-360deg); }
+}
+
+.cel-counter-row {
+  margin-top: 24px;
+  display: flex; align-items: baseline; gap: 8px;
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 0 0 16px #ffbe0b, 0 0 32px #ff006e, 0 2px 8px rgba(0,0,0,0.7);
+  animation: cel-counter-pop 5s ease-out;
+}
+.cel-counter-num {
+  font-size: 44px;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.02em;
+}
+.cel-counter-of {
+  font-size: 22px;
+  opacity: 0.85;
+}
+@keyframes cel-counter-pop {
+  0%, 12% { opacity: 0; transform: translateY(30px) scale(0.6); }
+  20%     { opacity: 1; transform: translateY(0) scale(1.15); }
+  24%     { opacity: 1; transform: translateY(0) scale(1); }
+  100%    { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.cel-subtext {
+  margin-top: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px #ffbe0b, 0 0 24px #ff006e, 0 2px 6px rgba(0,0,0,0.6);
+  animation: cel-subtext-fade 5s ease-out;
+}
+@keyframes cel-subtext-fade {
+  0%, 16% { opacity: 0; transform: translateY(20px); }
+  24%     { opacity: 1; transform: translateY(0); }
+  100%    { opacity: 1; transform: translateY(0); }
+}
+
+.cel-skip-hint {
+  position: absolute;
+  left: 50%; bottom: 24px;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  animation: cel-skip-hint 5s ease-out;
+}
+@keyframes cel-skip-hint {
+  0%, 30% { opacity: 0; }
+  50%     { opacity: 0.8; }
+  100%    { opacity: 0.5; }
+}

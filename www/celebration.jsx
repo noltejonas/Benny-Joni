@@ -65,19 +65,57 @@ function useCelebration(challenges, allSets, me, categories) {
 // Component: 5-second fullscreen celebration overlay.
 // Implementation grows over Tasks 4–7.
 function CelebrationOverlay({ category, targetReps, onDone }) {
-  const { useEffect } = React;
+  const { useEffect, useState } = React;
+  const [skipping, setSkipping] = useState(false);
+
   useEffect(() => {
-    const t = setTimeout(onDone, 5000);
+    const t = setTimeout(() => setSkipping(true), 5000);
     return () => clearTimeout(t);
-  }, [onDone]);
+  }, []);
+
+  useEffect(() => {
+    if (skipping) {
+      const t = setTimeout(onDone, 600);
+      return () => clearTimeout(t);
+    }
+  }, [skipping, onDone]);
+
+  const targetFormatted = (targetReps || 0).toLocaleString('de-DE');
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.85)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#fff', fontSize: 48, fontWeight: 900,
-    }}>
-      ZIEL ERREICHT (Stub)
+    <div
+      className={`celebration-overlay ${skipping ? 'is-skipping' : ''}`}
+      onClick={() => setSkipping(true)}
+    >
+      <div className="cel-flashbang" />
+      <div className="cel-laser-bg" />
+      <div className="cel-strobe" />
+
+      <div className="cel-laser-beam" style={{ '--top': '12%',  '--angle': '14deg',  '--delay': '0s',   '--dur': '1.6s', '--color': '#ff00ff' }} />
+      <div className="cel-laser-beam" style={{ '--top': '24%',  '--angle': '-22deg', '--delay': '0.2s', '--dur': '1.8s', '--color': '#00ffff' }} />
+      <div className="cel-laser-beam" style={{ '--top': '38%',  '--angle': '9deg',   '--delay': '0.5s', '--dur': '1.5s', '--color': '#ffff33' }} />
+      <div className="cel-laser-beam" style={{ '--top': '50%',  '--angle': '-14deg', '--delay': '0.8s', '--dur': '2.0s', '--color': '#ff0099' }} />
+      <div className="cel-laser-beam" style={{ '--top': '62%',  '--angle': '20deg',  '--delay': '1.1s', '--dur': '1.6s', '--color': '#00ff88' }} />
+      <div className="cel-laser-beam" style={{ '--top': '75%',  '--angle': '-8deg',  '--delay': '1.4s', '--dur': '1.8s', '--color': '#a855f7' }} />
+      <div className="cel-laser-beam" style={{ '--top': '86%',  '--angle': '16deg',  '--delay': '1.7s', '--dur': '1.5s', '--color': '#ff7700' }} />
+      <div className="cel-laser-beam" style={{ '--top': '6%',   '--angle': '-12deg', '--delay': '0.6s', '--dur': '1.7s', '--color': '#33ddff' }} />
+
+      <div className="cel-hero-wrap">
+        <div className="cel-hero-stage">
+          <div className="cel-halo cel-halo-1">💪</div>
+          <div className="cel-halo cel-halo-2">🔥</div>
+          <div className="cel-halo cel-halo-3">⚡</div>
+          <div className="cel-halo cel-halo-4">🏆</div>
+          <div className="cel-hero-text">ZIEL<br/>ERREICHT</div>
+        </div>
+        <div className="cel-counter-row">
+          <span className="cel-counter-num" data-target={targetReps}>0</span>
+          <span className="cel-counter-of">/ {targetFormatted} {category?.name || 'Reps'}</span>
+        </div>
+        <div className="cel-subtext">{category?.emoji || '🏆'} {targetFormatted} {category?.name || 'Reps'} geknackt</div>
+      </div>
+
+      <div className="cel-skip-hint">tap zum Überspringen</div>
     </div>
   );
 }
