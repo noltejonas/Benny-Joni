@@ -16,6 +16,14 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const { switching, triggerSwitch } = window.useAccountSwitch();
 
+  useEffect(() => {
+    if (!sessionStorage.getItem('pt_persistent_style_v1')) {
+      const styles = ['gold', 'sparkle', 'trophy'];
+      const pick = styles[Math.floor(Math.random() * styles.length)];
+      sessionStorage.setItem('pt_persistent_style_v1', pick);
+    }
+  }, []);
+
   // Theme + accent live on :root
   useEffect(() => {
     document.documentElement.dataset.theme = t.theme;
