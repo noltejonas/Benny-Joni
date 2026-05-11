@@ -232,6 +232,17 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
   }, []);
 
   useEffect(() => {
+    const H = window.PTCelebrationHaptics;
+    if (!H) return;
+    const safeCall = (fn) => { try { fn(); } catch (e) { /* no-op */ } };
+    safeCall(() => H.Haptics.impact({ style: H.ImpactStyle.Heavy }));
+    const t1 = setTimeout(() => safeCall(() => H.Haptics.impact({ style: H.ImpactStyle.Heavy })), 60);
+    const t2 = setTimeout(() => safeCall(() => H.Haptics.impact({ style: H.ImpactStyle.Heavy })), 120);
+    const t3 = setTimeout(() => safeCall(() => H.Haptics.notification({ type: H.NotificationType.Success })), 200);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  useEffect(() => {
     const t = setTimeout(() => setSkipping(true), 5000);
     return () => clearTimeout(t);
   }, []);
