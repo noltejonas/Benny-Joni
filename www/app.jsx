@@ -53,6 +53,7 @@ function App() {
   // UI state
   const [setupForChallenge, setSetupForChallenge] = useState(null); // null=closed, {} = new, {id, ...} = edit
   const [logForChallenge, setLogForChallenge] = useState(null); // null=closed, {challenge}=open
+  const [pickerForSet, setPickerForSet] = useState(null); // null=closed, set object = emoji picker open
   const [toast, setToast] = useState('');
   const lastFeedRef = React.useRef(null);
 
@@ -192,6 +193,68 @@ function App() {
     }
   }, [me, t.notifications]);
 
+  // Native APNs registration (Capacitor only — web uses the Notification API above)
+  useEffect(() => {
+    if (!me) return;
+    const Push = window.PTPushNotifications?.PushNotifications;
+    if (!Push) return; // not running natively, nothing to do
+
+    if (!t.notifications) {
+      // Toggle is OFF → wipe this device's token from the server so we stop
+      // receiving banners. Keep localStorage in sync.
+      const saved = localStorage.getItem('pt_apns_token');
+      if (saved) {
+        api.deleteDeviceToken(saved).catch(() => {});
+        localStorage.removeItem('pt_apns_token');
+      }
+      return;
+    }
+
+    let cleanup = () => {};
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const perm = await Push.checkPermissions();
+        if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+          const req = await Push.requestPermissions();
+          if (req.receive !== 'granted') return;
+        } else if (perm.receive !== 'granted') {
+          return;
+        }
+        if (cancelled) return;
+        await Push.register();
+
+        const onReg = await Push.addListener('registration', async (info) => {
+          try {
+            await api.upsertDeviceToken({ token: info.value, athlete: me, platform: 'ios' });
+            localStorage.setItem('pt_apns_token', info.value);
+          } catch (e) { console.warn('upsertDeviceToken failed', e); }
+        });
+        const onErr = await Push.addListener('registrationError', (e) => {
+          console.warn('Push registrationError', e);
+        });
+        const onTap = await Push.addListener('pushNotificationActionPerformed', () => {
+          window.dispatchEvent(new CustomEvent('pt:nav-feed'));
+        });
+        // Foreground deliveries: do nothing here. Supabase Realtime + the
+        // existing notify() toast covers in-app feedback. iOS suppresses
+        // the banner automatically while the app is in the foreground.
+
+        cleanup = () => { onReg.remove(); onErr.remove(); onTap.remove(); };
+      } catch (e) { console.warn('Push setup failed', e); }
+    })();
+
+    return () => { cancelled = true; cleanup(); };
+  }, [me, t.notifications, api]);
+
+  // Tap on push → switch to Feed tab
+  useEffect(() => {
+    const onNavFeed = () => setTab('feed');
+    window.addEventListener('pt:nav-feed', onNavFeed);
+    return () => window.removeEventListener('pt:nav-feed', onNavFeed);
+  }, []);
+
   // ─── Name picker (initial) ────────────────────────────────────────────────
   if (!me) {
     return (
@@ -278,7 +341,17 @@ function App() {
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} categories={categories}
           onEditSet={async (s, patch) => { try { await api.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
-          onDeleteSet={async (s) => { try { await api.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }} />}
+          onDeleteSet={async (s) => { try { await api.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
+          onToggleReaction={async (s, emoji) => {
+            if (!me) { alert('Bitte zuerst Athlet wählen'); return; }
+            const mineHas = (s.reactions || []).some(r => r.athlete === me && r.emoji === emoji);
+            try {
+              if (mineHas) await api.removeReaction({ set_id: s.id, athlete: me, emoji });
+              else await api.addReaction({ set_id: s.id, athlete: me, emoji });
+              reload();
+            } catch (e) { alert(e.message); }
+          }}
+          onPickEmoji={(s) => setPickerForSet(s)} />}
 
         {tab === 'history' &&
         <HistoryScreen
@@ -329,6 +402,19 @@ function App() {
           category={logForChallenge ? categories.find(c => c.id === logForChallenge.category_id) : null}
           onClose={() => setLogForChallenge(null)}
           onLogged={(r) => {setLogForChallenge(null);setToast(`+${r} geloggt 💪`);reload();}} />
+      </Sheet>
+
+      <Sheet open={!!pickerForSet} onClose={() => setPickerForSet(null)}>
+        <EmojiPickerSheet
+          onClose={() => setPickerForSet(null)}
+          onPick={async (emoji) => {
+            if (!me || !pickerForSet) { setPickerForSet(null); return; }
+            try {
+              await api.addReaction({ set_id: pickerForSet.id, athlete: me, emoji });
+              setPickerForSet(null);
+              reload();
+            } catch (e) { alert(e.message); }
+          }} />
       </Sheet>
 
       <Toast message={toast} onDone={() => setToast('')} />
