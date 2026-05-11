@@ -90,17 +90,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
   }
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const celebration = useCelebration(challenges, allSets, me, categories);
-
-  if (!challenges.length) {
-    return (
-      <div className="empty">
-        <div className="emoji">🏁</div>
-        <div className="title">Diese Woche ist offen</div>
-        <div style={{marginBottom: 24}}>Legt euer erstes Wochenziel fest.</div>
-        <button className="btn" onClick={onAddGoal}>Ziel anlegen</button>
-      </div>
-    );
-  }
   const scrollerRef = React.useRef(null);
   const [activeIdx, setActiveIdx] = React.useState(0);
   React.useEffect(() => {
@@ -116,6 +105,19 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     const el = scrollerRef.current; if (!el) return;
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
+
+  // Rules of Hooks: this early return must come AFTER all hooks above.
+  if (!challenges.length) {
+    return (
+      <div className="empty">
+        <div className="emoji">🏁</div>
+        <div className="title">Diese Woche ist offen</div>
+        <div style={{marginBottom: 24}}>Legt euer erstes Wochenziel fest.</div>
+        <button className="btn" onClick={onAddGoal}>Ziel anlegen</button>
+      </div>
+    );
+  }
+
   return (
     <>
     <div className={`layout-${layout} home-swiper-wrap`}>
