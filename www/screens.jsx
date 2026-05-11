@@ -1058,12 +1058,13 @@ function HistoryScreen({ challenges, categories, allSets }) {
   }, [allSets]);
 
   const totalReps = allSets.reduce((s, x) => s + x.reps, 0);
-  const weeksDone = challenges.filter((ch) => {
-    const sets = setsByCh[ch.id] || [];
-    const bT = sets.filter(x => x.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
-    const jT = sets.filter(x => x.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
-    return bT >= ch.target_reps && jT >= ch.target_reps;
-  }).length;
+  // Wochen: jede Kalenderwoche zählt, in der mindestens ein Satz geloggt wurde
+  // (unabhängig davon, ob das Wochenziel erreicht wurde).
+  const weeksDone = new Set(
+    challenges
+      .filter(ch => (setsByCh[ch.id] || []).length > 0)
+      .map(ch => ch.week_start)
+  ).size;
 
   if (challenges.length === 0) {
     return <div className="empty">
