@@ -204,6 +204,34 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
   }, []);
 
   useEffect(() => {
+    const audio = new Audio('sounds/goal-reached.mp3');
+    audio.volume = 0.85;
+    audio.play().catch(() => {
+      // Audio asset missing or autoplay blocked — synthesize a fallback beep
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.6);
+      } catch (e) {
+        // No-op
+      }
+    });
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, []);
+
+  useEffect(() => {
     const t = setTimeout(() => setSkipping(true), 5000);
     return () => clearTimeout(t);
   }, []);
