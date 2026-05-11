@@ -197,6 +197,8 @@
         saveDemo(s); emit();
         return s.rotation_config;
       },
+      async upsertDeviceToken(_payload) { /* no-op in demo mode */ },
+      async deleteDeviceToken(_token) { /* no-op in demo mode */ },
       onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     };
   }
@@ -377,6 +379,19 @@
         if (error) throw error;
         emit();
         return data;
+      },
+      // ── Push notification device tokens ───────────────────────────────
+      async upsertDeviceToken({ token, athlete, platform }) {
+        const { data, error } = await client.from('device_tokens')
+          .upsert({ token, athlete, platform, last_seen: new Date().toISOString() }, { onConflict: 'token' })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      },
+      async deleteDeviceToken(token) {
+        const { error } = await client.from('device_tokens').delete().eq('token', token);
+        if (error) throw error;
       },
       onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     };
