@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "www (main / capacitor webDir)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8000", "www"],
+      "port": 8000
+    },
+    {
+      "name": "Projekt Terminator (legacy)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8001", "Projekt Terminator"],
+      "port": 8001
+    },
+    {
+      "name": "Projekt Terminator-3 (legacy)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8002", "Projekt Terminator-3"],
+      "port": 8002
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+week,person,exercise,day_de,date,reps,status,confidence,notes
+W1,Jonas,Pull,Mo,2026-03-16,,,low,Striche schwer zu lesen
+W1,Jonas,Pull,Di,2026-03-17,,,low,Striche schwer zu lesen
+W1,Jonas,Pull,Mi,2026-03-18,,,low,Striche schwer zu lesen
+W1,Jonas,Pull,Do,2026-03-19,,,low,Striche schwer zu lesen
+W1,Jonas,Pull,Fr,2026-03-20,,,low,Striche schwer zu lesen
+W1,Jonas,Pull,Sa,2026-03-21,,,low,Striche schwer zu lesen
+W2,Jonas,Push,Mo,2026-03-23,,,low,"unklar: 8 oder Striche?"
+W2,Jonas,Push,Di,2026-03-24,100,,medium,"cell=10 (x10)"
+W2,Jonas,Push,Mi,2026-03-25,,,low,
+W2,Jonas,Push,Do,2026-03-26,,,low,
+W2,Jonas,Push,Fr,2026-03-27,220,,medium,"cell=22 (x10)"
+W2,Jonas,Push,Sa,2026-03-28,250,,medium,"cell=25 (x10)"
+W3,Jonas,Pull,Mo,2026-03-30,70,,medium,"cell=7 (x10)"
+W3,Jonas,Pull,Di,2026-03-31,,,low,
+W3,Jonas,Pull,Mi,2026-04-01,150,,medium,"cell=15 (x10)"
+W3,Jonas,Pull,Do,2026-04-02,,,low,
+W3,Jonas,Pull,Fr,2026-04-03,,,low,
+W3,Jonas,Pull,Sa,2026-04-04,,,low,
+W4,Jonas,Push,Mo,2026-04-06,60,,medium,"cell=6 (x10)"
+W4,Jonas,Push,Di,2026-04-07,0,,medium,"cell=0"
+W4,Jonas,Push,Mi,2026-04-08,200,,medium,"cell=20 (x10)"
+W4,Jonas,Push,Do,2026-04-09,60,,medium,"cell=6 (x10)"
+W4,Jonas,Push,Fr,2026-04-10,70,,medium,"cell=7 (x10)"
+W4,Jonas,Push,Sa,2026-04-11,,,low,
+W1,Benny,Pull,Mo,2026-03-16,50,,high,"cell=5 (x10)"
+W1,Benny,Pull,Di,2026-03-17,50,,high,"cell=5 (x10)"
+W1,Benny,Pull,Mi,2026-03-18,100,,high,"cell=10 (x10)"
+W1,Benny,Pull,Do,2026-03-19,50,,high,"cell=5 (x10)"
+W1,Benny,Pull,Fr,2026-03-20,60,,high,"cell=6 (x10)"
+W1,Benny,Pull,Sa,2026-03-21,0,,high,"leer"
+W2,Benny,Push,Mo,2026-03-23,100,✓,high,"cell=10 (x10)"
+W2,Benny,Push,Di,2026-03-24,100,✓,high,"cell=10 (x10)"
+W2,Benny,Push,Mi,2026-03-25,110,✓,high,"cell=11 (x10)"
+W2,Benny,Push,Do,2026-03-26,100,✓,high,"cell=10 (x10)"
+W2,Benny,Push,Fr,2026-03-27,50,✓,high,"cell=5 (x10)"
+W2,Benny,Push,Sa,2026-03-28,150,✓,high,"cell=15 (x10)"
+W3,Benny,Pull,Mo,2026-03-30,70,✗,high,"cell=7 (x10)"
+W3,Benny,Pull,Di,2026-03-31,120,✗,high,"cell=12 (x10)"
+W3,Benny,Pull,Mi,2026-04-01,10,✗,high,"cell=1 (x10)"
+W3,Benny,Pull,Do,2026-04-02,30,✗,high,"cell=3 (x10)"
+W3,Benny,Pull,Fr,2026-04-03,20,✗,high,"cell=2 (x10)"
+W3,Benny,Pull,Sa,2026-04-04,70,✗,high,"cell=7 (x10)"
+W4,Benny,Push,Mo,2026-04-06,100,✓,high,"cell=10 (x10)"
+W4,Benny,Push,Di,2026-04-07,100,✓,high,"cell=10 (x10)"
+W4,Benny,Push,Mi,2026-04-08,190,✓,high,"cell=19 (x10)"
+W4,Benny,Push,Do,2026-04-09,100,✓,high,"cell=10 (x10)"
+W4,Benny,Push,Fr,2026-04-10,100,✓,high,"cell=10 (x10)"
+W4,Benny,Push,Sa,2026-04-11,200,✓,high,"cell=20 (x10)"
+W5,Jonas,Pull,Mo,2026-04-13,100,,medium,"Zahl 100 mit !"
+W5,Jonas,Pull,Di,2026-04-14,100,,low,"~10 Striche (x10)"
+W5,Jonas,Pull,Mi,2026-04-15,0,,medium,"leer"
+W5,Jonas,Pull,Do,2026-04-16,120,,low,"~12 Striche (x10)"
+W5,Jonas,Pull,Fr,2026-04-17,0,,medium,"leer"
+W5,Jonas,Pull,Sa,2026-04-18,0,,medium,"leer"
+W5,Jonas,Pull,So,2026-04-19,170,,low,"~17 Striche (x10)"
+W6,Jonas,Push,Mo,2026-04-20,,,low,"60?"
+W6,Jonas,Push,Di,2026-04-21,,,low,"70?"
+W6,Jonas,Push,Mi,2026-04-22,,,low,"200?"
+W6,Jonas,Push,Do,2026-04-23,,,low,"80?"
+W6,Jonas,Push,Fr,2026-04-24,70,,low,
+W6,Jonas,Push,Sa,2026-04-25,10,,low,
+W6,Jonas,Push,So,2026-04-26,,,low,"100?"
+W7,Jonas,Pull,Mo,2026-04-27,,,low,
+W7,Jonas,Pull,Di,2026-04-28,,,low,
+W7,Jonas,Pull,Mi,2026-04-29,,,low,"60?"
+W7,Jonas,Pull,Do,2026-04-30,,,low,"80?"
+W7,Jonas,Pull,Fr,2026-05-01,,,low,
+W7,Jonas,Pull,Sa,2026-05-02,,,low,"100?"
+W7,Jonas,Pull,So,2026-05-03,100,,low,"~10 Striche (x10)"
+W8,Jonas,Push,Mo,2026-05-04,,,low,
+W8,Jonas,Push,Di,2026-05-05,,,low,
+W8,Jonas,Push,Mi,2026-05-06,,,low,
+W8,Jonas,Push,Do,2026-05-07,,,low,
+W8,Jonas,Push,Fr,2026-05-08,,,low,
+W8,Jonas,Push,Sa,2026-05-09,,,low,
+W8,Jonas,Push,So,2026-05-10,150,,low,"~15 Striche (x10)"
+W5,Benny,Pull,Mo,2026-04-13,140,,medium,"Reps direkt? oder x10?"
+W5,Benny,Pull,Di,2026-04-14,50,,medium,
+W5,Benny,Pull,Mi,2026-04-15,60,,medium,
+W5,Benny,Pull,Do,2026-04-16,100,,medium,
+W5,Benny,Pull,Fr,2026-04-17,40,,medium,
+W5,Benny,Pull,Sa,2026-04-18,40,,medium,
+W5,Benny,Pull,So,2026-04-19,50,,medium,
+W6,Benny,Push,Mo,2026-04-20,130,,medium,
+W6,Benny,Push,Di,2026-04-21,100,,medium,
+W6,Benny,Push,Mi,2026-04-22,110,,medium,
+W6,Benny,Push,Do,2026-04-23,,,low,"350? wahrscheinlich falsch gelesen"
+W6,Benny,Push,Fr,2026-04-24,50,,medium,
+W6,Benny,Push,Sa,2026-04-25,100,,medium,
+W6,Benny,Push,So,2026-04-26,50,,medium,
+W7,Benny,Pull,Mo,2026-04-27,60,,medium,
+W7,Benny,Pull,Di,2026-04-28,80,,medium,
+W7,Benny,Pull,Mi,2026-04-29,50,,medium,
+W7,Benny,Pull,Do,2026-04-30,40,,medium,
+W7,Benny,Pull,Fr,2026-05-01,70,,medium,
+W7,Benny,Pull,Sa,2026-05-02,60,,medium,
+W7,Benny,Pull,So,2026-05-03,100,,medium,
+W8,Benny,Push,Mo,2026-05-04,50,,medium,
+W8,Benny,Push,Di,2026-05-05,,,low,
+W8,Benny,Push,Mi,2026-05-06,60,,medium,
+W8,Benny,Push,Do,2026-05-07,40,,medium,
+W8,Benny,Push,Fr,2026-05-08,60,,medium,
+W8,Benny,Push,Sa,2026-05-09,20,,medium,
+W8,Benny,Push,So,2026-05-10,,,low,"laufende Woche?"
