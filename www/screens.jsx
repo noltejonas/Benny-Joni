@@ -100,6 +100,35 @@ function repsOnLocalDate(sets, athlete, dateStr) {
     .reduce((sum, s) => sum + s.reps, 0);
 }
 
+// Mo-first weekly breakdown of reps per athlete for a given set of sets.
+// Future days are forced to zero so a stray future-dated set never inflates a bar.
+function dailyBreakdownFor(weekStart, sets) {
+  const ws = weekStart || localDateOf(PTData.mondayOf(new Date()));
+  const todayIso = localDateOf(new Date());
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(ws + 'T00:00:00');
+    d.setDate(d.getDate() + i);
+    const iso = localDateOf(d);
+    days.push({
+      iso, dow: d.getDay(),
+      Benny: 0, Jonas: 0,
+      isFuture: iso > todayIso,
+      isToday: iso === todayIso,
+    });
+  }
+  const byIso = Object.fromEntries(days.map(d => [d.iso, d]));
+  for (const s of sets) {
+    const day = localDateOf(s.created_at);
+    const bucket = byIso[day];
+    if (bucket && !bucket.isFuture) bucket[s.athlete] += s.reps;
+  }
+  const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  return days
+    .map(d => ({ ...d, label: labels[d.dow] }))
+    .sort((a, b) => (a.dow === 0 ? 7 : a.dow) - (b.dow === 0 ? 7 : b.dow));
+}
+
 function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDelta, arrowDelta, showArrow }) {
   const isDone = done >= fairShare;
   const footerClass = variant === 'tug' ? 'tug-foot' : 'owe';
@@ -156,34 +185,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     const el = scrollerRef.current; if (!el) return;
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
-
-  // Daily breakdown: reps per athlete per day across this week's 7 days.
-  const dailyBreakdown = React.useMemo(() => {
-    const ws = weekStart || PTData.isoDate(PTData.mondayOf(new Date()));
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(ws + 'T00:00:00');
-      d.setDate(d.getDate() + i);
-      const iso = PTData.isoDate(d);
-      days.push({ iso, dow: d.getDay(), Benny: 0, Jonas: 0 });
-    }
-    const byIso = Object.fromEntries(days.map(d => [d.iso, d]));
-    for (const s of allSets) {
-      const day = PTData.isoDate(new Date(s.created_at));
-      if (byIso[day]) byIso[day][s.athlete] += s.reps;
-    }
-    const todayIso = PTData.isoDate(new Date());
-    const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-    // Display order: Mo, Di, Mi, Do, Fr, Sa, So (German convention).
-    return days
-      .map(d => ({
-        ...d,
-        label: labels[d.dow],
-        isFuture: d.iso > todayIso,
-        isToday: d.iso === todayIso,
-      }))
-      .sort((a, b) => (a.dow === 0 ? 7 : a.dow) - (b.dow === 0 ? 7 : b.dow));
-  }, [weekStart, allSets]);
 
   // Pro Challenge die Summe aller geloggten Reps einmal ermitteln,
   // dann erfüllte (total >= target_reps) ans Ende sortieren.
@@ -242,6 +243,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
       {sortedChallenges.map(ch => {
         const cat = catById[ch.category_id];
         const csets = allSets.filter(s => s.challenge_id === ch.id);
+        const chDailyBreakdown = dailyBreakdownFor(ch.week_start, csets);
         const total = totalsByChallenge.get(ch.id) ?? 0;
         const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((s,x)=>s+x.reps, 0);
         const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((s,x)=>s+x.reps, 0);
@@ -403,47 +405,48 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
             </>)}
             <button className="btn" style={{marginTop:16}} onClick={() => onLogChallenge(ch)}>+ Satz für {cat?.name} loggen</button>
             <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} />
-          </div></div>
+          </div>
+          {(() => {
+            const maxV = Math.max(1, ...chDailyBreakdown.flatMap(d => [d.Benny, d.Jonas]));
+            const bTot = chDailyBreakdown.reduce((a, d) => a + d.Benny, 0);
+            const jTot = chDailyBreakdown.reduce((a, d) => a + d.Jonas, 0);
+            return (
+              <div className="daily-breakdown">
+                <div className="db-header">
+                  <span className="db-eyebrow">Diese Woche · pro Tag</span>
+                  <span className="db-totals">
+                    <span className="mono" style={{color:'var(--accent)'}}>{bTot}</span>
+                    <span className="db-vs">vs</span>
+                    <span className="mono" style={{color:'var(--accent-3)'}}>{jTot}</span>
+                  </span>
+                </div>
+                <div className="db-grid">
+                  {chDailyBreakdown.map(d => {
+                    const bH = d.Benny ? Math.max(6, (d.Benny / maxV) * 38) : 0;
+                    const jH = d.Jonas ? Math.max(6, (d.Jonas / maxV) * 38) : 0;
+                    return (
+                      <div key={d.iso} className={`db-day${d.isToday ? ' today' : ''}${d.isFuture ? ' future' : ''}`}>
+                        <div className="db-bars">
+                          <div className="db-bar benny" style={{height: `${bH}px`}} title={`Benny: ${d.Benny}`} />
+                          <div className="db-bar jonas" style={{height: `${jH}px`}} title={`Jonas: ${d.Jonas}`} />
+                        </div>
+                        <div className="db-values">
+                          <div className="db-val benny mono">{d.isFuture ? '—' : d.Benny}</div>
+                          <div className="db-val jonas mono">{d.isFuture ? '—' : d.Jonas}</div>
+                        </div>
+                        <div className="db-label">{d.label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
         );
       })}
       </div>
     </div>
-    {dailyBreakdown && (() => {
-      const maxV = Math.max(1, ...dailyBreakdown.flatMap(d => [d.Benny, d.Jonas]));
-      const bTot = dailyBreakdown.reduce((a, d) => a + d.Benny, 0);
-      const jTot = dailyBreakdown.reduce((a, d) => a + d.Jonas, 0);
-      return (
-        <div className="daily-breakdown">
-          <div className="db-header">
-            <span className="db-eyebrow">Diese Woche · pro Tag</span>
-            <span className="db-totals">
-              <span className="mono" style={{color:'var(--accent)'}}>{bTot}</span>
-              <span className="db-vs">vs</span>
-              <span className="mono" style={{color:'var(--accent-3)'}}>{jTot}</span>
-            </span>
-          </div>
-          <div className="db-grid">
-            {dailyBreakdown.map(d => {
-              const bH = d.Benny ? Math.max(6, (d.Benny / maxV) * 38) : 0;
-              const jH = d.Jonas ? Math.max(6, (d.Jonas / maxV) * 38) : 0;
-              return (
-                <div key={d.iso} className={`db-day${d.isToday ? ' today' : ''}${d.isFuture ? ' future' : ''}`}>
-                  <div className="db-bars">
-                    <div className="db-bar benny" style={{height: `${bH}px`}} title={`Benny: ${d.Benny}`} />
-                    <div className="db-bar jonas" style={{height: `${jH}px`}} title={`Jonas: ${d.Jonas}`} />
-                  </div>
-                  <div className="db-values">
-                    <div className="db-val benny mono">{d.isFuture ? '—' : d.Benny}</div>
-                    <div className="db-val jonas mono">{d.isFuture ? '—' : d.Jonas}</div>
-                  </div>
-                  <div className="db-label">{d.label}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    })()}
     {nextWeekStart && (() => {
       const items = nextWeekChallenges.length ? nextWeekChallenges : nextWeekProposals;
       if (!items.length) return null;
