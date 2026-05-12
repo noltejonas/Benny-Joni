@@ -223,6 +223,22 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         const fairShare = Math.ceil(ch.target_reps / 2);
         const bennyOwed = Math.max(0, fairShare - bennyDone);
         const jonasOwed = Math.max(0, fairShare - jonasDone);
+        const todayStr = localDateOf(new Date());
+        const yesterdayStr = localDateOf(new Date(Date.now() - 86400000));
+        const dayIdx = dayIndexInWeek(ch.week_start);
+        const dailyTarget = Math.ceil(fairShare / 7);
+        const expectedByEod = Math.ceil(fairShare * dayIdx / 7);
+        const showArrow = dayIdx >= 2;
+
+        const bennyToday = repsOnLocalDate(csets, 'Benny', todayStr);
+        const bennyYesterday = repsOnLocalDate(csets, 'Benny', yesterdayStr);
+        const bennyTrackDelta = bennyDone - expectedByEod;
+        const bennyArrowDelta = bennyToday - bennyYesterday;
+
+        const jonasToday = repsOnLocalDate(csets, 'Jonas', todayStr);
+        const jonasYesterday = repsOnLocalDate(csets, 'Jonas', yesterdayStr);
+        const jonasTrackDelta = jonasDone - expectedByEod;
+        const jonasArrowDelta = jonasToday - jonasYesterday;
         return (
           <div key={ch.id} className="challenge-slide"><div className={`hero-card ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
             <SparkleLayer active={celebration.getPersistentStyle(ch) === 'sparkle'} />
