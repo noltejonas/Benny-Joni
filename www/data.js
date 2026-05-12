@@ -5,10 +5,20 @@
 (function() {
   const LS_KEY = 'pt_demo_store_v1';
 
+  function defaultPenaltyConfig() {
+    return { id: 1, enabled: false, rule_mode: 'per_week_aggregate', amount_cents: 500, currency: 'EUR', updated_at: new Date().toISOString() };
+  }
+
   function loadDemo() {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const s = JSON.parse(raw);
+        s.penalty_config ||= defaultPenaltyConfig();
+        s.penalties ||= [];
+        s.week_closures ||= [];
+        return s;
+      }
     } catch (e) {}
     return {
       categories: [
@@ -21,6 +31,9 @@
       challenges: [],
       sets: [],
       reactions: [],
+      penalty_config: defaultPenaltyConfig(),
+      penalties: [],
+      week_closures: [],
     };
   }
   function saveDemo(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
@@ -40,6 +53,61 @@
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+  }
+
+  // ── Penalty system: pure computation ────────────────────────────────
+  function fairShareOf(targetReps) { return Math.ceil(targetReps / 2); }
+
+  function repsForAthleteOnChallenge(sets, athlete, challengeId) {
+    let total = 0;
+    for (const s of sets) {
+      if (s.challenge_id === challengeId && s.athlete === athlete) total += s.reps;
+    }
+    return total;
+  }
+
+  // Returns penalty descriptors for one athlete on one week.
+  function computePenalties(challenges, sets, athlete, cfg) {
+    if (!challenges || !challenges.length) return [];
+    const mode = cfg.rule_mode;
+    const amount = cfg.amount_cents;
+
+    if (mode === 'per_challenge') {
+      const out = [];
+      for (const ch of challenges) {
+        const reps = repsForAthleteOnChallenge(sets, athlete, ch.id);
+        const share = fairShareOf(ch.target_reps);
+        if (reps < share) out.push({
+          athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
+          reason: `${share - reps} Reps unter fairShare`,
+        });
+      }
+      return out;
+    }
+
+    const perCh = challenges.map(ch => {
+      const reps = repsForAthleteOnChallenge(sets, athlete, ch.id);
+      const share = fairShareOf(ch.target_reps);
+      return { ch, reps, share, missed: reps < share };
+    });
+
+    let failed = false, reason = '';
+    if (mode === 'per_week_any') {
+      failed = perCh.some(x => x.missed);
+      reason = failed ? `${perCh.filter(x => x.missed).length} Challenge(s) verfehlt` : '';
+    } else if (mode === 'per_week_all') {
+      failed = perCh.every(x => x.missed);
+      reason = failed ? 'alle Challenges verfehlt' : '';
+    } else { // per_week_aggregate
+      const totalReps  = perCh.reduce((a, x) => a + x.reps, 0);
+      const totalShare = perCh.reduce((a, x) => a + x.share, 0);
+      failed = totalReps < totalShare;
+      reason = failed ? `aggregiert ${totalShare - totalReps} Reps unter fairShare` : '';
+    }
+
+    return failed
+      ? [{ athlete, challenge_id: null, amount_cents: amount, rule_mode: mode, reason }]
+      : [];
   }
 
   function createDemoAPI() {
@@ -116,9 +184,9 @@
         return loadDemo().sets.filter(x => x.challenge_id === challengeId)
           .sort((a,b) => b.created_at.localeCompare(a.created_at));
       },
-      async addSet({ challenge_id, athlete, reps, note }) {
+      async addSet({ challenge_id, athlete, reps, note, created_at }) {
         const s = loadDemo();
-        const set = { id: uid(), challenge_id, athlete, reps, note: note || null, created_at: new Date().toISOString() };
+        const set = { id: uid(), challenge_id, athlete, reps, note: note || null, created_at: created_at || new Date().toISOString() };
         s.sets.push(set);
         saveDemo(s); emit();
         return set;
@@ -209,6 +277,107 @@
       },
       async upsertDeviceToken(_payload) { /* no-op in demo mode */ },
       async deleteDeviceToken(_token) { /* no-op in demo mode */ },
+      // ── Penalty system ─────────────────────────────────────────────────
+      async getPenaltyConfig() { return { ...loadDemo().penalty_config }; },
+      async setPenaltyConfig(patch) {
+        const s = loadDemo();
+        const { _by, ...rest } = patch;
+        Object.assign(s.penalty_config, rest, { updated_at: new Date().toISOString() });
+        if (patch.enabled === true) {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const monday = mondayOf(today);
+          const pastWeeks = new Set();
+          for (const ch of s.challenges) {
+            if (ch.week_start < isoDate(monday)) pastWeeks.add(ch.week_start);
+          }
+          for (const w of pastWeeks) {
+            if (!s.week_closures.find(c => c.week_start === w)) {
+              s.week_closures.push({ week_start: w, closed_at: new Date().toISOString(), closed_by: _by || 'Benny' });
+            }
+          }
+        }
+        saveDemo(s); emit();
+        return { ...s.penalty_config };
+      },
+      async previewWeekClose(weekStart) {
+        const s = loadDemo();
+        const cfg = s.penalty_config;
+        const chs = s.challenges.filter(c => c.week_start === weekStart);
+        const chIds = new Set(chs.map(c => c.id));
+        const wkSets = s.sets.filter(x => chIds.has(x.challenge_id));
+        if (!cfg.enabled) return { penalties: [], cfg };
+        const pens = [];
+        for (const a of ['Benny','Jonas']) pens.push(...computePenalties(chs, wkSets, a, cfg));
+        return { penalties: pens, cfg };
+      },
+      async closeWeek(weekStart, by) {
+        const s = loadDemo();
+        if (s.week_closures.find(c => c.week_start === weekStart)) throw new Error('Woche bereits abgeschlossen');
+        const cfg = s.penalty_config;
+        const chs = s.challenges.filter(c => c.week_start === weekStart);
+        const chIds = new Set(chs.map(c => c.id));
+        const wkSets = s.sets.filter(x => chIds.has(x.challenge_id));
+        if (cfg.enabled) {
+          for (const a of ['Benny','Jonas']) {
+            for (const p of computePenalties(chs, wkSets, a, cfg)) {
+              s.penalties.push({
+                id: uid(), week_start: weekStart, athlete: p.athlete,
+                challenge_id: p.challenge_id, amount_cents: p.amount_cents,
+                rule_mode: p.rule_mode, created_at: new Date().toISOString(),
+                paid: false, paid_at: null, paid_by: null, note: null,
+              });
+            }
+          }
+        }
+        s.week_closures.push({ week_start: weekStart, closed_at: new Date().toISOString(), closed_by: by });
+        saveDemo(s); emit();
+        return { closed: true };
+      },
+      async reopenWeek(weekStart) {
+        const s = loadDemo();
+        s.penalties = s.penalties.filter(p => !(p.week_start === weekStart && !p.paid));
+        s.week_closures = s.week_closures.filter(c => c.week_start !== weekStart);
+        saveDemo(s); emit();
+      },
+      async listPenalties() {
+        return [...loadDemo().penalties]
+          .sort((a,b) => b.week_start.localeCompare(a.week_start) || b.created_at.localeCompare(a.created_at));
+      },
+      async markPenaltyPaid(id, { note, by }) {
+        const s = loadDemo();
+        const p = s.penalties.find(x => x.id === id);
+        if (!p) throw new Error('Strafe nicht gefunden');
+        p.paid = true; p.paid_at = new Date().toISOString(); p.paid_by = by; p.note = note ?? p.note;
+        saveDemo(s); emit();
+        return { ...p };
+      },
+      async unmarkPenaltyPaid(id) {
+        const s = loadDemo();
+        const p = s.penalties.find(x => x.id === id);
+        if (!p) throw new Error('Strafe nicht gefunden');
+        p.paid = false; p.paid_at = null; p.paid_by = null;
+        saveDemo(s); emit();
+        return { ...p };
+      },
+      async deletePenalty(id) {
+        const s = loadDemo();
+        s.penalties = s.penalties.filter(p => p.id !== id);
+        saveDemo(s); emit();
+      },
+      async listClosures() {
+        return [...loadDemo().week_closures].sort((a,b) => b.week_start.localeCompare(a.week_start));
+      },
+      async listOpenClosures() {
+        const s = loadDemo();
+        const today = new Date(); today.setHours(0,0,0,0);
+        const monday = mondayOf(today);
+        const closed = new Set(s.week_closures.map(c => c.week_start));
+        const weeks = new Set();
+        for (const ch of s.challenges) {
+          if (ch.week_start < isoDate(monday) && !closed.has(ch.week_start)) weeks.add(ch.week_start);
+        }
+        return [...weeks].sort();
+      },
       onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     };
   }
@@ -224,6 +393,9 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_slots' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rotation_config' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'penalties' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'week_closures' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'penalty_config' }, emit)
       .subscribe();
 
     return {
@@ -405,6 +577,123 @@
         const { error } = await client.from('device_tokens').delete().eq('token', token);
         if (error) throw error;
       },
+      // ── Penalty system ─────────────────────────────────────────────────
+      async getPenaltyConfig() {
+        const { data, error } = await client.from('penalty_config').select('*').eq('id', 1).single();
+        if (error) throw error;
+        return data;
+      },
+      async setPenaltyConfig(patch) {
+        const { _by, ...rest } = patch;
+        const { data: cfg, error } = await client.from('penalty_config')
+          .update({ ...rest, updated_at: new Date().toISOString() })
+          .eq('id', 1).select().single();
+        if (error) throw error;
+        if (patch.enabled === true) {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const monday = mondayOf(today);
+          const { data: chs } = await client.from('weekly_challenges')
+            .select('week_start').lt('week_start', isoDate(monday));
+          const seen = new Set();
+          const rows = [];
+          for (const c of chs || []) {
+            if (!seen.has(c.week_start)) {
+              seen.add(c.week_start);
+              rows.push({ week_start: c.week_start, closed_by: _by || 'Benny' });
+            }
+          }
+          if (rows.length) {
+            await client.from('week_closures').upsert(rows, { onConflict: 'week_start', ignoreDuplicates: true });
+          }
+        }
+        emit();
+        return cfg;
+      },
+      async previewWeekClose(weekStart) {
+        const cfg = await this.getPenaltyConfig();
+        const { data: chs } = await client.from('weekly_challenges').select('*').eq('week_start', weekStart);
+        const chIds = (chs || []).map(c => c.id);
+        let wkSets = [];
+        if (chIds.length) {
+          const { data } = await client.from('sets').select('*').in('challenge_id', chIds);
+          wkSets = data || [];
+        }
+        if (!cfg.enabled) return { penalties: [], cfg };
+        const pens = [];
+        for (const a of ['Benny','Jonas']) pens.push(...computePenalties(chs || [], wkSets, a, cfg));
+        return { penalties: pens, cfg };
+      },
+      async closeWeek(weekStart, by) {
+        const { error: clErr } = await client.from('week_closures').insert({ week_start: weekStart, closed_by: by });
+        if (clErr) {
+          if (clErr.code === '23505') throw new Error('Woche bereits abgeschlossen');
+          throw clErr;
+        }
+        const { penalties } = await this.previewWeekClose(weekStart);
+        if (penalties.length) {
+          const rows = penalties.map(p => ({
+            week_start: weekStart, athlete: p.athlete, challenge_id: p.challenge_id,
+            amount_cents: p.amount_cents, rule_mode: p.rule_mode,
+          }));
+          const { error: pErr } = await client.from('penalties').insert(rows);
+          if (pErr) throw pErr;
+        }
+        emit();
+        return { closed: true };
+      },
+      async reopenWeek(weekStart) {
+        await client.from('penalties').delete().eq('week_start', weekStart).eq('paid', false);
+        await client.from('week_closures').delete().eq('week_start', weekStart);
+        emit();
+      },
+      async listPenalties() {
+        const { data, error } = await client.from('penalties').select('*')
+          .order('week_start', { ascending: false })
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+      },
+      async markPenaltyPaid(id, { note, by }) {
+        const { data, error } = await client.from('penalties')
+          .update({ paid: true, paid_at: new Date().toISOString(), paid_by: by, note: note ?? null })
+          .eq('id', id).select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async unmarkPenaltyPaid(id) {
+        const { data, error } = await client.from('penalties')
+          .update({ paid: false, paid_at: null, paid_by: null })
+          .eq('id', id).select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async deletePenalty(id) {
+        const { error } = await client.from('penalties').delete().eq('id', id);
+        if (error) throw error;
+        emit();
+      },
+      async listClosures() {
+        const { data, error } = await client.from('week_closures').select('*')
+          .order('week_start', { ascending: false });
+        if (error) throw error;
+        return data || [];
+      },
+      async listOpenClosures() {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const monday = mondayOf(today);
+        const [chsRes, clRes] = await Promise.all([
+          client.from('weekly_challenges').select('week_start').lt('week_start', isoDate(monday)),
+          client.from('week_closures').select('week_start'),
+        ]);
+        if (chsRes.error) throw chsRes.error;
+        if (clRes.error) throw clRes.error;
+        const closed = new Set((clRes.data || []).map(c => c.week_start));
+        const weeks = new Set();
+        for (const ch of chsRes.data || []) if (!closed.has(ch.week_start)) weeks.add(ch.week_start);
+        return [...weeks].sort();
+      },
       onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     };
   }
@@ -462,6 +751,6 @@
       }
       return createDemoAPI();
     },
-    mondayOf, isoDate, uid, suggestForWeek, weekTemplateFor,
+    mondayOf, isoDate, uid, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf,
   };
 })();
