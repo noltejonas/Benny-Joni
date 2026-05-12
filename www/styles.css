@@ -1692,9 +1692,11 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 .recap-card.recap-jonas { box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent-3) 30%, transparent), 0 20px 40px -20px color-mix(in oklab, var(--accent-3) 40%, transparent); }
 .recap-card.recap-tie   { box-shadow: 0 0 0 1px var(--border); }
 
-.recap-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; position: relative; z-index: 2; }
-.recap-label { font-size: 11px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; }
-.recap-date { font-size: 11px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.recap-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; position: relative; z-index: 2; gap: 12px; }
+.recap-head-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.recap-label { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; }
+.recap-week-num { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; line-height: 1.1; }
+.recap-date { font-size: 11px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; margin-top: 4px; }
 
 .recap-winner { text-align: center; padding: 8px 0 18px; position: relative; z-index: 2; }
 .recap-trophy {
@@ -2890,3 +2892,50 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0 4px;
 }
+
+/* Strafkonto: ledger stats (Beitrag, Eingezahlt, Saldo) */
+.strafkonto-stats { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.strafkonto-stat { display: flex; flex-direction: column; gap: 2px; }
+.strafkonto-stat-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+.strafkonto-stat-row { display: flex; justify-content: space-around; gap: 14px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.strafkonto-stat-row .b { color: var(--accent); }
+.strafkonto-stat-row .j { color: var(--accent-3); }
+.strafkonto-stat-row .b.positive,
+.strafkonto-stat-row .j.positive { color: var(--text-2); }
+
+/* Strafkonto: payout row + amount color, re-open affordance */
+.penalty-row.payout { background: color-mix(in oklab, var(--accent) 5%, var(--surface)); }
+.penalty-row-amount.b { color: var(--accent); }
+.penalty-row-amount.j { color: var(--accent-3); }
+.penalty-row-reopen {
+  margin-left: 10px;
+  width: 28px; height: 28px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-2);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.penalty-row:hover .penalty-row-reopen { color: var(--text); }
+
+/* Recap: new debts section */
+.recap-penalties {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: color-mix(in oklab, var(--danger) 8%, var(--surface-2));
+  border: 1px solid color-mix(in oklab, var(--danger) 22%, transparent);
+  border-radius: var(--radius-sm);
+}
+.recap-penalties-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-2); margin-bottom: 4px;
+}
+.recap-penalties-row {
+  display: flex; justify-content: space-between; gap: 14px;
+  font-size: 15px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.recap-penalties-row .b { color: var(--accent); }
+.recap-penalties-row .j { color: var(--accent-3); }
+.recap-penalties-row .b.has,
+.recap-penalties-row .j.has { color: var(--danger); }

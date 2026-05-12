@@ -17,6 +17,7 @@
         s.penalty_config ||= defaultPenaltyConfig();
         s.penalties ||= [];
         s.week_closures ||= [];
+        s.payouts ||= [];
         return s;
       }
     } catch (e) {}
@@ -34,6 +35,7 @@
       penalty_config: defaultPenaltyConfig(),
       penalties: [],
       week_closures: [],
+      payouts: [],
     };
   }
   function saveDemo(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
@@ -378,6 +380,23 @@
         }
         return [...weeks].sort();
       },
+      async listPayouts() {
+        const s = loadDemo();
+        return [...(s.payouts || [])].sort((a,b) => b.paid_at.localeCompare(a.paid_at));
+      },
+      async addPayout({ athlete, amount_cents, note }) {
+        const s = loadDemo();
+        s.payouts ||= [];
+        const row = { id: uid(), athlete, amount_cents, paid_at: new Date().toISOString(), note: note || null, created_at: new Date().toISOString() };
+        s.payouts.push(row);
+        saveDemo(s); emit();
+        return row;
+      },
+      async deletePayout(id) {
+        const s = loadDemo();
+        s.payouts = (s.payouts || []).filter(p => p.id !== id);
+        saveDemo(s); emit();
+      },
       onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     };
   }
@@ -396,6 +415,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penalties' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'week_closures' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penalty_config' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payouts' }, emit)
       .subscribe();
 
     return {
@@ -693,6 +713,28 @@
         const weeks = new Set();
         for (const ch of chsRes.data || []) if (!closed.has(ch.week_start)) weeks.add(ch.week_start);
         return [...weeks].sort();
+      },
+      async listPayouts() {
+        const { data, error } = await client.from('payouts').select('*')
+          .order('paid_at', { ascending: false });
+        if (error) {
+          if (error.code === '42P01') return []; // table not yet created
+          throw error;
+        }
+        return data || [];
+      },
+      async addPayout({ athlete, amount_cents, note }) {
+        const { data, error } = await client.from('payouts')
+          .insert({ athlete, amount_cents, note: note || null })
+          .select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async deletePayout(id) {
+        const { error } = await client.from('payouts').delete().eq('id', id);
+        if (error) throw error;
+        emit();
       },
       onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     };

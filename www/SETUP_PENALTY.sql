@@ -49,3 +49,21 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY week_closures_all ON week_closures FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Payouts: separate Einzahlungs-Einträge (Ledger). Pot offen = Σ penalties − Σ payouts.
+CREATE TABLE IF NOT EXISTS payouts (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete      text NOT NULL REFERENCES athletes(name),
+  amount_cents int  NOT NULL CHECK (amount_cents > 0),
+  paid_at      timestamptz NOT NULL DEFAULT now(),
+  note         text,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payouts_paid_at_idx ON payouts(paid_at DESC);
+CREATE INDEX IF NOT EXISTS payouts_athlete_idx ON payouts(athlete);
+
+ALTER TABLE payouts ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY payouts_all ON payouts FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

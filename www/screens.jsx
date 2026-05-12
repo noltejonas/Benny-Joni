@@ -840,7 +840,9 @@ function LogSheet({ api, me, challenge, category, onClose, onLogged }) {
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
 function WeekRecap({ recap, me }) {
-  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [], bennySetCount = 0, jonasSetCount = 0, bennyMaxSet = 0, jonasMaxSet = 0 } = recap;
+  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [], bennySetCount = 0, jonasSetCount = 0, bennyMaxSet = 0, jonasMaxSet = 0, weekNumber, bennyPenCents = 0, jonasPenCents = 0 } = recap;
+  const penCents = { Benny: bennyPenCents, Jonas: jonasPenCents };
+  const formatEuroCents = (c) => (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
   const leftA  = me === 'Jonas' ? 'Jonas' : 'Benny';
   const rightA = leftA === 'Benny' ? 'Jonas' : 'Benny';
   const tallyTotals = { Benny: bennyTotal, Jonas: jonasTotal };
@@ -885,7 +887,10 @@ function WeekRecap({ recap, me }) {
         }}/>
       ))}
       <div className="recap-head">
-        <div className="recap-label">🏁 Wochenabschluss</div>
+        <div className="recap-head-left">
+          <div className="recap-label">🏁 Wochenabschluss</div>
+          {weekNumber != null && <div className="recap-week-num">Woche {weekNumber}</div>}
+        </div>
         <div className="recap-date">{fmtD(monday)} – {fmtD(sunday)}</div>
       </div>
       <div className="recap-winner">
@@ -959,6 +964,19 @@ function WeekRecap({ recap, me }) {
         </div>
       </div>
       <div className="recap-analysis">{analysis}</div>
+      {(bennyPenCents > 0 || jonasPenCents > 0) && (
+        <div className="recap-penalties">
+          <div className="recap-penalties-label">Neue Schulden</div>
+          <div className="recap-penalties-row">
+            <span className={`b ${penCents[leftA] > 0 ? 'has' : ''}`}>
+              {leftA} {penCents[leftA] > 0 ? `–${formatEuroCents(penCents[leftA])}` : '✓'}
+            </span>
+            <span className={`j ${penCents[rightA] > 0 ? 'has' : ''}`}>
+              {rightA} {penCents[rightA] > 0 ? `–${formatEuroCents(penCents[rightA])}` : '✓'}
+            </span>
+          </div>
+        </div>
+      )}
       {totalChallenges > 0 && (
         <div className="recap-foot">
           {hitCount} von {totalChallenges} Ziel{totalChallenges===1?'':'en'} erreicht
@@ -1769,17 +1787,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
         <div className="stat">
           <div className="v mono">{streak}🔥</div>
           <div className="k">Streak</div>
-          <div className="h">Tage in Folge geloggt</div>
         </div>
         <div className="stat">
           <div className="v mono">{weeksDone}</div>
           <div className="k">Wochen aktiv</div>
-          <div className="h">seit Start</div>
         </div>
         <div className="stat">
           <div className="v mono">{totalReps}</div>
           <div className="k">Reps gesamt</div>
-          <div className="h">alle Sätze</div>
         </div>
       </div>
 

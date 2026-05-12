@@ -66,6 +66,7 @@ function App() {
   const [closures, setClosures] = useState([]);
   const [openClosures, setOpenClosures] = useState([]);
   const [penaltyConfig, setPenaltyConfig] = useState(null);
+  const [payouts, setPayouts] = useState([]);
   const [closingWeek, setClosingWeek] = useState(null);
   const [proposalDismissed, setProposalDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -110,6 +111,8 @@ function App() {
       (byWeek[ch.week_start] ||= []).push(ch);
     }
     const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+    const firstWeekStart = Object.keys(byWeek).sort()[0];
+    const firstMonday = new Date(firstWeekStart + 'T00:00:00');
     const now = new Date();
     const out = [];
     for (const ws of Object.keys(byWeek)) {
@@ -146,18 +149,33 @@ function App() {
         .filter(c => c.jonasDone > 0)
         .map(c => ({ name: c.cat?.name || '—', reps: c.jonasDone }))
         .sort((a, b) => b.reps - a.reps);
+      // Per-athlete set-level aggregates across all challenges this week
+      const weekSets = allSets.filter(s => challs.some(ch => ch.id === s.challenge_id));
+      const bennySets = weekSets.filter(s => s.athlete === 'Benny');
+      const jonasSets = weekSets.filter(s => s.athlete === 'Jonas');
+      const bennySetCount = bennySets.length;
+      const jonasSetCount = jonasSets.length;
+      const bennyMaxSet = bennySets.reduce((m, s) => Math.max(m, s.reps), 0);
+      const jonasMaxSet = jonasSets.reduce((m, s) => Math.max(m, s.reps), 0);
+      const weekNumber = Math.round((monday - firstMonday) / (7 * 86400000)) + 1;
+      const weekPens = penalties.filter(p => p.week_start === ws);
+      const bennyPenCents = weekPens.filter(p => p.athlete === 'Benny').reduce((a,p)=>a+p.amount_cents, 0);
+      const jonasPenCents = weekPens.filter(p => p.athlete === 'Jonas').reduce((a,p)=>a+p.amount_cents, 0);
       out.push({
         kind: 'recap',
         id: `recap-${ws}`,
         week_start: ws,
         created_at: sundayEnd.toISOString(),
+        weekNumber,
         challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges: challs.length,
         bennyByCat, jonasByCat,
+        bennySetCount, jonasSetCount, bennyMaxSet, jonasMaxSet,
+        bennyPenCents, jonasPenCents,
         analysis,
       });
     }
     return out;
-  }, [allChallenges, allSets, categories]);
+  }, [allChallenges, allSets, categories, penalties]);
 
   const feedItems = useMemo(() => {
     // Past-week sets are represented by their WeekRecap card — drop the
@@ -189,7 +207,7 @@ function App() {
 
   const reload = useCallback(async () => {
     try {
-      const [cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, penCfg] = await Promise.all([
+      const [cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, penCfg, pys] = await Promise.all([
       api.getCategories(),
       api.listChallenges(),
       api.recentFeed(100),
@@ -199,7 +217,8 @@ function App() {
       api.listPenalties ? api.listPenalties() : [],
       api.listClosures ? api.listClosures() : [],
       api.listOpenClosures ? api.listOpenClosures() : [],
-      api.getPenaltyConfig ? api.getPenaltyConfig() : null]
+      api.getPenaltyConfig ? api.getPenaltyConfig() : null,
+      api.listPayouts ? api.listPayouts() : []]
       );
       setCategories(cats);
       setAllChallenges(challs);
@@ -211,6 +230,7 @@ function App() {
       setClosures(cls || []);
       setOpenClosures(openCls || []);
       setPenaltyConfig(penCfg);
+      setPayouts(pys || []);
 
       // Notification trigger
       if (lastFeedRef.current !== null && feedData[0] && feedData[0].id !== lastFeedRef.current &&
@@ -416,6 +436,7 @@ function App() {
           penalties={penalties}
           closures={closures}
           openClosures={openClosures}
+          payouts={payouts}
           onChange={reload}
           onOpenSettings={() => setTab('settings')} />
         }
@@ -461,10 +482,10 @@ function App() {
             <Icon name="feed" /> Feed
           </button>
           <button className={`tab-btn ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
-            <Icon name="history" /> Verlauf
+            <Icon name="trophy" /> Stats
           </button>
           <button className={`tab-btn ${tab === 'strafkonto' ? 'active' : ''}`} onClick={() => setTab('strafkonto')}>
-            <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,fontSize:18}}>⚖️</span> Strafkonto
+            <Icon name="scale" /> Strafkonto
             {penalties.filter(p => !p.paid).length > 0 && (
               <span className="tab-badge">{penalties.filter(p => !p.paid).length}</span>
             )}

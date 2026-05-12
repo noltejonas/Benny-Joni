@@ -2,7 +2,8 @@
 const { useState } = React;
 
 function formatEuro(cents) {
-  return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
+  const v = cents / 100;
+  return v.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
 }
 
 function weekLabel(weekStart) {
@@ -24,18 +25,25 @@ function reasonText(p) {
   }
 }
 
-function StrafkontoScreen({ api, me, penalties, closures, openClosures, onChange, onOpenSettings }) {
-  const [settlement, setSettlement] = useState(null);
+function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts = [], onChange, onOpenSettings }) {
   const [closing, setClosing] = useState(null);
+  const [penaltyEdit, setPenaltyEdit] = useState(null);
+  const [reopenWk, setReopenWk] = useState(null);
+  const [addPayout, setAddPayout] = useState(false);
+  const [payoutEdit, setPayoutEdit] = useState(null);
 
-  const open = penalties.filter(p => !p.paid);
-  const paid = penalties.filter(p => p.paid);
-  const potTotal = open.reduce((a, p) => a + p.amount_cents, 0);
-  const potBenny = open.filter(p => p.athlete === 'Benny').reduce((a, p) => a + p.amount_cents, 0);
-  const potJonas = open.filter(p => p.athlete === 'Jonas').reduce((a, p) => a + p.amount_cents, 0);
+  const totalPenalties = penalties.reduce((a, p) => a + p.amount_cents, 0);
+  const totalPayouts   = payouts.reduce((a, p) => a + p.amount_cents, 0);
+  const potOpen        = totalPenalties - totalPayouts;
+
+  const penBenny = penalties.filter(p => p.athlete === 'Benny').reduce((a, p) => a + p.amount_cents, 0);
+  const penJonas = penalties.filter(p => p.athlete === 'Jonas').reduce((a, p) => a + p.amount_cents, 0);
+  const payBenny = payouts.filter(p => p.athlete === 'Benny').reduce((a, p) => a + p.amount_cents, 0);
+  const payJonas = payouts.filter(p => p.athlete === 'Jonas').reduce((a, p) => a + p.amount_cents, 0);
+
   const closuresWithoutPenalty = closures.filter(c => !penalties.find(p => p.week_start === c.week_start));
 
-  if (!penalties.length && !openClosures.length && !closures.length) {
+  if (!penalties.length && !openClosures.length && !closures.length && !payouts.length) {
     return (
       <div className="strafkonto-screen">
         <div className="strafkonto-header">
@@ -62,16 +70,44 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, onChange
       </div>
 
       <div className="strafkonto-pot">
-        <div className="strafkonto-pot-amount mono">{formatEuro(potTotal)}</div>
-        <div className="strafkonto-pot-label">im Topf</div>
-        {(potBenny > 0 || potJonas > 0) && (
-          <div className="strafkonto-pot-split">
-            <span className="b">Benny: {formatEuro(potBenny)}</span>
-            {' · '}
-            <span className="j">Jonas: {formatEuro(potJonas)}</span>
+        <div className="strafkonto-pot-amount mono">{formatEuro(Math.max(0, potOpen))}</div>
+        <div className="strafkonto-pot-label">offen</div>
+        {(penBenny > 0 || penJonas > 0) && (
+          <div className="strafkonto-stats">
+            <div className="strafkonto-stat">
+              <div className="strafkonto-stat-label">Schulden (Beitrag)</div>
+              <div className="strafkonto-stat-row">
+                <span className="b">Benny {formatEuro(penBenny)}</span>
+                <span className="j">Jonas {formatEuro(penJonas)}</span>
+              </div>
+            </div>
+            {(payBenny > 0 || payJonas > 0) && (
+              <div className="strafkonto-stat">
+                <div className="strafkonto-stat-label">Eingezahlt</div>
+                <div className="strafkonto-stat-row">
+                  <span className="b">Benny {formatEuro(payBenny)}</span>
+                  <span className="j">Jonas {formatEuro(payJonas)}</span>
+                </div>
+              </div>
+            )}
+            <div className="strafkonto-stat">
+              <div className="strafkonto-stat-label">Saldo</div>
+              <div className="strafkonto-stat-row">
+                <span className={`b ${penBenny - payBenny <= 0 ? 'positive' : ''}`}>
+                  Benny {penBenny - payBenny > 0 ? '–' : ''}{formatEuro(Math.abs(penBenny - payBenny))}
+                </span>
+                <span className={`j ${penJonas - payJonas <= 0 ? 'positive' : ''}`}>
+                  Jonas {penJonas - payJonas > 0 ? '–' : ''}{formatEuro(Math.abs(penJonas - payJonas))}
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      <button className="btn" style={{width:'100%',marginTop:8,marginBottom:14}} onClick={() => setAddPayout(true)}>
+        + Einzahlung verbuchen
+      </button>
 
       {openClosures.length > 0 && (
         <div className="strafkonto-section">
@@ -85,35 +121,37 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, onChange
         </div>
       )}
 
-      {open.length > 0 && (
+      {penalties.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Offen</div>
-          {open.map(p => (
-            <div key={p.id} className="penalty-row" onClick={() => setSettlement(p)}>
+          <div className="strafkonto-section-label">Strafen</div>
+          {penalties.map(p => (
+            <div key={p.id} className="penalty-row" onClick={() => setPenaltyEdit(p)}>
               <div className="penalty-row-main">
                 <div className="penalty-row-head">{weekLabel(p.week_start)} · {p.athlete}</div>
                 <div className="penalty-row-meta">{reasonText(p)}</div>
               </div>
-              <div className="penalty-row-amount mono">{formatEuro(p.amount_cents)}</div>
-              <div className="penalty-check"/>
+              <div className={`penalty-row-amount mono ${p.athlete === 'Benny' ? 'b' : 'j'}`}>
+                –{formatEuro(p.amount_cents)}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {paid.length > 0 && (
+      {payouts.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Bezahlt</div>
-          {paid.map(p => (
-            <div key={p.id} className="penalty-row paid" onClick={() => setSettlement(p)}>
+          <div className="strafkonto-section-label">Einzahlungen</div>
+          {payouts.map(p => (
+            <div key={p.id} className="penalty-row payout" onClick={() => setPayoutEdit(p)}>
               <div className="penalty-row-main">
-                <div className="penalty-row-head">{weekLabel(p.week_start)} · {p.athlete}</div>
-                <div className="penalty-row-meta">
-                  {p.note || 'bezahlt'}{p.paid_at ? ` · ${new Date(p.paid_at).toLocaleDateString('de-DE')}` : ''}
+                <div className="penalty-row-head">
+                  {p.athlete} · {new Date(p.paid_at).toLocaleDateString('de-DE')}
                 </div>
+                {p.note && <div className="penalty-row-meta">„{p.note}"</div>}
               </div>
-              <div className="penalty-row-amount mono">{formatEuro(p.amount_cents)}</div>
-              <div className="penalty-check">✓</div>
+              <div className={`penalty-row-amount mono ${p.athlete === 'Benny' ? 'b' : 'j'}`}>
+                +{formatEuro(p.amount_cents)}
+              </div>
             </div>
           ))}
         </div>
@@ -123,81 +161,171 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, onChange
         <div className="strafkonto-section">
           <div className="strafkonto-section-label">Abgeschlossene Wochen — straffrei</div>
           {closuresWithoutPenalty.map(c => (
-            <div key={c.week_start} className="penalty-row">
+            <div key={c.week_start} className="penalty-row" onClick={() => setReopenWk(c.week_start)}>
               <div className="penalty-row-main">
                 <div className="penalty-row-head">✓ {weekLabel(c.week_start)} · alles geschafft</div>
               </div>
+              <span className="penalty-row-reopen" aria-label="Woche neu öffnen">↻</span>
             </div>
           ))}
         </div>
       )}
 
-      {settlement && (
-        <SettlementSheet penalty={settlement} api={api} me={me}
-          onClose={() => setSettlement(null)}
-          onDone={() => { setSettlement(null); onChange?.(); }}/>
-      )}
       {closing && (
         <WeekCloseSheet weekStart={closing} api={api} me={me}
           onClose={() => setClosing(null)}
           onDone={() => { setClosing(null); onChange?.(); }}/>
       )}
+      {penaltyEdit && (
+        <PenaltyEditSheet penalty={penaltyEdit} api={api}
+          onClose={() => setPenaltyEdit(null)}
+          onReopen={() => { setReopenWk(penaltyEdit.week_start); setPenaltyEdit(null); }}
+          onDone={() => { setPenaltyEdit(null); onChange?.(); }}/>
+      )}
+      {reopenWk && (
+        <ReopenSheet weekStart={reopenWk} api={api} penalties={penalties}
+          onClose={() => setReopenWk(null)}
+          onDone={() => { setReopenWk(null); onChange?.(); }}/>
+      )}
+      {addPayout && (
+        <PayoutSheet api={api} me={me} potOpen={potOpen}
+          onClose={() => setAddPayout(false)}
+          onDone={() => { setAddPayout(false); onChange?.(); }}/>
+      )}
+      {payoutEdit && (
+        <PayoutEditSheet payout={payoutEdit} api={api}
+          onClose={() => setPayoutEdit(null)}
+          onDone={() => { setPayoutEdit(null); onChange?.(); }}/>
+      )}
     </div>
   );
 }
 
-function SettlementSheet({ penalty, api, me, onClose, onDone }) {
-  const [note, setNote] = useState(penalty.note || '');
+function PenaltyEditSheet({ penalty, api, onClose, onReopen, onDone }) {
   const [busy, setBusy] = useState(false);
-
-  async function settle() {
-    setBusy(true);
-    try { await api.markPenaltyPaid(penalty.id, { note: note || null, by: me }); onDone(); }
-    catch (e) { alert(e.message); } finally { setBusy(false); }
-  }
-  async function unsettle() {
-    setBusy(true);
-    try { await api.unmarkPenaltyPaid(penalty.id); onDone(); }
-    catch (e) { alert(e.message); } finally { setBusy(false); }
-  }
   async function remove() {
-    if (!confirm('Strafe wirklich löschen?')) return;
+    if (!confirm('Diese Strafe löschen?')) return;
     setBusy(true);
     try { await api.deletePenalty(penalty.id); onDone(); }
     catch (e) { alert(e.message); } finally { setBusy(false); }
   }
-
   return (
     <Sheet open={true} onClose={onClose}>
       <h2 className="title" style={{marginBottom:8}}>Strafe</h2>
       <div className="subtitle" style={{marginBottom:18}}>
         {weekLabel(penalty.week_start)} · {penalty.athlete} · {formatEuro(penalty.amount_cents)}
       </div>
-      {!penalty.paid ? (
-        <>
-          <div className="label" style={{marginBottom:6}}>Notiz (optional)</div>
-          <input className="quick-chip-input" style={{width:'100%'}}
-            type="text" value={note} onChange={e => setNote(e.target.value)}
-            placeholder="z.B. Pizza ausgegeben"/>
-          <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
-            <button className="btn-ghost-sm" onClick={onClose}>Abbrechen</button>
-            <button className="btn-ghost-sm" onClick={remove} disabled={busy}>Löschen</button>
-            <button className="btn-ghost-sm primary" onClick={settle} disabled={busy}>Einlösen</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{marginBottom:16,color:'var(--text-2)'}}>
-            Bezahlt von {penalty.paid_by || '–'} am {penalty.paid_at ? new Date(penalty.paid_at).toLocaleDateString('de-DE') : '–'}
-            {penalty.note ? ` · „${penalty.note}"` : ''}
-          </div>
-          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-            <button className="btn-ghost-sm" onClick={onClose}>Schließen</button>
-            <button className="btn-ghost-sm" onClick={remove} disabled={busy}>Löschen</button>
-            <button className="btn-ghost-sm primary" onClick={unsettle} disabled={busy}>Zurücksetzen</button>
-          </div>
-        </>
+      <div style={{color:'var(--text-2)',marginBottom:18,fontSize:15}}>
+        {reasonText(penalty)} · gebucht {new Date(penalty.created_at).toLocaleDateString('de-DE')}
+      </div>
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap'}}>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
+        <button className="btn-ghost-sm" onClick={remove} disabled={busy}>Strafe löschen</button>
+        <button className="btn-ghost-sm primary" onClick={onReopen} disabled={busy}>Woche neu öffnen</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function ReopenSheet({ weekStart, api, penalties, onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const weekPenalties = penalties.filter(p => p.week_start === weekStart);
+  async function reopen() {
+    setBusy(true);
+    try { await api.reopenWeek(weekStart); onDone(); }
+    catch (e) { alert(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <Sheet open={true} onClose={onClose}>
+      <h2 className="title" style={{marginBottom:8}}>{weekLabel(weekStart)} neu öffnen?</h2>
+      <div className="subtitle" style={{marginBottom:18}}>
+        Closure wird gelöscht — danach kannst du nachloggen und neu abschließen.
+      </div>
+      {weekPenalties.length > 0 && (
+        <div style={{marginBottom:16,padding:'10px 12px',background:'var(--surface-2)',borderRadius:8,fontSize:14}}>
+          {weekPenalties.length} Strafe(n) dieser Woche werden ebenfalls gelöscht:
+          <ul style={{margin:'6px 0 0 18px',padding:0}}>
+            {weekPenalties.map(p => (
+              <li key={p.id}>{p.athlete} — {formatEuro(p.amount_cents)}</li>
+            ))}
+          </ul>
+        </div>
       )}
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
+        <button className="btn-ghost-sm primary" onClick={reopen} disabled={busy}>Neu öffnen</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function PayoutSheet({ api, me, potOpen, onClose, onDone }) {
+  const [athlete, setAthlete] = useState(me === 'Jonas' ? 'Jonas' : 'Benny');
+  const defaultEur = potOpen > 0 ? Math.round(potOpen / 100) : 5;
+  const [amount, setAmount] = useState(String(defaultEur));
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    const eur = parseFloat(amount.replace(',', '.'));
+    if (!Number.isFinite(eur) || eur <= 0) { alert('Betrag muss > 0 sein'); return; }
+    setBusy(true);
+    try {
+      await api.addPayout({ athlete, amount_cents: Math.round(eur * 100), note: note || null });
+      onDone();
+    } catch (e) { alert(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <Sheet open={true} onClose={onClose}>
+      <h2 className="title" style={{marginBottom:8}}>Einzahlung verbuchen</h2>
+      <div className="subtitle" style={{marginBottom:18}}>Wer hat wieviel beglichen?</div>
+
+      <div className="label" style={{marginBottom:8}}>Athlet</div>
+      <div className="segmented" style={{marginBottom:16}}>
+        {['Benny','Jonas'].map(n => (
+          <button key={n} className={athlete===n?'active':''} onClick={() => setAthlete(n)}>{n}</button>
+        ))}
+      </div>
+
+      <div className="label" style={{marginBottom:6}}>Betrag (€)</div>
+      <input className="quick-chip-input" style={{width:'100%',marginBottom:14}}
+        type="number" min="0.01" step="0.01" inputMode="decimal"
+        value={amount} onChange={e => setAmount(e.target.value)}
+        onFocus={e => e.target.select()}/>
+
+      <div className="label" style={{marginBottom:6}}>Notiz (optional)</div>
+      <input className="quick-chip-input" style={{width:'100%'}}
+        type="text" value={note} onChange={e => setNote(e.target.value)}
+        placeholder="z.B. Pizza bezahlt, Bier-Runde"/>
+
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:18}}>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
+        <button className="btn-ghost-sm primary" onClick={save} disabled={busy}>Verbuchen</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function PayoutEditSheet({ payout, api, onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+  async function remove() {
+    if (!confirm('Einzahlung löschen?')) return;
+    setBusy(true);
+    try { await api.deletePayout(payout.id); onDone(); }
+    catch (e) { alert(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <Sheet open={true} onClose={onClose}>
+      <h2 className="title" style={{marginBottom:8}}>Einzahlung</h2>
+      <div className="subtitle" style={{marginBottom:18}}>
+        {payout.athlete} · {formatEuro(payout.amount_cents)} · {new Date(payout.paid_at).toLocaleDateString('de-DE')}
+      </div>
+      {payout.note && (
+        <div style={{marginBottom:18,color:'var(--text-2)',fontSize:15}}>„{payout.note}"</div>
+      )}
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Schließen</button>
+        <button className="btn-ghost-sm primary" onClick={remove} disabled={busy}>Löschen</button>
+      </div>
     </Sheet>
   );
 }
