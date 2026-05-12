@@ -1310,9 +1310,6 @@ a { color: var(--accent); text-decoration: none; }
 .challenge-swiper::-webkit-scrollbar { display:none; }
 .challenge-slide { flex: 0 0 100%; scroll-snap-align:center; padding: 0 16px; box-sizing:border-box; }
 .challenge-slide .hero-card { margin-bottom: 6px; }
-.swiper-dots { display:flex; justify-content:center; gap:7px; padding: 12px 0 4px; }
-.swiper-dot { width:7px; height:7px; border-radius:50%; border:none; background:var(--border); padding:0; cursor:pointer; transition:all 0.25s ease; }
-.swiper-dot.active { background:var(--accent); width:22px; border-radius:4px; }
 
 /* ─── Heute-Übersicht über dem Swiper ─── */
 .challenge-overview {

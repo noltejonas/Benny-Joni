@@ -382,14 +382,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         );
       })}
       </div>
-      {challenges.length > 1 && (
-        <div className="swiper-dots">
-          {challenges.map((c, i) => (
-            <button key={c.id} className={`swiper-dot ${i===activeIdx?'active':''}`}
-              aria-label={`Challenge ${i+1}`} onClick={() => goTo(i)} />
-          ))}
-        </div>
-      )}
     </div>
     {nextWeekStart && (() => {
       const items = nextWeekChallenges.length ? nextWeekChallenges : nextWeekProposals;
