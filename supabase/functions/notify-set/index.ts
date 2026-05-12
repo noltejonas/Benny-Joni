@@ -62,7 +62,13 @@ Deno.serve(async (req) => {
     return Response.json({ ignored: true, reason: "not_insert" });
   }
   if (!APNS_KEY_ID || !APNS_TEAM_ID || !APNS_PRIVATE_KEY) {
-    return Response.json({ ignored: true, reason: "apns_not_configured" });
+    // 503: the function can't fulfill its purpose without APNs creds.
+    // Returning non-200 makes this visible in pg_net._http_response.status_code
+    // without having to inspect the body.
+    return Response.json(
+      { error: "apns_not_configured" },
+      { status: 503 },
+    );
   }
 
   const record = payload.record;
@@ -103,13 +109,25 @@ Deno.serve(async (req) => {
     });
   }
 
-  // 3. Today's Berlin date
+  // 3. Recipient tokens — load these BEFORE claiming the daily slot so we don't
+  //    burn the slot when the recipient has no device registered yet.
+  const { data: tokens } = await supabase
+    .from("device_tokens")
+    .select("token, platform")
+    .eq("athlete", recipient);
+
+  const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios");
+  if (iosTokens.length === 0) {
+    return Response.json({ ignored: true, reason: "no_recipient_tokens" });
+  }
+
+  // 4. Today's Berlin date
   const { data: today, error: todayErr } = await supabase.rpc("berlin_today");
   if (todayErr || !today) {
     return Response.json({ error: "today_rpc", detail: todayErr?.message }, { status: 500 });
   }
 
-  // 4. Dedup: push_log insert claims the daily slot
+  // 5. Dedup: push_log insert claims the daily slot
   const { error: logErr } = await supabase
     .from("push_log")
     .insert({ athlete: recipient, kind: "rival", day: today });
@@ -118,25 +136,6 @@ Deno.serve(async (req) => {
       return Response.json({ ignored: true, reason: "already_sent_today" });
     }
     return Response.json({ error: "log_insert", detail: logErr.message }, { status: 500 });
-  }
-
-  // 5. Recipient tokens
-  const { data: tokens } = await supabase
-    .from("device_tokens")
-    .select("token, platform")
-    .eq("athlete", recipient);
-
-  const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios");
-  if (iosTokens.length === 0) {
-    return Response.json({
-      sent: 0,
-      cleaned: 0,
-      attempted: 0,
-      senderToday,
-      failures: [],
-      reason: "no_recipient_tokens",
-      logged: true,
-    });
   }
 
   // 6. APNs push
