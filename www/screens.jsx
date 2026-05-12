@@ -100,7 +100,9 @@ function repsOnLocalDate(sets, athlete, dateStr) {
     .reduce((sum, s) => sum + s.reps, 0);
 }
 
-function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout, onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
+function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout,
+  nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
+  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
   // back-compat with old prop names if file got reverted
   challenge, category, sets, onSetup, onLog }) {
   // If invoked with old single-challenge API, normalize to new shape
@@ -159,7 +161,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     <>
     <div className={`layout-${layout} home-swiper-wrap`}>
       {sortedChallenges.length >= 2 && (
-        <div className="challenge-overview" role="list">
+        <div className="challenge-overview">
           {sortedChallenges.map((ch, i) => {
             const cat = catById[ch.category_id];
             const total = totalsByChallenge.get(ch.id) ?? 0;
@@ -167,11 +169,16 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
             const pct = Math.min(1, total / ch.target_reps);
             const pctInt = Math.round(pct * 100);
             return (
-              <div key={ch.id} className={`co-row ${done ? 'done' : ''}`} role="listitem">
+              <button
+                key={ch.id}
+                type="button"
+                className={`co-row ${done ? 'done' : ''} ${i === activeIdx ? 'active' : ''}`}
+                onClick={() => goTo(i)}
+                aria-label={`Zu ${cat?.name} springen, ${done ? 'erfüllt' : pctInt + ' Prozent'}`}>
                 <span className="co-name">{cat?.name}</span>
                 <span className="co-bar"><span className="co-bar-fill" style={{width: `${pct*100}%`}}/></span>
                 <span className="co-val mono">{done ? '✓' : `${pctInt}%`}</span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -232,6 +239,10 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                       <div className="tug-reps mono">{bennyDone}</div>
                       <div className={`tug-foot mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div>
                     </div>
+                    <div className="tug-side team">
+                      <div className="tug-who">Team</div>
+                      <div className="tug-reps mono">{total}</div>
+                    </div>
                     <div className="tug-side jonas">
                       <div className="tug-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="tug-avatar"/></div>
                       <div className="tug-reps mono">{jonasDone}</div>
@@ -249,14 +260,16 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                           <div className="tug-fill jonas" style={{width:`${jW}%`, left:`${bW}%`}}/>
                           <div className="tug-mid" aria-hidden="true"/>
                         </div>
-                        <div className="tug-summary">
-                          <div className="tug-summary-total mono">
-                            <span className="tug-summary-now">{total}</span>
-                            <span className="tug-summary-of">/{ch.target_reps}</span>
-                          </div>
-                          <div className={`tug-summary-sub mono ${teamRemaining===0?'done':''}`}>
-                            {teamRemaining===0 ? '🎉 Team-Ziel erreicht!' : `noch ${teamRemaining} als Team`}
-                          </div>
+                        <div className="tug-summary mono">
+                          {teamRemaining===0 ? (
+                            <span className="tug-summary-done">🎉 Team-Ziel erreicht!</span>
+                          ) : (
+                            <>
+                              <span className="tug-summary-target">Ziel {ch.target_reps}</span>
+                              <span className="tug-summary-sep">·</span>
+                              <span className="tug-summary-rem">noch {teamRemaining}</span>
+                            </>
+                          )}
                         </div>
                       </>
                     );
@@ -299,6 +312,45 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         </div>
       )}
     </div>
+    {nextWeekStart && (() => {
+      const items = nextWeekChallenges.length ? nextWeekChallenges : nextWeekProposals;
+      if (!items.length) return null;
+      const isConfirmed = nextWeekChallenges.length > 0;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const monday = new Date(nextWeekStart + 'T00:00:00');
+      const daysUntil = Math.max(0, Math.round((monday - today) / 86400000));
+      const whenLabel = daysUntil === 0 ? 'heute' : daysUntil === 1 ? 'morgen' : `in ${daysUntil} Tagen`;
+      return (
+        <div className="next-week-preview">
+          <div className="nwp-header">
+            <span className="nwp-eyebrow">Nächste Woche</span>
+            <span className="nwp-when">{whenLabel}</span>
+          </div>
+          <div className="nwp-subtitle">
+            KW {weekNumber(nextWeekStart)} · ab {formatWeek(nextWeekStart).split(' – ')[0]}
+            {!isConfirmed && ' · Vorschau'}
+          </div>
+          <div className="nwp-items">
+            {items.map((ch, i) => {
+              const cat = catById[ch.category_id];
+              return (
+                <div className="nwp-item" key={ch.id || `p-${i}`}>
+                  <span className="nwp-emoji">{cat?.emoji}</span>
+                  <div className="nwp-meta">
+                    <div className="nwp-name">{cat?.name}</div>
+                    <div className="nwp-picker">von {ch.chosen_by}</div>
+                  </div>
+                  <div className="nwp-target">
+                    <span className="mono">{ch.target_reps}</span>
+                    <span className="nwp-target-unit">Reps</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })()}
     {celebration.pendingCelebration && (
       <CelebrationOverlay
         category={celebration.pendingCelebration.category}

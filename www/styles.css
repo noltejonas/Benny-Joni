@@ -643,6 +643,84 @@ body {
 }
 .week-group.done .wgh-count { display: none; }
 
+/* Next week preview — peek at upcoming challenges on the Heute screen */
+.next-week-preview {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.nwp-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nwp-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.nwp-when {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.nwp-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.nwp-items {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nwp-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+.nwp-emoji {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+.nwp-meta { flex: 1; min-width: 0; }
+.nwp-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.nwp-picker {
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.nwp-target {
+  text-align: right;
+  font-weight: 800;
+  font-size: 16px;
+}
+.nwp-target-unit {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: -2px;
+}
+
 /* Segmented control */
 .segmented {
   display: flex;
@@ -1018,7 +1096,10 @@ body {
 /* Tug-of-war section: Benny pushes from left, Jonas pushes from right,
    shared target meets at the middle, total reps shown dominantly center. */
 .tug-section { margin-top: 16px; }
-.tug-labels { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+.tug-labels { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 8px; }
+.tug-side.team { text-align: center; flex: 0 1 auto; }
+.tug-side.team .tug-who { justify-content: center; gap: 0; }
+.tug-side.team .tug-reps { color: var(--text); }
 .tug-side.jonas { text-align: right; }
 .tug-who { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; gap: 8px; }
 .tug-side.jonas .tug-who { justify-content: flex-end; }
@@ -1069,34 +1150,17 @@ body {
 .tug-mid::before { top: 0; border-radius: 0 0 1px 1px; }
 .tug-mid::after { bottom: 0; border-radius: 1px 1px 0 0; }
 .tug-summary {
-  margin-top: 12px;
+  margin-top: 10px;
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.tug-summary-total {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  letter-spacing: -0.025em;
-  font-weight: 800;
-  line-height: 1;
-}
-.tug-summary-now { font-size: 30px; color: var(--text); }
-.tug-summary-of { font-size: 14px; font-weight: 600; color: var(--text-3); letter-spacing: -0.01em; }
-.tug-summary-sub {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
 }
-.tug-summary-sub.done { color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 13px; }
-@media (max-width: 400px) {
-  .tug-summary-now { font-size: 26px; }
-}
+.tug-summary-target { color: var(--text-2); }
+.tug-summary-rem { color: var(--text-2); }
+.tug-summary-sep { display: inline-block; margin: 0 7px; opacity: 0.45; }
+.tug-summary-done { color: var(--accent); font-size: 13px; font-weight: 700; }
 .split-cell .owe {
   margin-top: 4px;
   font-size: 12px;
@@ -1258,14 +1322,22 @@ a { color: var(--accent); text-decoration: none; }
 }
 .co-row {
   display: flex; align-items: center; gap: 10px;
+  width: 100%;
   min-height: 28px;
   padding: 4px 6px;
-  border-left: 2px solid transparent;
+  border: none; border-left: 2px solid transparent;
   border-radius: 4px;
+  background: none;
   color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: color .2s, font-weight .2s, border-color .2s, background .15s;
 }
+.co-row:active { background: var(--surface-2); }
 .co-row.done { color: var(--text-2); }
+.co-row.active { font-weight: 700; border-left-color: var(--accent); }
 .co-name {
   flex: 1 1 auto; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
