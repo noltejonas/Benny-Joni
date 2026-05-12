@@ -78,6 +78,28 @@ function QuickLogRow({ me, catId, onQuick }) {
 }
 
 // ─── HEUTE (Home) ────────────────────────────────────────────────────────────
+
+function localDateOf(input) {
+  const d = input instanceof Date ? input : new Date(input);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dayIndexInWeek(weekStart, today = new Date()) {
+  const ws = new Date(weekStart + 'T00:00:00');
+  const t = new Date(today); t.setHours(0, 0, 0, 0);
+  const diff = Math.floor((t - ws) / 86400000) + 1;
+  return Math.max(1, Math.min(7, diff));
+}
+
+function repsOnLocalDate(sets, athlete, dateStr) {
+  return sets
+    .filter(s => s.athlete === athlete && localDateOf(s.created_at) === dateStr)
+    .reduce((sum, s) => sum + s.reps, 0);
+}
+
 function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout, onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
   // back-compat with old prop names if file got reverted
   challenge, category, sets, onSetup, onLog }) {
@@ -183,15 +205,27 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                       <div className={`tug-foot mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div>
                     </div>
                   </div>
-                  <div className="tug-bar">
-                    <div className="tug-fill benny" style={{width:`${Math.min(100, (bennyDone/ch.target_reps)*100)}%`}}/>
-                    <div className="tug-fill jonas" style={{width:`${Math.min(100, (jonasDone/ch.target_reps)*100)}%`}}/>
-                    <div className="tug-mid" aria-hidden="true"/>
-                    <div className="tug-total mono">
-                      <span className="tug-total-now">{total}</span>
-                      <span className="tug-total-of"> / {ch.target_reps}</span>
-                    </div>
-                  </div>
+                  {(() => {
+                    const bW = Math.min(100, (bennyDone/ch.target_reps)*100);
+                    const jW = Math.min(100 - bW, (jonasDone/ch.target_reps)*100);
+                    const teamRemaining = Math.max(0, ch.target_reps - total);
+                    return (
+                      <>
+                        <div className="tug-bar">
+                          <div className="tug-fill benny" style={{width:`${bW}%`}}/>
+                          <div className="tug-fill jonas" style={{width:`${jW}%`, left:`${bW}%`}}/>
+                          <div className="tug-mid" aria-hidden="true"/>
+                          <div className="tug-total mono">
+                            <span className="tug-total-now">{total}</span>
+                            <span className="tug-total-of"> / {ch.target_reps}</span>
+                          </div>
+                        </div>
+                        <div className={`tug-remaining mono ${teamRemaining===0?'done':''}`}>
+                          {teamRemaining===0 ? '🎉 Team-Ziel erreicht!' : `Noch ${teamRemaining} Reps als Team`}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               {layout==='bar' && <>
@@ -812,6 +846,14 @@ function StatsChart({ benny, jonas, days, accent, accent3 }) {
   const labelIdx = days <= 7 ? benny.map((_, i) => i) : [0, Math.floor(days/4), Math.floor(days/2), Math.floor(3*days/4), days - 1];
   const fmt = (s) => { const d = new Date(s); return `${d.getDate()}.${d.getMonth()+1}`; };
 
+  // Week boundaries — Mondays within the range
+  const weekMarks = [];
+  for (let i = 0; i < benny.length; i++) {
+    const d = new Date(benny[i].date);
+    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(benny[i].date) });
+  }
+  const showWeekLabels = weekMarks.length <= 5;
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart" preserveAspectRatio="none">
       <defs>
@@ -825,6 +867,14 @@ function StatsChart({ benny, jonas, days, accent, accent3 }) {
         </linearGradient>
       </defs>
       {gridLines.map((y, i) => <line key={i} x1={PAD_X} x2={W - PAD_X} y1={y} y2={y} stroke="var(--border)" strokeWidth="0.5"/>)}
+      {weekMarks.map(({idx, kw}) => (
+        <g key={`wk${idx}`}>
+          <line className="chart-week-line" x1={xPos(idx)} x2={xPos(idx)} y1={PAD_Y * 0.6} y2={H - PAD_Y}/>
+          {showWeekLabels && (
+            <text x={xPos(idx)} y={PAD_Y * 0.55} fill="var(--text-2)" fontSize="8" textAnchor="middle" opacity="0.75">KW{kw}</text>
+          )}
+        </g>
+      ))}
       <path d={areaFor(benny)} fill="url(#grad-benny)"/>
       <path d={areaFor(jonas)} fill="url(#grad-jonas)"/>
       <path d={pathFor(benny)} fill="none" stroke={accent} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
@@ -868,6 +918,13 @@ function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, v
   // Y labels — 5 ticks
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * maxV));
 
+  // Week boundaries — Mondays within the range
+  const weekMarks = [];
+  for (let i = 0; i < benny.length; i++) {
+    const d = new Date(benny[i].date);
+    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(benny[i].date) });
+  }
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <defs>
@@ -881,6 +938,12 @@ function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, v
         </linearGradient>
       </defs>
       {gridLines.map((y, i) => <line key={i} x1={PAD_X} x2={W - PAD_X} y1={y} y2={y} stroke="var(--border)" strokeWidth="0.5"/>)}
+      {weekMarks.map(({idx, kw}) => (
+        <g key={`wk${idx}`}>
+          <line className="chart-week-line" x1={xPos(idx)} x2={xPos(idx)} y1={PAD_Y * 0.7} y2={H - PAD_Y}/>
+          <text x={xPos(idx)} y={PAD_Y * 0.6} fill="var(--text-2)" fontSize="10" textAnchor="middle" opacity="0.8">KW {kw}</text>
+        </g>
+      ))}
       <path d={areaFor(benny)} fill="url(#grad-benny-fs)"/>
       <path d={areaFor(jonas)} fill="url(#grad-jonas-fs)"/>
       <path d={pathFor(benny)} fill="none" stroke={accent} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
@@ -982,8 +1045,8 @@ function ChartFullscreen({
             <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>All</button>
           </div>
           <div className="segmented segmented-sm">
-            <button className={!cumulative?'active':''} onClick={()=>setCumulative(false)}>⌀ Tag</button>
-            <button className={cumulative?'active':''} onClick={()=>setCumulative(true)}>Σ Kumuliert</button>
+            <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
+            <button className={!cumulative?'active':''} onClick={()=>setCumulative(false)} aria-label="Pro Tag">Tag</button>
           </div>
         </div>
       </div>
@@ -1080,7 +1143,7 @@ function HistoryScreen({ challenges, categories, allSets }) {
 function HistoryView({ challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone }) {
   const [range, setRange] = useState('30'); // '7', '30', 'all'
   const [selectedCats, setSelectedCats] = useState([]); // [] = alle
-  const [cumulative, setCumulative] = useState(false);
+  const [cumulative, setCumulative] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
   // Resolve accent colors from CSS vars (read at render time)
@@ -1167,6 +1230,88 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
   const leader = bennyStats.total > jonasStats.total ? 'Benny' : jonasStats.total > bennyStats.total ? 'Jonas' : null;
   const diff = Math.abs(bennyStats.total - jonasStats.total);
 
+  // Momentum: who's gaining in the last 7 days?
+  // Only meaningful when the range is ≥ 2 weeks — otherwise "last 7" ≈ "all" and the line just repeats the headline.
+  const momentum = useMemo(() => {
+    if (!leader || totalDays < 14) return null;
+    const W = 7;
+    const rB = bennySeries.slice(-W).reduce((a, x) => a + x.reps, 0);
+    const rJ = jonasSeries.slice(-W).reduce((a, x) => a + x.reps, 0);
+    if (rB === rJ) return null;
+    const recentLeader = rB > rJ ? 'Benny' : 'Jonas';
+    const gap = Math.abs(rB - rJ);
+    const isCatchingUp = recentLeader !== leader;
+    const weeksToOvertake = isCatchingUp && gap >= 5 && (diff / gap) <= 8
+      ? Math.max(0.5, Math.round((diff / gap) * 2) / 2)
+      : null;
+    return { who: recentLeader, gap, isCatchingUp, weeksToOvertake };
+  }, [bennySeries, jonasSeries, totalDays, leader, diff]);
+
+  // All-time lead history: who currently leads overall, since when, and weekly tally.
+  // Uses filteredSets (category filter applied) but ignores the range selector — these are
+  // historical aggregates, not range-scoped views.
+  const leadHistory = useMemo(() => {
+    if (!filteredSets.length) return null;
+    const dayMap = new Map();
+    for (const s of filteredSets) {
+      const day = String(s.created_at).slice(0, 10);
+      if (!dayMap.has(day)) dayMap.set(day, { Benny: 0, Jonas: 0 });
+      dayMap.get(day)[s.athlete] += s.reps;
+    }
+    const days = Array.from(dayMap.keys()).sort();
+    let cumB = 0, cumJ = 0;
+    let currentLeader = null;
+    let leaderSinceDate = null;
+    for (const day of days) {
+      const dd = dayMap.get(day);
+      cumB += dd.Benny;
+      cumJ += dd.Jonas;
+      const todayLeader = cumB > cumJ ? 'Benny' : cumJ > cumB ? 'Jonas' : null;
+      if (todayLeader !== currentLeader) {
+        currentLeader = todayLeader;
+        leaderSinceDate = day;
+      }
+    }
+    if (!currentLeader) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const since = new Date(leaderSinceDate);
+    const daysSince = Math.max(1, Math.round((today - since) / 86400000) + 1);
+    return { leader: currentLeader, sinceDate: leaderSinceDate, daysSince };
+  }, [filteredSets]);
+
+  // Per-week win tally: for each completed calendar week, who had more reps in
+  // that week's challenges? Skips the current (in-progress) week and applies the
+  // category filter via selectedCats.
+  const weeklyTally = useMemo(() => {
+    const byWeek = new Map();
+    const catSet = selectedCats.length ? new Set(selectedCats) : null;
+    for (const ch of challenges) {
+      if (catSet && !catSet.has(ch.category_id)) continue;
+      const wk = ch.week_start;
+      if (!byWeek.has(wk)) byWeek.set(wk, { Benny: 0, Jonas: 0 });
+      const sets = setsByCh[ch.id] || [];
+      for (const s of sets) byWeek.get(wk)[s.athlete] += s.reps;
+    }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let bennyWins = 0, jonasWins = 0, ties = 0;
+    for (const [wkStart, t] of byWeek) {
+      const wEnd = new Date(wkStart); wEnd.setHours(0, 0, 0, 0); wEnd.setDate(wEnd.getDate() + 6);
+      if (wEnd >= today) continue; // skip current/future week
+      if (t.Benny === 0 && t.Jonas === 0) continue; // no activity
+      if (t.Benny > t.Jonas) bennyWins++;
+      else if (t.Jonas > t.Benny) jonasWins++;
+      else ties++;
+    }
+    return { bennyWins, jonasWins, ties };
+  }, [challenges, setsByCh, selectedCats]);
+
+  const fmtDateShort = (iso) => {
+    const d = new Date(iso);
+    const opts = { day: 'numeric', month: 'short' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString('de-DE', opts);
+  };
+
   // Per-category breakdown in range
   const perCat = useMemo(() => {
     const m = {};
@@ -1192,16 +1337,16 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       <div className="card">
         <div className="vs-head">
           <div className="label" style={{margin: 0}}>Benny vs. Jonas</div>
-          <div className="segmented segmented-sm">
-            <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>7T</button>
-            <button className={range==='30'?'active':''} onClick={()=>setRange('30')}>30T</button>
-            <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>All</button>
-          </div>
-        </div>
-        <div className="vs-head" style={{ marginTop: -4, marginBottom: 10, justifyContent: 'flex-end' }}>
-          <div className="segmented segmented-sm">
-            <button className={!cumulative?'active':''} onClick={()=>setCumulative(false)}>⌀ Tag</button>
-            <button className={cumulative?'active':''} onClick={()=>setCumulative(true)}>Σ Kumuliert</button>
+          <div className="vs-toggles">
+            <div className="segmented segmented-sm">
+              <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
+              <button className={!cumulative?'active':''} onClick={()=>setCumulative(false)} aria-label="Pro Tag">Tag</button>
+            </div>
+            <div className="segmented segmented-sm">
+              <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>7T</button>
+              <button className={range==='30'?'active':''} onClick={()=>setRange('30')}>30T</button>
+              <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>All</button>
+            </div>
           </div>
         </div>
 
@@ -1232,6 +1377,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
             <div className="winner-text">
               <div className="winner-name">{leader}</div>
               <div className="winner-lead">führt mit <span className="mono">+{diff}</span> Reps</div>
+              {momentum && (
+                <div className={`winner-momentum ${momentum.who.toLowerCase()}`}>
+                  {momentum.isCatchingUp ? '📈' : '🔒'} {momentum.who} {momentum.isCatchingUp ? 'holt auf' : 'baut aus'} · <span className="mono">+{momentum.gap}</span> in 7T
+                  {momentum.weeksToOvertake != null && (
+                    <> · überholt in ~<span className="mono">{momentum.weeksToOvertake}</span>W</>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1304,23 +1457,55 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
         )}
       </div>
 
-      <div className="label" style={{ marginBottom: 8, padding: '0 4px', marginTop: 18 }}>Verlauf</div>
-      {challenges.map((ch) => {
-        const cat = catById[ch.category_id];
-        const sets = setsByCh[ch.id] || [];
-        const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
-        const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
-        const bPct = Math.round(100 * bT / ch.target_reps);
-        const jPct = Math.round(100 * jT / ch.target_reps);
-        const bDone = bT >= ch.target_reps;
-        const jDone = jT >= ch.target_reps;
-        return (
-          <div className="week-row" key={ch.id}>
-            <div>
-              <div className="wk">KW {weekNumber(ch.week_start)} · {formatWeek(ch.week_start)}</div>
-              <div className="cat">{cat?.emoji} {cat?.name}</div>
-              <div className="wk" style={{ marginTop: 4 }}>Ziel {ch.target_reps} / Person</div>
+      {(leadHistory || weeklyTally.bennyWins + weeklyTally.jonasWins + weeklyTally.ties > 0) && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="label" style={{ marginBottom: 10 }}>Bilanz</div>
+          {leadHistory && (
+            <div className="lead-since">
+              <span className={`lead-since-name ${leadHistory.leader.toLowerCase()}`}>{leadHistory.leader}</span>
+              {' '}führt seit dem <span className="mono">{fmtDateShort(leadHistory.sinceDate)}</span>
+              {' · '}<span className="mono">{leadHistory.daysSince}</span> Tagen
             </div>
+          )}
+          {(weeklyTally.bennyWins + weeklyTally.jonasWins + weeklyTally.ties > 0) && (
+            <>
+              <div className="vs-row" style={{ marginTop: 12 }}>
+                <div className="vs-side benny">
+                  <div className="vs-name">Benny</div>
+                  <div className="vs-reps mono">{weeklyTally.bennyWins}</div>
+                  <div className="vs-meta">Wochen gewonnen</div>
+                </div>
+                <div className="vs-side jonas">
+                  <div className="vs-name">Jonas</div>
+                  <div className="vs-reps mono">{weeklyTally.jonasWins}</div>
+                  <div className="vs-meta">Wochen gewonnen</div>
+                </div>
+              </div>
+              {weeklyTally.ties > 0 && (
+                <div className="ties-row mono">{weeklyTally.ties} unentschieden</div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="label" style={{ marginBottom: 8, padding: '0 4px', marginTop: 18 }}>Verlauf</div>
+      {(() => {
+        const groups = [];
+        for (const ch of challenges) {
+          const last = groups[groups.length - 1];
+          if (last && last.weekStart === ch.week_start) last.items.push(ch);
+          else groups.push({ weekStart: ch.week_start, items: [ch] });
+        }
+        const progressRows = (ch) => {
+          const sets = setsByCh[ch.id] || [];
+          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
+          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
+          const bPct = Math.round(100 * bT / ch.target_reps);
+          const jPct = Math.round(100 * jT / ch.target_reps);
+          const bDone = bT >= ch.target_reps;
+          const jDone = jT >= ch.target_reps;
+          return (
             <div className="right">
               <div style={{display:'flex',justifyContent:'flex-end',alignItems:'baseline',gap:8}}>
                 <span className="mono" style={{color:'var(--accent)',fontWeight:700,fontSize:14}}>B</span>
@@ -1333,9 +1518,47 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                 <span className="wk mono" style={{minWidth:72,textAlign:'right'}}>{jT}/{ch.target_reps}</span>
               </div>
             </div>
-          </div>);
-
-      })}
+          );
+        };
+        return groups.map(({ weekStart, items }) => {
+          if (items.length === 1) {
+            const ch = items[0];
+            const cat = catById[ch.category_id];
+            return (
+              <div className="week-row" key={ch.id}>
+                <div>
+                  <div className="wk">KW {weekNumber(ch.week_start)} · {formatWeek(ch.week_start)}</div>
+                  <div className="cat">{cat?.emoji} {cat?.name}</div>
+                  <div className="wk" style={{ marginTop: 4 }}>Ziel {ch.target_reps} / Person</div>
+                </div>
+                {progressRows(ch)}
+              </div>
+            );
+          }
+          return (
+            <div className="week-group" key={weekStart}>
+              <div className="week-group-header">
+                <span className="wgh-kw">KW {weekNumber(weekStart)}</span>
+                <span className="wgh-sep">·</span>
+                <span className="wgh-range">{formatWeek(weekStart)}</span>
+                <span className="wgh-count">{items.length} Challenges</span>
+              </div>
+              {items.map((ch) => {
+                const cat = catById[ch.category_id];
+                return (
+                  <div className="week-group-item" key={ch.id}>
+                    <div>
+                      <div className="cat">{cat?.emoji} {cat?.name}</div>
+                      <div className="wk" style={{ marginTop: 2 }}>Ziel {ch.target_reps} / Person</div>
+                    </div>
+                    {progressRows(ch)}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        });
+      })()}
       {fullscreen && (
         <ChartFullscreen
           bennySeries={bennySeries}
