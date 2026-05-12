@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, EmojiPickerSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard */
+/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // User edits these to point to their Supabase project. Empty = demo mode.
@@ -62,6 +62,11 @@ function App() {
   const [allSets, setAllSets] = useState([]);
   const [planSlots, setPlanSlots] = useState([]);
   const [rotationConfig, setRotationConfig] = useState(null);
+  const [penalties, setPenalties] = useState([]);
+  const [closures, setClosures] = useState([]);
+  const [openClosures, setOpenClosures] = useState([]);
+  const [penaltyConfig, setPenaltyConfig] = useState(null);
+  const [closingWeek, setClosingWeek] = useState(null);
   const [proposalDismissed, setProposalDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -69,6 +74,7 @@ function App() {
   const [setupForChallenge, setSetupForChallenge] = useState(null); // null=closed, {} = new, {id, ...} = edit
   const [logForChallenge, setLogForChallenge] = useState(null); // null=closed, {challenge}=open
   const [pickerForSet, setPickerForSet] = useState(null); // null=closed, set object = emoji picker open
+  const [backfillOpen, setBackfillOpen] = useState(false);
   const [toast, setToast] = useState('');
   const lastFeedRef = React.useRef(null);
 
@@ -132,12 +138,21 @@ function App() {
       else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winner} dominiert mit ${diff} Reps Vorsprung.`;
       else if (diff / sumAll > 0.15) analysis = `${winner} setzt sich durch — ${diff} Reps Vorsprung.`;
       else analysis = `Knapper Sieg für ${winner} — nur ${diff} Reps Unterschied.`;
+      const bennyByCat = challStats
+        .filter(c => c.bennyDone > 0)
+        .map(c => ({ name: c.cat?.name || '—', reps: c.bennyDone }))
+        .sort((a, b) => b.reps - a.reps);
+      const jonasByCat = challStats
+        .filter(c => c.jonasDone > 0)
+        .map(c => ({ name: c.cat?.name || '—', reps: c.jonasDone }))
+        .sort((a, b) => b.reps - a.reps);
       out.push({
         kind: 'recap',
         id: `recap-${ws}`,
         week_start: ws,
         created_at: sundayEnd.toISOString(),
         challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges: challs.length,
+        bennyByCat, jonasByCat,
         analysis,
       });
     }
@@ -145,10 +160,16 @@ function App() {
   }, [allChallenges, allSets, categories]);
 
   const feedItems = useMemo(() => {
-    const items = [...weekRecaps, ...feed.map(s => ({ kind: 'set', ...s }))];
+    // Past-week sets are represented by their WeekRecap card — drop the
+    // individual entries so the feed stays bounded.
+    const currentSets = feed.filter(s => {
+      if (!s.created_at) return true;
+      return PTData.isoDate(new Date(s.created_at)) >= weekStart;
+    });
+    const items = [...weekRecaps, ...currentSets.map(s => ({ kind: 'set', ...s }))];
     items.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     return items;
-  }, [feed, weekRecaps]);
+  }, [feed, weekRecaps, weekStart]);
 
   async function fixWeek(picks) {
     try {
@@ -168,13 +189,17 @@ function App() {
 
   const reload = useCallback(async () => {
     try {
-      const [cats, challs, feedData, allSetsData, slots, cfg] = await Promise.all([
+      const [cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, penCfg] = await Promise.all([
       api.getCategories(),
       api.listChallenges(),
       api.recentFeed(100),
       api.getAllSets ? api.getAllSets() : api.recentFeed(10000),
       api.getPlanSlots ? api.getPlanSlots() : [],
-      api.getRotationConfig ? api.getRotationConfig() : null]
+      api.getRotationConfig ? api.getRotationConfig() : null,
+      api.listPenalties ? api.listPenalties() : [],
+      api.listClosures ? api.listClosures() : [],
+      api.listOpenClosures ? api.listOpenClosures() : [],
+      api.getPenaltyConfig ? api.getPenaltyConfig() : null]
       );
       setCategories(cats);
       setAllChallenges(challs);
@@ -182,6 +207,10 @@ function App() {
       setAllSets(allSetsData);
       setPlanSlots(slots);
       setRotationConfig(cfg);
+      setPenalties(pens || []);
+      setClosures(cls || []);
+      setOpenClosures(openCls || []);
+      setPenaltyConfig(penCfg);
 
       // Notification trigger
       if (lastFeedRef.current !== null && feedData[0] && feedData[0].id !== lastFeedRef.current &&
@@ -333,6 +362,12 @@ function App() {
       </header>
 
       <main className="app-main">
+        {loading ? (
+          <div className="app-loader" role="status" aria-live="polite">
+            <div className="app-loader-spinner" aria-hidden="true" />
+            <div className="app-loader-text">Lade Daten…</div>
+          </div>
+        ) : (<>
         {api.mode === 'demo' && tab === 'home' &&
         <div className="banner">
             <div className="banner-icon">!</div>
@@ -360,6 +395,8 @@ function App() {
           nextWeekStart={nextWeekStart}
           nextWeekChallenges={nextWeekChallenges}
           nextWeekProposals={nextWeekProposals}
+          openClosures={openClosures}
+          onCloseWeek={(w) => setClosingWeek(w)}
           onAddGoal={() => setSetupForChallenge({})}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
           onLogChallenge={(ch) => setLogForChallenge(ch)}
@@ -371,6 +408,16 @@ function App() {
             } catch (e) { alert(e.message); }
           }} />
 
+        }
+
+        {tab === 'strafkonto' &&
+        <StrafkontoScreen
+          api={api} me={me}
+          penalties={penalties}
+          closures={closures}
+          openClosures={openClosures}
+          onChange={reload}
+          onOpenSettings={() => setTab('settings')} />
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} categories={categories}
@@ -385,7 +432,8 @@ function App() {
               reload();
             } catch (e) { alert(e.message); }
           }}
-          onPickEmoji={(s) => setPickerForSet(s)} />}
+          onPickEmoji={(s) => setPickerForSet(s)}
+          onBackfill={() => setBackfillOpen(true)} />}
 
         {tab === 'history' &&
         <HistoryScreen
@@ -397,9 +445,11 @@ function App() {
 
         {tab === 'settings' &&
         <SettingsScreen api={api} categories={categories} onAddCategory={reload}
+          me={me}
           notificationsEnabled={t.notifications}
           onSetNotifications={(v) => setTweak('notifications', v)} />
         }
+        </>)}
       </main>
 
       <nav className="tabbar">
@@ -413,8 +463,20 @@ function App() {
           <button className={`tab-btn ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
             <Icon name="history" /> Verlauf
           </button>
+          <button className={`tab-btn ${tab === 'strafkonto' ? 'active' : ''}`} onClick={() => setTab('strafkonto')}>
+            <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,fontSize:18}}>⚖️</span> Strafkonto
+            {penalties.filter(p => !p.paid).length > 0 && (
+              <span className="tab-badge">{penalties.filter(p => !p.paid).length}</span>
+            )}
+          </button>
         </div>
       </nav>
+
+      {closingWeek && (
+        <WeekCloseSheet weekStart={closingWeek} api={api} me={me}
+          onClose={() => setClosingWeek(null)}
+          onDone={() => { setClosingWeek(null); setToast('Woche abgeschlossen'); reload(); }} />
+      )}
 
       <Sheet open={!!setupForChallenge} onClose={() => setSetupForChallenge(null)}>
         <SetupSheet
@@ -438,6 +500,16 @@ function App() {
           category={logForChallenge ? categories.find(c => c.id === logForChallenge.category_id) : null}
           onClose={() => setLogForChallenge(null)}
           onLogged={(r) => {setLogForChallenge(null);setToast(`+${r} geloggt 💪`);reload();}} />
+      </Sheet>
+
+      <Sheet open={backfillOpen} onClose={() => setBackfillOpen(false)}>
+        <BackfillSheet
+          api={api}
+          me={me}
+          challenges={currentChallenges}
+          categories={categories}
+          onClose={() => setBackfillOpen(false)}
+          onSaved={(r) => {setBackfillOpen(false);setToast(`+${r} nachgetragen`);reload();}} />
       </Sheet>
 
       <Sheet open={!!pickerForSet} onClose={() => setPickerForSet(null)}>

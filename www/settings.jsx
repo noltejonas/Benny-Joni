@@ -40,19 +40,30 @@ function NotificationsCard({ enabled, onChange }) {
   );
 }
 
-function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, onSetNotifications }) {
+function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, onSetNotifications, me }) {
   const [slots, setSlots] = useState([]);
   const [config, setConfig] = useState(null);
+  const [penaltyCfg, setPenaltyCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   async function reload() {
     try {
-      const [s, c] = await Promise.all([api.getPlanSlots(), api.getRotationConfig()]);
+      const [s, c, pc] = await Promise.all([
+        api.getPlanSlots(),
+        api.getRotationConfig(),
+        api.getPenaltyConfig ? api.getPenaltyConfig() : null,
+      ]);
       setSlots(s);
       setConfig(c);
+      setPenaltyCfg(pc);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
+  }
+
+  async function reloadPenalty() {
+    if (!api.getPenaltyConfig) return;
+    try { setPenaltyCfg(await api.getPenaltyConfig()); } catch (e) {}
   }
 
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -158,6 +169,9 @@ function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, 
     <div>
       <AppearanceCard />
       <NotificationsCard enabled={notificationsEnabled} onChange={onSetNotifications}/>
+      {penaltyCfg !== null && window.PenaltyConfigCard && (
+        <PenaltyConfigCard api={api} cfg={penaltyCfg} me={me} onChange={reloadPenalty}/>
+      )}
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>

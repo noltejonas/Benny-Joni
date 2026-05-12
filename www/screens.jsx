@@ -14,7 +14,7 @@ function setQuickSets(athlete, catId, arr) {
   localStorage.setItem('quickSets', JSON.stringify(all));
 }
 
-function QuickLogRow({ me, catId, onQuick }) {
+function QuickLogRow({ me, catId, onQuick, onLog }) {
   const [values, setValues] = useState(() => getQuickSets(me, catId));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(values);
@@ -70,14 +70,46 @@ function QuickLogRow({ me, catId, onQuick }) {
         )}
       </div>
       <div className="quick-chips">
+        {onLog && (
+          <button className="quick-chip-open" onClick={onLog}>+ Satz</button>
+        )}
         {values.length === 0 ? (
           <button className="quick-chip-setup" onClick={() => { setDraft([5, 10, 15]); setEditing(true); }}>
-            + Schnellsatz-Werte festlegen
+            Schnellsatz festlegen
           </button>
         ) : values.map((v, i) => (
           <button key={i} className="quick-chip mono" onClick={() => onQuick(v)}>+{v}</button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function GlowPreview() {
+  const variants = [
+    { id: 'v1', name: '01 · Soft Halo' },
+    { id: 'v2', name: '02 · Top Highlight' },
+    { id: 'v3', name: '03 · Underglow' },
+    { id: 'v4', name: '04 · Neon Outline' },
+    { id: 'v5', name: '05 · Ambient Wide' },
+    { id: 'v6', name: '06 · Color Ring' },
+    { id: 'v7', name: '07 · Bright Pop' },
+    { id: 'v8', name: '08 · Inner Edge' },
+    { id: 'v9', name: '09 · Side Light' },
+    { id: 'v10', name: '10 · Shimmer' },
+  ];
+  return (
+    <div className="glow-preview">
+      <div className="glow-preview-title">Glow-Vorschau · sag mir die Nummer</div>
+      {variants.map(v => (
+        <div className={`glow-preview-row tug-glow-${v.id}`} key={v.id}>
+          <span className="glow-preview-name">{v.name}</span>
+          <div className="tug-bar opposing tug-preview">
+            <div className="tug-fill benny" style={{width: '60%'}} />
+            <div className="tug-fill jonas from-right" style={{width: '30%'}} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -134,18 +166,13 @@ function dailyBreakdownFor(weekStart, sets) {
     .sort((a, b) => (a.dow === 0 ? 7 : a.dow) - (b.dow === 0 ? 7 : b.dow));
 }
 
-function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDelta, arrowDelta, showArrow }) {
+function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDelta }) {
   const isDone = done >= fairShare;
   const footerClass = variant === 'tug' ? 'tug-foot' : 'owe';
 
   if (isDone) {
     return <div className={`${footerClass} mono done`}>✓ erledigt</div>;
   }
-
-  const arrow = !showArrow ? null
-    : arrowDelta > 0 ? <span className="arrow-up">↑ +{arrowDelta}</span>
-    : arrowDelta < 0 ? <span className="arrow-down">↓ {arrowDelta}</span>
-    : <span className="arrow-flat">→ ±0</span>;
 
   const statusClass = trackDelta >= 0 ? 'ok' : 'behind';
   const statusText = trackDelta >= 0 ? '✓ Auf Kurs' : `${Math.abs(trackDelta)} hinten`;
@@ -154,15 +181,31 @@ function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDe
     <>
       <div className="daily-line mono">
         <span>heute {todayReps} / {dailyTarget}</span>
-        {arrow}
       </div>
       <div className={`track-status ${statusClass}`}>{statusText}</div>
     </>
   );
 }
 
+function WeekCloseBanner({ weekStart, onClose }) {
+  function weekKW(ws) {
+    const d = new Date(ws + 'T00:00:00'); d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yStart = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil((((d - yStart) / 86400000) + 1) / 7);
+  }
+  return (
+    <div className="weekclose-banner">
+      <div className="weekclose-banner-title">KW {weekKW(weekStart)} ist um.</div>
+      <div className="weekclose-banner-sub">Strafkonto-Abschluss noch offen.</div>
+      <button className="weekclose-banner-btn" onClick={() => onClose(weekStart)}>Woche abschließen</button>
+    </div>
+  );
+}
+
 function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout,
   weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
+  openClosures = [], onCloseWeek,
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
   // back-compat with old prop names if file got reverted
   challenge, category, sets, onSetup, onLog }) {
@@ -220,6 +263,10 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
 
   return (
     <>
+    <GlowPreview />
+    {openClosures.length > 0 && openClosures.map(w => (
+      <WeekCloseBanner key={w} weekStart={w} onClose={onCloseWeek}/>
+    ))}
     <div className={`layout-${layout} home-swiper-wrap`}>
       {sortedChallenges.length >= 2 && (
         <div className="challenge-overview">
@@ -257,21 +304,15 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         const remaining = Math.max(0, ch.target_reps - total);
         const fairShare = Math.ceil(ch.target_reps / 2);
         const todayStr = localDateOf(new Date());
-        const yesterdayStr = localDateOf(new Date(Date.now() - 86400000));
         const dayIdx = dayIndexInWeek(ch.week_start);
         const dailyTarget = Math.ceil(fairShare / 7);
         const expectedByEod = Math.ceil(fairShare * dayIdx / 7);
-        const showArrow = dayIdx >= 2;
 
         const bennyToday = repsOnLocalDate(csets, 'Benny', todayStr);
-        const bennyYesterday = repsOnLocalDate(csets, 'Benny', yesterdayStr);
         const bennyTrackDelta = bennyDone - expectedByEod;
-        const bennyArrowDelta = bennyToday - bennyYesterday;
 
         const jonasToday = repsOnLocalDate(csets, 'Jonas', todayStr);
-        const jonasYesterday = repsOnLocalDate(csets, 'Jonas', yesterdayStr);
         const jonasTrackDelta = jonasDone - expectedByEod;
-        const jonasArrowDelta = jonasToday - jonasYesterday;
         return (
           <div key={ch.id} className="challenge-slide"><div className={`hero-card ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
             <SparkleLayer active={celebration.getPersistentStyle(ch) === 'sparkle'} />
@@ -320,8 +361,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                         dailyTarget={dailyTarget}
                         todayReps={bennyToday}
                         trackDelta={bennyTrackDelta}
-                        arrowDelta={bennyArrowDelta}
-                        showArrow={showArrow}
                       />
                     </div>
                     <div className="tug-side team">
@@ -339,8 +378,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                         dailyTarget={dailyTarget}
                         todayReps={jonasToday}
                         trackDelta={jonasTrackDelta}
-                        arrowDelta={jonasArrowDelta}
-                        showArrow={showArrow}
                       />
                     </div>
                   </div>
@@ -388,8 +425,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     dailyTarget={dailyTarget}
                     todayReps={bennyToday}
                     trackDelta={bennyTrackDelta}
-                    arrowDelta={bennyArrowDelta}
-                    showArrow={showArrow}
                   />
                 </div>
                 <div className="split-cell jonas">
@@ -402,14 +437,11 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     dailyTarget={dailyTarget}
                     todayReps={jonasToday}
                     trackDelta={jonasTrackDelta}
-                    arrowDelta={jonasArrowDelta}
-                    showArrow={showArrow}
                   />
                 </div>
               </div>}
             </>)}
-            <button className="btn" style={{marginTop:16}} onClick={() => onLogChallenge(ch)}>+ Satz für {cat?.name} loggen</button>
-            <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} />
+            <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} onLog={() => onLogChallenge(ch)} />
           </div>
           {(() => {
             const maxV = Math.max(1, ...chDailyBreakdown.flatMap(d => [d.Benny, d.Jonas]));
@@ -842,7 +874,7 @@ function LogSheet({ api, me, challenge, category, onClose, onLogged }) {
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
 function WeekRecap({ recap }) {
-  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis } = recap;
+  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [] } = recap;
   const monday = new Date(week_start + 'T00:00:00');
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
   const fmtD = (d) => `${d.getDate()}.${d.getMonth()+1}.`;
@@ -918,6 +950,24 @@ function WeekRecap({ recap }) {
           </div>
         ))}
       </div>
+      <div className="recap-athlete-stats">
+        <div className="recap-athlete-line">
+          <img src="uploads/benny.jpg" alt="Benny" className="recap-athlete-mini-avatar"/>
+          <span className="recap-athlete-stats-text">
+            {bennyByCat.length === 0 ? '— keine Reps —' : bennyByCat.map((x, i) => (
+              <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
+            ))}
+          </span>
+        </div>
+        <div className="recap-athlete-line">
+          <img src="uploads/jonas.jpg" alt="Jonas" className="recap-athlete-mini-avatar"/>
+          <span className="recap-athlete-stats-text">
+            {jonasByCat.length === 0 ? '— keine Reps —' : jonasByCat.map((x, i) => (
+              <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
+            ))}
+          </span>
+        </div>
+      </div>
       <div className="recap-analysis">{analysis}</div>
       {totalChallenges > 0 && (
         <div className="recap-foot">
@@ -987,7 +1037,7 @@ function EmojiPickerSheet({ onPick, onClose }) {
   );
 }
 
-function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji }) {
+function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
   const [editId, setEditId] = React.useState(null);
   const [editVal, setEditVal] = React.useState('');
   // Snapshot last-seen timestamp; on tab-unmount, persist "now" so next visit
@@ -1026,7 +1076,12 @@ function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggl
   };
   return (
     <div className="card">
-      <div className="label" style={{ marginBottom: 6 }}>Live-Feed</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div className="label">Live-Feed</div>
+        {onBackfill && me && (
+          <button className="btn-link" onClick={onBackfill}>Nachtrag</button>
+        )}
+      </div>
       {feed.map((s) => {
         if (s.kind === 'recap') return <WeekRecap key={s.id} recap={s} />;
         const mine = !me || s.athlete === me;
@@ -2124,4 +2179,125 @@ function computeAthleteStats(sets, athlete, series) {
   return { total, sets: setCount, avgSet, maxSet, activeDays, bestDay, avgDay };
 }
 
-Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, StatsChart, FullscreenChart, ChartFullscreen, HistoryView, computeAthleteStats, EmojiPickerSheet });
+function BackfillSheet({ api, me, challenges = [], categories = [], onClose, onSaved }) {
+  const today = new Date();
+  const monday = PTData.mondayOf(today);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+  const todayIso = localDateOf(today);
+  const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+
+  const [dateIso, setDateIso] = React.useState(todayIso);
+  const [challengeId, setChallengeId] = React.useState(challenges[0]?.id || '');
+  const [reps, setReps] = React.useState(10);
+  const [saving, setSaving] = React.useState(false);
+
+  async function save() {
+    if (reps <= 0 || !challengeId) return;
+    setSaving(true);
+    try {
+      const now = new Date();
+      const [y, m, d] = dateIso.split('-').map(Number);
+      // Pick midday of the chosen date so it sorts predictably relative to
+      // any other entries that day without leaking real-time-of-day info.
+      const created = new Date(y, m - 1, d, 12, 0, 0);
+      await api.addSet({
+        challenge_id: challengeId,
+        athlete: me,
+        reps: parseInt(reps),
+        note: null,
+        created_at: created.toISOString(),
+      });
+      onSaved?.(reps);
+    } catch (e) {
+      alert(e.message || 'Fehler');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+  return (
+    <>
+      <h2 className="title" style={{ marginBottom: 4 }}>Nachtrag</h2>
+      <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
+        Satz für diese Woche nachtragen
+      </div>
+
+      <div className="label" style={{ marginBottom: 8 }}>Tag</div>
+      <div className="chip-row" style={{ marginBottom: 16 }}>
+        {days.map((d, i) => {
+          const iso = localDateOf(d);
+          const disabled = iso > todayIso;
+          const selected = iso === dateIso;
+          return (
+            <button
+              key={iso}
+              className="chip"
+              disabled={disabled}
+              onClick={() => setDateIso(iso)}
+              style={{
+                opacity: disabled ? 0.25 : 1,
+                background: selected ? 'var(--accent)' : undefined,
+                color: selected ? '#000' : undefined,
+              }}>
+              {dayLabels[i]} {d.getDate()}.
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="label" style={{ marginBottom: 8 }}>Challenge</div>
+      {challenges.length === 0 ? (
+        <div className="subtitle" style={{ marginBottom: 16 }}>Keine Challenges diese Woche</div>
+      ) : (
+        <div className="chip-row" style={{ marginBottom: 16 }}>
+          {challenges.map(ch => {
+            const cat = catById[ch.category_id];
+            const selected = ch.id === challengeId;
+            return (
+              <button
+                key={ch.id}
+                className="chip"
+                onClick={() => setChallengeId(ch.id)}
+                style={{
+                  background: selected ? 'var(--accent)' : undefined,
+                  color: selected ? '#000' : undefined,
+                }}>
+                {cat?.name || '—'}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="label" style={{ marginBottom: 8 }}>Reps</div>
+      <input
+        className="input input-lg mono"
+        type="number"
+        inputMode="numeric"
+        value={reps}
+        onChange={(e) => setReps(parseInt(e.target.value) || 0)}
+        onFocus={(e) => e.target.select()} />
+
+      <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+        {[5, 10, 15, 20, 25, 30].map((v) =>
+          <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
+        )}
+      </div>
+
+      <div className="btn-row" style={{ marginTop: 24 }}>
+        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        <button className="btn" onClick={save} disabled={saving || reps <= 0 || !challengeId}>
+          {saving ? '…' : `+${reps} nachtragen`}
+        </button>
+      </div>
+    </>
+  );
+}
+
+Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, BackfillSheet, HistoryScreen, StatsChart, FullscreenChart, ChartFullscreen, HistoryView, computeAthleteStats, EmojiPickerSheet });

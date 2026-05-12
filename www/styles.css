@@ -1798,6 +1798,12 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 .recap-chall-badge { font-size: 15px; min-width: 18px; text-align: center; }
 .recap-chall-badge.hit { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--accent) 60%, transparent)); }
 
+.recap-athlete-stats { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; position: relative; z-index: 2; }
+.recap-athlete-line { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); line-height: 1.3; }
+.recap-athlete-mini-avatar { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+.recap-athlete-stats-text { min-width: 0; word-break: break-word; }
+.recap-athlete-stats-text .mono { color: var(--text); font-weight: 700; }
+
 .recap-analysis { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; padding: 12px 14px; background: var(--surface-2); border-radius: var(--radius-sm); position: relative; z-index: 2; }
 .recap-foot { font-size: 11px; font-weight: 600; color: var(--text-3); text-align: center; margin-top: 10px; text-transform: uppercase; letter-spacing: 0.06em; position: relative; z-index: 2; }
 
@@ -2460,6 +2466,99 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 .weekfix-range-fixed { font-style: italic; opacity: 0.7; }
 .weekfix-cta { width: 100%; margin-top: 2px; }
 .weekfix-cta.is-loading { opacity: 0.7; pointer-events: none; }
+
+/* Temporary glow preview panel — pick favorite, then remove */
+.glow-preview {
+  margin: 14px 0 18px;
+  padding: 16px 14px 18px;
+  background: var(--surface);
+  border: 1px dashed color-mix(in oklab, var(--accent) 55%, var(--border));
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.glow-preview-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.glow-preview-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.glow-preview-name {
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.tug-preview { margin: 0; }
+.tug-preview .tug-fill.jonas { opacity: 0.7; filter: saturate(0.85); }
+
+/* ── 1: Soft Halo — weiche äußere Aura ────────────────────────── */
+.tug-glow-v1 .tug-bar {
+  box-shadow: 0 0 16px color-mix(in oklab, var(--accent) 38%, transparent);
+}
+
+/* ── 2: Top Highlight — 3D-Schimmer an Ober-/Unterkante ───────── */
+.tug-glow-v2 .tug-fill.benny {
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 55%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, black 18%, transparent);
+}
+
+/* ── 3: Underglow — Neon-Schein nur nach unten ────────────────── */
+.tug-glow-v3 .tug-bar {
+  box-shadow: 0 6px 14px -4px color-mix(in oklab, var(--accent) 50%, transparent);
+}
+
+/* ── 4: Neon Outline — knackiger 1.5px-Akzentrahmen ───────────── */
+.tug-glow-v4 .tug-bar {
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--accent) 75%, transparent);
+}
+
+/* ── 5: Ambient Wide — sehr diffuser, breiter Halo ────────────── */
+.tug-glow-v5 .tug-bar {
+  box-shadow: 0 0 36px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+/* ── 6: Color Ring — sanfter 2px Akzent-Ring ──────────────────── */
+.tug-glow-v6 .tug-bar {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent);
+}
+
+/* ── 7: Bright Pop — nur Sättigung/Helligkeit hoch ────────────── */
+.tug-glow-v7 .tug-fill.benny {
+  filter: saturate(1.3) brightness(1.15);
+}
+
+/* ── 8: Inner Edge — feine Innenkanten in Akzent + Weiß ────────── */
+.tug-glow-v8 .tug-fill.benny {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, white 35%, transparent);
+}
+.tug-glow-v8 .tug-bar {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* ── 9: Side Light — gerichteter Schein von links ─────────────── */
+.tug-glow-v9 .tug-bar {
+  box-shadow: -6px 0 14px -2px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* ── 10: Shimmer — metallischer Verlauf in der Leader-Fill ────── */
+.tug-glow-v10 .tug-fill.benny {
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    color-mix(in oklab, var(--accent) 45%, white) 50%,
+    var(--accent) 100%
+  );
+}
 
 /* App-wide initial loader — shown while first Supabase fetch is in flight */
 .app-loader {

@@ -304,3 +304,4 @@ function PenaltyConfigCard({ api, cfg, me, onChange }) {
 
 window.StrafkontoScreen = StrafkontoScreen;
 window.PenaltyConfigCard = PenaltyConfigCard;
+window.WeekCloseSheet = WeekCloseSheet;
