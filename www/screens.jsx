@@ -128,15 +128,19 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
 
-  // Erfüllte Challenges (total >= target_reps) rutschen ans Ende.
-  // Offene Reihenfolge bleibt erhalten — gleiche Quelle für Swiper UND Overview.
-  const sortedChallenges = React.useMemo(() => {
-    const totalFor = (chId) => allSets.filter(s => s.challenge_id === chId).reduce((s, x) => s + x.reps, 0);
+  // Pro Challenge die Summe aller geloggten Reps einmal ermitteln,
+  // dann erfüllte (total >= target_reps) ans Ende sortieren.
+  // Gleiche Quelle für Swiper UND Overview, kein Mehrfach-Filter.
+  const { sortedChallenges, totalsByChallenge } = React.useMemo(() => {
+    const totals = new Map(challenges.map(c => [c.id, 0]));
+    for (const s of allSets) {
+      if (totals.has(s.challenge_id)) totals.set(s.challenge_id, totals.get(s.challenge_id) + s.reps);
+    }
     const open = [], done = [];
     for (const ch of challenges) {
-      if (totalFor(ch.id) >= ch.target_reps) done.push(ch); else open.push(ch);
+      if ((totals.get(ch.id) ?? 0) >= ch.target_reps) done.push(ch); else open.push(ch);
     }
-    return [...open, ...done];
+    return { sortedChallenges: [...open, ...done], totalsByChallenge: totals };
   }, [challenges, allSets]);
 
   // Rules of Hooks: this early return must come AFTER all hooks above.
@@ -154,11 +158,30 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
   return (
     <>
     <div className={`layout-${layout} home-swiper-wrap`}>
+      {sortedChallenges.length >= 2 && (
+        <div className="challenge-overview" role="list">
+          {sortedChallenges.map((ch, i) => {
+            const cat = catById[ch.category_id];
+            const total = totalsByChallenge.get(ch.id) ?? 0;
+            const done = total >= ch.target_reps;
+            const pct = Math.min(1, total / ch.target_reps);
+            const pctInt = Math.round(pct * 100);
+            return (
+              <div key={ch.id} className={`co-row ${done ? 'done' : ''}`} role="listitem">
+                <span className="co-emoji">{cat?.emoji}</span>
+                <span className="co-name">{cat?.name}</span>
+                <span className="co-bar"><span className="co-bar-fill" style={{width: `${pct*100}%`}}/></span>
+                <span className="co-val mono">{done ? '✓' : `${pctInt}%`}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="challenge-swiper" ref={scrollerRef}>
       {sortedChallenges.map(ch => {
         const cat = catById[ch.category_id];
         const csets = allSets.filter(s => s.challenge_id === ch.id);
-        const total = csets.reduce((s, x) => s + x.reps, 0);
+        const total = totalsByChallenge.get(ch.id) ?? 0;
         const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((s,x)=>s+x.reps, 0);
         const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((s,x)=>s+x.reps, 0);
         const pct = Math.min(1, total / ch.target_reps);
@@ -226,13 +249,15 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                           <div className="tug-fill benny" style={{width:`${bW}%`}}/>
                           <div className="tug-fill jonas" style={{width:`${jW}%`, left:`${bW}%`}}/>
                           <div className="tug-mid" aria-hidden="true"/>
-                          <div className="tug-total mono">
-                            <span className="tug-total-now">{total}</span>
-                            <span className="tug-total-of"> / {ch.target_reps}</span>
-                          </div>
                         </div>
-                        <div className={`tug-remaining mono ${teamRemaining===0?'done':''}`}>
-                          {teamRemaining===0 ? '🎉 Team-Ziel erreicht!' : `Noch ${teamRemaining} Reps als Team`}
+                        <div className="tug-summary">
+                          <div className="tug-summary-total mono">
+                            <span className="tug-summary-now">{total}</span>
+                            <span className="tug-summary-of">/{ch.target_reps}</span>
+                          </div>
+                          <div className={`tug-summary-sub mono ${teamRemaining===0?'done':''}`}>
+                            {teamRemaining===0 ? '🎉 Team-Ziel erreicht!' : `noch ${teamRemaining} als Team`}
+                          </div>
                         </div>
                       </>
                     );
@@ -1508,6 +1533,12 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           if (last && last.weekStart === ch.week_start) last.items.push(ch);
           else groups.push({ weekStart: ch.week_start, items: [ch] });
         }
+        const challengeIsDone = (ch) => {
+          const sets = setsByCh[ch.id] || [];
+          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
+          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
+          return bT >= ch.target_reps && jT >= ch.target_reps;
+        };
         const progressRows = (ch) => {
           const sets = setsByCh[ch.id] || [];
           const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
@@ -1532,11 +1563,13 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           );
         };
         return groups.map(({ weekStart, items }) => {
+          const allDone = items.every(challengeIsDone);
           if (items.length === 1) {
             const ch = items[0];
             const cat = catById[ch.category_id];
             return (
-              <div className="week-row" key={ch.id}>
+              <div className={`week-row${allDone ? ' done' : ''}`} key={ch.id}>
+                {allDone && <span className="week-done-badge" aria-label="geschafft">✓</span>}
                 <div>
                   <div className="wk">KW {weekNumber(ch.week_start)} · {formatWeek(ch.week_start)}</div>
                   <div className="cat">{cat?.emoji} {cat?.name}</div>
@@ -1547,11 +1580,12 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
             );
           }
           return (
-            <div className="week-group" key={weekStart}>
+            <div className={`week-group${allDone ? ' done' : ''}`} key={weekStart}>
               <div className="week-group-header">
                 <span className="wgh-kw">KW {weekNumber(weekStart)}</span>
                 <span className="wgh-sep">·</span>
                 <span className="wgh-range">{formatWeek(weekStart)}</span>
+                {allDone && <span className="week-done-badge inline" aria-label="geschafft">✓</span>}
                 <span className="wgh-count">{items.length} Challenges</span>
               </div>
               {items.map((ch) => {

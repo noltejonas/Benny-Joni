@@ -608,6 +608,41 @@ body {
 .week-group-item .pct.done { color: var(--accent); }
 .week-group-item .pct.miss { color: var(--danger); }
 
+/* Completed week — both athletes hit every challenge target */
+.week-row.done,
+.week-group.done {
+  position: relative;
+  border: 1.5px solid var(--accent);
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent),
+    0 0 18px color-mix(in oklab, var(--accent) 14%, transparent);
+}
+.week-done-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #000;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+.week-done-badge.inline {
+  position: static;
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+}
+.week-group.done .wgh-count { display: none; }
+
 /* Segmented control */
 .segmented {
   display: flex;
@@ -1004,9 +1039,9 @@ body {
 
 .tug-bar {
   position: relative;
-  height: 56px;
+  height: 18px;
   background: var(--surface-2);
-  border-radius: 14px;
+  border-radius: 999px;
   overflow: hidden;
 }
 .tug-fill {
@@ -1017,9 +1052,8 @@ body {
 .tug-fill.benny { background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 65%, white)); }
 .tug-fill.jonas { background: linear-gradient(90deg, color-mix(in oklab, var(--accent-3) 65%, white), var(--accent-3)); }
 .tug-mid {
-  position: absolute; left: 50%; top: 4px; bottom: 4px;
+  position: absolute; left: 50%; top: 0; bottom: 0;
   width: 0;
-  border-left: 1px dashed rgba(255,255,255,0.55);
   transform: translateX(-50%);
   z-index: 1;
   pointer-events: none;
@@ -1028,38 +1062,40 @@ body {
 .tug-mid::after {
   content: '';
   position: absolute; left: 50%;
-  width: 5px; height: 5px;
-  background: rgba(255,255,255,0.7);
-  border-radius: 50%;
+  width: 2px; height: 7px;
+  background: rgba(255,255,255,0.5);
   transform: translateX(-50%);
 }
-.tug-mid::before { top: -3px; }
-.tug-mid::after { bottom: -3px; }
-.tug-remaining {
-  margin-top: 8px;
+.tug-mid::before { top: 0; border-radius: 0 0 1px 1px; }
+.tug-mid::after { bottom: 0; border-radius: 1px 1px 0 0; }
+.tug-summary {
+  margin-top: 12px;
   text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  letter-spacing: 0.02em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
-.tug-remaining.done { color: var(--accent); }
-.tug-total {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  display: flex; align-items: baseline; gap: 4px;
-  color: #fff;
-  letter-spacing: -0.02em;
-  text-shadow: 0 1px 3px rgba(0,0,0,.55);
+.tug-summary-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  letter-spacing: -0.025em;
   font-weight: 800;
-  white-space: nowrap;
+  line-height: 1;
 }
-.tug-total-now { font-size: 30px; line-height: 1; }
-.tug-total-of { font-size: 13px; font-weight: 600; opacity: 0.85; }
+.tug-summary-now { font-size: 30px; color: var(--text); }
+.tug-summary-of { font-size: 14px; font-weight: 600; color: var(--text-3); letter-spacing: -0.01em; }
+.tug-summary-sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.tug-summary-sub.done { color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 13px; }
 @media (max-width: 400px) {
-  .tug-total-of { display: none; }
-  .tug-total-now { font-size: 26px; }
+  .tug-summary-now { font-size: 26px; }
 }
 .split-cell .owe {
   margin-top: 4px;
@@ -1213,6 +1249,45 @@ a { color: var(--accent); text-decoration: none; }
 .swiper-dots { display:flex; justify-content:center; gap:7px; padding: 12px 0 4px; }
 .swiper-dot { width:7px; height:7px; border-radius:50%; border:none; background:var(--border); padding:0; cursor:pointer; transition:all 0.25s ease; }
 .swiper-dot.active { background:var(--accent); width:22px; border-radius:4px; }
+
+/* ─── Heute-Übersicht über dem Swiper ─── */
+.challenge-overview {
+  display: flex; flex-direction: column;
+  padding: 6px 16px 14px;
+  gap: 2px;
+}
+.co-row {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 38px;
+  padding: 6px 8px 6px 10px;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  transition: color .2s, font-weight .2s, border-color .2s, background .15s;
+}
+.co-row.done { color: var(--text-2); }
+.co-emoji { font-size: 18px; line-height: 1; flex: 0 0 auto; }
+.co-name {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14px;
+}
+.co-bar {
+  flex: 1.4 1 auto; height: 5px;
+  background: var(--border); border-radius: 3px; overflow: hidden;
+  min-width: 60px; max-width: 140px;
+}
+.co-bar-fill {
+  display: block; height: 100%;
+  background: var(--accent); border-radius: 3px;
+  transition: width .35s cubic-bezier(.2,.7,.2,1);
+}
+.co-val {
+  flex: 0 0 auto; min-width: 36px;
+  text-align: right;
+  font-size: 12px; color: var(--text-2);
+}
+.co-row.done .co-val { color: var(--accent); }
 
 
 .plan-sync-btn { margin-top:14px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
