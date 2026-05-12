@@ -4,11 +4,15 @@ create table if not exists plan_slots (
   id uuid primary key default gen_random_uuid(),
   week_index int not null,           -- 0-based position in the rotation cycle
   category_id uuid references categories(id) on delete cascade,
-  start_target int not null default 100,
-  growth_pct numeric not null default 10,  -- % growth per completed cycle
+  start_target int not null default 100,  -- base reps for the week
+  bonus_max int not null default 0 check (bonus_max >= 0),  -- max bonus the picker can add on top of base
+  growth_pct numeric not null default 10, -- legacy, unused
   position int not null default 0,   -- ordering within the same week
   created_at timestamptz default now()
 );
+
+-- For existing installs: add bonus_max if missing
+alter table plan_slots add column if not exists bonus_max int not null default 0 check (bonus_max >= 0);
 
 create table if not exists rotation_config (
   id int primary key default 1,

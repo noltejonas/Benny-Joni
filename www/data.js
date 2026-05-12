@@ -106,7 +106,11 @@
         saveDemo(s); emit();
       },
       async listChallenges() {
-        return [...loadDemo().challenges].sort((a,b) => b.week_start.localeCompare(a.week_start));
+        return [...loadDemo().challenges].sort((a,b) => {
+          const w = b.week_start.localeCompare(a.week_start);
+          if (w !== 0) return w;
+          return (a.created_at || '').localeCompare(b.created_at || '');
+        });
       },
       async listSets(challengeId) {
         return loadDemo().sets.filter(x => x.challenge_id === challengeId)
@@ -172,10 +176,10 @@
         const s = loadDemo();
         return [...(s.plan_slots || [])].sort((a,b) => a.week_index - b.week_index || a.position - b.position);
       },
-      async addPlanSlot({ week_index, category_id, start_target, growth_pct, position }) {
+      async addPlanSlot({ week_index, category_id, start_target, bonus_max, position }) {
         const s = loadDemo();
         s.plan_slots = s.plan_slots || [];
-        const slot = { id: uid(), week_index, category_id, start_target: start_target||100, growth_pct: growth_pct??10, position: position||0, created_at: new Date().toISOString() };
+        const slot = { id: uid(), week_index, category_id, start_target: start_target||100, bonus_max: bonus_max??0, growth_pct: 0, position: position||0, created_at: new Date().toISOString() };
         s.plan_slots.push(slot);
         saveDemo(s); emit();
         return slot;
@@ -275,7 +279,9 @@
       },
       async listChallenges() {
         const { data, error } = await client.from('weekly_challenges')
-          .select('*').order('week_start', { ascending: false });
+          .select('*')
+          .order('week_start', { ascending: false })
+          .order('created_at', { ascending: true });
         if (error) throw error;
         return data;
       },
@@ -354,7 +360,7 @@
           week_index: payload.week_index,
           category_id: payload.category_id,
           start_target: payload.start_target || 100,
-          growth_pct: payload.growth_pct ?? 10,
+          bonus_max: payload.bonus_max ?? 0,
           position: payload.position || 0,
         }).select().single();
         if (error) throw error;
@@ -403,8 +409,11 @@
     };
   }
 
-  // ── Suggestion helper (pure) ────────────────────────────────────────
-  function suggestForWeek({ weekStart, slots, config }) {
+  // ── Week template helper (pure) ─────────────────────────────────────
+  // Returns the plan's template slots for a given weekStart: base reps
+  // and bonus_max per exercise. No growth math, no owner alternation —
+  // whoever fixes the week first picks the actual target via slider.
+  function weekTemplateFor({ weekStart, slots, config }) {
     if (!config?.enabled || !slots?.length) return [];
     const cycleLength = Math.max(...slots.map(s => s.week_index)) + 1;
     const start = mondayOf(new Date(config.start_date + 'T00:00:00'));
@@ -413,27 +422,29 @@
     target.setHours(0,0,0,0);
     const weeksSince = Math.round((target - start) / (7 * 86400000));
     if (weeksSince < 0) return [];
-    const cycleCount = Math.floor(weeksSince / cycleLength);
     const weekInCycle = ((weeksSince % cycleLength) + cycleLength) % cycleLength;
     return slots
       .filter(s => s.week_index === weekInCycle)
-      .map(s => {
-        const g = Number(s.growth_pct) || 0;
-        const mode = s.growth_mode || 'pct';
-        const target = mode === 'abs'
-          ? s.start_target + g * cycleCount
-          : s.start_target * Math.pow(1 + g/100, cycleCount);
-        const first = config.first_picker === 'Jonas' ? 'Jonas' : 'Benny';
-        const other = first === 'Benny' ? 'Jonas' : 'Benny';
-        const owner = weekInCycle % 2 === 0 ? first : other;
-        return {
-          category_id: s.category_id,
-          target_reps: Math.max(1, Math.round(target)),
-          slot_id: s.id,
-          chosen_by: owner,
-          week_in_cycle: weekInCycle,
-        };
-      });
+      .sort((a,b) => (a.position||0) - (b.position||0))
+      .map(s => ({
+        category_id: s.category_id,
+        base_reps: Math.max(1, Math.round(Number(s.start_target) || 0)),
+        bonus_max: Math.max(0, Math.round(Number(s.bonus_max) || 0)),
+        slot_id: s.id,
+        week_in_cycle: weekInCycle,
+      }));
+  }
+
+  // Back-compat shim — older callers expect `target_reps` + `chosen_by`.
+  // We now default the target to the base (no growth, no owner).
+  function suggestForWeek(args) {
+    return weekTemplateFor(args).map(t => ({
+      category_id: t.category_id,
+      target_reps: t.base_reps,
+      bonus_max: t.bonus_max,
+      slot_id: t.slot_id,
+      week_in_cycle: t.week_in_cycle,
+    }));
   }
 
   window.PTData = {
@@ -451,6 +462,6 @@
       }
       return createDemoAPI();
     },
-    mondayOf, isoDate, uid, suggestForWeek,
+    mondayOf, isoDate, uid, suggestForWeek, weekTemplateFor,
   };
 })();

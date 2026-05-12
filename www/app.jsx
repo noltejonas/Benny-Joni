@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, EmojiPickerSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle */
+/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, EmojiPickerSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // User edits these to point to their Supabase project. Empty = demo mode.
@@ -76,9 +76,9 @@ function App() {
   const weekStart = PTData.isoDate(PTData.mondayOf(new Date()));
   const currentChallenges = allChallenges.filter((c) => c.week_start === weekStart);
 
-  const proposals = useMemo(() => {
-    if (!PTData.suggestForWeek || !rotationConfig || !planSlots.length) return [];
-    return PTData.suggestForWeek({ weekStart, slots: planSlots, config: rotationConfig });
+  const weekTemplate = useMemo(() => {
+    if (!PTData.weekTemplateFor || !rotationConfig || !planSlots.length) return [];
+    return PTData.weekTemplateFor({ weekStart, slots: planSlots, config: rotationConfig });
   }, [weekStart, planSlots, rotationConfig]);
 
   // Next week preview — actual challenges if already set up, otherwise rotation suggestions.
@@ -150,18 +150,18 @@ function App() {
     return items;
   }, [feed, weekRecaps]);
 
-  async function acceptProposals() {
+  async function fixWeek(picks) {
     try {
-      for (const p of proposals) {
+      for (const p of picks) {
         if (currentChallenges.find(c => c.category_id === p.category_id)) continue;
         await api.upsertChallenge({
           week_start: weekStart,
           category_id: p.category_id,
-          chosen_by: p.chosen_by || me,
+          chosen_by: me,
           target_reps: p.target_reps,
         });
       }
-      setToast('Wochenplan übernommen');
+      setToast(`Woche fixiert – los geht's, ${me}!`);
       reload();
     } catch (e) { alert(e.message); }
   }
@@ -342,9 +342,9 @@ function App() {
           </div>
         }
 
-        {tab === 'home' && !currentChallenges.length && !proposalDismissed && proposals.length > 0 &&
-          <ProposalBanner proposals={proposals} categories={categories}
-            onAccept={acceptProposals}
+        {tab === 'home' && !currentChallenges.length && !proposalDismissed && weekTemplate.length > 0 &&
+          <WeekFixCard template={weekTemplate} categories={categories} me={me}
+            onFix={fixWeek}
             onDismiss={() => setProposalDismissed(true)} />
         }
 

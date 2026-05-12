@@ -57,8 +57,7 @@ function SettingsScreen({ api, categories, onAddCategory }) {
         week_index: newIndex,
         category_id: categories[0].id,
         start_target: 100,
-        growth_pct: 10,
-        growth_mode: 'abs',
+        bonus_max: 0,
         position: 0,
       });
       reload();
@@ -74,8 +73,7 @@ function SettingsScreen({ api, categories, onAddCategory }) {
         week_index: weekIndex,
         category_id: cat.id,
         start_target: 100,
-        growth_pct: 10,
-        growth_mode: 'abs',
+        bonus_max: 0,
         position: (byWeek[weekIndex]||[]).length,
       });
       reload();
@@ -109,10 +107,6 @@ function SettingsScreen({ api, categories, onAddCategory }) {
     const next = !config.enabled;
     try {
       await api.setRotationConfig({ enabled: next });
-      if (next && cycleLength > 0) {
-        // Plan-First: overwrite current week with this cycle's plan slots
-        await applyPlanToCurrentWeek({ silent: true });
-      }
       reload();
     } catch (e) { alert(e.message); }
   }
@@ -120,18 +114,20 @@ function SettingsScreen({ api, categories, onAddCategory }) {
   async function applyPlanToCurrentWeek({ silent } = {}) {
     if (!cycleLength) return;
     const weekStart = PTData.isoDate(PTData.mondayOf(new Date()));
-    const proposals = PTData.suggestForWeek({ weekStart, slots, config: { ...config, enabled: true } });
-    if (!proposals.length) return;
-    if (!silent && !confirm('Aktuelle Woche aus Plan überschreiben? Bestehende Challenges dieser Woche bleiben erhalten, Ziele werden angeglichen.')) return;
+    const template = PTData.weekTemplateFor
+      ? PTData.weekTemplateFor({ weekStart, slots, config: { ...config, enabled: true } })
+      : [];
+    if (!template.length) return;
+    if (!silent && !confirm('Aktuelle Woche aus Plan überschreiben? Bestehende Challenges dieser Woche bleiben erhalten, Ziele werden auf Basis-Reps gesetzt.')) return;
     try {
       const existing = await api.listChallenges();
       const thisWeek = existing.filter(c => c.week_start === weekStart);
-      for (const p of proposals) {
-        const match = thisWeek.find(c => c.category_id === p.category_id);
+      for (const t of template) {
+        const match = thisWeek.find(c => c.category_id === t.category_id);
         if (match) {
-          await api.upsertChallenge({ id: match.id, week_start: weekStart, category_id: p.category_id, chosen_by: match.chosen_by, target_reps: p.target_reps });
+          await api.upsertChallenge({ id: match.id, week_start: weekStart, category_id: t.category_id, chosen_by: match.chosen_by, target_reps: t.base_reps });
         } else {
-          await api.upsertChallenge({ week_start: weekStart, category_id: p.category_id, chosen_by: p.chosen_by || 'Benny', target_reps: p.target_reps });
+          await api.upsertChallenge({ week_start: weekStart, category_id: t.category_id, chosen_by: 'Benny', target_reps: t.base_reps });
         }
       }
     } catch (e) { if (!silent) alert(e.message); }
@@ -143,12 +139,12 @@ function SettingsScreen({ api, categories, onAddCategory }) {
     <div>
       <AppearanceCard />
       <div className="card">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
-            <div className="label" style={{margin:0}}>Rotations-Plan</div>
+            <div className="label" style={{margin:0}}>Wochen-Plan</div>
             <div className="subtitle" style={{fontSize:13,marginTop:2}}>
               {cycleLength > 0
-                ? `${cycleLength} Wochen-Zyklus, dann wiederholt sich der Plan`
+                ? `${cycleLength}-Wochen-Zyklus – wer Montags zuerst da ist, fixiert die Reps`
                 : 'Noch kein Plan – lege deine erste Wochen-Vorlage an'}
             </div>
           </div>
@@ -157,38 +153,23 @@ function SettingsScreen({ api, categories, onAddCategory }) {
             <span className="toggle-slider"/>
           </label>
         </div>
-        {!!config?.start_date && (
-          <div className="subtitle mono" style={{fontSize:12, marginBottom:0}}>Startwoche: {config.start_date}</div>
-        )}
-        {cycleLength > 0 && (
-          <div className="first-picker-row">
-            <label className="plan-field" style={{flex:1}}>
-              <span>Startdatum</span>
-              <input className="input plan-input mono" type="date"
-                value={config?.start_date || ''}
-                onChange={e => api.setRotationConfig({ start_date: e.target.value }).then(reload)}/>
-            </label>
-          </div>
-        )}
       </div>
 
       {cycleLength === 0 && (
         <div className="empty" style={{padding:'28px 16px'}}>
           <div className="emoji">🗓️</div>
           <div className="title">Plan ist leer</div>
-          <div style={{marginBottom:18}}>Definiere die Kategorien einer Woche. Pro Woche kannst du mehrere Übungen festlegen, und nach Ablauf wiederholt sich der Zyklus mit gewachsenem Ziel.</div>
+          <div style={{marginBottom:18}}>Definiere die Kategorien pro Woche. Für jede Übung legst du eine Basis-Reps-Zahl fest und wie weit man die nach oben drehen darf.</div>
           <button className="btn" onClick={addWeek}>Erste Woche anlegen</button>
         </div>
       )}
 
-      {Array.from({length: cycleLength}, (_, w) => {
-        const tag = String.fromCharCode(65 + (w % 26));
-        return (
+      {Array.from({length: cycleLength}, (_, w) => (
         <div className="card plan-week" key={w}>
           <div className="plan-week-head">
             <div>
-              <div className="plan-week-num">Woche {w + 1} · <span className={`plan-owner-tag tag-${w%2===0?'a':'b'}`}>{tag}-Woche</span></div>
-              <div className="subtitle" style={{fontSize:12, marginTop:2}}>{(byWeek[w]||[]).length} Übung{(byWeek[w]||[]).length === 1 ? '' : 'en'}</div>
+              <div className="plan-week-num">Woche {w + 1}</div>
+              <div className="subtitle" style={{fontSize:13, marginTop:2}}>{(byWeek[w]||[]).length} Übung{(byWeek[w]||[]).length === 1 ? '' : 'en'}</div>
             </div>
             <button className="icon-btn icon-btn-danger" aria-label="Woche löschen" onClick={() => deleteWeek(w)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -206,8 +187,7 @@ function SettingsScreen({ api, categories, onAddCategory }) {
             + Übung hinzufügen
           </button>
         </div>
-        );
-      })}
+      ))}
 
       {cycleLength > 0 && (
         <button className="btn btn-secondary" style={{marginTop:14}} onClick={addWeek}>
@@ -218,7 +198,7 @@ function SettingsScreen({ api, categories, onAddCategory }) {
       {cycleLength > 0 && config?.enabled && (
         <button className="btn btn-secondary plan-sync-btn" onClick={() => applyPlanToCurrentWeek({})}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          Aktuelle Woche aus Plan setzen
+          Aktuelle Woche auf Basis-Reps setzen
         </button>
       )}
 
@@ -230,18 +210,34 @@ function SettingsScreen({ api, categories, onAddCategory }) {
 function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete }) {
   const cat = catById[slot.category_id];
   const usedSet = new Set(usedInWeek);
-  const [target, setTarget] = useState(String(slot.start_target));
-  const [growth, setGrowth] = useState(String(slot.growth_pct));
-  useEffect(() => { setTarget(String(slot.start_target)); }, [slot.start_target]);
-  useEffect(() => { setGrowth(String(slot.growth_pct)); }, [slot.growth_pct]);
-  const commitTarget = () => {
-    const v = parseInt(target) || 0;
-    if (v !== slot.start_target) onChange({ start_target: v });
+  const [base, setBase] = useState(String(slot.start_target));
+  const [max, setMax] = useState(String(slot.start_target + (slot.bonus_max||0)));
+  useEffect(() => { setBase(String(slot.start_target)); }, [slot.start_target]);
+  useEffect(() => { setMax(String(slot.start_target + (slot.bonus_max||0))); }, [slot.start_target, slot.bonus_max]);
+  const commitBase = () => {
+    const v = Math.max(1, parseInt(base) || 1);
+    const m = Math.max(v, parseInt(max) || v);
+    const patch = {};
+    if (v !== slot.start_target) patch.start_target = v;
+    const newBonus = m - v;
+    if (newBonus !== (slot.bonus_max||0)) patch.bonus_max = newBonus;
+    if (Object.keys(patch).length) onChange(patch);
+    setBase(String(v));
+    setMax(String(m));
   };
-  const commitGrowth = () => {
-    const v = parseFloat(growth) || 0;
-    if (v !== Number(slot.growth_pct)) onChange({ growth_pct: v });
+  const commitMax = () => {
+    const v = parseInt(base) || 1;
+    const m = Math.max(v, parseInt(max) || v);
+    const newBonus = m - v;
+    if (newBonus !== (slot.bonus_max||0)) onChange({ bonus_max: newBonus });
+    setMax(String(m));
   };
+  // visual track: scale 0..(max*1.15) so the handles never touch the edges
+  const numericMax = parseInt(max) || 0;
+  const numericBase = parseInt(base) || 0;
+  const trackScale = Math.max(numericMax * 1.15, 100);
+  const basePct = Math.min(100, (numericBase / trackScale) * 100);
+  const maxPct = Math.min(100, (numericMax / trackScale) * 100);
   return (
     <div className="plan-slot">
       <div className="plan-slot-cat">
@@ -252,70 +248,125 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
             <option key={c.id} value={c.id} disabled={usedSet.has(c.id)}>{c.emoji} {c.name}</option>
           ))}
         </select>
-      </div>
-      <div className="plan-slot-controls">
-        <label className="plan-field">
-          <span>Start-Reps</span>
-          <input className="input plan-input mono" type="number" inputMode="numeric"
-            value={target}
-            onFocus={e => e.target.select()}
-            onChange={e => setTarget(e.target.value)}
-            onBlur={commitTarget}
-            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}/>
-        </label>
-        <label className="plan-field">
-          <span>Wachstum / Zyklus</span>
-          <div className="plan-growth">
-            <div className="plan-input-suffix" style={{flex:1}}>
-              <input className="input plan-input mono" type="number" inputMode="numeric" step={1}
-                value={growth}
-                onFocus={e => e.target.select()}
-                onChange={e => setGrowth(e.target.value)}
-                onBlur={commitGrowth}
-                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}/>
-              <span className="suffix">Reps</span>
-            </div>
-          </div>
-        </label>
         <button className="icon-btn icon-btn-danger" aria-label="Übung entfernen" onClick={onDelete}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
+      <div className="plan-range">
+        <div className="plan-range-track">
+          <div className="plan-range-fill" style={{ left: `${basePct}%`, width: `${Math.max(0, maxPct - basePct)}%` }}/>
+          <div className="plan-range-handle" style={{ left: `${basePct}%` }}/>
+          <div className="plan-range-handle" style={{ left: `${maxPct}%` }}/>
+        </div>
+        <div className="plan-range-inputs">
+          <label className="plan-range-input">
+            <span>Basis</span>
+            <input className="input mono" type="number" inputMode="numeric" min={1}
+              value={base}
+              onFocus={e => e.target.select()}
+              onChange={e => setBase(e.target.value)}
+              onBlur={commitBase}
+              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}/>
+          </label>
+          <span className="plan-range-arrow">→</span>
+          <label className="plan-range-input">
+            <span>Max</span>
+            <input className="input mono" type="number" inputMode="numeric" min={1}
+              value={max}
+              onFocus={e => e.target.select()}
+              onChange={e => setMax(e.target.value)}
+              onBlur={commitMax}
+              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}/>
+          </label>
+        </div>
+      </div>
     </div>
   );
 }
 
-// Banner shown on Home when current week is empty AND there's a plan suggestion
-function ProposalBanner({ proposals, categories, onAccept, onDismiss }) {
+// Card on Home: the first person of the week picks the reps for every exercise.
+// Default = base_reps, range = [base_reps, base_reps + bonus_max].
+function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
-  if (!proposals?.length) return null;
+  const [values, setValues] = useState(() => {
+    const initial = {};
+    for (const t of template) initial[t.slot_id] = t.base_reps;
+    return initial;
+  });
+  const [busy, setBusy] = useState(false);
+  if (!template?.length) return null;
+
+  const step = (n) => n < 50 ? 5 : n < 200 ? 10 : n < 500 ? 25 : 50;
+  const bump = (t, dir) => {
+    const cur = values[t.slot_id] ?? t.base_reps;
+    const next = cur + dir * step(cur);
+    const clamped = Math.max(t.base_reps, Math.min(t.base_reps + t.bonus_max, next));
+    setValues({ ...values, [t.slot_id]: clamped });
+  };
+  const setExact = (t, raw) => {
+    const v = parseInt(raw);
+    if (!Number.isFinite(v)) return;
+    const clamped = Math.max(t.base_reps, Math.min(t.base_reps + t.bonus_max, v));
+    setValues({ ...values, [t.slot_id]: clamped });
+  };
+
+  const fix = async () => {
+    setBusy(true);
+    try { await onFix(template.map(t => ({ category_id: t.category_id, target_reps: values[t.slot_id] ?? t.base_reps }))); }
+    finally { setBusy(false); }
+  };
+
   return (
-    <div className="proposal-card">
-      <div className="proposal-head">
+    <div className="weekfix-card">
+      <div className="weekfix-head">
         <div>
-          <div className="proposal-label">Vorschlag aus deinem Plan</div>
-          <div className="proposal-title">Diese Woche</div>
+          <div className="weekfix-label">Neue Woche</div>
+          <div className="weekfix-title">Reps für diese Woche fixieren</div>
+          <div className="weekfix-sub">Wer zuerst da ist, setzt das Ziel für beide.</div>
         </div>
-        <button className="proposal-dismiss" aria-label="Schließen" onClick={onDismiss}>×</button>
+        {onDismiss && (
+          <button className="weekfix-dismiss" aria-label="Später" onClick={onDismiss}>×</button>
+        )}
       </div>
-      <div className="proposal-list">
-        {proposals.map((p, i) => {
-          const cat = catById[p.category_id];
+      <div className="weekfix-list">
+        {template.map(t => {
+          const cat = catById[t.category_id];
+          const cur = values[t.slot_id] ?? t.base_reps;
+          const minV = t.base_reps;
+          const maxV = t.base_reps + t.bonus_max;
+          const hasBonus = t.bonus_max > 0;
+          const canMinus = cur > minV;
+          const canPlus = cur < maxV;
           return (
-            <div className="proposal-item" key={i}>
-              <span className="proposal-emoji">{cat?.emoji}</span>
-              <span className="proposal-name">{cat?.name || 'Unbekannt'}</span>
-              <span className="proposal-target mono">{p.target_reps}</span>
+            <div className="weekfix-item" key={t.slot_id}>
+              <div className="weekfix-item-head">
+                <span className="weekfix-item-emoji">{cat?.emoji || '?'}</span>
+                <span className="weekfix-item-name">{cat?.name || 'Unbekannt'}</span>
+              </div>
+              <div className="weekfix-stepper">
+                <button className={`weekfix-step ${!canMinus?'is-disabled':''}`} disabled={!canMinus || !hasBonus}
+                  onClick={() => bump(t, -1)} aria-label="weniger">−</button>
+                <input className="weekfix-val mono" type="number" inputMode="numeric"
+                  value={cur}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setExact(t, e.target.value)}/>
+                <button className={`weekfix-step ${!canPlus?'is-disabled':''}`} disabled={!canPlus || !hasBonus}
+                  onClick={() => bump(t, 1)} aria-label="mehr">+</button>
+              </div>
+              {hasBonus ? (
+                <div className="weekfix-range">{minV} <span className="weekfix-range-sep">···</span> {maxV}</div>
+              ) : (
+                <div className="weekfix-range weekfix-range-fixed">fest auf {minV}</div>
+              )}
             </div>
           );
         })}
       </div>
-      <div className="proposal-actions">
-        <button className="btn btn-secondary" onClick={onDismiss}>Anders machen</button>
-        <button className="btn" onClick={onAccept}>Übernehmen</button>
-      </div>
+      <button className={`btn weekfix-cta ${busy?'is-loading':''}`} disabled={busy} onClick={fix}>
+        {busy ? 'Wird gesetzt…' : 'Woche starten'}
+      </button>
     </div>
   );
 }
 
-Object.assign(window, { SettingsScreen, PlanSlotRow, ProposalBanner, AppearanceCard });
+Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard, AppearanceCard });
