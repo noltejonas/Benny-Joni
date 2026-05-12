@@ -168,7 +168,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
             const pctInt = Math.round(pct * 100);
             return (
               <div key={ch.id} className={`co-row ${done ? 'done' : ''}`} role="listitem">
-                <span className="co-emoji">{cat?.emoji}</span>
                 <span className="co-name">{cat?.name}</span>
                 <span className="co-bar"><span className="co-bar-fill" style={{width: `${pct*100}%`}}/></span>
                 <span className="co-val mono">{done ? '✓' : `${pctInt}%`}</span>

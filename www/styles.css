@@ -1253,39 +1253,38 @@ a { color: var(--accent); text-decoration: none; }
 /* ─── Heute-Übersicht über dem Swiper ─── */
 .challenge-overview {
   display: flex; flex-direction: column;
-  padding: 6px 16px 14px;
-  gap: 2px;
+  padding: 4px 16px 10px;
+  gap: 0;
 }
 .co-row {
   display: flex; align-items: center; gap: 10px;
-  min-height: 38px;
-  padding: 6px 8px 6px 10px;
+  min-height: 28px;
+  padding: 4px 6px;
   border-left: 2px solid transparent;
   border-radius: 4px;
   color: var(--text);
   transition: color .2s, font-weight .2s, border-color .2s, background .15s;
 }
 .co-row.done { color: var(--text-2); }
-.co-emoji { font-size: 18px; line-height: 1; flex: 0 0 auto; }
 .co-name {
   flex: 1 1 auto; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 14px;
+  font-size: 13px;
 }
 .co-bar {
-  flex: 1.4 1 auto; height: 5px;
-  background: var(--border); border-radius: 3px; overflow: hidden;
+  flex: 1.4 1 auto; height: 4px;
+  background: var(--border); border-radius: 2px; overflow: hidden;
   min-width: 60px; max-width: 140px;
 }
 .co-bar-fill {
   display: block; height: 100%;
-  background: var(--accent); border-radius: 3px;
+  background: var(--accent); border-radius: 2px;
   transition: width .35s cubic-bezier(.2,.7,.2,1);
 }
 .co-val {
-  flex: 0 0 auto; min-width: 36px;
+  flex: 0 0 auto; min-width: 32px;
   text-align: right;
-  font-size: 12px; color: var(--text-2);
+  font-size: 11px; color: var(--text-2);
 }
 .co-row.done .co-val { color: var(--accent); }
 
