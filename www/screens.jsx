@@ -280,7 +280,16 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     <div className="tug-side benny">
                       <div className="tug-who"><img src="uploads/benny.jpg" alt="Benny" className="tug-avatar"/>Benny</div>
                       <div className="tug-reps mono">{bennyDone}</div>
-                      <div className={`tug-foot mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div>
+                      <DailyStatus
+                        variant="tug"
+                        done={bennyDone}
+                        fairShare={fairShare}
+                        dailyTarget={dailyTarget}
+                        todayReps={bennyToday}
+                        trackDelta={bennyTrackDelta}
+                        arrowDelta={bennyArrowDelta}
+                        showArrow={showArrow}
+                      />
                     </div>
                     <div className="tug-side team">
                       <div className="tug-who">Team</div>
@@ -289,7 +298,16 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     <div className="tug-side jonas">
                       <div className="tug-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="tug-avatar"/></div>
                       <div className="tug-reps mono">{jonasDone}</div>
-                      <div className={`tug-foot mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div>
+                      <DailyStatus
+                        variant="tug"
+                        done={jonasDone}
+                        fairShare={fairShare}
+                        dailyTarget={dailyTarget}
+                        todayReps={jonasToday}
+                        trackDelta={jonasTrackDelta}
+                        arrowDelta={jonasArrowDelta}
+                        showArrow={showArrow}
+                      />
                     </div>
                   </div>
                   {(() => {
