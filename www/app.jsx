@@ -396,7 +396,9 @@ function App() {
         }
 
         {tab === 'settings' &&
-        <SettingsScreen api={api} categories={categories} onAddCategory={reload} />
+        <SettingsScreen api={api} categories={categories} onAddCategory={reload}
+          notificationsEnabled={t.notifications}
+          onSetNotifications={(v) => setTweak('notifications', v)} />
         }
       </main>
 

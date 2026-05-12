@@ -21,7 +21,26 @@ function AppearanceCard() {
   );
 }
 
-function SettingsScreen({ api, categories, onAddCategory }) {
+function NotificationsCard({ enabled, onChange }) {
+  return (
+    <div className="card">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
+        <div>
+          <div className="label" style={{margin:0}}>Benachrichtigungen</div>
+          <div className="subtitle" style={{fontSize:13,marginTop:2}}>
+            Push, wenn der/die andere heute schon &gt;100 Reps hat und du noch bei 0 bist. Max 1×/Tag.
+          </div>
+        </div>
+        <label className="toggle-switch">
+          <input type="checkbox" checked={!!enabled} onChange={e => onChange(e.target.checked)}/>
+          <span className="toggle-slider"/>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, onSetNotifications }) {
   const [slots, setSlots] = useState([]);
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +157,7 @@ function SettingsScreen({ api, categories, onAddCategory }) {
   return (
     <div>
       <AppearanceCard />
+      <NotificationsCard enabled={notificationsEnabled} onChange={onSetNotifications}/>
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
@@ -369,4 +389,4 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
   );
 }
 
-Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard, AppearanceCard });
+Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard, AppearanceCard, NotificationsCard });
