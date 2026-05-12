@@ -85,35 +85,6 @@ function QuickLogRow({ me, catId, onQuick, onLog }) {
   );
 }
 
-function GlowPreview() {
-  const variants = [
-    { id: 'v1', name: '01 · Soft Halo' },
-    { id: 'v2', name: '02 · Top Highlight' },
-    { id: 'v3', name: '03 · Underglow' },
-    { id: 'v4', name: '04 · Neon Outline' },
-    { id: 'v5', name: '05 · Ambient Wide' },
-    { id: 'v6', name: '06 · Color Ring' },
-    { id: 'v7', name: '07 · Bright Pop' },
-    { id: 'v8', name: '08 · Inner Edge' },
-    { id: 'v9', name: '09 · Side Light' },
-    { id: 'v10', name: '10 · Shimmer' },
-  ];
-  return (
-    <div className="glow-preview">
-      <div className="glow-preview-title">Glow-Vorschau · sag mir die Nummer</div>
-      {variants.map(v => (
-        <div className={`glow-preview-row tug-glow-${v.id}`} key={v.id}>
-          <span className="glow-preview-name">{v.name}</span>
-          <div className="tug-bar opposing tug-preview">
-            <div className="tug-fill benny" style={{width: '60%'}} />
-            <div className="tug-fill jonas from-right" style={{width: '30%'}} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── HEUTE (Home) ────────────────────────────────────────────────────────────
 
 function localDateOf(input) {
@@ -263,10 +234,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
 
   return (
     <>
-    <GlowPreview />
-    {openClosures.length > 0 && openClosures.map(w => (
-      <WeekCloseBanner key={w} weekStart={w} onClose={onCloseWeek}/>
-    ))}
     <div className={`layout-${layout} home-swiper-wrap`}>
       {sortedChallenges.length >= 2 && (
         <div className="challenge-overview">
@@ -313,6 +280,46 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
 
         const jonasToday = repsOnLocalDate(csets, 'Jonas', todayStr);
         const jonasTrackDelta = jonasDone - expectedByEod;
+
+        // Active user goes left in comparisons.
+        const leftA  = me === 'Jonas' ? 'Jonas' : 'Benny';
+        const rightA = leftA === 'Benny' ? 'Jonas' : 'Benny';
+        const stats = {
+          Benny: { done: bennyDone, today: bennyToday, trackDelta: bennyTrackDelta },
+          Jonas: { done: jonasDone, today: jonasToday, trackDelta: jonasTrackDelta },
+        };
+        const widths = {
+          Benny: Math.min(100, (bennyDone/ch.target_reps)*100),
+          Jonas: Math.min(100, (jonasDone/ch.target_reps)*100),
+        };
+        const tugSide = (athlete, isRight) => {
+          const cls = athlete.toLowerCase();
+          const s = stats[athlete];
+          return (
+            <div className={`tug-side ${cls}${isRight ? ' is-right' : ''}`}>
+              <div className="tug-who">
+                {isRight
+                  ? <>{athlete}<img src={`uploads/${cls}.jpg`} alt={athlete} className="tug-avatar"/></>
+                  : <><img src={`uploads/${cls}.jpg`} alt={athlete} className="tug-avatar"/>{athlete}</>}
+              </div>
+              <div className="tug-reps mono">{s.done}</div>
+              <DailyStatus variant="tug" done={s.done} fairShare={fairShare}
+                dailyTarget={dailyTarget} todayReps={s.today} trackDelta={s.trackDelta}/>
+            </div>
+          );
+        };
+        const splitCell = (athlete) => {
+          const cls = athlete.toLowerCase();
+          const s = stats[athlete];
+          return (
+            <div className={`split-cell ${cls}`}>
+              <div className="who"><img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/>{athlete}</div>
+              <div className="v mono">{s.done}<span className="owe-of"> / {fairShare}</span></div>
+              <DailyStatus variant="cell" done={s.done} fairShare={fairShare}
+                dailyTarget={dailyTarget} todayReps={s.today} trackDelta={s.trackDelta}/>
+            </div>
+          );
+        };
         return (
           <div key={ch.id} className="challenge-slide"><div className={`hero-card ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
             <SparkleLayer active={celebration.getPersistentStyle(ch) === 'sparkle'} />
@@ -338,12 +345,12 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     <div className="pm-trophy-stat-l">Reps</div>
                   </div>
                   <div>
-                    <div className="pm-trophy-stat-v">{bennyDone.toLocaleString('de-DE')}</div>
-                    <div className="pm-trophy-stat-l">Benny</div>
+                    <div className="pm-trophy-stat-v">{stats[leftA].done.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-l">{leftA}</div>
                   </div>
                   <div>
-                    <div className="pm-trophy-stat-v">{jonasDone.toLocaleString('de-DE')}</div>
-                    <div className="pm-trophy-stat-l">Jonas</div>
+                    <div className="pm-trophy-stat-v">{stats[rightA].done.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-l">{rightA}</div>
                   </div>
                 </div>
               </div>
@@ -351,50 +358,28 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
               {layout==='rings' && (
                 <div className={`tug-section${bennyDone > jonasDone ? ' lead-benny' : jonasDone > bennyDone ? ' lead-jonas' : ''}`}>
                   <div className="tug-labels">
-                    <div className="tug-side benny">
-                      <div className="tug-who"><img src="uploads/benny.jpg" alt="Benny" className="tug-avatar"/>Benny</div>
-                      <div className="tug-reps mono">{bennyDone}</div>
-                      <DailyStatus
-                        variant="tug"
-                        done={bennyDone}
-                        fairShare={fairShare}
-                        dailyTarget={dailyTarget}
-                        todayReps={bennyToday}
-                        trackDelta={bennyTrackDelta}
-                      />
-                    </div>
+                    {tugSide(leftA, false)}
                     <div className="tug-side team">
-                      <div className="tug-who">Team</div>
+                      <div className="tug-who">Gesamt</div>
                       <div className="tug-reps mono">{total}</div>
                       <div className={`tug-foot mono ${remaining===0?'done':''}`}>{remaining===0?'✓ erledigt':`noch ${remaining}`}</div>
                     </div>
-                    <div className="tug-side jonas">
-                      <div className="tug-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="tug-avatar"/></div>
-                      <div className="tug-reps mono">{jonasDone}</div>
-                      <DailyStatus
-                        variant="tug"
-                        done={jonasDone}
-                        fairShare={fairShare}
-                        dailyTarget={dailyTarget}
-                        todayReps={jonasToday}
-                        trackDelta={jonasTrackDelta}
-                      />
-                    </div>
+                    {tugSide(rightA, true)}
                   </div>
                   {(() => {
-                    let bW = Math.min(100, (bennyDone/ch.target_reps)*100);
-                    let jW = Math.min(100, (jonasDone/ch.target_reps)*100);
-                    if (bW + jW > 100) { const s = 100 / (bW + jW); bW *= s; jW *= s; }
+                    let lW = widths[leftA];
+                    let rW = widths[rightA];
+                    if (lW + rW > 100) { const s = 100 / (lW + rW); lW *= s; rW *= s; }
                     const teamRemaining = Math.max(0, ch.target_reps - total);
                     return (
                       <>
                         <div className="tug-bar opposing">
-                          <div className="tug-fill benny" style={{width:`${bW}%`}}/>
-                          <div className="tug-fill jonas from-right" style={{width:`${jW}%`}}/>
+                          <div className={`tug-fill ${leftA.toLowerCase()}`} style={{width:`${lW}%`}}/>
+                          <div className={`tug-fill ${rightA.toLowerCase()} from-right`} style={{width:`${rW}%`}}/>
                         </div>
                         <div className="tug-summary mono">
                           {teamRemaining===0 ? (
-                            <span className="tug-summary-done">🎉 Team-Ziel erreicht!</span>
+                            <span className="tug-summary-done">🎉 Gesamtziel erreicht!</span>
                           ) : (
                             <>Wochenziel <span className="tug-summary-target">{ch.target_reps}</span></>
                           )}
@@ -415,30 +400,8 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                 <div className="of mono">{total} / {ch.target_reps} Reps</div>
                 <div style={{marginTop:8,fontSize:13,color:'var(--text-2)'}}>{remaining>0?`Noch ${remaining}`:'🎉 Ziel erreicht'}</div></div>}
               {layout!=='rings' && <div className="split-row">
-                <div className="split-cell benny">
-                  <div className="who"><img src="uploads/benny.jpg" alt="Benny" className="cell-avatar"/>Benny</div>
-                  <div className="v mono">{bennyDone}<span className="owe-of"> / {fairShare}</span></div>
-                  <DailyStatus
-                    variant="cell"
-                    done={bennyDone}
-                    fairShare={fairShare}
-                    dailyTarget={dailyTarget}
-                    todayReps={bennyToday}
-                    trackDelta={bennyTrackDelta}
-                  />
-                </div>
-                <div className="split-cell jonas">
-                  <div className="who"><img src="uploads/jonas.jpg" alt="Jonas" className="cell-avatar"/>Jonas</div>
-                  <div className="v mono">{jonasDone}<span className="owe-of"> / {fairShare}</span></div>
-                  <DailyStatus
-                    variant="cell"
-                    done={jonasDone}
-                    fairShare={fairShare}
-                    dailyTarget={dailyTarget}
-                    todayReps={jonasToday}
-                    trackDelta={jonasTrackDelta}
-                  />
-                </div>
+                {splitCell(leftA)}
+                {splitCell(rightA)}
               </div>}
             </>)}
             <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} onLog={() => onLogChallenge(ch)} />
@@ -477,6 +440,9 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
       })}
       </div>
     </div>
+    {openClosures.length > 0 && openClosures.map(w => (
+      <WeekCloseBanner key={w} weekStart={w} onClose={onCloseWeek}/>
+    ))}
     {nextWeekStart && (() => {
       const items = nextWeekChallenges.length ? nextWeekChallenges : nextWeekProposals;
       if (!items.length) return null;
@@ -873,8 +839,24 @@ function LogSheet({ api, me, challenge, category, onClose, onLogged }) {
 }
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
-function WeekRecap({ recap }) {
-  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [] } = recap;
+function WeekRecap({ recap, me }) {
+  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [], bennySetCount = 0, jonasSetCount = 0, bennyMaxSet = 0, jonasMaxSet = 0 } = recap;
+  const leftA  = me === 'Jonas' ? 'Jonas' : 'Benny';
+  const rightA = leftA === 'Benny' ? 'Jonas' : 'Benny';
+  const tallyTotals = { Benny: bennyTotal, Jonas: jonasTotal };
+  const recapTallySide = (athlete, isRight) => {
+    const cls = athlete.toLowerCase();
+    return (
+      <div className={`recap-tally-side ${cls}${isRight ? ' is-right' : ''} ${winner === athlete ? 'win' : ''}`}>
+        <div className="recap-tally-who">
+          {isRight
+            ? <>{athlete}<img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/></>
+            : <><img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/>{athlete}</>}
+        </div>
+        <div className="recap-tally-v mono">{tallyTotals[athlete]}</div>
+      </div>
+    );
+  };
   const monday = new Date(week_start + 'T00:00:00');
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
   const fmtD = (d) => `${d.getDate()}.${d.getMonth()+1}.`;
@@ -925,15 +907,9 @@ function WeekRecap({ recap }) {
         )}
       </div>
       <div className="recap-tally">
-        <div className={`recap-tally-side benny ${winner==='Benny'?'win':''}`}>
-          <div className="recap-tally-who"><img src="uploads/benny.jpg" alt="Benny" className="cell-avatar"/>Benny</div>
-          <div className="recap-tally-v mono">{bennyTotal}</div>
-        </div>
+        {recapTallySide(leftA, false)}
         <div className="recap-tally-vs">vs</div>
-        <div className={`recap-tally-side jonas ${winner==='Jonas'?'win':''}`}>
-          <div className="recap-tally-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="cell-avatar"/></div>
-          <div className="recap-tally-v mono">{jonasTotal}</div>
-        </div>
+        {recapTallySide(rightA, true)}
       </div>
       <div className="recap-challs">
         {challStats.map((c, i) => (
@@ -953,19 +929,33 @@ function WeekRecap({ recap }) {
       <div className="recap-athlete-stats">
         <div className="recap-athlete-line">
           <img src="uploads/benny.jpg" alt="Benny" className="recap-athlete-mini-avatar"/>
-          <span className="recap-athlete-stats-text">
-            {bennyByCat.length === 0 ? '— keine Reps —' : bennyByCat.map((x, i) => (
-              <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
-            ))}
-          </span>
+          <div className="recap-athlete-stats-text">
+            <div>
+              {bennyByCat.length === 0 ? '— keine Reps —' : bennyByCat.map((x, i) => (
+                <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
+              ))}
+            </div>
+            {bennySetCount > 0 && (
+              <div className="recap-athlete-meta">
+                in <span className="mono">{bennySetCount}</span> {bennySetCount === 1 ? 'Satz' : 'Sätzen'} · größter <span className="mono">+{bennyMaxSet}</span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="recap-athlete-line">
           <img src="uploads/jonas.jpg" alt="Jonas" className="recap-athlete-mini-avatar"/>
-          <span className="recap-athlete-stats-text">
-            {jonasByCat.length === 0 ? '— keine Reps —' : jonasByCat.map((x, i) => (
-              <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
-            ))}
-          </span>
+          <div className="recap-athlete-stats-text">
+            <div>
+              {jonasByCat.length === 0 ? '— keine Reps —' : jonasByCat.map((x, i) => (
+                <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
+              ))}
+            </div>
+            {jonasSetCount > 0 && (
+              <div className="recap-athlete-meta">
+                in <span className="mono">{jonasSetCount}</span> {jonasSetCount === 1 ? 'Satz' : 'Sätzen'} · größter <span className="mono">+{jonasMaxSet}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="recap-analysis">{analysis}</div>
@@ -1083,7 +1073,7 @@ function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggl
         )}
       </div>
       {feed.map((s) => {
-        if (s.kind === 'recap') return <WeekRecap key={s.id} recap={s} />;
+        if (s.kind === 'recap') return <WeekRecap key={s.id} recap={s} me={me} />;
         const mine = !me || s.athlete === me;
         const editing = editId === s.id;
         const trackingNum = trackingNumById[s.id];
