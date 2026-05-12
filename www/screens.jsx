@@ -100,7 +100,7 @@ function repsOnLocalDate(sets, athlete, dateStr) {
     .reduce((sum, s) => sum + s.reps, 0);
 }
 
-function DailyStatus({ variant, athleteSide, done, fairShare, dailyTarget, todayReps, trackDelta, arrowDelta, showArrow }) {
+function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDelta, arrowDelta, showArrow }) {
   const isDone = done >= fairShare;
   const footerClass = variant === 'tug' ? 'tug-foot' : 'owe';
 
