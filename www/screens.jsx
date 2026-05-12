@@ -1347,7 +1347,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
 
       <div className="card">
         <div className="vs-head">
-          <div className="label vs-head-title">Vergleich</div>
+          <div className="label" style={{margin: 0}}>Benny vs. Jonas</div>
           <div className="vs-toggles">
             <div className="segmented segmented-sm">
               <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
