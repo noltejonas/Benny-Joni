@@ -34,7 +34,13 @@
     d.setHours(0, 0, 0, 0);
     return d;
   }
-  function isoDate(d) { return d.toISOString().slice(0, 10); }
+  function isoDate(d) {
+    const date = d instanceof Date ? d : new Date(d);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   function createDemoAPI() {
     const listeners = new Set();
@@ -401,9 +407,9 @@
   function suggestForWeek({ weekStart, slots, config }) {
     if (!config?.enabled || !slots?.length) return [];
     const cycleLength = Math.max(...slots.map(s => s.week_index)) + 1;
-    const start = mondayOf(new Date(config.start_date));
+    const start = mondayOf(new Date(config.start_date + 'T00:00:00'));
     start.setHours(0,0,0,0);
-    const target = new Date(weekStart);
+    const target = new Date(weekStart + 'T00:00:00');
     target.setHours(0,0,0,0);
     const weeksSince = Math.round((target - start) / (7 * 86400000));
     if (weeksSince < 0) return [];

@@ -128,7 +128,7 @@ function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDe
 }
 
 function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout,
-  nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
+  weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
   // back-compat with old prop names if file got reverted
   challenge, category, sets, onSetup, onLog }) {
@@ -156,6 +156,34 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     const el = scrollerRef.current; if (!el) return;
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
+
+  // Daily breakdown: reps per athlete per day across this week's 7 days.
+  const dailyBreakdown = React.useMemo(() => {
+    const ws = weekStart || PTData.isoDate(PTData.mondayOf(new Date()));
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(ws + 'T00:00:00');
+      d.setDate(d.getDate() + i);
+      const iso = PTData.isoDate(d);
+      days.push({ iso, dow: d.getDay(), Benny: 0, Jonas: 0 });
+    }
+    const byIso = Object.fromEntries(days.map(d => [d.iso, d]));
+    for (const s of allSets) {
+      const day = PTData.isoDate(new Date(s.created_at));
+      if (byIso[day]) byIso[day][s.athlete] += s.reps;
+    }
+    const todayIso = PTData.isoDate(new Date());
+    const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    // Display order: Mo, Di, Mi, Do, Fr, Sa, So (German convention).
+    return days
+      .map(d => ({
+        ...d,
+        label: labels[d.dow],
+        isFuture: d.iso > todayIso,
+        isToday: d.iso === todayIso,
+      }))
+      .sort((a, b) => (a.dow === 0 ? 7 : a.dow) - (b.dow === 0 ? 7 : b.dow));
+  }, [weekStart, allSets]);
 
   // Pro Challenge die Summe aller geloggten Reps einmal ermitteln,
   // dann erfüllte (total >= target_reps) ans Ende sortieren.
@@ -292,6 +320,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     <div className="tug-side team">
                       <div className="tug-who">Team</div>
                       <div className="tug-reps mono">{total}</div>
+                      <div className={`tug-foot mono ${remaining===0?'done':''}`}>{remaining===0?'✓ erledigt':`noch ${remaining}`}</div>
                     </div>
                     <div className="tug-side jonas">
                       <div className="tug-who">Jonas<img src="uploads/jonas.jpg" alt="Jonas" className="tug-avatar"/></div>
@@ -323,11 +352,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                           {teamRemaining===0 ? (
                             <span className="tug-summary-done">🎉 Team-Ziel erreicht!</span>
                           ) : (
-                            <>
-                              <span className="tug-summary-target">Ziel {ch.target_reps}</span>
-                              <span className="tug-summary-sep">·</span>
-                              <span className="tug-summary-rem">noch {teamRemaining}</span>
-                            </>
+                            <>Wochenziel <span className="tug-summary-target">{ch.target_reps}</span></>
                           )}
                         </div>
                       </>
@@ -383,6 +408,42 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
       })}
       </div>
     </div>
+    {dailyBreakdown && (() => {
+      const maxV = Math.max(1, ...dailyBreakdown.flatMap(d => [d.Benny, d.Jonas]));
+      const bTot = dailyBreakdown.reduce((a, d) => a + d.Benny, 0);
+      const jTot = dailyBreakdown.reduce((a, d) => a + d.Jonas, 0);
+      return (
+        <div className="daily-breakdown">
+          <div className="db-header">
+            <span className="db-eyebrow">Diese Woche · pro Tag</span>
+            <span className="db-totals">
+              <span className="mono" style={{color:'var(--accent)'}}>{bTot}</span>
+              <span className="db-vs">vs</span>
+              <span className="mono" style={{color:'var(--accent-3)'}}>{jTot}</span>
+            </span>
+          </div>
+          <div className="db-grid">
+            {dailyBreakdown.map(d => {
+              const bH = d.Benny ? Math.max(6, (d.Benny / maxV) * 38) : 0;
+              const jH = d.Jonas ? Math.max(6, (d.Jonas / maxV) * 38) : 0;
+              return (
+                <div key={d.iso} className={`db-day${d.isToday ? ' today' : ''}${d.isFuture ? ' future' : ''}`}>
+                  <div className="db-bars">
+                    <div className="db-bar benny" style={{height: `${bH}px`}} title={`Benny: ${d.Benny}`} />
+                    <div className="db-bar jonas" style={{height: `${jH}px`}} title={`Jonas: ${d.Jonas}`} />
+                  </div>
+                  <div className="db-values">
+                    <div className="db-val benny mono">{d.isFuture ? '—' : d.Benny}</div>
+                    <div className="db-val jonas mono">{d.isFuture ? '—' : d.Jonas}</div>
+                  </div>
+                  <div className="db-label">{d.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })()}
     {nextWeekStart && (() => {
       const items = nextWeekChallenges.length ? nextWeekChallenges : nextWeekProposals;
       if (!items.length) return null;
@@ -1359,13 +1420,13 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     const bennyArr = [], jonasArr = [];
     for (let i = 0; i < total; i++) {
       const d = new Date(start); d.setDate(d.getDate() + i);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = PTData.isoDate(d);
       bennyArr.push({ date: iso, reps: 0 });
       jonasArr.push({ date: iso, reps: 0 });
     }
     for (const s of filteredSets) {
-      const day = String(s.created_at).slice(0, 10);
-      const i = Math.round((new Date(day) - start) / 86400000);
+      const day = PTData.isoDate(new Date(s.created_at));
+      const i = Math.round((new Date(day + 'T00:00:00') - start) / 86400000);
       if (i < 0 || i >= total) continue;
       const arr = s.athlete === 'Benny' ? bennyArr : jonasArr;
       arr[i].reps += s.reps;

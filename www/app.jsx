@@ -66,6 +66,21 @@ function App() {
     return PTData.suggestForWeek({ weekStart, slots: planSlots, config: rotationConfig });
   }, [weekStart, planSlots, rotationConfig]);
 
+  // Next week preview — actual challenges if already set up, otherwise rotation suggestions.
+  const nextWeekStart = useMemo(() => {
+    const d = new Date(weekStart + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    return PTData.isoDate(d);
+  }, [weekStart]);
+  const nextWeekChallenges = useMemo(
+    () => allChallenges.filter(c => c.week_start === nextWeekStart),
+    [allChallenges, nextWeekStart]
+  );
+  const nextWeekProposals = useMemo(() => {
+    if (!PTData.suggestForWeek || !rotationConfig || !planSlots.length) return [];
+    return PTData.suggestForWeek({ weekStart: nextWeekStart, slots: planSlots, config: rotationConfig });
+  }, [nextWeekStart, planSlots, rotationConfig]);
+
   // Wochenabschluss-Recaps für jede abgeschlossene Woche (Sonntag 23:59:59 < jetzt)
   const weekRecaps = useMemo(() => {
     if (!allChallenges.length) return [];
@@ -326,6 +341,10 @@ function App() {
           categories={categories}
           allSets={allSets}
           layout={t.layout}
+          weekStart={weekStart}
+          nextWeekStart={nextWeekStart}
+          nextWeekChallenges={nextWeekChallenges}
+          nextWeekProposals={nextWeekProposals}
           onAddGoal={() => setSetupForChallenge({})}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
           onLogChallenge={(ch) => setLogForChallenge(ch)}
