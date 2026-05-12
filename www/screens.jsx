@@ -221,8 +221,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         const pctInt = Math.round(pct * 100);
         const remaining = Math.max(0, ch.target_reps - total);
         const fairShare = Math.ceil(ch.target_reps / 2);
-        const bennyOwed = Math.max(0, fairShare - bennyDone);
-        const jonasOwed = Math.max(0, fairShare - jonasDone);
         const todayStr = localDateOf(new Date());
         const yesterdayStr = localDateOf(new Date(Date.now() - 86400000));
         const dayIdx = dayIndexInWeek(ch.week_start);
