@@ -24,11 +24,26 @@ function App() {
     }
   }, []);
 
-  // Theme + accent live on :root
+  // Theme: end-user preference persists in localStorage (override of tweak default).
+  // Settings dispatches 'pt:theme-change' to update without reload.
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('pt:theme') || t.theme || 'dark'; }
+    catch (e) { return t.theme || 'dark'; }
+  });
   useEffect(() => {
-    document.documentElement.dataset.theme = t.theme;
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('pt:theme', theme); } catch (e) {}
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#000000');
+  }, [theme]);
+  useEffect(() => {
+    const onChange = (e) => { if (e?.detail?.theme) setTheme(e.detail.theme); };
+    window.addEventListener('pt:theme-change', onChange);
+    return () => window.removeEventListener('pt:theme-change', onChange);
+  }, []);
+  useEffect(() => {
     document.documentElement.style.setProperty('--accent', t.accent);
-  }, [t.theme, t.accent]);
+  }, [t.accent]);
 
   // Data API (Supabase or demo)
   const api = useMemo(() => PTData.init({ url: SUPABASE_URL, key: SUPABASE_ANON_KEY }), []);

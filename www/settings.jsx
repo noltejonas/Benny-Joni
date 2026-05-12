@@ -1,6 +1,26 @@
 /* global React, PTData, Icon */
 const { useState, useEffect, useMemo } = React;
 
+function AppearanceCard() {
+  const [theme, setThemeState] = useState(() => {
+    try { return localStorage.getItem('pt:theme') || 'dark'; } catch (e) { return 'dark'; }
+  });
+  const applyTheme = (next) => {
+    try { localStorage.setItem('pt:theme', next); } catch (e) {}
+    window.dispatchEvent(new CustomEvent('pt:theme-change', { detail: { theme: next } }));
+    setThemeState(next);
+  };
+  return (
+    <div className="card">
+      <div className="label" style={{margin:0, marginBottom:10}}>Erscheinungsbild</div>
+      <div className="segmented">
+        <button className={theme==='dark'?'active':''} onClick={() => applyTheme('dark')}>Dunkel</button>
+        <button className={theme==='light'?'active':''} onClick={() => applyTheme('light')}>Hell</button>
+      </div>
+    </div>
+  );
+}
+
 function SettingsScreen({ api, categories, onAddCategory }) {
   const [slots, setSlots] = useState([]);
   const [config, setConfig] = useState(null);
@@ -121,6 +141,7 @@ function SettingsScreen({ api, categories, onAddCategory }) {
 
   return (
     <div>
+      <AppearanceCard />
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
           <div>
@@ -297,4 +318,4 @@ function ProposalBanner({ proposals, categories, onAccept, onDismiss }) {
   );
 }
 
-Object.assign(window, { SettingsScreen, PlanSlotRow, ProposalBanner });
+Object.assign(window, { SettingsScreen, PlanSlotRow, ProposalBanner, AppearanceCard });

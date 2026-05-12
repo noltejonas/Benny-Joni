@@ -14,6 +14,8 @@
   --accent-3: #0a84ff;     /* Stand ring blue */
   --danger: #ff453a;
   --warning: #ff9f0a;
+  --bar-tick: rgba(255, 255, 255, 0.5);
+  --bar-fill-blend: screen;
   --radius: 18px;
   --radius-lg: 28px;
   --radius-sm: 12px;
@@ -30,6 +32,10 @@
   --text-2: rgba(0, 0, 0, 0.6);
   --text-3: rgba(0, 0, 0, 0.35);
   --border: rgba(0, 0, 0, 0.08);
+  --accent: #28a745;       /* slightly darker greens read better on light */
+  --accent-3: #0a7aff;
+  --bar-tick: rgba(0, 0, 0, 0.4);
+  --bar-fill-blend: normal;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -643,6 +649,81 @@ body {
 }
 .week-group.done .wgh-count { display: none; }
 
+/* Daily breakdown — current week reps per day, Benny vs Jonas */
+.daily-breakdown {
+  margin-top: 18px;
+  padding: 14px 14px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.db-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.db-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.db-totals { font-size: 14px; font-weight: 700; display: flex; align-items: baseline; gap: 6px; }
+.db-vs { font-size: 10px; color: var(--text-2); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.db-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 2px 4px;
+  border-radius: 8px;
+  min-width: 0;
+}
+.db-day.today { background: color-mix(in oklab, var(--accent) 6%, var(--surface-2)); outline: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); }
+.db-day.future { opacity: 0.45; }
+.db-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 42px;
+  width: 100%;
+}
+.db-bar {
+  width: 7px;
+  border-radius: 2px 2px 0 0;
+  min-height: 0;
+}
+.db-bar.benny { background: var(--accent); }
+.db-bar.jonas { background: var(--accent-3); }
+.db-values {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+  line-height: 1.1;
+}
+.db-val { font-size: 11px; font-weight: 700; }
+.db-val.benny { color: var(--accent); }
+.db-val.jonas { color: var(--accent-3); }
+.db-day.future .db-val { color: var(--text-2); }
+.db-label {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.db-day.today .db-label { color: var(--accent); }
+
 /* Next week preview — peek at upcoming challenges on the Heute screen */
 .next-week-preview {
   margin-top: 18px;
@@ -1096,10 +1177,20 @@ body {
 /* Tug-of-war section: Benny pushes from left, Jonas pushes from right,
    shared target meets at the middle, total reps shown dominantly center. */
 .tug-section { margin-top: 16px; }
-.tug-labels { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 8px; }
-.tug-side.team { text-align: center; flex: 0 1 auto; }
-.tug-side.team .tug-who { justify-content: center; gap: 0; }
+.tug-labels { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px; }
+.tug-side.team {
+  text-align: center;
+  flex: 0 1 auto;
+}
+.tug-side.team .tug-who {
+  justify-content: center;
+  gap: 0;
+  min-height: 28px;
+  color: var(--text-3);
+  letter-spacing: 0.1em;
+}
 .tug-side.team .tug-reps { color: var(--text); }
+.tug-side.team .tug-foot { text-align: center; white-space: nowrap; }
 .tug-side.jonas { text-align: right; }
 .tug-who { font-size: 11px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; gap: 8px; }
 .tug-side.jonas .tug-who { justify-content: flex-end; }
@@ -1128,7 +1219,7 @@ body {
 .tug-fill {
   position: absolute; top: 0; bottom: 0; left: 0;
   transition: width .6s cubic-bezier(.2,.8,.2,1), left .6s cubic-bezier(.2,.8,.2,1);
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--bar-fill-blend);
 }
 .tug-fill.benny { background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 65%, white)); }
 .tug-fill.jonas { background: linear-gradient(90deg, color-mix(in oklab, var(--accent-3) 65%, white), var(--accent-3)); }
@@ -1144,7 +1235,7 @@ body {
   content: '';
   position: absolute; left: 50%;
   width: 2px; height: 7px;
-  background: rgba(255,255,255,0.5);
+  background: var(--bar-tick);
   transform: translateX(-50%);
 }
 .tug-mid::before { top: 0; border-radius: 0 0 1px 1px; }
@@ -1152,15 +1243,24 @@ body {
 .tug-summary {
   margin-top: 10px;
   text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
-.tug-summary-target { color: var(--text-2); }
-.tug-summary-rem { color: var(--text-2); }
-.tug-summary-sep { display: inline-block; margin: 0 7px; opacity: 0.45; }
-.tug-summary-done { color: var(--accent); font-size: 13px; font-weight: 700; }
+.tug-summary-target {
+  color: var(--text-2);
+  margin-left: 6px;
+  letter-spacing: 0.04em;
+}
+.tug-summary-done {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
 .split-cell .owe {
   margin-top: 4px;
   font-size: 12px;
