@@ -1126,6 +1126,16 @@ a { color: var(--accent); text-decoration: none; }
 .feed-edit input { width:72px; text-align:right; font-weight:800; font-size:16px; padding:6px 10px; }
 .feed-item.editing { background: var(--surface-2); border-radius: 10px; }
 
+.feed-reactions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+.reaction-pill { display:inline-flex; align-items:center; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:2px 8px; font-size:13px; color:var(--text); cursor:pointer; transition:background 0.12s, border-color 0.12s; }
+.reaction-pill:hover { background:var(--surface); }
+.reaction-pill.mine { background:rgba(50,215,75,0.12); border-color:var(--accent); }
+.reaction-emoji { font-size:14px; line-height:1; }
+.reaction-count { font-size:11px; font-weight:600; color:var(--text-2); }
+.reaction-pill.mine .reaction-count { color:var(--accent); }
+.reaction-add { display:inline-flex; align-items:center; justify-content:center; width:26px; height:24px; border-radius:12px; background:transparent; border:1px dashed var(--border); color:var(--text-2); cursor:pointer; padding:0; }
+.reaction-add:hover { color:var(--text); border-color:var(--text-2); }
+
 
 .plan-growth { display:flex; gap:6px; align-items:stretch; }
 .growth-mode-toggle { display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:2px; gap:2px; }
