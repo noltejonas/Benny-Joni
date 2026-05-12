@@ -128,6 +128,17 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
 
+  // Erfüllte Challenges (total >= target_reps) rutschen ans Ende.
+  // Offene Reihenfolge bleibt erhalten — gleiche Quelle für Swiper UND Overview.
+  const sortedChallenges = React.useMemo(() => {
+    const totalFor = (chId) => allSets.filter(s => s.challenge_id === chId).reduce((s, x) => s + x.reps, 0);
+    const open = [], done = [];
+    for (const ch of challenges) {
+      if (totalFor(ch.id) >= ch.target_reps) done.push(ch); else open.push(ch);
+    }
+    return [...open, ...done];
+  }, [challenges, allSets]);
+
   // Rules of Hooks: this early return must come AFTER all hooks above.
   if (!challenges.length) {
     return (
@@ -144,7 +155,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     <>
     <div className={`layout-${layout} home-swiper-wrap`}>
       <div className="challenge-swiper" ref={scrollerRef}>
-      {challenges.map(ch => {
+      {sortedChallenges.map(ch => {
         const cat = catById[ch.category_id];
         const csets = allSets.filter(s => s.challenge_id === ch.id);
         const total = csets.reduce((s, x) => s + x.reps, 0);
@@ -1336,7 +1347,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
 
       <div className="card">
         <div className="vs-head">
-          <div className="label" style={{margin: 0}}>Benny vs. Jonas</div>
+          <div className="label vs-head-title">Vergleich</div>
           <div className="vs-toggles">
             <div className="segmented segmented-sm">
               <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
