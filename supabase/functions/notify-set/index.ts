@@ -31,8 +31,13 @@ interface WebhookPayload {
   old_record: SetRecord | null;
 }
 
+// Binary by design — the app is hard-wired to two athletes. If a third
+// athlete is ever added, recipient resolution must move to a pair/challenge
+// model rather than extending this helper.
 function otherAthlete(name: string): string {
-  return name === "Benny" ? "Jonas" : "Benny";
+  if (name === "Benny") return "Jonas";
+  if (name === "Jonas") return "Benny";
+  throw new Error(`unknown athlete: ${name}`);
 }
 
 Deno.serve(async (req) => {
@@ -72,6 +77,7 @@ Deno.serve(async (req) => {
   if (senderErr) {
     return Response.json({ error: "sender_rpc", detail: senderErr.message }, { status: 500 });
   }
+  // Strict-greater than threshold — spec says "more than 100", not "at least 100".
   if ((senderToday ?? 0) <= RIVAL_THRESHOLD) {
     return Response.json({
       ignored: true,
@@ -124,6 +130,10 @@ Deno.serve(async (req) => {
   if (iosTokens.length === 0) {
     return Response.json({
       sent: 0,
+      cleaned: 0,
+      attempted: 0,
+      senderToday,
+      failures: [],
       reason: "no_recipient_tokens",
       logged: true,
     });
