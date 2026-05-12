@@ -12,6 +12,8 @@ const APNS_ENV = (Deno.env.get("APNS_ENV") ?? "production") as
   | "development";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
+const RIVAL_THRESHOLD = 100;
+
 interface SetRecord {
   id: string;
   challenge_id: string;
@@ -27,6 +29,10 @@ interface WebhookPayload {
   schema: string;
   record: SetRecord | null;
   old_record: SetRecord | null;
+}
+
+function otherAthlete(name: string): string {
+  return name === "Benny" ? "Jonas" : "Benny";
 }
 
 Deno.serve(async (req) => {
@@ -48,61 +54,93 @@ Deno.serve(async (req) => {
   }
 
   if (payload.type !== "INSERT" || !payload.record) {
-    return Response.json({ ignored: true });
+    return Response.json({ ignored: true, reason: "not_insert" });
   }
   if (!APNS_KEY_ID || !APNS_TEAM_ID || !APNS_PRIVATE_KEY) {
-    // Function deployed but APNs not configured yet — accept the webhook so
-    // Supabase doesn't retry, but signal config gap.
-    return Response.json({ ignored: true, reason: "apns not configured" });
+    return Response.json({ ignored: true, reason: "apns_not_configured" });
   }
-  const record = payload.record;
 
+  const record = payload.record;
+  const recipient = otherAthlete(record.athlete);
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Lookup category via challenge → categories
-  const { data: challenge } = await supabase
-    .from("weekly_challenges")
-    .select("category_id")
-    .eq("id", record.challenge_id)
-    .maybeSingle();
-
-  let categoryName = "Reps";
-  let categoryEmoji = "💪";
-  if (challenge?.category_id) {
-    const { data: category } = await supabase
-      .from("categories")
-      .select("name, emoji")
-      .eq("id", challenge.category_id)
-      .maybeSingle();
-    if (category) {
-      categoryName = category.name ?? categoryName;
-      categoryEmoji = category.emoji ?? categoryEmoji;
-    }
+  // 1. Sender daily total
+  const { data: senderToday, error: senderErr } = await supabase.rpc(
+    "athlete_reps_today",
+    { p_athlete: record.athlete },
+  );
+  if (senderErr) {
+    return Response.json({ error: "sender_rpc", detail: senderErr.message }, { status: 500 });
+  }
+  if ((senderToday ?? 0) <= RIVAL_THRESHOLD) {
+    return Response.json({
+      ignored: true,
+      reason: "sender_below_threshold",
+      senderToday,
+      threshold: RIVAL_THRESHOLD,
+    });
   }
 
-  // Recipients = every device whose athlete differs from the actor
+  // 2. Recipient daily total
+  const { data: recipientToday, error: recipientErr } = await supabase.rpc(
+    "athlete_reps_today",
+    { p_athlete: recipient },
+  );
+  if (recipientErr) {
+    return Response.json({ error: "recipient_rpc", detail: recipientErr.message }, { status: 500 });
+  }
+  if ((recipientToday ?? 0) > 0) {
+    return Response.json({
+      ignored: true,
+      reason: "recipient_active",
+      recipientToday,
+    });
+  }
+
+  // 3. Today's Berlin date
+  const { data: today, error: todayErr } = await supabase.rpc("berlin_today");
+  if (todayErr || !today) {
+    return Response.json({ error: "today_rpc", detail: todayErr?.message }, { status: 500 });
+  }
+
+  // 4. Dedup: push_log insert claims the daily slot
+  const { error: logErr } = await supabase
+    .from("push_log")
+    .insert({ athlete: recipient, kind: "rival", day: today });
+  if (logErr) {
+    if (logErr.code === "23505") {
+      return Response.json({ ignored: true, reason: "already_sent_today" });
+    }
+    return Response.json({ error: "log_insert", detail: logErr.message }, { status: 500 });
+  }
+
+  // 5. Recipient tokens
   const { data: tokens } = await supabase
     .from("device_tokens")
     .select("token, platform")
-    .neq("athlete", record.athlete);
+    .eq("athlete", recipient);
 
   const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios");
   if (iosTokens.length === 0) {
-    return Response.json({ sent: 0, cleaned: 0, reason: "no recipients" });
+    return Response.json({
+      sent: 0,
+      reason: "no_recipient_tokens",
+      logged: true,
+    });
   }
 
-  const title = `${categoryEmoji} ${record.athlete}: +${record.reps} ${categoryName}`;
-  const body = record.note ? `„${record.note}"` : "";
+  // 6. APNs push
+  const title = `🔥 ${record.athlete} ist los`;
+  const body = `Schon ${senderToday} Reps heute — du noch bei 0.`;
 
   const apsPayload = {
     aps: {
-      alert: body ? { title, body } : { title },
+      alert: { title, body },
       sound: "default",
     },
-    kind: "set",
-    set_id: record.id,
-    challenge_id: record.challenge_id,
+    kind: "rival",
     athlete: record.athlete,
+    sender_today: senderToday,
   };
 
   const jwt = await buildApnsJwt({
@@ -140,6 +178,7 @@ Deno.serve(async (req) => {
     sent,
     cleaned: dead.length,
     attempted: results.length,
+    senderToday,
     failures: results
       .filter((r) => r.status !== 200)
       .map((r) => ({ status: r.status, reason: r.reason })),
