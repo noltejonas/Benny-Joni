@@ -351,11 +351,31 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                 <div className="split-cell benny">
                   <div className="who"><img src="uploads/benny.jpg" alt="Benny" className="cell-avatar"/>Benny</div>
                   <div className="v mono">{bennyDone}<span className="owe-of"> / {fairShare}</span></div>
-                  <div className={`owe mono ${bennyOwed===0?'done':''}`}>{bennyOwed===0?'✓ erledigt':`noch ${bennyOwed}`}</div></div>
+                  <DailyStatus
+                    variant="cell"
+                    done={bennyDone}
+                    fairShare={fairShare}
+                    dailyTarget={dailyTarget}
+                    todayReps={bennyToday}
+                    trackDelta={bennyTrackDelta}
+                    arrowDelta={bennyArrowDelta}
+                    showArrow={showArrow}
+                  />
+                </div>
                 <div className="split-cell jonas">
                   <div className="who"><img src="uploads/jonas.jpg" alt="Jonas" className="cell-avatar"/>Jonas</div>
                   <div className="v mono">{jonasDone}<span className="owe-of"> / {fairShare}</span></div>
-                  <div className={`owe mono ${jonasOwed===0?'done':''}`}>{jonasOwed===0?'✓ erledigt':`noch ${jonasOwed}`}</div></div>
+                  <DailyStatus
+                    variant="cell"
+                    done={jonasDone}
+                    fairShare={fairShare}
+                    dailyTarget={dailyTarget}
+                    todayReps={jonasToday}
+                    trackDelta={jonasTrackDelta}
+                    arrowDelta={jonasArrowDelta}
+                    showArrow={showArrow}
+                  />
+                </div>
               </div>}
             </>)}
             <button className="btn" style={{marginTop:16}} onClick={() => onLogChallenge(ch)}>+ Satz für {cat?.name} loggen</button>
