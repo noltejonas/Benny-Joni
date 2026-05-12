@@ -365,6 +365,32 @@ body {
   margin-top: 2px;
 }
 .winner-lead .mono { color: var(--text); }
+.winner-momentum {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 3px;
+  letter-spacing: -0.005em;
+}
+.winner-momentum.benny { color: var(--accent); }
+.winner-momentum.jonas { color: var(--accent-3); }
+.winner-momentum .mono { font-weight: 700; }
+
+.lead-since {
+  font-size: 13px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.lead-since .mono { color: var(--text); font-weight: 700; }
+.lead-since-name { font-weight: 800; }
+.lead-since-name.benny { color: var(--accent); }
+.lead-since-name.jonas { color: var(--accent-3); }
+.ties-row {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-align: center;
+  font-weight: 600;
+}
 
 /* Sheet / Modal */
 .sheet-backdrop {
@@ -533,6 +559,54 @@ body {
 .week-row .pct { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .week-row .pct.done { color: var(--accent); }
 .week-row .pct.miss { color: var(--danger); }
+
+/* History — week group (mehrere Challenges in derselben KW) */
+.week-group {
+  background: var(--surface);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.week-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 18px 10px;
+  font-size: 13px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.week-group-header .wgh-kw {
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  font-size: 14px;
+}
+.week-group-header .wgh-sep { opacity: 0.5; }
+.week-group-header .wgh-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--surface-2);
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.week-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+}
+.week-group-item .wk { font-size: 13px; color: var(--text-2); font-weight: 600; }
+.week-group-item .cat { font-size: 17px; font-weight: 700; }
+.week-group-item .right { text-align: right; }
+.week-group-item .pct { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.week-group-item .pct.done { color: var(--accent); }
+.week-group-item .pct.miss { color: var(--danger); }
 
 /* Segmented control */
 .segmented {
@@ -712,6 +786,10 @@ body {
 .vs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
 .segmented-sm { padding: 3px; }
 .segmented-sm button { font-size: 12px; padding: 5px 10px; min-width: 38px; }
+.vs-toggles { display: flex; gap: 6px; justify-content: flex-end; flex-shrink: 0; }
+.vs-toggles .segmented { margin-bottom: 0; }
+.vs-toggles .segmented-sm button { min-width: auto; padding: 5px 8px; }
+.vs-head-title { margin: 0; white-space: nowrap; }
 
 .chart-wrap { margin-top: 16px; }
 .chart-legend { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--text-2); font-weight: 600; margin-bottom: 6px; }
@@ -932,19 +1010,40 @@ body {
   overflow: hidden;
 }
 .tug-fill {
-  position: absolute; top: 0; bottom: 0;
-  transition: width .6s cubic-bezier(.2,.8,.2,1);
+  position: absolute; top: 0; bottom: 0; left: 0;
+  transition: width .6s cubic-bezier(.2,.8,.2,1), left .6s cubic-bezier(.2,.8,.2,1);
   mix-blend-mode: screen;
 }
-.tug-fill.benny { left: 0; background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 65%, white)); }
-.tug-fill.jonas { right: 0; background: linear-gradient(270deg, var(--accent-3), color-mix(in oklab, var(--accent-3) 65%, white)); }
+.tug-fill.benny { background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 65%, white)); }
+.tug-fill.jonas { background: linear-gradient(90deg, color-mix(in oklab, var(--accent-3) 65%, white), var(--accent-3)); }
 .tug-mid {
-  position: absolute; left: 50%; top: 6px; bottom: 6px;
-  width: 2px; background: #fff; opacity: 0.55;
+  position: absolute; left: 50%; top: 4px; bottom: 4px;
+  width: 0;
+  border-left: 1px dashed rgba(255,255,255,0.55);
   transform: translateX(-50%);
   z-index: 1;
-  border-radius: 1px;
+  pointer-events: none;
 }
+.tug-mid::before,
+.tug-mid::after {
+  content: '';
+  position: absolute; left: 50%;
+  width: 5px; height: 5px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+.tug-mid::before { top: -3px; }
+.tug-mid::after { bottom: -3px; }
+.tug-remaining {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.02em;
+}
+.tug-remaining.done { color: var(--accent); }
 .tug-total {
   position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
@@ -1412,6 +1511,7 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 /* Scrubber visuals inside the SVG */
 .chart-scrubber-line { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
 .chart-scrubber-dot { stroke: var(--bg); stroke-width: 2.5; }
+.chart-week-line { stroke: var(--text-2); stroke-width: 0.5; stroke-dasharray: 2 4; opacity: 0.35; }
 
 /* ============================================================ */
 /* Celebration Overlay — fullscreen takeover when goal reached  */
@@ -1852,3 +1952,28 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
     animation: none !important;
   }
 }
+
+/* Daily target line + on-track status (per-athlete) */
+.daily-line {
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tug-side.jonas .daily-line { justify-content: flex-end; }
+.daily-line .arrow-up { color: var(--accent); font-weight: 700; }
+.daily-line .arrow-down { color: var(--danger); font-weight: 700; }
+.daily-line .arrow-flat { color: var(--text-3); font-weight: 700; }
+.track-status {
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.track-status.ok { color: var(--accent); }
+.track-status.behind { color: var(--warning); }
+.tug-side.jonas .track-status.ok { color: var(--accent-3); }
+.split-cell.jonas .track-status.ok { color: var(--accent-3); }
