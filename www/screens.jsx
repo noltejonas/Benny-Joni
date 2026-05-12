@@ -100,6 +100,33 @@ function repsOnLocalDate(sets, athlete, dateStr) {
     .reduce((sum, s) => sum + s.reps, 0);
 }
 
+function DailyStatus({ variant, athleteSide, done, fairShare, dailyTarget, todayReps, trackDelta, arrowDelta, showArrow }) {
+  const isDone = done >= fairShare;
+  const footerClass = variant === 'tug' ? 'tug-foot' : 'owe';
+
+  if (isDone) {
+    return <div className={`${footerClass} mono done`}>✓ erledigt</div>;
+  }
+
+  const arrow = !showArrow ? null
+    : arrowDelta > 0 ? <span className="arrow-up">↑ +{arrowDelta}</span>
+    : arrowDelta < 0 ? <span className="arrow-down">↓ {arrowDelta}</span>
+    : <span className="arrow-flat">→ ±0</span>;
+
+  const statusClass = trackDelta >= 0 ? 'ok' : 'behind';
+  const statusText = trackDelta >= 0 ? '✓ Auf Kurs' : `${Math.abs(trackDelta)} hinten`;
+
+  return (
+    <>
+      <div className="daily-line mono">
+        <span>heute {todayReps} / {dailyTarget}</span>
+        {arrow}
+      </div>
+      <div className={`track-status ${statusClass}`}>{statusText}</div>
+    </>
+  );
+}
+
 function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout,
   nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
