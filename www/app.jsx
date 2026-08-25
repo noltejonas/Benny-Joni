@@ -67,6 +67,8 @@ function App() {
   const [openClosures, setOpenClosures] = useState([]);
   const [penaltyConfig, setPenaltyConfig] = useState(null);
   const [payouts, setPayouts] = useState([]);
+  const [projectTags, setProjectTags] = useState([]);
+  const [toolTags, setToolTags]       = useState([]);
   const [closingWeek, setClosingWeek] = useState(null);
   const [proposalDismissed, setProposalDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -207,7 +209,7 @@ function App() {
 
   const reload = useCallback(async () => {
     try {
-      const [cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, penCfg, pys] = await Promise.all([
+      const [cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, penCfg, pys, projTags, toolTagsData] = await Promise.all([
       api.getCategories(),
       api.listChallenges(),
       api.recentFeed(100),
@@ -218,8 +220,10 @@ function App() {
       api.listClosures ? api.listClosures() : [],
       api.listOpenClosures ? api.listOpenClosures() : [],
       api.getPenaltyConfig ? api.getPenaltyConfig() : null,
-      api.listPayouts ? api.listPayouts() : []]
-      );
+      api.listPayouts ? api.listPayouts() : [],
+      api.getProjectTags ? api.getProjectTags() : [],
+      api.getToolTags    ? api.getToolTags()    : [],
+      ]);
       setCategories(cats);
       setAllChallenges(challs);
       setFeed(feedData);
@@ -231,6 +235,8 @@ function App() {
       setOpenClosures(openCls || []);
       setPenaltyConfig(penCfg);
       setPayouts(pys || []);
+      setProjectTags(projTags || []);
+      setToolTags(toolTagsData || []);
 
       // Notification trigger
       if (lastFeedRef.current !== null && feedData[0] && feedData[0].id !== lastFeedRef.current &&
@@ -507,6 +513,8 @@ function App() {
           weekStart={weekStart}
           existing={setupForChallenge?.id ? setupForChallenge : null}
           usedCategoryIds={currentChallenges.filter(c => c.id !== setupForChallenge?.id).map(c => c.category_id)}
+          projectTags={projectTags}
+          toolTags={toolTags}
           onClose={() => setSetupForChallenge(null)}
           onSaved={() => {setSetupForChallenge(null);setToast('Ziel gespeichert');reload();}}
           onDeleted={() => {setSetupForChallenge(null);setToast('Ziel gelöscht');reload();}}
@@ -519,6 +527,8 @@ function App() {
           me={me}
           challenge={logForChallenge}
           category={logForChallenge ? categories.find(c => c.id === logForChallenge.category_id) : null}
+          projectTags={projectTags}
+          toolTags={toolTags}
           onClose={() => setLogForChallenge(null)}
           onLogged={(r) => {setLogForChallenge(null);setToast(`+${r} geloggt 💪`);reload();}} />
       </Sheet>
