@@ -40,7 +40,94 @@ function NotificationsCard({ enabled, onChange }) {
   );
 }
 
-function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, onSetNotifications, me }) {
+function TagList({ tags, onAdd, onUpdate, onDelete }) {
+  const [adding, setAdding] = React.useState(false);
+  const [newName, setNewName] = React.useState('');
+  const [newEmoji, setNewEmoji] = React.useState('📁');
+  const [editingId, setEditingId] = React.useState(null);
+  const [editName, setEditName] = React.useState('');
+  const [editEmoji, setEditEmoji] = React.useState('');
+
+  async function doAdd() {
+    if (!newName.trim()) return;
+    await onAdd(newName.trim(), newEmoji);
+    setAdding(false); setNewName(''); setNewEmoji('📁');
+  }
+  async function doUpdate() {
+    await onUpdate(editingId, { name: editName.trim(), emoji: editEmoji });
+    setEditingId(null);
+  }
+  async function doDelete(id) {
+    if (!confirm('Tag löschen?')) return;
+    await onDelete(id);
+  }
+
+  return (
+    <div className="tag-list">
+      {tags.map(t => (
+        <div key={t.id} className="tag-row">
+          {editingId === t.id ? (
+            <>
+              <input className="input new-cat-emoji" value={editEmoji}
+                onChange={e => setEditEmoji(e.target.value)} maxLength={2} />
+              <input className="input" value={editName}
+                onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && doUpdate()} />
+              <button className="new-cat-add new-cat-del" onClick={() => doDelete(t.id)}>🗑</button>
+              <button className="new-cat-add" onClick={doUpdate}>✓</button>
+            </>
+          ) : (
+            <>
+              <span className="tag-emoji">{t.emoji}</span>
+              <span className="tag-name">{t.name}</span>
+              <button className="cat-edit" onClick={() => { setEditingId(t.id); setEditName(t.name); setEditEmoji(t.emoji); }}>✎</button>
+            </>
+          )}
+        </div>
+      ))}
+      {adding ? (
+        <div className="new-cat-row">
+          <input className="input new-cat-emoji" value={newEmoji}
+            onChange={e => setNewEmoji(e.target.value)} maxLength={2} />
+          <input className="input" placeholder="Name" autoFocus value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && doAdd()} />
+          <button className="new-cat-add" onClick={doAdd}>✓</button>
+        </div>
+      ) : (
+        <button className="btn btn-secondary" style={{ marginTop: 8, width: '100%' }}
+          onClick={() => setAdding(true)}>+ Tag hinzufügen</button>
+      )}
+    </div>
+  );
+}
+
+function WorkTagsCard({ api, projectTags, toolTags, reload }) {
+  const wrap = (fn) => async (...args) => { try { await fn(...args); reload(); } catch (e) { alert(e.message); } };
+  return (
+    <div className="card">
+      <div className="label" style={{margin:0, marginBottom:10}}>💻 Work Tags</div>
+
+      <div className="settings-section-label">Projekte</div>
+      <TagList
+        tags={projectTags}
+        onAdd={wrap((n,e) => api.addProjectTag(n, e))}
+        onUpdate={wrap((id, p) => api.updateProjectTag(id, p))}
+        onDelete={wrap((id) => api.deleteProjectTag(id))}
+      />
+
+      <div className="settings-section-label" style={{ marginTop: 20 }}>Tools</div>
+      <TagList
+        tags={toolTags}
+        onAdd={wrap((n,e) => api.addToolTag(n, e))}
+        onUpdate={wrap((id, p) => api.updateToolTag(id, p))}
+        onDelete={wrap((id) => api.deleteToolTag(id))}
+      />
+    </div>
+  );
+}
+
+function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, onSetNotifications, me, projectTags, toolTags, reload: reloadProp }) {
   const [slots, setSlots] = useState([]);
   const [config, setConfig] = useState(null);
   const [penaltyCfg, setPenaltyCfg] = useState(null);
@@ -172,6 +259,7 @@ function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, 
       {penaltyCfg !== null && window.PenaltyConfigCard && (
         <PenaltyConfigCard api={api} cfg={penaltyCfg} me={me} onChange={reloadPenalty}/>
       )}
+      {reloadProp && <WorkTagsCard api={api} projectTags={projectTags || []} toolTags={toolTags || []} reload={reloadProp} />}
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
@@ -403,4 +491,4 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
   );
 }
 
-Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard, AppearanceCard, NotificationsCard });
+Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard, AppearanceCard, NotificationsCard, TagList, WorkTagsCard });

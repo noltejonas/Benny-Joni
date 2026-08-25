@@ -475,7 +475,10 @@ function App() {
         <SettingsScreen api={api} categories={categories} onAddCategory={reload}
           me={me}
           notificationsEnabled={t.notifications}
-          onSetNotifications={(v) => setTweak('notifications', v)} />
+          onSetNotifications={(v) => setTweak('notifications', v)}
+          projectTags={projectTags}
+          toolTags={toolTags}
+          reload={reload} />
         }
         </>)}
       </main>
