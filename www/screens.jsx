@@ -187,7 +187,17 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     categories = category ? [category] : categories;
     onAddGoal = onSetup; onEditChallenge = () => onSetup?.(); onLogChallenge = () => onLog?.();
   }
+  const [activeTab, setActiveTab] = React.useState(
+    () => sessionStorage.getItem('pt_home_tab') || 'sports'
+  );
+  React.useEffect(() => {
+    sessionStorage.setItem('pt_home_tab', activeTab);
+  }, [activeTab]);
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+  const tabChallenges = challenges.filter(ch => {
+    const cat = catById[ch.category_id];
+    return (cat?.kind || 'sports') === activeTab;
+  });
   const celebration = useCelebration(challenges, allSets, me, categories);
   const scrollerRef = React.useRef(null);
   const [activeIdx, setActiveIdx] = React.useState(0);
@@ -199,7 +209,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
-  }, [challenges.length]);
+  }, [tabChallenges.length]);
   const goTo = (i) => {
     const el = scrollerRef.current; if (!el) return;
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
@@ -209,19 +219,19 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
   // dann erfüllte (total >= target_reps) ans Ende sortieren.
   // Gleiche Quelle für Swiper UND Overview, kein Mehrfach-Filter.
   const { sortedChallenges, totalsByChallenge } = React.useMemo(() => {
-    const totals = new Map(challenges.map(c => [c.id, 0]));
+    const totals = new Map(tabChallenges.map(c => [c.id, 0]));
     for (const s of allSets) {
       if (totals.has(s.challenge_id)) totals.set(s.challenge_id, totals.get(s.challenge_id) + s.reps);
     }
     const open = [], done = [];
-    for (const ch of challenges) {
+    for (const ch of tabChallenges) {
       if ((totals.get(ch.id) ?? 0) >= ch.target_reps) done.push(ch); else open.push(ch);
     }
     return { sortedChallenges: [...open, ...done], totalsByChallenge: totals };
-  }, [challenges, allSets]);
+  }, [tabChallenges, allSets]);
 
   // Rules of Hooks: this early return must come AFTER all hooks above.
-  if (!challenges.length) {
+  if (!tabChallenges.length) {
     return (
       <div className="empty">
         <div className="emoji">🏁</div>
@@ -234,6 +244,18 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
 
   return (
     <>
+      <div className="work-tab-toggle">
+        <button
+          className={`work-tab-btn ${activeTab === 'sports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('sports')}>
+          🏋️ Sports
+        </button>
+        <button
+          className={`work-tab-btn ${activeTab === 'work' ? 'active' : ''}`}
+          onClick={() => setActiveTab('work')}>
+          💻 Work
+        </button>
+      </div>
     <div className={`layout-${layout} home-swiper-wrap`}>
       {sortedChallenges.length >= 2 && (
         <div className="challenge-overview">
