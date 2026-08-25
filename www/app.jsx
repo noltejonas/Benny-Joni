@@ -252,10 +252,12 @@ function App() {
   }, [api, me, t.notifications]);
 
   function notify(set) {
-    setToast(`${set.athlete}: +${set.reps} ${set.category?.name || ''}`);
+    const isWork = set.category?.kind === 'work';
+    const valStr = isWork ? window.formatDuration?.(set.duration_minutes) ?? `${set.duration_minutes}m` : `+${set.reps}`;
+    setToast(`${set.athlete}: ${valStr} ${set.category?.name || ''}`);
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`💪 ${set.athlete} hat geliefert`, {
-        body: `+${set.reps} ${set.category?.name || 'Reps'}`,
+      new Notification(`${isWork ? '💻' : '💪'} ${set.athlete} hat geliefert`, {
+        body: `${valStr} ${set.category?.name || (isWork ? 'min' : 'Reps')}`,
         icon: '/favicon.ico'
       });
     }
@@ -534,7 +536,12 @@ function App() {
           projectTags={projectTags}
           toolTags={toolTags}
           onClose={() => setLogForChallenge(null)}
-          onLogged={(r) => {setLogForChallenge(null);setToast(`+${r} geloggt 💪`);reload();}} />
+          onLogged={(r, isWork) => {
+            setLogForChallenge(null);
+            const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
+            setToast(`${valStr} geloggt ${isWork ? '💻' : '💪'}`);
+            reload();
+          }} />
       </Sheet>
 
       <Sheet open={backfillOpen} onClose={() => setBackfillOpen(false)}>
