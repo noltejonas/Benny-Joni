@@ -123,13 +123,15 @@ function App() {
       if (now <= sundayEnd) continue;
       const challs = byWeek[ws];
       const challStats = challs.map(ch => {
+        const isWorkCh = (catById[ch.category_id]?.kind || 'sports') === 'work';
+        const val = (s) => isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
         const csets = allSets.filter(s => s.challenge_id === ch.id);
-        const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((a,x)=>a+x.reps,0);
-        const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((a,x)=>a+x.reps,0);
+        const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((a,x)=>a+val(x), 0);
+        const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((a,x)=>a+val(x), 0);
         const total = bennyDone + jonasDone;
         const bennyHit = bennyDone >= ch.target_reps;
         const jonasHit = jonasDone >= ch.target_reps;
-        return { ch, cat: catById[ch.category_id], total, bennyDone, jonasDone, bennyHit, jonasHit, hit: bennyHit && jonasHit };
+        return { ch, cat: catById[ch.category_id], total, bennyDone, jonasDone, bennyHit, jonasHit, hit: bennyHit && jonasHit, isWorkCh, val };
       });
       const bennyTotal = challStats.reduce((s,x)=>s+x.bennyDone,0);
       const jonasTotal = challStats.reduce((s,x)=>s+x.jonasDone,0);
@@ -137,12 +139,14 @@ function App() {
       const winner = bennyTotal === jonasTotal ? null : (bennyTotal > jonasTotal ? 'Benny' : 'Jonas');
       const diff = Math.abs(bennyTotal - jonasTotal);
       const hitCount = challStats.filter(c => c.hit).length;
+      const allWork = challStats.length > 0 && challStats.every(c => c.isWorkCh);
+      const unit = allWork ? 'min' : 'Reps';
       let analysis;
       if (sumAll === 0) analysis = 'Stille Woche. Auf in die nächste!';
       else if (!winner) analysis = 'Unentschieden — perfekt ausbalanciert.';
-      else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winner} dominiert mit ${diff} Reps Vorsprung.`;
-      else if (diff / sumAll > 0.15) analysis = `${winner} setzt sich durch — ${diff} Reps Vorsprung.`;
-      else analysis = `Knapper Sieg für ${winner} — nur ${diff} Reps Unterschied.`;
+      else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winner} dominiert mit ${diff} ${unit} Vorsprung.`;
+      else if (diff / sumAll > 0.15) analysis = `${winner} setzt sich durch — ${diff} ${unit} Vorsprung.`;
+      else analysis = `Knapper Sieg für ${winner} — nur ${diff} ${unit} Unterschied.`;
       const bennyByCat = challStats
         .filter(c => c.bennyDone > 0)
         .map(c => ({ name: c.cat?.name || '—', reps: c.bennyDone }))
@@ -157,8 +161,14 @@ function App() {
       const jonasSets = weekSets.filter(s => s.athlete === 'Jonas');
       const bennySetCount = bennySets.length;
       const jonasSetCount = jonasSets.length;
-      const bennyMaxSet = bennySets.reduce((m, s) => Math.max(m, s.reps), 0);
-      const jonasMaxSet = jonasSets.reduce((m, s) => Math.max(m, s.reps), 0);
+      const bennyMaxSet = bennySets.reduce((m, s) => {
+        const stat = challStats.find(c => c.ch.id === s.challenge_id);
+        return Math.max(m, stat ? stat.val(s) : (s.reps ?? 0));
+      }, 0);
+      const jonasMaxSet = jonasSets.reduce((m, s) => {
+        const stat = challStats.find(c => c.ch.id === s.challenge_id);
+        return Math.max(m, stat ? stat.val(s) : (s.reps ?? 0));
+      }, 0);
       const weekNumber = Math.round((monday - firstMonday) / (7 * 86400000)) + 1;
       const weekPens = penalties.filter(p => p.week_start === ws);
       const bennyPenCents = weekPens.filter(p => p.athlete === 'Benny').reduce((a,p)=>a+p.amount_cents, 0);
@@ -428,10 +438,15 @@ function App() {
           onAddGoal={() => setSetupForChallenge({})}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
           onLogChallenge={(ch) => setLogForChallenge(ch)}
-          onQuickLog={async (ch, reps) => {
+          onQuickLog={async (ch, val) => {
             try {
-              await api.addSet({ challenge_id: ch.id, athlete: me, reps: parseInt(reps), note: null });
-              setToast(`+${reps} geloggt 💪`);
+              const cat = categories.find(c => c.id === ch.category_id);
+              const isWork = cat?.kind === 'work';
+              const payload = isWork
+                ? { challenge_id: ch.id, athlete: me, reps: null, duration_minutes: parseInt(val), note: null }
+                : { challenge_id: ch.id, athlete: me, reps: parseInt(val), note: null };
+              await api.addSet(payload);
+              setToast(`+${val} ${isWork ? 'min 💻' : 'geloggt 💪'}`);
               reload();
             } catch (e) { alert(e.message); }
           }} />
