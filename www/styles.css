@@ -3005,3 +3005,23 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   color: var(--text-2);
   margin-left: 4px;
 }
+
+/* ── Settings tag list ────────────────────────────────────────────────────── */
+.settings-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.tag-list { display: flex; flex-direction: column; gap: 4px; }
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+.tag-emoji { font-size: 18px; }
+.tag-name  { flex: 1; font-size: 14px; }
