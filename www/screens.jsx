@@ -1750,6 +1750,14 @@ function HistoryScreen({ challenges, categories, allSets }) {
 function HistoryView({ challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone }) {
   const [range, setRange] = useState('30'); // '7', '30', 'all'
   const [selectedCats, setSelectedCats] = useState([]); // [] = alle
+
+  // Determine if the current filter is exclusively work or sports for unit labels
+  const filterKind = useMemo(() => {
+    if (!selectedCats.length) return 'mixed';
+    const kinds = [...new Set(selectedCats.map(id => catById[id]?.kind || 'sports'))];
+    return kinds.length === 1 ? kinds[0] : 'mixed';
+  }, [selectedCats, catById]);
+  const unitLabel = filterKind === 'work' ? 'Min.' : 'Reps';
   const [cumulative, setCumulative] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -1957,7 +1965,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       const ch = challenges.find(c => c.id === s.challenge_id);
       if (!ch) continue;
       m[ch.category_id] ||= { Benny: 0, Jonas: 0 };
-      m[ch.category_id][s.athlete] = (m[ch.category_id][s.athlete] || 0) + s.reps;
+      m[ch.category_id][s.athlete] = (m[ch.category_id][s.athlete] || 0) + (s.reps ?? s.duration_minutes ?? 0);
     }
     return Object.entries(m)
       .map(([cid, v]) => ({ cat: catById[cid], ...v, total: v.Benny + v.Jonas }))
@@ -1976,9 +1984,10 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     const maxSet = { Benny: 0, Jonas: 0 };
     const byDay = { Benny: {}, Jonas: {} };
     for (const s of relevant) {
-      if (s.reps > maxSet[s.athlete]) maxSet[s.athlete] = s.reps;
+      const val = s.reps ?? s.duration_minutes ?? 0;
+      if (val > maxSet[s.athlete]) maxSet[s.athlete] = val;
       const d = PTData.isoDate(new Date(s.created_at));
-      byDay[s.athlete][d] = (byDay[s.athlete][d] || 0) + s.reps;
+      byDay[s.athlete][d] = (byDay[s.athlete][d] || 0) + val;
     }
     const bestDay = { Benny: 0, Jonas: 0 };
     const longestStreak = { Benny: 0, Jonas: 0 };
@@ -2045,14 +2054,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       const w = maxSet.Benny > maxSet.Jonas ? 'Benny' : 'Jonas';
       push({
         key: 'maxSet', icon: '💪', title: 'Rekord-Satz', tier: 'silver',
-        winner: w, value: `${maxSet[w]} Reps`, sub: 'in einem Satz',
+        winner: w, value: `${maxSet[w]} ${unitLabel}`, sub: 'in einem Satz',
       });
     }
     if (bestDay.Benny !== bestDay.Jonas && (bestDay.Benny || bestDay.Jonas)) {
       const w = bestDay.Benny > bestDay.Jonas ? 'Benny' : 'Jonas';
       push({
         key: 'bestDay', icon: '📅', title: 'Bester Tag', tier: 'silver',
-        winner: w, value: `${bestDay[w]} Reps`, sub: 'an einem Tag',
+        winner: w, value: `${bestDay[w]} ${unitLabel}`, sub: 'an einem Tag',
       });
     }
     if (longestStreak.Benny !== longestStreak.Jonas && (longestStreak.Benny || longestStreak.Jonas)) {
@@ -2080,7 +2089,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
         </div>
         <div className="stat">
           <div className="v mono">{totalReps}</div>
-          <div className="k">Reps gesamt</div>
+          <div className="k">{unitLabel} gesamt</div>
         </div>
       </div>
 
@@ -2126,7 +2135,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
             </div>
             <div className="winner-text">
               <div className="winner-name">{leader}</div>
-              <div className="winner-lead">führt mit <span className="mono">+{diff}</span> Reps</div>
+              <div className="winner-lead">führt mit <span className="mono">+{diff}</span> {unitLabel}</div>
               {momentum && (
                 <div className={`winner-momentum ${momentum.who.toLowerCase()}`}>
                   {momentum.isCatchingUp ? '📈' : '🔒'} {momentum.who} {momentum.isCatchingUp ? 'holt auf' : 'baut aus'} · <span className="mono">+{momentum.gap}</span> in 7T
@@ -2161,7 +2170,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           <div className="chart-legend">
             <span><span className="dot" style={{background: accentColors.accent}}/>Benny</span>
             <span><span className="dot" style={{background: accentColors.accent3}}/>Jonas</span>
-            <span className="chart-title">{cumulative ? 'Kumuliert' : 'Reps pro Tag'}</span>
+            <span className="chart-title">{cumulative ? 'Kumuliert' : `${unitLabel} pro Tag`}</span>
             <Icon name="expand" size={14} color="var(--text-2)" />
           </div>
           <StatsChart
@@ -2178,7 +2187,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
             { label: 'Aktive Tage', b: bennyStats.activeDays, j: jonasStats.activeDays },
             { label: 'Bester Tag', b: bennyStats.bestDay, j: jonasStats.bestDay },
             { label: 'Größter Satz', b: bennyStats.maxSet, j: jonasStats.maxSet },
-            { label: '⌀ Reps/Tag', b: bennyStats.avgDay, j: jonasStats.avgDay },
+            { label: `⌀ ${unitLabel}/Tag`, b: bennyStats.avgDay, j: jonasStats.avgDay },
             {
               label: '⌀ Sätze bis Ziel',
               b: setsToTarget.bennyHits ? setsToTarget.benny : null,
