@@ -868,7 +868,13 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
   const [toolTagId, setToolTagId] = useState(null);
   const [timerStart, setTimerStart] = React.useState(() => {
     const v = localStorage.getItem(TIMER_KEY);
-    return v ? parseInt(v) : null;
+    const parsed = v ? parseInt(v) : null;
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    if (Date.now() - parsed > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(TIMER_KEY);
+      return null;
+    }
+    return parsed;
   });
   const [elapsedSec, setElapsedSec] = React.useState(0);
 
@@ -918,6 +924,9 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
           tool_tag_id: toolTagId || null,
           note: note.trim() || null,
         });
+        localStorage.removeItem(TIMER_KEY);
+        setTimerStart(null);
+        setElapsedSec(0);
         onLogged(durationMinutes, true);
       } catch (e) {
         alert(e.message || 'Fehler');
@@ -1674,7 +1683,7 @@ function HistoryScreen({ challenges, categories, allSets }) {
     return s;
   }, [allSets]);
 
-  const totalReps = allSets.reduce((s, x) => s + x.reps, 0);
+  const totalReps = allSets.reduce((s, x) => s + (x.reps ?? x.duration_minutes ?? 0), 0);
   // Wochen: jede Kalenderwoche zählt, in der mindestens ein Satz geloggt wurde
   // (unabhängig davon, ob das Wochenziel erreicht wurde).
   const weeksDone = new Set(
@@ -1764,7 +1773,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       const i = Math.round((new Date(day + 'T00:00:00') - start) / 86400000);
       if (i < 0 || i >= total) continue;
       const arr = s.athlete === 'Benny' ? bennyArr : jonasArr;
-      arr[i].reps += s.reps;
+      arr[i].reps += (s.reps ?? s.duration_minutes ?? 0);
     }
     // Cumulative variants (running sum within the range)
     let bennyAcc = 0, jonasAcc = 0;
@@ -1794,7 +1803,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
         let sum = 0;
         for (let i = 0; i < own.length; i++) {
-          sum += own[i].reps;
+          sum += (own[i].reps ?? own[i].duration_minutes ?? 0);
           if (sum >= ch.target_reps) {
             acc[athlete].totalSets += i + 1;
             acc[athlete].hits += 1;
@@ -1841,7 +1850,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     for (const s of filteredSets) {
       const day = String(s.created_at).slice(0, 10);
       if (!dayMap.has(day)) dayMap.set(day, { Benny: 0, Jonas: 0 });
-      dayMap.get(day)[s.athlete] += s.reps;
+      dayMap.get(day)[s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
     }
     const days = Array.from(dayMap.keys()).sort();
     let cumB = 0, cumJ = 0;
@@ -1875,7 +1884,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       const wk = ch.week_start;
       if (!byWeek.has(wk)) byWeek.set(wk, { Benny: 0, Jonas: 0 });
       const sets = setsByCh[ch.id] || [];
-      for (const s of sets) byWeek.get(wk)[s.athlete] += s.reps;
+      for (const s of sets) byWeek.get(wk)[s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
     }
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let bennyWins = 0, jonasWins = 0, ties = 0;
@@ -1945,7 +1954,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     for (const s of relevant) {
       const ch = chMap.get(s.challenge_id);
       perCatAll[ch.category_id] ||= { Benny: 0, Jonas: 0 };
-      perCatAll[ch.category_id][s.athlete] += s.reps;
+      perCatAll[ch.category_id][s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
     }
     const catWins = { Benny: 0, Jonas: 0 };
     for (const v of Object.values(perCatAll)) {
@@ -2310,14 +2319,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
         const currentWeekStart = PTData.isoDate(PTData.mondayOf(new Date()));
         const challengeIsDone = (ch) => {
           const sets = setsByCh[ch.id] || [];
-          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
-          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
+          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
+          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
           return bT >= ch.target_reps && jT >= ch.target_reps;
         };
         const progressRows = (ch) => {
           const sets = setsByCh[ch.id] || [];
-          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + x.reps, 0);
-          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + x.reps, 0);
+          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
+          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
           const bPct = Math.round(100 * bT / ch.target_reps);
           const jPct = Math.round(100 * jT / ch.target_reps);
           const bDone = bT >= ch.target_reps;
@@ -2402,14 +2411,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
 
 function computeAthleteStats(sets, athlete, series) {
   const own = sets.filter(s => s.athlete === athlete);
-  const total = own.reduce((a, x) => a + x.reps, 0);
+  const total = own.reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
   const setCount = own.length;
   const avgSet = setCount ? Math.round(total / setCount) : 0;
-  const maxSet = own.reduce((m, x) => Math.max(m, x.reps), 0);
+  const maxSet = own.reduce((m, x) => Math.max(m, x.reps ?? x.duration_minutes ?? 0), 0);
   const byDay = {};
   for (const s of own) {
     const d = String(s.created_at).slice(0, 10);
-    byDay[d] = (byDay[d] || 0) + s.reps;
+    byDay[d] = (byDay[d] || 0) + (s.reps ?? s.duration_minutes ?? 0);
   }
   const activeDays = Object.keys(byDay).length;
   const bestDay = Object.values(byDay).reduce((m, v) => Math.max(m, v), 0);

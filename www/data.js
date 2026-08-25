@@ -85,7 +85,9 @@
   function repsForAthleteOnChallenge(sets, athlete, challengeId) {
     let total = 0;
     for (const s of sets) {
-      if (s.challenge_id === challengeId && s.athlete === athlete) total += s.reps;
+      if (s.challenge_id === challengeId && s.athlete === athlete) {
+        total += s.reps ?? s.duration_minutes ?? 0;
+      }
     }
     return total;
   }
@@ -103,7 +105,7 @@
         const share = fairShareOf(ch.target_reps);
         if (reps < share) out.push({
           athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
-          reason: `${share - reps} Reps unter fairShare`,
+          reason: `${share - reps} unter fairShare`,
         });
       }
       return out;
@@ -126,7 +128,7 @@
       const totalReps  = perCh.reduce((a, x) => a + x.reps, 0);
       const totalShare = perCh.reduce((a, x) => a + x.share, 0);
       failed = totalReps < totalShare;
-      reason = failed ? `aggregiert ${totalShare - totalReps} Reps unter fairShare` : '';
+      reason = failed ? `aggregiert ${totalShare - totalReps} unter fairShare` : '';
     }
 
     return failed
