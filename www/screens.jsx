@@ -219,9 +219,13 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
   // dann erfüllte (total >= target_reps) ans Ende sortieren.
   // Gleiche Quelle für Swiper UND Overview, kein Mehrfach-Filter.
   const { sortedChallenges, totalsByChallenge } = React.useMemo(() => {
+    const catKind = Object.fromEntries(tabChallenges.map(c => [c.id, catById[c.category_id]?.kind || 'sports']));
     const totals = new Map(tabChallenges.map(c => [c.id, 0]));
     for (const s of allSets) {
-      if (totals.has(s.challenge_id)) totals.set(s.challenge_id, totals.get(s.challenge_id) + s.reps);
+      if (totals.has(s.challenge_id)) {
+        const v = catKind[s.challenge_id] === 'work' ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
+        totals.set(s.challenge_id, totals.get(s.challenge_id) + v);
+      }
     }
     const open = [], done = [];
     for (const ch of tabChallenges) {
@@ -286,8 +290,11 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
         const csets = allSets.filter(s => s.challenge_id === ch.id);
         const chDailyBreakdown = dailyBreakdownFor(ch.week_start, csets);
         const total = totalsByChallenge.get(ch.id) ?? 0;
-        const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((s,x)=>s+x.reps, 0);
-        const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((s,x)=>s+x.reps, 0);
+        const isWorkCh = cat?.kind === 'work';
+        const sumVal = (s) => isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
+        const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((a,x)=>a+sumVal(x), 0);
+        const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((a,x)=>a+sumVal(x), 0);
+        const fmtVal = (v) => isWorkCh ? formatDuration(v) : v;
         const pct = Math.min(1, total / ch.target_reps);
         const pctInt = Math.round(pct * 100);
         const remaining = Math.max(0, ch.target_reps - total);
@@ -324,7 +331,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                   ? <>{athlete}<img src={`uploads/${cls}.jpg`} alt={athlete} className="tug-avatar"/></>
                   : <><img src={`uploads/${cls}.jpg`} alt={athlete} className="tug-avatar"/>{athlete}</>}
               </div>
-              <div className="tug-reps mono">{s.done}</div>
+              <div className="tug-reps mono">{fmtVal(s.done)}</div>
               <DailyStatus variant="tug" done={s.done} fairShare={fairShare}
                 dailyTarget={dailyTarget} todayReps={s.today} trackDelta={s.trackDelta}/>
             </div>
@@ -336,7 +343,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
           return (
             <div className={`split-cell ${cls}`}>
               <div className="who"><img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/>{athlete}</div>
-              <div className="v mono">{s.done}<span className="owe-of"> / {fairShare}</span></div>
+              <div className="v mono">{fmtVal(s.done)}<span className="owe-of"> / {fmtVal(fairShare)}</span></div>
               <DailyStatus variant="cell" done={s.done} fairShare={fairShare}
                 dailyTarget={dailyTarget} todayReps={s.today} trackDelta={s.trackDelta}/>
             </div>
@@ -363,15 +370,15 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                 <div className="pm-trophy-sub">{cat?.emoji} {cat?.name} • Diese Woche</div>
                 <div className="pm-trophy-stats">
                   <div>
-                    <div className="pm-trophy-stat-v">{total.toLocaleString('de-DE')}</div>
-                    <div className="pm-trophy-stat-l">Reps</div>
+                    <div className="pm-trophy-stat-v">{isWorkCh ? formatDuration(total) : total.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-l">{isWorkCh ? 'Zeit' : 'Reps'}</div>
                   </div>
                   <div>
-                    <div className="pm-trophy-stat-v">{stats[leftA].done.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-v">{fmtVal(stats[leftA].done)}</div>
                     <div className="pm-trophy-stat-l">{leftA}</div>
                   </div>
                   <div>
-                    <div className="pm-trophy-stat-v">{stats[rightA].done.toLocaleString('de-DE')}</div>
+                    <div className="pm-trophy-stat-v">{fmtVal(stats[rightA].done)}</div>
                     <div className="pm-trophy-stat-l">{rightA}</div>
                   </div>
                 </div>
@@ -383,8 +390,8 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                     {tugSide(leftA, false)}
                     <div className="tug-side team">
                       <div className="tug-who">Gesamt</div>
-                      <div className="tug-reps mono">{total}</div>
-                      <div className={`tug-foot mono ${remaining===0?'done':''}`}>{remaining===0?'✓ erledigt':`noch ${remaining}`}</div>
+                      <div className="tug-reps mono">{fmtVal(total)}</div>
+                      <div className={`tug-foot mono ${remaining===0?'done':''}`}>{remaining===0?'✓ erledigt':`noch ${fmtVal(remaining)}`}</div>
                     </div>
                     {tugSide(rightA, true)}
                   </div>
@@ -403,7 +410,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                           {teamRemaining===0 ? (
                             <span className="tug-summary-done">🎉 Gesamtziel erreicht!</span>
                           ) : (
-                            <>Wochenziel <span className="tug-summary-target">{ch.target_reps}</span></>
+                            <>Wochenziel <span className="tug-summary-target">{fmtVal(ch.target_reps)}</span></>
                           )}
                         </div>
                       </>
@@ -414,13 +421,13 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
               {layout==='bar' && <>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:12}}>
                   <div className="display mono" style={{fontSize:44,lineHeight:1}}>{pctInt}%</div>
-                  <div className="subtitle mono">{total} / {ch.target_reps}</div></div>
+                  <div className="subtitle mono">{fmtVal(total)} / {fmtVal(ch.target_reps)}</div></div>
                 <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct*100}%`}}/></div>
-                <div className="subtitle" style={{fontSize:13,fontWeight:500}}>{remaining>0?`Noch ${remaining} Reps`:'🎉 Ziel erreicht!'}</div></>}
+                <div className="subtitle" style={{fontSize:13,fontWeight:500}}>{remaining>0?`Noch ${fmtVal(remaining)} ${isWorkCh?'':'Reps'}`:'🎉 Ziel erreicht!'}</div></>}
               {layout==='numeric' && <div style={{textAlign:'center',marginTop:12}}>
                 <div className="big-number mono" style={{fontSize:72}}>{pctInt}%</div>
-                <div className="of mono">{total} / {ch.target_reps} Reps</div>
-                <div style={{marginTop:8,fontSize:13,color:'var(--text-2)'}}>{remaining>0?`Noch ${remaining}`:'🎉 Ziel erreicht'}</div></div>}
+                <div className="of mono">{fmtVal(total)} / {fmtVal(ch.target_reps)} {isWorkCh?'':'Reps'}</div>
+                <div style={{marginTop:8,fontSize:13,color:'var(--text-2)'}}>{remaining>0?`Noch ${fmtVal(remaining)}`:'🎉 Ziel erreicht'}</div></div>}
               {layout!=='rings' && <div className="split-row">
                 {splitCell(leftA)}
                 {splitCell(rightA)}
@@ -911,7 +918,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
           tool_tag_id: toolTagId || null,
           note: note.trim() || null,
         });
-        onLogged(durationMinutes);
+        onLogged(durationMinutes, true);
       } catch (e) {
         alert(e.message || 'Fehler');
       } finally {
@@ -927,7 +934,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
           reps: parseInt(reps),
           note: note.trim() || null,
         });
-        onLogged(reps);
+        onLogged(reps, false);
       } catch (e) {
         alert(e.message || 'Fehler');
       } finally {
