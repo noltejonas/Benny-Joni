@@ -145,12 +145,12 @@
       async getCategories() {
         return loadDemo().categories;
       },
-      async addCategory(name, emoji='💪') {
+      async addCategory(name, emoji='💪', kind='sports') {
         const s = loadDemo();
         if (s.categories.find(c => c.name.toLowerCase() === name.toLowerCase())) {
           throw new Error('Kategorie existiert bereits');
         }
-        const cat = { id: uid(), name, emoji };
+        const cat = { id: uid(), name, emoji, kind };
         s.categories.push(cat);
         saveDemo(s); emit();
         return cat;
@@ -508,8 +508,8 @@
         if (error) throw error;
         return data;
       },
-      async addCategory(name, emoji='💪') {
-        const { data, error } = await client.from('categories').insert({ name, emoji }).select().single();
+      async addCategory(name, emoji='💪', kind='sports') {
+        const { data, error } = await client.from('categories').insert({ name, emoji, kind }).select().single();
         if (error) throw error;
         emit();
         return data;

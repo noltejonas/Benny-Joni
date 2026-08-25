@@ -642,9 +642,17 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatEmoji, setNewCatEmoji] = useState('💪');
+  const [newCatKind, setNewCatKind] = useState('sports');
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const selectedCat = categories.find(c => c.id === catId);
+  const isWork = selectedCat?.kind === 'work';
+  // For work challenges: target is in hours; stored value = hours * 60
+  const [hoursTarget, setHoursTarget] = useState(
+    existing?.target_reps ? (isWork ? existing.target_reps / 60 : null) : null
+  );
 
   async function deleteChallenge() {
     if (!existing?.id) return;
@@ -669,7 +677,7 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
         week_start: weekStart,
         category_id: catId,
         chosen_by: chosenBy,
-        target_reps: target
+        target_reps: isWork ? Math.round((hoursTarget || 1) * 60) : target,
       });
       onSaved();
     } catch (e) {
@@ -682,11 +690,12 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
   async function addNewCat() {
     if (!newCatName.trim()) return;
     try {
-      const cat = await api.addCategory(newCatName.trim(), newCatEmoji);
+      const cat = await api.addCategory(newCatName.trim(), newCatEmoji, newCatKind);
       onAddCategory();
       setCatId(cat.id);
       setShowNewCat(false);
       setNewCatName('');
+      setNewCatKind('sports');
     } catch (e) {
       alert(e.message);
     }
@@ -728,23 +737,48 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
       <div className="label" style={{ marginBottom: 8 }}>Kategorie</div>
 
       <div className="cat-grid">
-        {categories.map((c) =>
-        <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
-            <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
-              <div className="emoji">{c.emoji}</div>
-              <div className="name">{c.name}</div>
-            </button>
-            <button className="cat-edit" aria-label="Bearbeiten"
-          onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-              ✎
-            </button>
-          </div>
-        )}
-        <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
-        onClick={() => {setShowNewCat((s) => !s);setEditingCat(null);}}>
-          <div className="emoji">＋</div>
-          <div className="name">Neue Kategorie</div>
-        </button>
+        {(() => {
+          const sports = categories.filter(c => (c.kind || 'sports') === 'sports');
+          const work   = categories.filter(c => c.kind === 'work');
+          return (
+            <>
+              {sports.map((c) => (
+                <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
+                  <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
+                    <div className="emoji">{c.emoji}</div>
+                    <div className="name">{c.name}</div>
+                  </button>
+                  <button className="cat-edit" aria-label="Bearbeiten"
+                    onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
+                    ✎
+                  </button>
+                </div>
+              ))}
+              {work.length > 0 && (
+                <>
+                  <div className="cat-grid-divider">💻 Work</div>
+                  {work.map((c) => (
+                    <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
+                      <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
+                        <div className="emoji">{c.emoji}</div>
+                        <div className="name">{c.name}</div>
+                      </button>
+                      <button className="cat-edit" aria-label="Bearbeiten"
+                        onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
+                        ✎
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+              <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
+                onClick={() => {setShowNewCat((s) => !s);setEditingCat(null);}}>
+                <div className="emoji">＋</div>
+                <div className="name">Neue Kategorie</div>
+              </button>
+            </>
+          );
+        })()}
       </div>
 
       {editingCat &&
@@ -763,23 +797,41 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
       }
 
       {showNewCat &&
-      <div className="new-cat-row">
+        <div className="new-cat-row">
           <input className="input new-cat-emoji"
-        value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} maxLength={2} />
+            value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} maxLength={2} />
           <input className="input" placeholder="Name (z.B. Dips)" autoFocus
-        value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
+            value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
+          <div className="segmented" style={{ flexShrink: 0 }}>
+            <button className={newCatKind === 'sports' ? 'active' : ''} onClick={() => setNewCatKind('sports')}>🏋️</button>
+            <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
+          </div>
           <button className="new-cat-add" onClick={addNewCat} aria-label="Hinzufügen">✓</button>
         </div>
       }
 
-      <div className="label" style={{ marginBottom: 0 }}>Ziel-Wiederholungen / Woche</div>
-      <Stepper value={target} onChange={setTarget} step={target < 50 ? 5 : target < 200 ? 10 : 25} />
-      <div className="chip-row" style={{ justifyContent: 'center' }}>
-        {[50, 100, 200, 500].map((v) =>
-        <button key={v} className="chip" onClick={() => setTarget(v)}>{v}</button>
-        )}
-      </div>
+      {isWork ? (
+        <>
+          <div className="label" style={{ marginBottom: 0 }}>Ziel-Stunden / Woche</div>
+          <Stepper value={hoursTarget ?? 10} onChange={setHoursTarget} step={1} min={1} />
+          <div className="chip-row" style={{ justifyContent: 'center' }}>
+            {[5, 10, 20, 40].map((v) =>
+              <button key={v} className="chip" onClick={() => setHoursTarget(v)}>{v}h</button>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="label" style={{ marginBottom: 0 }}>Ziel-Wiederholungen / Woche</div>
+          <Stepper value={target} onChange={setTarget} step={target < 50 ? 5 : target < 200 ? 10 : 25} />
+          <div className="chip-row" style={{ justifyContent: 'center' }}>
+            {[50, 100, 200, 500].map((v) =>
+              <button key={v} className="chip" onClick={() => setTarget(v)}>{v}</button>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>

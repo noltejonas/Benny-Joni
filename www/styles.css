@@ -2962,3 +2962,13 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   background: var(--accent);
   color: #fff;
 }
+
+.cat-grid-divider {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  padding: 8px 0 4px;
+}
