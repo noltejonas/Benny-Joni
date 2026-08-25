@@ -681,7 +681,7 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
     setSaving(true);
     try {
       await api.upsertChallenge({
-        week_start: weekStart,
+        ...(existing?.id ? { id: existing.id } : { week_start: weekStart }),
         category_id: catId,
         chosen_by: chosenBy,
         target_reps: isWork ? Math.round((hoursTarget || 1) * 60) : target,
