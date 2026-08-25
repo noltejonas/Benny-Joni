@@ -326,11 +326,17 @@ body {
 .feed-title { font-size: 15px; font-weight: 600; }
 .feed-meta { font-size: 13px; color: var(--text-2); margin-top: 2px; }
 .feed-reps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
   font-size: 20px; font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--accent);
 }
 .feed-reps.jonas { color: var(--accent-3); }
+.feed-reps-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.feed-tags-row { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
 .feed-meta-tracking { color: var(--text-2); font-weight: 500; }
 .reps-fire { display: inline-block; font-size: 12px; vertical-align: -1px; margin-left: 1px; }
 
@@ -1588,8 +1594,9 @@ a { color: var(--accent); text-decoration: none; }
 .feed-actions { display:flex; gap:4px; margin-left:8px; opacity:0.55; transition:opacity 0.15s; }
 .feed-item:hover .feed-actions, .feed-item:active .feed-actions { opacity:1; }
 .feed-action-btn { width:28px; height:28px; border-radius:14px; }
-.feed-edit { margin-left:auto; }
-.feed-edit input { width:72px; text-align:right; font-weight:700; font-size:17px; padding:6px 10px; }
+.feed-edit { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+.feed-edit input { width:80px; text-align:right; font-weight:700; font-size:17px; padding:6px 10px; }
+.feed-edit-unit { font-size:11px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em; }
 .feed-item.editing { background: var(--surface-2); border-radius: 10px; }
 
 .feed-reactions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
