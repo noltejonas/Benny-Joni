@@ -1770,6 +1770,9 @@ function HistoryScreen({ challenges, categories, allSets }) {
     </div>;
   }
 
+  const emptyFilter = filteredChallenges.length === 0;
+  const kindLabel = kindTab === 'work' ? 'Work' : 'Sports';
+
   return (
     <>
       {showToggle && (
@@ -1779,7 +1782,15 @@ function HistoryScreen({ challenges, categories, allSets }) {
           <button className={`work-tab-btn${kindTab === 'work' ? ' active' : ''}`} onClick={() => switchKind('work')}>💻 Work</button>
         </div>
       )}
-      <HistoryView {...{challenges: filteredChallenges, categories, allSets: filteredAllSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab}} />
+      {emptyFilter ? (
+        <div className="empty">
+          <div className="emoji">{kindTab === 'work' ? '💻' : '🏋️'}</div>
+          <div className="title">Keine {kindLabel}-Challenges</div>
+          <div>Starte eine {kindLabel}-Challenge, um hier Daten zu sehen.</div>
+        </div>
+      ) : (
+        <HistoryView {...{challenges: filteredChallenges, categories, allSets: filteredAllSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab}} />
+      )}
     </>
   );
 }
