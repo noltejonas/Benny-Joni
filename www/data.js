@@ -18,16 +18,38 @@
         s.penalties ||= [];
         s.week_closures ||= [];
         s.payouts ||= [];
+        s.project_tags ||= [
+          { id: 'pt1', name: 'IBM',           emoji: '🏢', created_at: new Date().toISOString() },
+          { id: 'pt2', name: 'Bauerlieferant', emoji: '🚜', created_at: new Date().toISOString() },
+          { id: 'pt3', name: 'FarmerOS',      emoji: '🌱', created_at: new Date().toISOString() },
+        ];
+        s.tool_tags ||= [
+          { id: 'tt1', name: 'Claude Code', emoji: '🤖', created_at: new Date().toISOString() },
+          { id: 'tt2', name: 'Codex',       emoji: '⚡', created_at: new Date().toISOString() },
+          { id: 'tt3', name: 'Bob',         emoji: '🦾', created_at: new Date().toISOString() },
+        ];
+        // Back-fill kind on legacy categories
+        for (const c of (s.categories || [])) { c.kind ||= 'sports'; }
         return s;
       }
     } catch (e) {}
     return {
       categories: [
-        { id: 'c1', name: 'Liegestütze', emoji: '🤜' },
-        { id: 'c2', name: 'Klimmzüge', emoji: '🆙' },
-        { id: 'c3', name: 'Sit-ups', emoji: '🧘' },
-        { id: 'c4', name: 'Kniebeugen', emoji: '🦵' },
-        { id: 'c5', name: 'Burpees', emoji: '🔥' },
+        { id: 'c1', name: 'Liegestütze', emoji: '🤜', kind: 'sports' },
+        { id: 'c2', name: 'Klimmzüge',  emoji: '🆙', kind: 'sports' },
+        { id: 'c3', name: 'Sit-ups',    emoji: '🧘', kind: 'sports' },
+        { id: 'c4', name: 'Kniebeugen', emoji: '🦵', kind: 'sports' },
+        { id: 'c5', name: 'Burpees',    emoji: '🔥', kind: 'sports' },
+      ],
+      project_tags: [
+        { id: 'pt1', name: 'IBM',           emoji: '🏢', created_at: new Date().toISOString() },
+        { id: 'pt2', name: 'Bauerlieferant', emoji: '🚜', created_at: new Date().toISOString() },
+        { id: 'pt3', name: 'FarmerOS',      emoji: '🌱', created_at: new Date().toISOString() },
+      ],
+      tool_tags: [
+        { id: 'tt1', name: 'Claude Code', emoji: '🤖', created_at: new Date().toISOString() },
+        { id: 'tt2', name: 'Codex',       emoji: '⚡', created_at: new Date().toISOString() },
+        { id: 'tt3', name: 'Bob',         emoji: '🦾', created_at: new Date().toISOString() },
       ],
       challenges: [],
       sets: [],
@@ -149,6 +171,54 @@
         s.categories = s.categories.filter(c => c.id !== id);
         saveDemo(s); emit();
       },
+      async getProjectTags() {
+        return [...loadDemo().project_tags];
+      },
+      async addProjectTag(name, emoji = '📁') {
+        const s = loadDemo();
+        const tag = { id: uid(), name, emoji, created_at: new Date().toISOString() };
+        s.project_tags.push(tag);
+        saveDemo(s); emit();
+        return tag;
+      },
+      async updateProjectTag(id, { name, emoji }) {
+        const s = loadDemo();
+        const tag = s.project_tags.find(t => t.id === id);
+        if (!tag) throw new Error('Tag nicht gefunden');
+        if (name  !== undefined) tag.name  = name;
+        if (emoji !== undefined) tag.emoji = emoji;
+        saveDemo(s); emit();
+        return tag;
+      },
+      async deleteProjectTag(id) {
+        const s = loadDemo();
+        s.project_tags = s.project_tags.filter(t => t.id !== id);
+        saveDemo(s); emit();
+      },
+      async getToolTags() {
+        return [...loadDemo().tool_tags];
+      },
+      async addToolTag(name, emoji = '🔧') {
+        const s = loadDemo();
+        const tag = { id: uid(), name, emoji, created_at: new Date().toISOString() };
+        s.tool_tags.push(tag);
+        saveDemo(s); emit();
+        return tag;
+      },
+      async updateToolTag(id, { name, emoji }) {
+        const s = loadDemo();
+        const tag = s.tool_tags.find(t => t.id === id);
+        if (!tag) throw new Error('Tag nicht gefunden');
+        if (name  !== undefined) tag.name  = name;
+        if (emoji !== undefined) tag.emoji = emoji;
+        saveDemo(s); emit();
+        return tag;
+      },
+      async deleteToolTag(id) {
+        const s = loadDemo();
+        s.tool_tags = s.tool_tags.filter(t => t.id !== id);
+        saveDemo(s); emit();
+      },
       async getChallengeForWeek(weekStart) {
         const s = loadDemo();
         return s.challenges.filter(c => c.week_start === weekStart);
@@ -186,9 +256,17 @@
         return loadDemo().sets.filter(x => x.challenge_id === challengeId)
           .sort((a,b) => b.created_at.localeCompare(a.created_at));
       },
-      async addSet({ challenge_id, athlete, reps, note, created_at }) {
+      async addSet({ challenge_id, athlete, reps, note, created_at, duration_minutes, project_tag_id, tool_tag_id }) {
         const s = loadDemo();
-        const set = { id: uid(), challenge_id, athlete, reps, note: note || null, created_at: created_at || new Date().toISOString() };
+        const set = {
+          id: uid(), challenge_id, athlete,
+          reps: reps ?? null,
+          note: note || null,
+          duration_minutes: duration_minutes ?? null,
+          project_tag_id: project_tag_id ?? null,
+          tool_tag_id: tool_tag_id ?? null,
+          created_at: created_at || new Date().toISOString(),
+        };
         s.sets.push(set);
         saveDemo(s); emit();
         return set;
@@ -416,6 +494,8 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'week_closures' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penalty_config' }, emit)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payouts' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tags' }, emit)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tool_tags' }, emit)
       .subscribe();
 
     return {
@@ -443,6 +523,50 @@
       async deleteCategory(id) {
         const { error } = await client.from('categories').delete().eq('id', id);
         if (error) throw new Error(error.message.includes('foreign') ? 'Kategorie wird genutzt – nicht löschbar' : error.message);
+        emit();
+      },
+      async getProjectTags() {
+        const { data, error } = await client.from('project_tags').select('*').order('created_at');
+        if (error) throw error;
+        return data;
+      },
+      async addProjectTag(name, emoji = '📁') {
+        const { data, error } = await client.from('project_tags').insert({ name, emoji }).select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async updateProjectTag(id, patch) {
+        const { data, error } = await client.from('project_tags').update(patch).eq('id', id).select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async deleteProjectTag(id) {
+        const { error } = await client.from('project_tags').delete().eq('id', id);
+        if (error) throw error;
+        emit();
+      },
+      async getToolTags() {
+        const { data, error } = await client.from('tool_tags').select('*').order('created_at');
+        if (error) throw error;
+        return data;
+      },
+      async addToolTag(name, emoji = '🔧') {
+        const { data, error } = await client.from('tool_tags').insert({ name, emoji }).select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async updateToolTag(id, patch) {
+        const { data, error } = await client.from('tool_tags').update(patch).eq('id', id).select().single();
+        if (error) throw error;
+        emit();
+        return data;
+      },
+      async deleteToolTag(id) {
+        const { error } = await client.from('tool_tags').delete().eq('id', id);
+        if (error) throw error;
         emit();
       },
       async getChallengeForWeek(weekStart) {
