@@ -53,7 +53,12 @@ function App() {
   useEffect(() => {if (me) localStorage.setItem('pt_me', me);}, [me]);
 
   // Tabs
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState(() => {
+    try { return sessionStorage.getItem('pt:tab') || 'home'; } catch { return 'home'; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem('pt:tab', tab); } catch {}
+  }, [tab]);
 
   // Data
   const [categories, setCategories] = useState([]);

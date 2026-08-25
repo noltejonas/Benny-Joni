@@ -6,6 +6,7 @@
   --surface-2: #2c2c2e;
   --surface-3: #3a3a3c;
   --text: #fff;
+  --text-1: var(--text);
   --text-2: rgba(255, 255, 255, 0.6);
   --text-3: rgba(255, 255, 255, 0.35);
   --border: rgba(255, 255, 255, 0.08);
@@ -28,6 +29,7 @@
   --surface-2: #e5e5ea;
   --surface-3: #d1d1d6;
   --text: #000;
+  --text-1: var(--text);
   --text-2: rgba(0, 0, 0, 0.6);
   --text-3: rgba(0, 0, 0, 0.35);
   --border: rgba(0, 0, 0, 0.08);
@@ -2956,6 +2958,7 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 .work-tab-btn {
   flex: 1;
   padding: 8px 0;
+  min-height: 44px;
   border-radius: 10px;
   border: none;
   background: var(--surface-2);
@@ -2995,8 +2998,8 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   color: var(--accent);
 }
 .chip-active {
-  background: var(--accent) !important;
-  color: #fff !important;
+  background: var(--accent);
+  color: #000;
 }
 
 /* ── Feed work tags ───────────────────────────────────────────────────────── */
@@ -3011,6 +3014,8 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   background: var(--surface-2);
   color: var(--text-2);
   margin-left: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── Settings tag list ────────────────────────────────────────────────────── */
@@ -3032,3 +3037,31 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 }
 .tag-emoji { font-size: 18px; }
 .tag-name  { flex: 1; font-size: 14px; }
+
+/* ── Running timer banner ─────────────────────────────────────────────────── */
+.timer-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 16px 0;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.timer-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: timer-pulse 1.5s ease-in-out infinite;
+}
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

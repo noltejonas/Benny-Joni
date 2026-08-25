@@ -157,12 +157,13 @@
         saveDemo(s); emit();
         return cat;
       },
-      async updateCategory(id, { name, emoji }) {
+      async updateCategory(id, { name, emoji, kind }) {
         const s = loadDemo();
         const cat = s.categories.find(c => c.id === id);
         if (!cat) throw new Error('Kategorie nicht gefunden');
-        if (name !== undefined) cat.name = name;
+        if (name  !== undefined) cat.name  = name;
         if (emoji !== undefined) cat.emoji = emoji;
+        if (kind  !== undefined) cat.kind  = kind;
         saveDemo(s); emit();
         return cat;
       },
