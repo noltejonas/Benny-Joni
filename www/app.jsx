@@ -448,6 +448,7 @@ function App() {
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} categories={categories}
+          projectTags={projectTags} toolTags={toolTags}
           onEditSet={async (s, patch) => { try { await api.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
           onDeleteSet={async (s) => { try { await api.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
           onToggleReaction={async (s, emoji) => {

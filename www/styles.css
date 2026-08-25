@@ -2991,3 +2991,17 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   background: var(--accent) !important;
   color: #fff !important;
 }
+
+/* ── Feed work tags ───────────────────────────────────────────────────────── */
+.feed-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  margin-left: 4px;
+}
