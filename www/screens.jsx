@@ -1695,14 +1695,40 @@ function ChartFullscreen({
 }
 
 function HistoryScreen({ challenges, categories, allSets }) {
+  const [kindTab, setKindTab] = React.useState(() =>
+    sessionStorage.getItem('pt_history_kind') || 'all'
+  );
+  const switchKind = (k) => { setKindTab(k); sessionStorage.setItem('pt_history_kind', k); };
+
+  // Determine which categories exist across all data (to decide whether to show the toggle)
+  const hasWork   = useMemo(() => categories.some(c => c.kind === 'work'), [categories]);
+  const hasSports = useMemo(() => categories.some(c => (c.kind || 'sports') === 'sports'), [categories]);
+  const showToggle = hasWork && hasSports;
+
+  // Apply kind filter to challenges + sets
+  const filteredChallenges = useMemo(() => {
+    if (kindTab === 'all') return challenges;
+    return challenges.filter(ch => {
+      const cat = categories.find(c => c.id === ch.category_id);
+      return (cat?.kind || 'sports') === kindTab;
+    });
+  }, [challenges, categories, kindTab]);
+
+  const filteredChallengeIds = useMemo(() => new Set(filteredChallenges.map(c => c.id)), [filteredChallenges]);
+
+  const filteredAllSets = useMemo(() =>
+    kindTab === 'all' ? allSets : allSets.filter(s => filteredChallengeIds.has(s.challenge_id)),
+    [allSets, filteredChallengeIds, kindTab]
+  );
+
   const catById = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
   const setsByCh = useMemo(() => {
     const m = {};
-    for (const s of allSets) {
+    for (const s of filteredAllSets) {
       (m[s.challenge_id] ||= []).push(s);
     }
     return m;
-  }, [allSets]);
+  }, [filteredAllSets]);
 
   // Streak: aufeinanderfolgende Tage (Local Time) mit mindestens einem geloggten Satz.
   // Wenn heute noch nichts geloggt ist, wird gestern als Start genommen (Grace-Tag), damit
@@ -1715,7 +1741,7 @@ function HistoryScreen({ challenges, categories, allSets }) {
       return `${y}-${m}-${day}`;
     };
     const days = new Set();
-    for (const x of allSets) days.add(localDay(new Date(x.created_at)));
+    for (const x of filteredAllSets) days.add(localDay(new Date(x.created_at)));
     const cursor = new Date();
     cursor.setHours(0, 0, 0, 0);
     if (!days.has(localDay(cursor))) cursor.setDate(cursor.getDate() - 1);
@@ -1725,13 +1751,13 @@ function HistoryScreen({ challenges, categories, allSets }) {
       cursor.setDate(cursor.getDate() - 1);
     }
     return s;
-  }, [allSets]);
+  }, [filteredAllSets]);
 
-  const totalReps = allSets.reduce((s, x) => s + (x.reps ?? x.duration_minutes ?? 0), 0);
+  const totalReps = filteredAllSets.reduce((s, x) => s + (x.reps ?? x.duration_minutes ?? 0), 0);
   // Wochen: jede Kalenderwoche zählt, in der mindestens ein Satz geloggt wurde
   // (unabhängig davon, ob das Wochenziel erreicht wurde).
   const weeksDone = new Set(
-    challenges
+    filteredChallenges
       .filter(ch => (setsByCh[ch.id] || []).length > 0)
       .map(ch => ch.week_start)
   ).size;
@@ -1744,19 +1770,31 @@ function HistoryScreen({ challenges, categories, allSets }) {
     </div>;
   }
 
-  return <HistoryView {...{challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone}} />;
+  return (
+    <>
+      {showToggle && (
+        <div className="work-tab-toggle" style={{marginBottom: 12}}>
+          <button className={`work-tab-btn${kindTab === 'all' ? ' active' : ''}`} onClick={() => switchKind('all')}>Alle</button>
+          <button className={`work-tab-btn${kindTab === 'sports' ? ' active' : ''}`} onClick={() => switchKind('sports')}>🏋️ Sports</button>
+          <button className={`work-tab-btn${kindTab === 'work' ? ' active' : ''}`} onClick={() => switchKind('work')}>💻 Work</button>
+        </div>
+      )}
+      <HistoryView {...{challenges: filteredChallenges, categories, allSets: filteredAllSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab}} />
+    </>
+  );
 }
 
-function HistoryView({ challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone }) {
+function HistoryView({ challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab = 'all' }) {
   const [range, setRange] = useState('30'); // '7', '30', 'all'
   const [selectedCats, setSelectedCats] = useState([]); // [] = alle
 
-  // Determine if the current filter is exclusively work or sports for unit labels
+  // Determine if the current filter is exclusively work or sports for unit labels.
+  // When no category chips are selected, inherit kind from the parent toggle (kindTab).
   const filterKind = useMemo(() => {
-    if (!selectedCats.length) return 'mixed';
+    if (!selectedCats.length) return kindTab === 'all' ? 'mixed' : kindTab;
     const kinds = [...new Set(selectedCats.map(id => catById[id]?.kind || 'sports'))];
     return kinds.length === 1 ? kinds[0] : 'mixed';
-  }, [selectedCats, catById]);
+  }, [selectedCats, catById, kindTab]);
   const unitLabel = filterKind === 'work' ? 'Min.' : 'Reps';
   const [cumulative, setCumulative] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
