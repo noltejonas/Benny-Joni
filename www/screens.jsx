@@ -1,4 +1,4 @@
-/* global React, Ring, Icon, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting */
+/* global React, Ring, Icon, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting, formatDuration */
 const { useState, useEffect, useMemo } = React;
 
 // Per-athlete-per-category quick-log values, stored locally.
@@ -192,7 +192,27 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
   );
   React.useEffect(() => {
     sessionStorage.setItem('pt_home_tab', activeTab);
+    if (scrollerRef.current) {
+      scrollerRef.current.scrollTo({ left: 0, behavior: 'instant' });
+    }
+    setActiveIdx(0);
   }, [activeTab]);
+  const [timerRunning, setTimerRunning] = React.useState(() => {
+    const v = localStorage.getItem('pt_work_timer_start');
+    const parsed = v ? parseInt(v) : null;
+    return Number.isFinite(parsed) && parsed > 0 && Date.now() - parsed < 86_400_000;
+  });
+  // Re-check on focus (user may have started/stopped timer elsewhere)
+  React.useEffect(() => {
+    const check = () => {
+      const v = localStorage.getItem('pt_work_timer_start');
+      const parsed = v ? parseInt(v) : null;
+      setTimerRunning(Number.isFinite(parsed) && parsed > 0 && Date.now() - parsed < 86_400_000);
+    };
+    window.addEventListener('focus', check);
+    window.addEventListener('pt:timer-changed', check);
+    return () => { window.removeEventListener('focus', check); window.removeEventListener('pt:timer-changed', check); };
+  }, []);
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const tabChallenges = challenges.filter(ch => {
     const cat = catById[ch.category_id];
@@ -260,6 +280,12 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
           💻 Work
         </button>
       </div>
+      {timerRunning && (
+        <div className="timer-banner" onClick={onAddGoal}>
+          <span className="timer-banner-dot" />
+          <span>⏱️ Timer läuft · tippe zum Loggen</span>
+        </div>
+      )}
     <div className={`layout-${layout} home-swiper-wrap`}>
       {sortedChallenges.length >= 2 && (
         <div className="challenge-overview">
@@ -660,6 +686,11 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
   const [hoursTarget, setHoursTarget] = useState(
     existing?.target_reps ? (isWork ? existing.target_reps / 60 : null) : null
   );
+  React.useEffect(() => {
+    if (isWork && existing?.target_reps) {
+      setHoursTarget(existing.target_reps / 60);
+    }
+  }, [isWork]);
 
   async function deleteChallenge() {
     if (!existing?.id) return;
@@ -703,6 +734,7 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
       setShowNewCat(false);
       setNewCatName('');
       setNewCatKind('sports');
+      setNewCatEmoji('💪');
     } catch (e) {
       alert(e.message);
     }
@@ -892,6 +924,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
     setTimerStart(now);
     setElapsedSec(0);
     setDurationMinutes(0);
+    window.dispatchEvent(new Event('pt:timer-changed'));
   }
   function stopTimer() {
     const mins = Math.max(1, Math.floor((Date.now() - timerStart) / 60000));
@@ -899,6 +932,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
     setTimerStart(null);
     setElapsedSec(0);
     setDurationMinutes(mins);
+    window.dispatchEvent(new Event('pt:timer-changed'));
   }
 
   function fmtElapsed(sec) {
@@ -925,6 +959,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
           note: note.trim() || null,
         });
         localStorage.removeItem(TIMER_KEY);
+        window.dispatchEvent(new Event('pt:timer-changed'));
         setTimerStart(null);
         setElapsedSec(0);
         onLogged(durationMinutes, true);
@@ -983,27 +1018,33 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
 
         {/* Project tag picker */}
         <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Projekt</div>
-        <div className="chip-row" style={{ flexWrap: 'wrap' }}>
-          {projectTags.map(t =>
-            <button key={t.id}
-              className={`chip ${projectTagId === t.id ? 'chip-active' : ''}`}
-              onClick={() => setProjectTagId(t.id)}>
-              {t.emoji} {t.name}
-            </button>
-          )}
-        </div>
+        {projectTags.length === 0
+          ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>Keine Projekte — in Einstellungen hinzufügen</div>
+          : <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+              {projectTags.map(t =>
+                <button key={t.id}
+                  className={`chip ${projectTagId === t.id ? 'chip-active' : ''}`}
+                  onClick={() => setProjectTagId(prev => prev === t.id ? null : t.id)}>
+                  {t.emoji} {t.name}
+                </button>
+              )}
+            </div>
+        }
 
         {/* Tool tag picker */}
         <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Tool</div>
-        <div className="chip-row" style={{ flexWrap: 'wrap' }}>
-          {toolTags.map(t =>
-            <button key={t.id}
-              className={`chip ${toolTagId === t.id ? 'chip-active' : ''}`}
-              onClick={() => setToolTagId(t.id)}>
-              {t.emoji} {t.name}
-            </button>
-          )}
-        </div>
+        {toolTags.length === 0
+          ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>Keine Tools — in Einstellungen hinzufügen</div>
+          : <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+              {toolTags.map(t =>
+                <button key={t.id}
+                  className={`chip ${toolTagId === t.id ? 'chip-active' : ''}`}
+                  onClick={() => setToolTagId(prev => prev === t.id ? null : t.id)}>
+                  {t.emoji} {t.name}
+                </button>
+              )}
+            </div>
+        }
 
         <input
           className="input"
@@ -1015,7 +1056,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         <div className="btn-row" style={{ marginTop: 24 }}>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
           <button className="btn" onClick={save}
-            disabled={saving || durationMinutes <= 0}>
+            disabled={saving || durationMinutes <= 0 || !projectTagId || !toolTagId}>
             {saving ? '…' : `${durationMinutes}m loggen`}
           </button>
         </div>
@@ -1061,6 +1102,9 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
 // ─── FEED ────────────────────────────────────────────────────────────────────
 function WeekRecap({ recap, me }) {
   const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [], bennySetCount = 0, jonasSetCount = 0, bennyMaxSet = 0, jonasMaxSet = 0, weekNumber, bennyPenCents = 0, jonasPenCents = 0 } = recap;
+  const isWorkWeek = challStats.length > 0 && challStats.every(c => c.cat?.kind === 'work');
+  const unit = isWorkWeek ? 'min' : 'Reps';
+  const fmtRecapVal = (v) => isWorkWeek ? formatDuration(v) : v;
   const penCents = { Benny: bennyPenCents, Jonas: jonasPenCents };
   const formatEuroCents = (c) => (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
   const leftA  = me === 'Jonas' ? 'Jonas' : 'Benny';
@@ -1075,7 +1119,7 @@ function WeekRecap({ recap, me }) {
             ? <>{athlete}<img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/></>
             : <><img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/>{athlete}</>}
         </div>
-        <div className="recap-tally-v mono">{tallyTotals[athlete]}</div>
+        <div className="recap-tally-v mono">{fmtRecapVal(tallyTotals[athlete])}</div>
       </div>
     );
   };
@@ -1127,7 +1171,7 @@ function WeekRecap({ recap, me }) {
           <>
             <div className="recap-trophy">🤝</div>
             <div className="recap-winner-name tie">Unentschieden</div>
-            <div className="recap-winner-sub">{sumAll} Reps · beide gleichauf</div>
+            <div className="recap-winner-sub">{fmtRecapVal(sumAll)} {unit} · beide gleichauf</div>
           </>
         )}
       </div>
@@ -1142,10 +1186,10 @@ function WeekRecap({ recap, me }) {
             <span className="recap-chall-emoji">{c.cat?.emoji}</span>
             <span className="recap-chall-name">{c.cat?.name || '—'}</span>
             <span className="recap-chall-tally mono">
-              <span style={{color:'var(--accent)'}}>{c.bennyDone}</span>
+              <span style={{color:'var(--accent)'}}>{fmtRecapVal(c.bennyDone)}</span>
               {' · '}
-              <span style={{color:'var(--accent-3)'}}>{c.jonasDone}</span>
-              {' / '}{c.ch.target_reps}
+              <span style={{color:'var(--accent-3)'}}>{fmtRecapVal(c.jonasDone)}</span>
+              {' / '}{fmtRecapVal(c.ch.target_reps)}
             </span>
             <span className={`recap-chall-badge ${c.hit?'hit':'miss'}`}>{c.hit?'✓':(c.bennyHit||c.jonasHit?'½':'🚧')}</span>
           </div>
@@ -2426,7 +2470,7 @@ function computeAthleteStats(sets, athlete, series) {
   return { total, sets: setCount, avgSet, maxSet, activeDays, bestDay, avgDay };
 }
 
-function BackfillSheet({ api, me, challenges = [], categories = [], onClose, onSaved }) {
+function BackfillSheet({ api, me, challenges = [], categories = [], projectTags = [], toolTags = [], onClose, onSaved }) {
   const today = new Date();
   const monday = PTData.mondayOf(today);
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -2441,24 +2485,43 @@ function BackfillSheet({ api, me, challenges = [], categories = [], onClose, onS
   const [challengeId, setChallengeId] = React.useState(challenges[0]?.id || '');
   const [reps, setReps] = React.useState(10);
   const [saving, setSaving] = React.useState(false);
+  const [durationMinutes, setDurationMinutes] = React.useState(60);
+  const [projectTagId, setProjectTagId] = React.useState(null);
+  const [toolTagId, setToolTagId] = React.useState(null);
+
+  const selectedChallenge = challenges.find(c => c.id === challengeId);
+  const selectedCat = catById[selectedChallenge?.category_id];
+  const isWork = selectedCat?.kind === 'work';
 
   async function save() {
-    if (reps <= 0 || !challengeId) return;
+    if (!challengeId) return;
+    if (isWork ? durationMinutes <= 0 : reps <= 0) return;
     setSaving(true);
     try {
-      const now = new Date();
       const [y, m, d] = dateIso.split('-').map(Number);
       // Pick midday of the chosen date so it sorts predictably relative to
       // any other entries that day without leaking real-time-of-day info.
       const created = new Date(y, m - 1, d, 12, 0, 0);
-      await api.addSet({
-        challenge_id: challengeId,
-        athlete: me,
-        reps: parseInt(reps),
-        note: null,
-        created_at: created.toISOString(),
-      });
-      onSaved?.(reps);
+      const payload = isWork
+        ? {
+            challenge_id: challengeId,
+            athlete: me,
+            reps: null,
+            duration_minutes: durationMinutes,
+            project_tag_id: projectTagId || null,
+            tool_tag_id: toolTagId || null,
+            note: null,
+            created_at: created.toISOString(),
+          }
+        : {
+            challenge_id: challengeId,
+            athlete: me,
+            reps: parseInt(reps),
+            note: null,
+            created_at: created.toISOString(),
+          };
+      await api.addSet(payload);
+      onSaved?.(isWork ? durationMinutes : reps, isWork);
     } catch (e) {
       alert(e.message || 'Fehler');
     } finally {
@@ -2522,25 +2585,60 @@ function BackfillSheet({ api, me, challenges = [], categories = [], onClose, onS
         </div>
       )}
 
-      <div className="label" style={{ marginBottom: 8 }}>Reps</div>
-      <input
-        className="input input-lg mono"
-        type="number"
-        inputMode="numeric"
-        value={reps}
-        onChange={(e) => setReps(parseInt(e.target.value) || 0)}
-        onFocus={(e) => e.target.select()} />
+      {isWork ? (
+        <>
+          <div className="label" style={{ marginBottom: 0 }}>Minuten</div>
+          <Stepper value={durationMinutes} onChange={setDurationMinutes} step={15} min={15} />
+          <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
+            {[30, 60, 90, 120].map(v =>
+              <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button>
+            )}
+          </div>
+          <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Projekt</div>
+          <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+            {projectTags.map(t =>
+              <button key={t.id}
+                className={`chip ${projectTagId === t.id ? 'chip-active' : ''}`}
+                onClick={() => setProjectTagId(prev => prev === t.id ? null : t.id)}>
+                {t.emoji} {t.name}
+              </button>
+            )}
+          </div>
+          <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Tool</div>
+          <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+            {toolTags.map(t =>
+              <button key={t.id}
+                className={`chip ${toolTagId === t.id ? 'chip-active' : ''}`}
+                onClick={() => setToolTagId(prev => prev === t.id ? null : t.id)}>
+                {t.emoji} {t.name}
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="label" style={{ marginBottom: 8 }}>Reps</div>
+          <input
+            className="input input-lg mono"
+            type="number"
+            inputMode="numeric"
+            value={reps}
+            onChange={(e) => setReps(parseInt(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()} />
 
-      <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
-        {[5, 10, 15, 20, 25, 30].map((v) =>
-          <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
-        )}
-      </div>
+          <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+            {[5, 10, 15, 20, 25, 30].map((v) =>
+              <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
-        <button className="btn" onClick={save} disabled={saving || reps <= 0 || !challengeId}>
-          {saving ? '…' : `+${reps} nachtragen`}
+        <button className="btn" onClick={save}
+          disabled={saving || !challengeId || (isWork ? durationMinutes <= 0 : reps <= 0)}>
+          {saving ? '…' : isWork ? `+${durationMinutes}min nachtragen` : `+${reps} nachtragen`}
         </button>
       </div>
     </>
