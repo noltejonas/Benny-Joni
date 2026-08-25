@@ -2972,3 +2972,22 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   color: var(--text-3);
   padding: 8px 0 4px;
 }
+
+/* ── Work session log sheet ───────────────────────────────────────────────── */
+.work-timer-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+.work-timer-display {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--accent);
+}
+.chip-active {
+  background: var(--accent) !important;
+  color: #fff !important;
+}

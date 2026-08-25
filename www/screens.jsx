@@ -849,36 +849,171 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
 }
 
 // ─── LOG SHEET ──────────────────────────────────────────────────────────────
-function LogSheet({ api, me, challenge, category, onClose, onLogged }) {
+function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [], onClose, onLogged }) {
+  const isWork = category?.kind === 'work';
   const [reps, setReps] = useState(10);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  // Work-mode state
+  const TIMER_KEY = 'pt_work_timer_start';
+  const [durationMinutes, setDurationMinutes] = useState(0);
+  const [projectTagId, setProjectTagId] = useState(null);
+  const [toolTagId, setToolTagId] = useState(null);
+  const [timerStart, setTimerStart] = React.useState(() => {
+    const v = localStorage.getItem(TIMER_KEY);
+    return v ? parseInt(v) : null;
+  });
+  const [elapsedSec, setElapsedSec] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isWork || !timerStart) return;
+    const iv = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - timerStart) / 1000));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [isWork, timerStart]);
+
+  function startTimer() {
+    const now = Date.now();
+    localStorage.setItem(TIMER_KEY, String(now));
+    setTimerStart(now);
+    setElapsedSec(0);
+    setDurationMinutes(0);
+  }
+  function stopTimer() {
+    const mins = Math.max(1, Math.floor((Date.now() - timerStart) / 60000));
+    localStorage.removeItem(TIMER_KEY);
+    setTimerStart(null);
+    setElapsedSec(0);
+    setDurationMinutes(mins);
+  }
+
+  function fmtElapsed(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
 
   async function save() {
-    if (reps <= 0) return;
-    setSaving(true);
-    try {
-      await api.addSet({
-        challenge_id: challenge.id,
-        athlete: me,
-        reps: parseInt(reps),
-        note: note.trim() || null
-      });
-      onLogged(reps);
-    } catch (e) {
-      alert(e.message || 'Fehler');
-    } finally {
-      setSaving(false);
+    if (isWork) {
+      if (durationMinutes <= 0) return;
+      setSaving(true);
+      try {
+        await api.addSet({
+          challenge_id: challenge.id,
+          athlete: me,
+          reps: null,
+          duration_minutes: durationMinutes,
+          project_tag_id: projectTagId || null,
+          tool_tag_id: toolTagId || null,
+          note: note.trim() || null,
+        });
+        onLogged(durationMinutes);
+      } catch (e) {
+        alert(e.message || 'Fehler');
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      if (reps <= 0) return;
+      setSaving(true);
+      try {
+        await api.addSet({
+          challenge_id: challenge.id,
+          athlete: me,
+          reps: parseInt(reps),
+          note: note.trim() || null,
+        });
+        onLogged(reps);
+      } catch (e) {
+        alert(e.message || 'Fehler');
+      } finally {
+        setSaving(false);
+      }
     }
   }
 
+  if (isWork) {
+    return (
+      <>
+        <h2 className="title" style={{ marginBottom: 4 }}>Session loggen</h2>
+        <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
+          {category?.emoji} {category?.name} · {me}
+        </div>
+
+        {/* Timer */}
+        <div className="work-timer-block">
+          {timerStart ? (
+            <>
+              <div className="work-timer-display mono">{fmtElapsed(elapsedSec)}</div>
+              <button className="btn btn-danger" onClick={stopTimer}>⏹ Stop</button>
+            </>
+          ) : (
+            <button className="btn btn-secondary" onClick={startTimer}>▶ Timer starten</button>
+          )}
+        </div>
+
+        {/* Manual duration input */}
+        <div className="label" style={{ marginTop: 16, marginBottom: 0 }}>Minuten (manuell)</div>
+        <Stepper value={durationMinutes} onChange={setDurationMinutes} step={15} min={0} />
+        <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
+          {[30, 60, 90, 120].map((v) =>
+            <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button>
+          )}
+        </div>
+
+        {/* Project tag picker */}
+        <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Projekt</div>
+        <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+          {projectTags.map(t =>
+            <button key={t.id}
+              className={`chip ${projectTagId === t.id ? 'chip-active' : ''}`}
+              onClick={() => setProjectTagId(t.id)}>
+              {t.emoji} {t.name}
+            </button>
+          )}
+        </div>
+
+        {/* Tool tag picker */}
+        <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Tool</div>
+        <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+          {toolTags.map(t =>
+            <button key={t.id}
+              className={`chip ${toolTagId === t.id ? 'chip-active' : ''}`}
+              onClick={() => setToolTagId(t.id)}>
+              {t.emoji} {t.name}
+            </button>
+          )}
+        </div>
+
+        <input
+          className="input"
+          placeholder="Notiz (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          style={{ marginTop: 16 }} />
+
+        <div className="btn-row" style={{ marginTop: 24 }}>
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button className="btn" onClick={save}
+            disabled={saving || durationMinutes <= 0}>
+            {saving ? '…' : `${durationMinutes}m loggen`}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // Sports branch (original UI)
   return (
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>Satz loggen</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
         {category?.emoji} {category?.name} · {me}
       </div>
-
       <input
         className="input input-lg mono"
         type="number"
@@ -886,30 +1021,25 @@ function LogSheet({ api, me, challenge, category, onClose, onLogged }) {
         value={reps}
         onChange={(e) => setReps(parseInt(e.target.value) || 0)}
         onFocus={(e) => e.target.select()} />
-      
-
       <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
         {[5, 10, 15, 20, 25, 30].map((v) =>
-        <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
+          <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
         )}
       </div>
-
       <input
         className="input"
         placeholder="Notiz (optional, z.B. ‚saubere Form')"
         value={note}
         onChange={(e) => setNote(e.target.value)}
         style={{ marginTop: 16 }} />
-      
-
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         <button className="btn" onClick={save} disabled={saving || reps <= 0}>
           {saving ? '…' : `+${reps} loggen`}
         </button>
       </div>
-    </>);
-
+    </>
+  );
 }
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
