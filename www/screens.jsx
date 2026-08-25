@@ -105,7 +105,7 @@ function dayIndexInWeek(weekStart, today = new Date()) {
 function repsOnLocalDate(sets, athlete, dateStr) {
   return sets
     .filter(s => s.athlete === athlete && localDateOf(s.created_at) === dateStr)
-    .reduce((sum, s) => sum + s.reps, 0);
+    .reduce((sum, s) => sum + (s.reps ?? s.duration_minutes ?? 0), 0);
 }
 
 // Mo-first weekly breakdown of reps per athlete for a given set of sets.
@@ -129,7 +129,7 @@ function dailyBreakdownFor(weekStart, sets) {
   for (const s of sets) {
     const day = localDateOf(s.created_at);
     const bucket = byIso[day];
-    if (bucket && !bucket.isFuture) bucket[s.athlete] += s.reps;
+    if (bucket && !bucket.isFuture) bucket[s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
   }
   const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   return days
