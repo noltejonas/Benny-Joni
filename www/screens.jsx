@@ -1287,10 +1287,15 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
       <div>Logge den ersten Satz, um den Feed zu starten.</div>
     </div>;
   }
-  const startEdit = (s) => { setEditId(s.id); setEditVal(String(s.reps)); };
+  const isWorkSet = (s) => s.duration_minutes != null;
+  const startEdit = (s) => { setEditId(s.id); setEditVal(String(isWorkSet(s) ? s.duration_minutes : s.reps)); };
   const commitEdit = (s) => {
     const v = parseInt(editVal) || 0;
-    if (v > 0 && v !== s.reps) onEditSet?.(s, { reps: v });
+    if (isWorkSet(s)) {
+      if (v > 0 && v !== s.duration_minutes) onEditSet?.(s, { duration_minutes: v });
+    } else {
+      if (v > 0 && v !== s.reps) onEditSet?.(s, { reps: v });
+    }
     setEditId(null);
   };
   return (
@@ -1334,6 +1339,7 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
           </div>
           {editing ? (
             <div className="feed-edit">
+              <div className="feed-edit-unit">{isWorkSet(s) ? 'min' : 'reps'}</div>
               <input className="input mono" type="number" inputMode="numeric"
                 value={editVal} autoFocus
                 onChange={e => setEditVal(e.target.value)}
@@ -1343,18 +1349,21 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
             </div>
           ) : (
             <div className={`feed-reps ${s.athlete.toLowerCase()} mono`}>
-              {s.duration_minutes != null
-                ? <span className="feed-reps mono">{formatDuration(s.duration_minutes)}</span>
-                : <span className="feed-reps mono">+{s.reps}</span>
-              }
-              {s.project_tag_id && (() => {
-                const pt = projectTags.find(t => t.id === s.project_tag_id);
-                return pt ? <span className="feed-tag">{pt.emoji} {pt.name}</span> : null;
-              })()}
-              {s.tool_tag_id && (() => {
-                const tt = toolTags.find(t => t.id === s.tool_tag_id);
-                return tt ? <span className="feed-tag">{tt.emoji} {tt.name}</span> : null;
-              })()}
+              <div className="feed-reps-val">
+                {s.duration_minutes != null ? formatDuration(s.duration_minutes) : `+${s.reps}`}
+              </div>
+              {(s.project_tag_id || s.tool_tag_id) && (
+                <div className="feed-tags-row">
+                  {s.project_tag_id && (() => {
+                    const pt = projectTags.find(t => t.id === s.project_tag_id);
+                    return pt ? <span className="feed-tag">{pt.emoji} {pt.name}</span> : null;
+                  })()}
+                  {s.tool_tag_id && (() => {
+                    const tt = toolTags.find(t => t.id === s.tool_tag_id);
+                    return tt ? <span className="feed-tag">{tt.emoji} {tt.name}</span> : null;
+                  })()}
+                </div>
+              )}
             </div>
           )}
           {mine && !editing && (
@@ -1362,7 +1371,7 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
               <button className="icon-btn feed-action-btn" aria-label="Bearbeiten" onClick={() => startEdit(s)}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </button>
-              <button className="icon-btn icon-btn-danger feed-action-btn" aria-label="Löschen" onClick={() => { if (confirm(`Satz +${s.reps} löschen?`)) onDeleteSet?.(s); }}>
+              <button className="icon-btn icon-btn-danger feed-action-btn" aria-label="Löschen" onClick={() => { if (confirm(`${isWorkSet(s) ? formatDuration(s.duration_minutes) : `+${s.reps}`} löschen?`)) onDeleteSet?.(s); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
             </div>
