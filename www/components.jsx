@@ -112,6 +112,15 @@ function formatRelative(ts) {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
 }
 
+function formatDuration(minutes) {
+  if (!minutes || minutes <= 0) return '0m';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 function formatWeek(weekStart) {
   const d = new Date(weekStart);
   const end = new Date(d); end.setDate(d.getDate() + 6);
@@ -140,5 +149,5 @@ function todayGreeting() {
 
 Object.assign(window, {
   Icon, Ring, Toast, Sheet, Stepper,
-  formatRelative, formatWeek, weekNumber, todayGreeting,
+  formatRelative, formatDuration, formatWeek, weekNumber, todayGreeting,
 });

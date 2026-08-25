@@ -1249,7 +1249,7 @@ function EmojiPickerSheet({ onPick, onClose }) {
   );
 }
 
-function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
+function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
   const [editId, setEditId] = React.useState(null);
   const [editVal, setEditVal] = React.useState('');
   // Snapshot last-seen timestamp; on tab-unmount, persist "now" so next visit
@@ -1335,7 +1335,20 @@ function FeedScreen({ feed, me, categories = [], onEditSet, onDeleteSet, onToggl
                 onBlur={() => commitEdit(s)} />
             </div>
           ) : (
-            <div className={`feed-reps ${s.athlete.toLowerCase()} mono`}>+{s.reps}</div>
+            <div className={`feed-reps ${s.athlete.toLowerCase()} mono`}>
+              {s.duration_minutes != null
+                ? <span className="feed-reps mono">{formatDuration(s.duration_minutes)}</span>
+                : <span className="feed-reps mono">+{s.reps}</span>
+              }
+              {s.project_tag_id && (() => {
+                const pt = projectTags.find(t => t.id === s.project_tag_id);
+                return pt ? <span className="feed-tag">{pt.emoji} {pt.name}</span> : null;
+              })()}
+              {s.tool_tag_id && (() => {
+                const tt = toolTags.find(t => t.id === s.tool_tag_id);
+                return tt ? <span className="feed-tag">{tt.emoji} {tt.name}</span> : null;
+              })()}
+            </div>
           )}
           {mine && !editing && (
             <div className="feed-actions">
