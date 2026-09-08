@@ -3065,3 +3065,301 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+/* ─── OBLIGATORY CHALLENGE BADGE ─────────────────────────────────────────── */
+.hero-card--obligatory {
+  border: 1.5px solid var(--accent-3);
+}
+.obligatory-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--accent-3);
+  border: 1px solid rgba(10, 132, 255, 0.3);
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+.obligatory-badge.done {
+  background: rgba(50, 215, 75, 0.15);
+  color: var(--accent);
+  border-color: rgba(50, 215, 75, 0.3);
+}
+
+/* ─── TOM HOLLAND SHEET ──────────────────────────────────────────────────── */
+.th-countdown {
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-3);
+  margin: 8px 0 20px;
+  line-height: 1;
+}
+.th-countdown.time-up {
+  color: var(--accent);
+}
+.th-round-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 16px;
+}
+.th-round-btn {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 3px solid var(--accent-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.th-round-btn:active:not(:disabled) {
+  transform: scale(0.93);
+  background: var(--surface-3);
+}
+.th-round-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.th-round-count {
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.th-round-label {
+  font-size: 14px;
+  color: var(--text-2);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.th-round-plus {
+  font-size: 28px;
+  color: var(--accent-3);
+  line-height: 1;
+  margin-top: 4px;
+}
+.th-time-up-banner {
+  background: rgba(50, 215, 75, 0.12);
+  border: 1px solid rgba(50, 215, 75, 0.3);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ─── BRING SALLY UP SHEET ───────────────────────────────────────────────── */
+.bsu-done-btn {
+  width: 100%;
+  padding: 24px 16px;
+  border-radius: var(--radius);
+  background: rgba(50, 215, 75, 0.12);
+  border: 2px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+  margin-bottom: 24px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bsu-done-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  background: rgba(50, 215, 75, 0.22);
+}
+.bsu-done-btn:disabled { opacity: 0.5; }
+.bsu-done-icon { font-size: 48px; line-height: 1; }
+.bsu-done-label {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+.bsu-partial {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+.bsu-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  margin: 4px 0;
+}
+.bsu-slider-val {
+  text-align: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.03em;
+  margin-top: 4px;
+}
+
+
+/* ─── WEEK FIX CARD ─────────────────────────────────────────────────────────── */
+.weekfix-card {
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.weekfix-header { margin-bottom: 16px; }
+.weekfix-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+}
+.weekfix-sub {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.weekfix-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.weekfix-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+.weekfix-emoji { font-size: 20px; flex-shrink: 0; width: 28px; text-align: center; }
+.weekfix-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  min-width: 0;
+}
+.weekfix-pflicht-badge,
+.weekfix-pflicht {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent-3);
+  background: rgba(10, 132, 255, 0.14);
+  border-radius: 6px;
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+.weekfix-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.weekfix-step-btn {
+  background: var(--surface-3);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  color: var(--text-1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.weekfix-step-btn:active { background: var(--surface-2); }
+.weekfix-input {
+  width: 56px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+/* ─── TH HISTORY ─────────────────────────────────────────────────────────── */
+.th-history {
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 20px;
+}
+.th-history-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.th-history-best {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+}
+.th-history-sets { display: flex; flex-direction: column; gap: 6px; }
+.th-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  color: var(--text-1);
+}
+.th-history-time {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* ─── BSU HISTORY ────────────────────────────────────────────────────────── */
+.bsu-history {
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 20px;
+}
+.bsu-history-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.bsu-history-sets { display: flex; flex-direction: column; gap: 6px; }
+.bsu-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+.bsu-hist-done { color: var(--accent); }
+.bsu-hist-best {
+  font-size: 12px;
+  color: var(--warning);
+  font-weight: 700;
+}

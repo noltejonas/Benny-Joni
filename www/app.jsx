@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard */
+/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // User edits these to point to their Supabase project. Empty = demo mode.
@@ -210,12 +210,17 @@ function App() {
     try {
       for (const p of picks) {
         if (currentChallenges.find(c => c.category_id === p.category_id)) continue;
-        await api.upsertChallenge({
-          week_start: weekStart,
-          category_id: p.category_id,
-          chosen_by: me,
-          target_reps: p.target_reps,
-        });
+        try {
+          await api.upsertChallenge({
+            week_start: weekStart,
+            category_id: p.category_id,
+            chosen_by: me,
+            target_reps: p.target_reps,
+          });
+        } catch (inner) {
+          // Unique constraint = already exists, skip silently
+          if (!inner.message?.includes('bereits')) throw inner;
+        }
       }
       setToast(`Woche fixiert – los geht's, ${me}!`);
       reload();
@@ -548,20 +553,58 @@ function App() {
       </Sheet>
 
       <Sheet open={!!logForChallenge} onClose={() => setLogForChallenge(null)}>
-        <LogSheet
-          api={api}
-          me={me}
-          challenge={logForChallenge}
-          category={logForChallenge ? categories.find(c => c.id === logForChallenge.category_id) : null}
-          projectTags={projectTags}
-          toolTags={toolTags}
-          onClose={() => setLogForChallenge(null)}
-          onLogged={(r, isWork) => {
-            setLogForChallenge(null);
-            const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
-            setToast(`${valStr} geloggt ${isWork ? '💻' : '💪'}`);
-            reload();
-          }} />
+        {(() => {
+          if (!logForChallenge) return null;
+          const logCat = categories.find(c => c.id === logForChallenge.category_id);
+          const ctype = logCat?.challenge_type || 'standard';
+          if (ctype === 'tom_holland') {
+            return (
+              <TomHollandSheet
+                api={api}
+                me={me}
+                challenge={logForChallenge}
+                allSets={allSets}
+                onClose={() => setLogForChallenge(null)}
+                onLogged={(rounds) => {
+                  setLogForChallenge(null);
+                  setToast(`${rounds} Runden geloggt 🦸`);
+                  reload();
+                }} />
+            );
+          }
+          if (ctype === 'bring_sally_up') {
+            return (
+              <BringSallySheet
+                api={api}
+                me={me}
+                challenge={logForChallenge}
+                allSets={allSets}
+                onClose={() => setLogForChallenge(null)}
+                onLogged={(val) => {
+                  setLogForChallenge(null);
+                  const m = Math.floor(val/60), s = val%60;
+                  setToast(val >= 204 ? '✅ Bring Sally Up geschafft!' : `${m}:${String(s).padStart(2,'0')} geloggt 🌸`);
+                  reload();
+                }} />
+            );
+          }
+          return (
+            <LogSheet
+              api={api}
+              me={me}
+              challenge={logForChallenge}
+              category={logCat}
+              projectTags={projectTags}
+              toolTags={toolTags}
+              onClose={() => setLogForChallenge(null)}
+              onLogged={(r, isWork) => {
+                setLogForChallenge(null);
+                const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
+                setToast(`${valStr} geloggt ${isWork ? '💻' : '💪'}`);
+                reload();
+              }} />
+          );
+        })()}
       </Sheet>
 
       <Sheet open={backfillOpen} onClose={() => setBackfillOpen(false)}>

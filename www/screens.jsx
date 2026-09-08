@@ -187,16 +187,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     categories = category ? [category] : categories;
     onAddGoal = onSetup; onEditChallenge = () => onSetup?.(); onLogChallenge = () => onLog?.();
   }
-  const [activeTab, setActiveTab] = React.useState(
-    () => sessionStorage.getItem('pt_home_tab') || 'sports'
-  );
-  React.useEffect(() => {
-    sessionStorage.setItem('pt_home_tab', activeTab);
-    if (scrollerRef.current) {
-      scrollerRef.current.scrollTo({ left: 0, behavior: 'instant' });
-    }
-    setActiveIdx(0);
-  }, [activeTab]);
   const [timerRunning, setTimerRunning] = React.useState(() => {
     const v = localStorage.getItem('pt_work_timer_start');
     const parsed = v ? parseInt(v) : null;
@@ -216,7 +206,7 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const tabChallenges = challenges.filter(ch => {
     const cat = catById[ch.category_id];
-    return (cat?.kind || 'sports') === activeTab;
+    return (cat?.kind || 'sports') === 'sports';
   });
   const celebration = useCelebration(challenges, allSets, me, categories);
   const scrollerRef = React.useRef(null);
@@ -268,18 +258,6 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
 
   return (
     <>
-      <div className="work-tab-toggle">
-        <button
-          className={`work-tab-btn ${activeTab === 'sports' ? 'active' : ''}`}
-          onClick={() => setActiveTab('sports')}>
-          🏋️ Sports
-        </button>
-        <button
-          className={`work-tab-btn ${activeTab === 'work' ? 'active' : ''}`}
-          onClick={() => setActiveTab('work')}>
-          💻 Work
-        </button>
-      </div>
       {timerRunning && (
         <div className="timer-banner" onClick={onAddGoal}>
           <span className="timer-banner-dot" />
@@ -375,13 +353,24 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
             </div>
           );
         };
+        const catType = cat?.challenge_type || 'standard';
+        const isObligatory = catType === 'tom_holland' || catType === 'bring_sally_up';
+        // Check if athlete already logged this challenge this week
+        const thisWeekStr = ch.week_start;
+        const myDoneThisWeek = csets.filter(s => s.athlete === me && s.created_at && localDateOf(s.created_at) >= thisWeekStr).length > 0;
+
         return (
-          <div key={ch.id} className="challenge-slide"><div className={`hero-card ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
+          <div key={ch.id} className="challenge-slide"><div className={`hero-card ${isObligatory ? 'hero-card--obligatory' : ''} ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
             <SparkleLayer active={celebration.getPersistentStyle(ch) === 'sparkle'} />
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:20,fontWeight:700,letterSpacing:'-0.03em'}}>
                   <span style={{marginRight:8}}>{cat?.emoji}</span>{cat?.name}
+                  {isObligatory && (
+                    <span className={`obligatory-badge${myDoneThisWeek ? ' done' : ''}`}>
+                      {myDoneThisWeek ? '✓ diese Woche' : 'Pflicht'}
+                    </span>
+                  )}
                 </div>
                 <div className="subtitle" style={{marginTop:2,fontSize:13,fontWeight:500}}>Gewählt von {ch.chosen_by}</div>
               </div>
@@ -459,7 +448,15 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
                 {splitCell(rightA)}
               </div>}
             </>)}
-            <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} onLog={() => onLogChallenge(ch)} />
+            {catType === 'tom_holland' || catType === 'bring_sally_up' ? (
+              <div style={{ marginTop: 16 }}>
+                <button className="btn" style={{ width: '100%' }} onClick={() => onLogChallenge(ch)}>
+                  {catType === 'tom_holland' ? '▶ Workout starten' : '▶ Bring Sally Up starten'}
+                </button>
+              </div>
+            ) : (
+              <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} onLog={() => onLogChallenge(ch)} />
+            )}
           </div>
           {(() => {
             const maxV = Math.max(1, ...chDailyBreakdown.flatMap(d => [d.Benny, d.Jonas]));
@@ -863,9 +860,9 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
       ) : (
         <>
           <div className="label" style={{ marginBottom: 0 }}>Ziel-Wiederholungen / Woche</div>
-          <Stepper value={target} onChange={setTarget} step={target < 50 ? 5 : target < 200 ? 10 : 25} />
+          <Stepper value={target} onChange={setTarget} step={target < 30 ? 1 : target < 100 ? 5 : 10} />
           <div className="chip-row" style={{ justifyContent: 'center' }}>
-            {[50, 100, 200, 500].map((v) =>
+            {[15, 25, 40, 60, 80, 100].map((v) =>
               <button key={v} className="chip" onClick={() => setTarget(v)}>{v}</button>
             )}
           </div>
@@ -1094,6 +1091,357 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         <button className="btn" onClick={save} disabled={saving || reps <= 0}>
           {saving ? '…' : `+${reps} loggen`}
         </button>
+      </div>
+    </>
+  );
+}
+
+// ─── WEEK FIX CARD ───────────────────────────────────────────────────────────
+// Shown at the top of the home screen when no challenges exist yet this week.
+// Renders all template slots with individually editable targets,
+// then creates all challenges in one tap.
+function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
+  const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+  const [targets, setTargets] = React.useState(() =>
+    Object.fromEntries(template.map(t => [t.category_id, t.base_reps]))
+  );
+
+  // Keep targets in sync if template changes (e.g. after load)
+  React.useEffect(() => {
+    setTargets(Object.fromEntries(template.map(t => [t.category_id, t.base_reps])));
+  }, [template.map(t => t.category_id + t.base_reps).join(',')]);
+
+  const OBLIGATORY_TYPES = new Set(['tom_holland', 'bring_sally_up']);
+
+  function handleFix() {
+    const picks = template.map(t => ({
+      category_id: t.category_id,
+      target_reps: Math.max(1, targets[t.category_id] || t.base_reps),
+    }));
+    onFix(picks);
+  }
+
+  return (
+    <div className="weekfix-card">
+      <div className="weekfix-header">
+        <div className="weekfix-title">Woche starten</div>
+        <div className="weekfix-sub">Targets anpassen & alle Challenges anlegen</div>
+      </div>
+
+      <div className="weekfix-slots">
+        {template.map(t => {
+          const cat = catById[t.category_id];
+          if (!cat) return null;
+          const isObligatory = OBLIGATORY_TYPES.has(cat.challenge_type);
+          const val = targets[t.category_id] ?? t.base_reps;
+          return (
+            <div key={t.category_id} className="weekfix-row">
+              <span className="weekfix-emoji">{cat.emoji}</span>
+              <span className="weekfix-name">{cat.name}</span>
+              {isObligatory ? (
+                <span className="weekfix-pflicht">PFLICHT</span>
+              ) : (
+                <div className="weekfix-stepper">
+                  <button className="weekfix-step-btn"
+                    onClick={() => setTargets(p => ({ ...p, [t.category_id]: Math.max(1, (p[t.category_id] || t.base_reps) - 5) }))}>−</button>
+                  <input
+                    className="weekfix-input mono"
+                    type="number"
+                    inputMode="numeric"
+                    value={val}
+                    onChange={e => {
+                      const n = parseInt(e.target.value);
+                      if (Number.isFinite(n) && n > 0)
+                        setTargets(p => ({ ...p, [t.category_id]: n }));
+                    }}
+                    onFocus={e => e.target.select()} />
+                  <button className="weekfix-step-btn"
+                    onClick={() => setTargets(p => ({ ...p, [t.category_id]: (p[t.category_id] || t.base_reps) + 5 }))}>＋</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="btn-row" style={{ marginTop: 16 }}>
+        <button className="btn btn-secondary" onClick={onDismiss}>Später</button>
+        <button className="btn" onClick={handleFix}>🏁 Woche starten</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── TOM HOLLAND WORKOUT ─────────────────────────────────────────────────────
+// 20-min AMRAP timer + round counter. Logs reps=rounds, note=elapsed time.
+const TH_TIMER_KEY   = 'pt_th_timer_start';
+const TH_ROUNDS_KEY  = 'pt_th_rounds';
+const TH_CHALL_KEY   = 'pt_th_challenge_id';
+const TH_DURATION_MS = 20 * 60 * 1000; // 20 minutes
+
+function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }) {
+  const [rounds, setRounds] = React.useState(() => {
+    const saved = localStorage.getItem(TH_ROUNDS_KEY);
+    const savedCh = localStorage.getItem(TH_CHALL_KEY);
+    if (savedCh === challenge?.id) return parseInt(saved || '0') || 0;
+    return 0;
+  });
+  const [timerStart, setTimerStart] = React.useState(() => {
+    const v = localStorage.getItem(TH_TIMER_KEY);
+    const savedCh = localStorage.getItem(TH_CHALL_KEY);
+    const parsed = v ? parseInt(v) : null;
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    if (savedCh !== challenge?.id) return null;
+    if (Date.now() - parsed > TH_DURATION_MS + 60000) { localStorage.removeItem(TH_TIMER_KEY); return null; }
+    return parsed;
+  });
+  const [elapsed, setElapsed] = React.useState(() => timerStart ? Math.min(TH_DURATION_MS, Date.now() - timerStart) : 0);
+  const [saving, setSaving] = React.useState(false);
+
+  // Tick every second while timer is running
+  React.useEffect(() => {
+    if (!timerStart) return;
+    const iv = setInterval(() => {
+      const e = Date.now() - timerStart;
+      if (e >= TH_DURATION_MS) { setElapsed(TH_DURATION_MS); clearInterval(iv); }
+      else setElapsed(e);
+    }, 500);
+    return () => clearInterval(iv);
+  }, [timerStart]);
+
+  const timeUp = elapsed >= TH_DURATION_MS;
+  const remaining = Math.max(0, TH_DURATION_MS - elapsed);
+  const remMin  = Math.floor(remaining / 60000);
+  const remSec  = Math.floor((remaining % 60000) / 1000);
+  const countdownStr = `${String(remMin).padStart(2,'0')}:${String(remSec).padStart(2,'0')}`;
+
+  // Elapsed string for logging note
+  function elapsedStr() {
+    const ms = timerStart ? Math.min(TH_DURATION_MS, Date.now() - timerStart) : elapsed;
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function startTimer() {
+    const now = Date.now();
+    localStorage.setItem(TH_TIMER_KEY, String(now));
+    localStorage.setItem(TH_CHALL_KEY, challenge.id);
+    localStorage.setItem(TH_ROUNDS_KEY, '0');
+    setTimerStart(now);
+    setElapsed(0);
+    setRounds(0);
+  }
+
+  function addRound() {
+    const next = rounds + 1;
+    setRounds(next);
+    localStorage.setItem(TH_ROUNDS_KEY, String(next));
+  }
+
+  function cancelSession() {
+    localStorage.removeItem(TH_TIMER_KEY);
+    localStorage.removeItem(TH_ROUNDS_KEY);
+    localStorage.removeItem(TH_CHALL_KEY);
+    onClose();
+  }
+
+  async function saveSession() {
+    if (rounds <= 0 && !timerStart) { onClose(); return; }
+    setSaving(true);
+    try {
+      await api.addSet({
+        challenge_id: challenge.id,
+        athlete: me,
+        reps: rounds,
+        note: `Zeit: ${elapsedStr()}`,
+      });
+      localStorage.removeItem(TH_TIMER_KEY);
+      localStorage.removeItem(TH_ROUNDS_KEY);
+      localStorage.removeItem(TH_CHALL_KEY);
+      onLogged(rounds);
+    } catch (e) {
+      alert(e.message || 'Fehler');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const timerRunning = !!timerStart && !timeUp;
+  const canSave = rounds > 0 || timeUp;
+
+  return (
+    <>
+      <h2 className="title" style={{ marginBottom: 4 }}>Tom Holland Workout</h2>
+      <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
+        🦸 5 Klimmzüge · 10 Liegestütze · 15 Squats · {me}
+      </div>
+
+      {/* Countdown display */}
+      <div className={`th-countdown${timeUp ? ' time-up' : ''}`}>
+        {countdownStr}
+      </div>
+
+      {/* Start timer button — only before first start */}
+      {!timerStart && (
+        <button className="btn btn-secondary" style={{ width: '100%', marginBottom: 20 }} onClick={startTimer}>
+          ▶ 20-Minuten-Timer starten
+        </button>
+      )}
+
+      {/* Giant round counter button */}
+      <div className="th-round-wrap">
+        <button
+          className="th-round-btn"
+          onClick={addRound}
+          disabled={!timerRunning && !timeUp}
+          aria-label="Runde hinzufügen">
+          <span className="th-round-count">{rounds}</span>
+          <span className="th-round-label">Runden</span>
+          <span className="th-round-plus">＋</span>
+        </button>
+      </div>
+
+      {timeUp && (
+        <div className="th-time-up-banner">⏰ Zeit ist um! Drücke + für jede fertige Runde.</div>
+      )}
+
+      {/* History: last weeks */}
+      {(() => {
+        // Use all sets that belong to the same category (tom_holland) for history,
+        // by finding sets from other challenges with the same category_id.
+        const catSets = allSets.filter(s => s.athlete === me && s.reps != null && typeof s.reps === 'number');
+        const chSets  = catSets.filter(s => s.challenge_id === challenge?.id);
+        if (chSets.length === 0) return null;
+        const best = Math.max(...chSets.map(s => s.reps));
+        return (
+          <div className="th-history">
+            <div className="th-history-label">Diese Woche bisher</div>
+            <div className="th-history-best mono">{best} Rd. persönliches Best</div>
+            <div className="th-history-sets">
+              {chSets.slice(-5).reverse().map(s => (
+                <div key={s.id} className="th-history-row">
+                  <span className="mono">{s.reps} Rd.</span>
+                  <span className="th-history-time">{s.note || ''}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      <div className="btn-row" style={{ marginTop: 24 }}>
+        <button className="btn btn-secondary" onClick={cancelSession}>Abbrechen</button>
+        <button className="btn" onClick={saveSession} disabled={saving || !canSave}>
+          {saving ? '…' : `${rounds} Runden loggen`}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ─── BRING SALLY UP ──────────────────────────────────────────────────────────
+// Logs reps=100 for completed, or 1–99 for partial completion (percent).
+// Song length: 3:24 = 204 seconds. reps stores seconds (1–204). 204 = completed.
+const BSU_MAX_SEC = 204; // 3:24
+
+function bsuFmt(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }) {
+  const [sec, setSec] = React.useState(Math.round(BSU_MAX_SEC / 2)); // default ~1:42
+  const [saving, setSaving] = React.useState(false);
+
+  async function saveResult(value) {
+    setSaving(true);
+    try {
+      await api.addSet({
+        challenge_id: challenge.id,
+        athlete: me,
+        reps: value,
+        note: value >= BSU_MAX_SEC ? null : `${bsuFmt(value)} von 3:24`,
+      });
+      onLogged(value);
+    } catch (e) {
+      alert(e.message || 'Fehler');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <h2 className="title" style={{ marginBottom: 4 }}>Bring Sally Up</h2>
+      <div className="subtitle" style={{ marginBottom: 24, fontSize: 15 }}>
+        🌸 Liegestütze zum Song · {me} · Max: 3:24
+      </div>
+
+      {/* Success button */}
+      <button
+        className="bsu-done-btn"
+        onClick={() => saveResult(BSU_MAX_SEC)}
+        disabled={saving}
+        aria-label="Komplett geschafft">
+        <span className="bsu-done-icon">✅</span>
+        <span className="bsu-done-label">Geschafft! (3:24)</span>
+      </button>
+
+      {/* Partial progress */}
+      <div className="bsu-partial">
+        <div className="label" style={{ marginBottom: 12 }}>Nicht ganz... wie weit?</div>
+
+        {/* Quick-chips: landmark times */}
+        <div className="chip-row" style={{ justifyContent: 'center', marginBottom: 16 }}>
+          {[{ l: '0:30', v: 30 }, { l: '1:00', v: 60 }, { l: '1:42', v: 102 }, { l: '2:33', v: 153 }].map(({ l, v }) =>
+            <button key={v} className={`chip ${sec === v ? 'chip-active' : ''}`}
+              onClick={() => setSec(v)}>{l}</button>
+          )}
+        </div>
+
+        {/* Slider */}
+        <input
+          type="range"
+          min="1" max={BSU_MAX_SEC - 1}
+          value={sec}
+          onChange={e => setSec(parseInt(e.target.value))}
+          className="bsu-slider"
+          aria-label="Zeitfortschritt" />
+        <div className="bsu-slider-val mono">{bsuFmt(sec)}</div>
+
+        <button className="btn btn-secondary" style={{ width: '100%', marginTop: 16 }}
+          onClick={() => saveResult(sec)}
+          disabled={saving}>
+          {saving ? '…' : `${bsuFmt(sec)} loggen`}
+        </button>
+      </div>
+
+      {/* History: previous attempts this week */}
+      {(() => {
+        const chSets = allSets.filter(s => s.challenge_id === challenge?.id && s.athlete === me && s.reps != null);
+        if (chSets.length === 0) return null;
+        const best = Math.max(...chSets.map(s => s.reps));
+        return (
+          <div className="bsu-history">
+            <div className="bsu-history-label">Bisherige Versuche diese Woche</div>
+            <div className="bsu-history-sets">
+              {chSets.slice(-5).reverse().map(s => (
+                <div key={s.id} className="bsu-history-row">
+                  <span className={`mono ${s.reps >= BSU_MAX_SEC ? 'bsu-hist-done' : ''}`}>
+                    {s.reps >= BSU_MAX_SEC ? '✅ 3:24' : bsuFmt(s.reps)}
+                  </span>
+                  {s.reps === best && chSets.length > 1 && <span className="bsu-hist-best">🏆 Best</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      <div style={{ marginTop: 16, textAlign: 'center' }}>
+        <button className="btn-link" onClick={onClose}>Schließen</button>
       </div>
     </>
   );
@@ -1403,7 +1751,13 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
           ) : (
             <div className={`feed-reps ${s.athlete.toLowerCase()} mono`}>
               <div className="feed-reps-val">
-                {s.duration_minutes != null ? formatDuration(s.duration_minutes) : `+${s.reps}`}
+                {s.duration_minutes != null
+                  ? formatDuration(s.duration_minutes)
+                  : s.category?.challenge_type === 'tom_holland'
+                    ? `${s.reps} Rd.`
+                    : s.category?.challenge_type === 'bring_sally_up'
+                      ? (s.reps >= BSU_MAX_SEC ? '✅ 3:24' : bsuFmt(s.reps))
+                      : `+${s.reps}`}
               </div>
               {(s.project_tag_id || s.tool_tag_id) && (
                 <div className="feed-tags-row">
@@ -2703,4 +3057,4 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
   );
 }
 
-Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, BackfillSheet, HistoryScreen, StatsChart, FullscreenChart, ChartFullscreen, HistoryView, computeAthleteStats, EmojiPickerSheet });
+Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, BackfillSheet, HistoryScreen, StatsChart, FullscreenChart, ChartFullscreen, HistoryView, computeAthleteStats, EmojiPickerSheet, WeekFixCard, TomHollandSheet, BringSallySheet });

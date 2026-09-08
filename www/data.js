@@ -30,16 +30,53 @@
         ];
         // Back-fill kind on legacy categories
         for (const c of (s.categories || [])) { c.kind ||= 'sports'; }
+        // Back-fill challenge_type on legacy categories
+        for (const c of (s.categories || [])) { c.challenge_type ||= 'standard'; }
+        // Back-fill new calisthenics categories if missing
+        const existingCatIds = new Set((s.categories || []).map(c => c.id));
+        const newCats = [
+          { id: 'c6',  name: 'Leg Raises',     emoji: '🦵', kind: 'sports', challenge_type: 'standard'       },
+          { id: 'c7',  name: 'HSPU',           emoji: '🤸', kind: 'sports', challenge_type: 'standard'       },
+          { id: 'c8',  name: 'Dips',           emoji: '🔽', kind: 'sports', challenge_type: 'standard'       },
+          { id: 'c9',  name: 'Tom Holland',    emoji: '🦸', kind: 'sports', challenge_type: 'tom_holland'    },
+          { id: 'c10', name: 'Bring Sally Up', emoji: '🌸', kind: 'sports', challenge_type: 'bring_sally_up' },
+        ];
+        for (const nc of newCats) {
+          if (!existingCatIds.has(nc.id)) s.categories.push(nc);
+        }
+        // Back-fill plan_slots and rotation_config if missing
+        s.plan_slots ||= [
+          { id: 'ps01', week_index: 0, category_id: 'c2',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 1 },
+          { id: 'ps02', week_index: 0, category_id: 'c8',  start_target: 60,  bonus_max: 0, growth_pct: 10, position: 2 },
+          { id: 'ps03', week_index: 0, category_id: 'c1',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 },
+          { id: 'ps04', week_index: 0, category_id: 'c6',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 4 },
+          { id: 'ps05', week_index: 0, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 },
+          { id: 'ps06', week_index: 0, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 },
+          { id: 'ps07', week_index: 0, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 },
+          { id: 'ps11', week_index: 1, category_id: 'c1',  start_target: 80,  bonus_max: 0, growth_pct: 10, position: 1 },
+          { id: 'ps12', week_index: 1, category_id: 'c6',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 2 },
+          { id: 'ps13', week_index: 1, category_id: 'c2',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 },
+          { id: 'ps14', week_index: 1, category_id: 'c8',  start_target: 40,  bonus_max: 0, growth_pct: 5,  position: 4 },
+          { id: 'ps15', week_index: 1, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 },
+          { id: 'ps16', week_index: 1, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 },
+          { id: 'ps17', week_index: 1, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 },
+        ];
+        s.rotation_config ||= { id: 1, start_date: new Date().toISOString().slice(0,10), enabled: true };
         return s;
       }
     } catch (e) {}
     return {
       categories: [
-        { id: 'c1', name: 'Liegestütze', emoji: '🤜', kind: 'sports' },
-        { id: 'c2', name: 'Klimmzüge',  emoji: '🆙', kind: 'sports' },
-        { id: 'c3', name: 'Sit-ups',    emoji: '🧘', kind: 'sports' },
-        { id: 'c4', name: 'Kniebeugen', emoji: '🦵', kind: 'sports' },
-        { id: 'c5', name: 'Burpees',    emoji: '🔥', kind: 'sports' },
+        { id: 'c1',  name: 'Liegestütze',    emoji: '🤜', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c2',  name: 'Klimmzüge',      emoji: '🆙', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c3',  name: 'Sit-ups',        emoji: '🧘', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c4',  name: 'Kniebeugen',     emoji: '🦵', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c5',  name: 'Burpees',        emoji: '🔥', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c6',  name: 'Leg Raises',     emoji: '🦵', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c7',  name: 'HSPU',           emoji: '🤸', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c8',  name: 'Dips',           emoji: '🔽', kind: 'sports', challenge_type: 'standard'       },
+        { id: 'c9',  name: 'Tom Holland',    emoji: '🦸', kind: 'sports', challenge_type: 'tom_holland'    },
+        { id: 'c10', name: 'Bring Sally Up', emoji: '🌸', kind: 'sports', challenge_type: 'bring_sally_up' },
       ],
       project_tags: [
         { id: 'pt1', name: 'IBM',           emoji: '🏢', created_at: new Date().toISOString() },
@@ -58,6 +95,28 @@
       penalties: [],
       week_closures: [],
       payouts: [],
+      // 2-week Calisthenics rotation:
+      // Week 0: Klimmzüge (Fokus) + Dips (Fokus) + Liegestütze + Leg Raises + HSPU + Tom Holland + Bring Sally Up
+      // Week 1: Liegestütze (Fokus) + Leg Raises (Fokus) + Klimmzüge + Dips + HSPU + Tom Holland + Bring Sally Up
+      plan_slots: [
+        // ── Week index 0: Klimmzüge + Dips Fokus ──────────────────────────
+        { id: 'ps01', week_index: 0, category_id: 'c2',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 1 }, // Klimmzüge (Fokus)
+        { id: 'ps02', week_index: 0, category_id: 'c8',  start_target: 60,  bonus_max: 0, growth_pct: 10, position: 2 }, // Dips (Fokus)
+        { id: 'ps03', week_index: 0, category_id: 'c1',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 }, // Liegestütze
+        { id: 'ps04', week_index: 0, category_id: 'c6',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 4 }, // Leg Raises
+        { id: 'ps05', week_index: 0, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 }, // HSPU
+        { id: 'ps06', week_index: 0, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 }, // Tom Holland (Pflicht)
+        { id: 'ps07', week_index: 0, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 }, // Bring Sally Up (Pflicht)
+        // ── Week index 1: Liegestütze + Leg Raises Fokus ──────────────────
+        { id: 'ps11', week_index: 1, category_id: 'c1',  start_target: 80,  bonus_max: 0, growth_pct: 10, position: 1 }, // Liegestütze (Fokus)
+        { id: 'ps12', week_index: 1, category_id: 'c6',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 2 }, // Leg Raises (Fokus)
+        { id: 'ps13', week_index: 1, category_id: 'c2',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 }, // Klimmzüge
+        { id: 'ps14', week_index: 1, category_id: 'c8',  start_target: 40,  bonus_max: 0, growth_pct: 5,  position: 4 }, // Dips
+        { id: 'ps15', week_index: 1, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 }, // HSPU
+        { id: 'ps16', week_index: 1, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 }, // Tom Holland (Pflicht)
+        { id: 'ps17', week_index: 1, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 }, // Bring Sally Up (Pflicht)
+      ],
+      rotation_config: { id: 1, start_date: new Date().toISOString().slice(0,10), enabled: true },
     };
   }
   function saveDemo(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
@@ -585,7 +644,12 @@
           : client.from('weekly_challenges').insert(payload).select().single();
         const { data, error } = await q;
         if (error) {
-          if (error.code === '23505') throw new Error('Diese Kategorie existiert in dieser Woche bereits');
+          // Unique constraint: category already exists this week — fetch and return the existing row
+          if (error.code === '23505' && payload.week_start && payload.category_id) {
+            const { data: existing } = await client.from('weekly_challenges')
+              .select('*').eq('week_start', payload.week_start).eq('category_id', payload.category_id).single();
+            if (existing) { emit(); return existing; }
+          }
           throw error;
         }
         emit();

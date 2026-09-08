@@ -1,0 +1,357 @@
+
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Projekt Terminator — App Review</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #ffffff; color: #1f2328; max-width: 760px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #57606a; font-size: 13px; margin-bottom: 32px; }
+  h2 { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #57606a; margin: 36px 0 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+  h3 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+  .stat { flex: 1; min-width: 120px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+  .stat-val { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 12px; color: #57606a; margin-top: 4px; }
+  .stat.red .stat-val { color: #cf222e; }
+  .stat.yellow .stat-val { color: #9a6700; }
+  .stat.green .stat-val { color: #1a7f37; }
+  .finding { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .finding.critical { border-left: 4px solid #cf222e; background: #fff5f5; }
+  .finding.high { border-left: 4px solid #cf222e; }
+  .finding.medium { border-left: 4px solid #9a6700; }
+  .finding.low { border-left: 4px solid #1a7f37; }
+  .finding.improvement { border-left: 4px solid #3b82d4; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; margin-right: 6px; vertical-align: middle; }
+  .badge.red { background: #ffebe9; color: #cf222e; }
+  .badge.yellow { background: #fff8c5; color: #9a6700; }
+  .badge.blue { background: #ddf4ff; color: #0969da; }
+  .finding-title { font-weight: 700; display: inline; }
+  .location { font-size: 12px; color: #57606a; margin-top: 3px; font-family: "SF Mono", "Fira Code", monospace; }
+  .desc { margin-top: 6px; color: #1f2328; font-size: 13px; }
+  .fix { margin-top: 6px; padding: 8px 10px; background: #f7f8fa; border-radius: 6px; font-size: 12px; color: #1a7f37; font-weight: 600; }
+  .fix::before { content: "→ Fix: "; }
+  .section-intro { font-size: 13px; color: #57606a; margin-bottom: 12px; }
+  .tag { display: inline-block; font-size: 11px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 6px; margin-left: 4px; color: #57606a; vertical-align: middle; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #57606a; }
+</style>
+</head>
+<body>
+
+<h1>Projekt Terminator — App Review</h1>
+<p class="subtitle">8 parallele Review-Agents · screens.jsx · data.js · app.jsx · styles.css · Work-Feature · History · Settings · Migrations · UX</p>
+
+<div class="stats">
+  <div class="stat red"><div class="stat-val">14</div><div class="stat-label">🔴 Bugs / Kritisch</div></div>
+  <div class="stat yellow"><div class="stat-val">16</div><div class="stat-label">🟡 UX-Issues</div></div>
+  <div class="stat green"><div class="stat-val">9</div><div class="stat-label">🟢 Verbesserungen</div></div>
+  <div class="stat"><div class="stat-val">39</div><div class="stat-label">Findings gesamt</div></div>
+</div>
+
+
+<h2>P0 — Sofort fixen (Datenverlust / komplett broken)</h2>
+<p class="section-intro">Diese Bugs führen zu silently falschen Daten oder brechen komplette Features.</p>
+
+<div class="finding critical">
+  <span class="badge red">🔴 BUG</span><span class="badge red">CRITICAL</span>
+  <span class="finding-title">History ignoriert Work-Sessions komplett</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 1677, 1767, 1786, 2405 — HistoryScreen + StatsChart + computeAthleteStats</div>
+  <div class="desc">Alle Aggregationen summieren <code>s.reps</code> — bei Work-Sessions ist das <code>null</code>, ergibt 0. Work-Wochen erscheinen leer im Chart, "Erster zum Ziel"-Badge immer "–", Stats-Totals ignorieren geleistete Minuten.</div>
+  <div class="fix">Überall <code>s.reps</code> → <code>(s.reps ?? s.duration_minutes ?? 0)</code> ersetzen. Benötigt category-kind-Lookup für korrekte Einheit.</div>
+</div>
+
+<div class="finding critical">
+  <span class="badge red">🔴 BUG</span><span class="badge red">CRITICAL</span>
+  <span class="finding-title">weekRecaps in app.jsx: NaN-Totals bei Work-Challenges</span>
+  <span class="tag">app.jsx</span>
+  <div class="location">Lines 127–128, 160 — weekRecaps useMemo</div>
+  <div class="desc"><code>reduce((a,x) =&gt; a+x.reps, 0)</code> addiert <code>null</code> → 0, aber <code>bennyMaxSet = Math.max(m, null) = 0</code>. Wochenabschluss-Recap zeigt "0 Reps Vorsprung" auch wenn 10h geloggt wurden. Analysis-Text sagt stets "Reps Vorsprung".</div>
+  <div class="fix">Für Work-Challenges <code>duration_minutes</code> summieren, <code>isWorkCh</code>-Flag aus <code>catById</code> ableiten. Analysis-String einheits-abhängig machen.</div>
+</div>
+
+<div class="finding critical">
+  <span class="badge red">🔴 BUG</span><span class="badge red">CRITICAL</span>
+  <span class="finding-title">onQuickLog schickt reps für Work-Challenges</span>
+  <span class="tag">app.jsx</span>
+  <div class="location">Lines 431–437 — HomeScreen onQuickLog handler</div>
+  <div class="desc">QuickLog ist für alle Challenges sichtbar, sendet aber immer <code>reps: parseInt(v)</code> — bei Work-Challenges müsste es <code>duration_minutes</code> sein. Führt zu Datenverfälschung.</div>
+  <div class="fix">Category-Kind prüfen; Work-Challenges: <code>{ duration_minutes: parseInt(v) }</code> senden, Toast anpassen. Oder QuickLog für Work-Tab deaktivieren.</div>
+</div>
+
+<div class="finding critical">
+  <span class="badge red">🔴 BUG</span><span class="badge red">CRITICAL</span>
+  <span class="finding-title">Penalty-System bricht für Work-Challenges</span>
+  <span class="tag">data.js</span>
+  <div class="location">Lines 63–90, 94–135 — repsForAthleteOnChallenge + computePenalties</div>
+  <div class="desc"><code>repsForAthleteOnChallenge()</code> summiert <code>s.reps</code> → 0 für alle Work-Sets. Work-Challenges werden immer als "nicht erfüllt" gewertet, egal wie viele Stunden geloggt wurden. Penalty-Reason sagt "120 Reps unter fairShare" statt Minuten.</div>
+  <div class="fix">In <code>computePenalties()</code> pro Challenge prüfen ob <code>kind === 'work'</code>; dann <code>duration_minutes</code> summieren. Reason-Strings einheits-abhängig.</div>
+</div>
+
+<div class="finding critical">
+  <span class="badge red">🔴 BUG</span><span class="badge red">CRITICAL</span>
+  <span class="finding-title">repsOnLocalDate() und dailyBreakdownFor() ignorieren duration_minutes</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 105–109, 113–138 — Hilfsfunktionen für DailyStatus</div>
+  <div class="desc">Tages-Tracking-Anzeige zeigt immer 0 für Work-Sessions. "Heute X / Tagesziel" im Tug-Card zeigt falsches Ergebnis für Work-Challenges.</div>
+  <div class="fix"><code>(s.reps ?? s.duration_minutes ?? 0)</code> überall wo Sets summiert werden.</div>
+</div>
+
+
+<h2>P1 — Wichtig (UX-Brüche, Timer-Edge-Cases)</h2>
+
+<div class="finding high">
+  <span class="badge red">🔴 BUG</span>
+  <span class="finding-title">Timer-Staleness: Kein Auto-Reset nach 24h</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 865–872 — LogSheet timerStart initialization</div>
+  <div class="desc">Timer der vor 3 Tagen gestartet wurde zeigt "72:45:23" beim nächsten Öffnen. Kein Schutz gegen riesige Elapsed-Werte.</div>
+  <div class="fix">Beim Initialisieren prüfen: <code>if (parsed &gt; 0 &amp;&amp; Date.now() - parsed &lt; 86_400_000)</code> — sonst auto-clearen. Warnung zeigen wenn Timer &gt; 8h.</div>
+</div>
+
+<div class="finding high">
+  <span class="badge red">🔴 BUG</span>
+  <span class="finding-title">Timer nicht gecleart nach Submit</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Line 907–944 — save() Funktion</div>
+  <div class="desc">Nach erfolgreichem Submit bleibt <code>pt_work_timer_start</code> in localStorage. Beim nächsten Öffnen des LogSheets läuft der alte Timer weiter.</div>
+  <div class="fix"><code>localStorage.removeItem(TIMER_KEY)</code> direkt nach <code>await api.addSet()</code> einfügen.</div>
+</div>
+
+<div class="finding high">
+  <span class="badge red">🔴 BUG</span>
+  <span class="finding-title">NaN durch korrupten localStorage-Wert im Timer</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 869–871</div>
+  <div class="desc"><code>parseInt('corrupted')</code> = NaN. Display zeigt "NaN:NaN:NaN", <code>stopTimer()</code> schreibt NaN in duration.</div>
+  <div class="fix"><code>const parsed = parseInt(v); return (Number.isFinite(parsed) &amp;&amp; parsed &gt; 0) ? parsed : null;</code></div>
+</div>
+
+<div class="finding high">
+  <span class="badge red">🔴 BUG</span>
+  <span class="finding-title">Fehlende Performance-Indexes in Migrations</span>
+  <span class="tag">migrations</span>
+  <div class="location">supabase/migrations/ — alle Dateien</div>
+  <div class="desc">Keine Indexes auf <code>sets.project_tag_id</code>, <code>sets.tool_tag_id</code>, <code>categories.kind</code>, <code>sets.athlete</code>. Bei wachsenden Daten werden JOINs und Filter langsam.</div>
+  <div class="fix">Migration <code>20260513030000_indexes.sql</code> anlegen mit <code>CREATE INDEX IF NOT EXISTS sets_project_tag_id_idx ON sets(project_tag_id)</code> etc.</div>
+</div>
+
+<div class="finding high">
+  <span class="badge red">🔴 BUG</span>
+  <span class="finding-title">ON CONFLICT DO NOTHING ohne UNIQUE-Constraint</span>
+  <span class="tag">migrations</span>
+  <div class="location">20260513000000_work_tags.sql — Lines 34–44</div>
+  <div class="desc"><code>INSERT ... ON CONFLICT DO NOTHING</code> funktioniert nur wenn eine UNIQUE-Constraint existiert. Ohne diese schlägt der Conflict-Check fehl und Seeds werden bei Re-Run dupliziert.</div>
+  <div class="fix"><code>CREATE UNIQUE INDEX IF NOT EXISTS project_tags_name_idx ON project_tags(name);</code> vor den INSERTs. Dann <code>ON CONFLICT (name) DO NOTHING</code>.</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">Tags nicht abwählbar (kein Toggle)</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 978, 990 — LogSheet Tag-Picker</div>
+  <div class="desc">Einmal gewählter Tag kann nicht abgewählt werden — nur durch Wahl eines anderen. Wenn User einen falschen Tag anklickt, gibt es kein Escape.</div>
+  <div class="fix"><code>onClick={() =&gt; setProjectTagId(projectTagId === t.id ? null : t.id)}</code></div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">Log-Button disabled ohne Erklärung wenn keine Tags existieren</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 1008–1011 — LogSheet save button</div>
+  <div class="desc">Wenn <code>projectTags</code> oder <code>toolTags</code> leer sind, gibt es keine Chips und der User versteht nicht warum er nicht loggen kann.</div>
+  <div class="fix">Disabled-Check um <code>|| !projectTagId || !toolTagId</code> erweitern. Fallback-Text zeigen: "Keine Projekte — in Einstellungen hinzufügen".</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">Kein visueller Indikator für laufenden Timer auf Home-Screen</span>
+  <span class="tag">screens.jsx / app.jsx</span>
+  <div class="location">HomeScreen, Tab-Bar</div>
+  <div class="desc">User startet Timer im LogSheet, navigiert weg — kein Hinweis dass Timer läuft. User vergisst ihn zu stoppen.</div>
+  <div class="fix">Banner oben auf Home anzeigen wenn <code>localStorage.pt_work_timer_start</code> gesetzt ist: "⏱️ Timer läuft — tippe zum Loggen".</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">HomeScreen Swiper-Position nicht resetted beim Tab-Wechsel</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 190–215 — HomeScreen activeIdx / activeTab</div>
+  <div class="desc">Wenn User auf Challenge #3 scrolt (Sports) und dann zum Work-Tab wechselt, ist der Swiper noch bei Position 3. Beim Zurückwechseln zu Sports wieder Index-Mismatch.</div>
+  <div class="fix"><code>useEffect(() =&gt; { scrollerRef.current?.scrollTo({left:0}); setActiveIdx(0); }, [activeTab]);</code></div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">BackfillSheet unterstützt keine Work-Sessions</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 2420–2539 — BackfillSheet</div>
+  <div class="desc">BackfillSheet hat nur Reps-Input. Work-Sessions (mit duration_minutes + Tags) können nicht nachgetragen werden.</div>
+  <div class="fix">Gleiche isWork-Branching wie in LogSheet — Duration-Stepper + Tag-Picker wenn Challenge kind === 'work'.</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">WeekRecap hardcodet "Reps" überall</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 1121, 1129–1132, 1150–1151 — WeekRecap</div>
+  <div class="desc">"X Reps · beide gleichauf", Kategorie-Stats zeigen rohe Zahlen ohne Einheit, Work-Wochen zeigen falsche Labels.</div>
+  <div class="fix">Challenge-Kind aus challStats lesen, Einheit kontextabhängig wählen.</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">updateCategory() im Demo-API ignoriert kind-Feld</span>
+  <span class="tag">data.js</span>
+  <div class="location">Line 158–165 — Demo updateCategory</div>
+  <div class="desc">Wenn eine Kategorie von Sports auf Work umgestellt wird, wird das in der Demo-API nicht gespeichert (nur name + emoji).</div>
+  <div class="fix">Signatur erweitern: <code>async updateCategory(id, { name, emoji, kind })</code> + <code>if (kind !== undefined) cat.kind = kind;</code></div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">hoursTarget Race Condition beim Bearbeiten von Work-Challenges</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 660–661 — SetupSheet useState Initialization</div>
+  <div class="desc">Wenn categories beim ersten Render noch leer sind, ist <code>isWork = false</code> und <code>hoursTarget = null</code>. Nach dem Laden der categories aktualisiert sich hoursTarget nicht mehr (useState läuft nur einmal).</div>
+  <div class="fix"><code>useEffect(() =&gt; { if (isWork &amp;&amp; existing?.target_reps) setHoursTarget(existing.target_reps / 60); }, [isWork]);</code></div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">Tab-Auswahl (home/feed/history) geht bei Reload verloren</span>
+  <span class="tag">app.jsx</span>
+  <div class="location">Line 56</div>
+  <div class="desc">Tab wird in React-State gespeichert, bei Reload immer wieder "home". Besonders störend wenn man im Feed ist und die App im Hintergrund refreshed.</div>
+  <div class="fix"><code>useState(() =&gt; sessionStorage.getItem('pt:tab') || 'home')</code> + useEffect der <code>sessionStorage.setItem</code> aufruft.</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">CSS: .work-tab-btn zu kleine Touch-Target (32px statt 44px)</span>
+  <span class="tag">styles.css</span>
+  <div class="location">Line 2956 — .work-tab-btn</div>
+  <div class="desc">Padding 8px ergibt ~32px Höhe. iOS/Android WCAG-Empfehlung sind 44×44px. Schwer zu treffen auf kleinen Geräten.</div>
+  <div class="fix"><code>min-height: 44px; padding: 12px 0;</code></div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">CSS: Fehlende Variable --text-1 (undefined)</span>
+  <span class="tag">styles.css</span>
+  <div class="location">Lines 1492, 1502, 1629 — referenziert aber nie definiert</div>
+  <div class="desc"><code>var(--text-1)</code> wird an mehreren Stellen verwendet, ist aber weder in <code>:root</code> noch in <code>[data-theme="light"]</code> definiert. Elemente haben keine Farbe.</div>
+  <div class="fix"><code>--text-1: var(--text);</code> in beide Theme-Blöcke einfügen.</div>
+</div>
+
+<div class="finding medium">
+  <span class="badge yellow">🟡 UX</span>
+  <span class="finding-title">chip-active mit !important und hardcoded #fff</span>
+  <span class="tag">styles.css</span>
+  <div class="location">Lines 2997–3000</div>
+  <div class="desc"><code>color: #fff !important</code> bricht im Light-Theme: weißer Text auf hellem Accent-Grün hat schlechten Kontrast.</div>
+  <div class="fix"><code>!important</code> entfernen, <code>color: #000</code> oder kontrastabhängigen Wert verwenden.</div>
+</div>
+
+
+<h2>P2 — Verbesserungen (Nice to have)</h2>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">Reload-Fehler werden still geschluckt</span>
+  <span class="tag">app.jsx</span>
+  <div class="location">Lines 247–251 — reload() catch</div>
+  <div class="desc">Wenn <code>Promise.all</code> fehlschlägt, sieht der User nichts und arbeitet mit veralteten Daten weiter.</div>
+  <div class="fix"><code>setToast('⚠️ Sync fehlgeschlagen: ' + e.message)</code> im catch-Block.</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">alert() für API-Fehler statt Toast</span>
+  <span class="tag">app.jsx / screens.jsx</span>
+  <div class="location">Viele Stellen — catch(e) { alert(e.message) }</div>
+  <div class="desc">Browser-Alerts blocken die UI und sehen auf iOS-Native unpassend aus.</div>
+  <div class="fix">Überall durch <code>setToast('Fehler: ' + e.message)</code> ersetzen oder einen globalen Error-Handler einführen.</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">Timer-Laufhinweis wenn Timer &gt; 8h oder ungewöhnlich lang</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 897–904 — fmtElapsed</div>
+  <div class="desc">Bei einem Timer der schon 25 Stunden läuft gibt es keine Warnung.</div>
+  <div class="fix">Wenn <code>elapsedSec &gt; 8 * 3600</code>: orangene Warnung "Timer läuft seit &gt;8h — korrekt?" anzeigen.</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">newCatEmoji wird nach Kategorie-Erstellung nicht resettet</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">Lines 697–709 — addNewCat() in SetupSheet</div>
+  <div class="desc">Emoji bleibt auf letztem Wert nach Erstellen einer Kategorie. Nächste Kategorie hat den falschen Emoji als Default.</div>
+  <div class="fix"><code>setNewCatEmoji('💪');</code> nach <code>setNewCatKind('sports');</code> hinzufügen.</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">History braucht Sports/Work-Toggle wie HomeScreen</span>
+  <span class="tag">screens.jsx</span>
+  <div class="location">HistoryScreen — oben</div>
+  <div class="desc">History zeigt alles gemischt ohne Filter zwischen Work und Sports. Wenn man nur Work-Statistiken sehen will, ist das nicht möglich.</div>
+  <div class="fix">Gleichen Tab-Toggle wie HomeScreen oben in HistoryView einbauen, Challenge-Filter entsprechend anpassen.</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">Onboarding: Keine Erklärung des Work-Tabs für Erstnutzer</span>
+  <span class="tag">app.jsx / screens.jsx</span>
+  <div class="location">Nach Athlete-Auswahl</div>
+  <div class="desc">Neuer User sieht den "💻 Work"-Tab ohne Kontext. Kein Hinweis dass man dort Vibe-Coding-Sessions tracken kann.</div>
+  <div class="fix">Einmaliger Tooltip nach erster Anmeldung: "💡 Neu: Tracke deine Coding-Sessions unter Work"</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">addSet() in Supabase-API nicht normalisiert</span>
+  <span class="tag">data.js</span>
+  <div class="location">Line 611–615 — Supabase addSet</div>
+  <div class="desc">Demo-API normalisiert alle Felder explizit auf null. Supabase-API nimmt den payload as-is — wenn Caller <code>reps: undefined</code> schickt, könnte Supabase anders reagieren als Demo.</div>
+  <div class="fix">Payload in Supabase-addSet vor dem Insert normalisieren: <code>reps: payload.reps ?? null</code> etc.</div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">timer-display zu groß auf sehr kleinen Screens (&lt;360px)</span>
+  <span class="tag">styles.css</span>
+  <div class="location">Line 2992 — .work-timer-display: 48px</div>
+  <div class="desc">Auf Geräten unter 360px Breite dominiert der 48px Timer den Screen.</div>
+  <div class="fix"><code>@media (max-width: 400px) { .work-timer-display { font-size: 36px; } }</code></div>
+</div>
+
+<div class="finding improvement">
+  <span class="badge blue">🟢</span>
+  <span class="finding-title">feed-tag ohne white-space: nowrap — Text kann in der Mitte umbrechen</span>
+  <span class="tag">styles.css</span>
+  <div class="location">Lines 3003–3012 — .feed-tag</div>
+  <div class="desc">Tag "Claude Code" könnte auf "Claude" + "Code" umbrechen wenn der Platz eng ist.</div>
+  <div class="fix"><code>.feed-tag { white-space: nowrap; flex-shrink: 0; }</code></div>
+</div>
+
+
+<h2>Migrations-Action Item</h2>
+<div class="finding high">
+  <span class="badge red">🔴</span>
+  <span class="finding-title">Migration 20260513030000_indexes.sql erstellen</span>
+  <div class="desc">Diese SQL-Befehle im Supabase SQL Editor ausführen und als Migrations-Datei speichern:</div>
+  <div class="fix" style="font-family:monospace;white-space:pre-wrap;font-weight:400">CREATE UNIQUE INDEX IF NOT EXISTS project_tags_name_idx ON project_tags(name);
+CREATE UNIQUE INDEX IF NOT EXISTS tool_tags_name_idx ON tool_tags(name);
+CREATE INDEX IF NOT EXISTS sets_project_tag_id_idx ON sets(project_tag_id);
+CREATE INDEX IF NOT EXISTS sets_tool_tag_id_idx ON sets(tool_tag_id);
+CREATE INDEX IF NOT EXISTS categories_kind_idx ON categories(kind);</div>
+</div>
+
+<footer>Made with IBM Bob</footer>
+</body>
+</html>

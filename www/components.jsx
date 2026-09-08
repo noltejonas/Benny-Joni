@@ -15,6 +15,8 @@ function Icon({ name, size = 24, color = 'currentColor' }) {
     swap: <><path d="M7 5l-4 4 4 4M3 9h14M17 19l4-4-4-4M21 15H7" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>,
     bell: <path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9zM10 21a2 2 0 0 0 4 0" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
     expand: <path d="M4 10V4h6M20 14v6h-6M4 4l7 7M20 20l-7-7" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>,
+    trophy: <><path d="M8 21h8M12 17v4M7 4H4v4c0 2.8 1.8 5.1 4 6" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M17 4h3v4c0 2.8-1.8 5.1-4 6" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M7 4a5 5 0 0 0 5 9 5 5 0 0 0 5-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" fill="none"/></>,
+    scale: <><path d="M12 3v18M3 9l9-6 9 6" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M5 14c0 2.2 1.3 4 3 4h8c1.7 0 3-1.8 3-4" stroke={color} strokeWidth="1.8" strokeLinecap="round" fill="none"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

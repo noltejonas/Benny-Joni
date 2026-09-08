@@ -418,18 +418,16 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
   const [busy, setBusy] = useState(false);
   if (!template?.length) return null;
 
-  const step = (n) => n < 50 ? 5 : n < 200 ? 10 : n < 500 ? 25 : 50;
+  const step = (n) => n < 30 ? 1 : n < 100 ? 5 : 10;
   const bump = (t, dir) => {
     const cur = values[t.slot_id] ?? t.base_reps;
-    const next = cur + dir * step(cur);
-    const clamped = Math.max(t.base_reps, Math.min(t.base_reps + t.bonus_max, next));
-    setValues({ ...values, [t.slot_id]: clamped });
+    const next = Math.max(1, cur + dir * step(cur));
+    setValues({ ...values, [t.slot_id]: next });
   };
   const setExact = (t, raw) => {
     const v = parseInt(raw);
-    if (!Number.isFinite(v)) return;
-    const clamped = Math.max(t.base_reps, Math.min(t.base_reps + t.bonus_max, v));
-    setValues({ ...values, [t.slot_id]: clamped });
+    if (!Number.isFinite(v) || v < 1) return;
+    setValues({ ...values, [t.slot_id]: v });
   };
 
   const fix = async () => {
@@ -454,31 +452,30 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
         {template.map(t => {
           const cat = catById[t.category_id];
           const cur = values[t.slot_id] ?? t.base_reps;
-          const minV = t.base_reps;
-          const maxV = t.base_reps + t.bonus_max;
-          const hasBonus = t.bonus_max > 0;
-          const canMinus = cur > minV;
-          const canPlus = cur < maxV;
+          const isObligatory = cat?.challenge_type === 'tom_holland' || cat?.challenge_type === 'bring_sally_up';
           return (
             <div className="weekfix-item" key={t.slot_id}>
               <div className="weekfix-item-head">
                 <span className="weekfix-item-emoji">{cat?.emoji || '?'}</span>
                 <span className="weekfix-item-name">{cat?.name || 'Unbekannt'}</span>
+                {isObligatory && <span className="weekfix-pflicht-badge">PFLICHT</span>}
               </div>
-              <div className="weekfix-stepper">
-                <button className={`weekfix-step ${!canMinus?'is-disabled':''}`} disabled={!canMinus || !hasBonus}
-                  onClick={() => bump(t, -1)} aria-label="weniger">−</button>
-                <input className="weekfix-val mono" type="number" inputMode="numeric"
-                  value={cur}
-                  onFocus={e => e.target.select()}
-                  onChange={e => setExact(t, e.target.value)}/>
-                <button className={`weekfix-step ${!canPlus?'is-disabled':''}`} disabled={!canPlus || !hasBonus}
-                  onClick={() => bump(t, 1)} aria-label="mehr">+</button>
-              </div>
-              {hasBonus ? (
-                <div className="weekfix-range">{minV} <span className="weekfix-range-sep">···</span> {maxV}</div>
+              {isObligatory ? (
+                <div className="weekfix-range weekfix-range-fixed" style={{textAlign:'center',padding:'10px 0'}}>Wird jede Woche gemacht</div>
               ) : (
-                <div className="weekfix-range weekfix-range-fixed">fest auf {minV}</div>
+                <>
+                  <div className="weekfix-stepper">
+                    <button className="weekfix-step" disabled={cur <= 1}
+                      onClick={() => bump(t, -1)} aria-label="weniger">−</button>
+                    <input className="weekfix-val mono" type="number" inputMode="numeric"
+                      value={cur}
+                      onFocus={e => e.target.select()}
+                      onChange={e => setExact(t, e.target.value)}/>
+                    <button className="weekfix-step"
+                      onClick={() => bump(t, 1)} aria-label="mehr">+</button>
+                  </div>
+                  <div className="weekfix-range weekfix-range-fixed">Vorschlag: {t.base_reps}</div>
+                </>
               )}
             </div>
           );
