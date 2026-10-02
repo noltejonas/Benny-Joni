@@ -1,126 +1,14 @@
 // Projekt Terminator — Data Layer
-// Wraps Supabase with a localStorage fallback so the app works in demo mode
-// before the user wires up their Supabase keys.
+// Supabase-Client mit Auth, Profilen, Challenges (Tabelle `competitions`) und
+// einem pro Challenge gescopten API (`api.forCompetition(id)`), das dieselben
+// Methoden wie früher anbietet (listChallenges, addSet, …).
+//
+// Konvention: Zeilen mit `user_id` bekommen zusätzlich `athlete = user_id`,
+// damit die Screens weiter mit `s.athlete === me` arbeiten können — `me` ist
+// jetzt die User-ID, nicht mehr ein Name.
 
 (function() {
-  const LS_KEY = 'pt_demo_store_v1';
-
-  function defaultPenaltyConfig() {
-    return { id: 1, enabled: false, rule_mode: 'per_week_aggregate', amount_cents: 500, currency: 'EUR', updated_at: new Date().toISOString() };
-  }
-
-  function loadDemo() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        s.penalty_config ||= defaultPenaltyConfig();
-        s.penalties ||= [];
-        s.week_closures ||= [];
-        s.payouts ||= [];
-        s.project_tags ||= [
-          { id: 'pt1', name: 'IBM',           emoji: '🏢', created_at: new Date().toISOString() },
-          { id: 'pt2', name: 'Bauerlieferant', emoji: '🚜', created_at: new Date().toISOString() },
-          { id: 'pt3', name: 'FarmerOS',      emoji: '🌱', created_at: new Date().toISOString() },
-        ];
-        s.tool_tags ||= [
-          { id: 'tt1', name: 'Claude Code', emoji: '🤖', created_at: new Date().toISOString() },
-          { id: 'tt2', name: 'Codex',       emoji: '⚡', created_at: new Date().toISOString() },
-          { id: 'tt3', name: 'Bob',         emoji: '🦾', created_at: new Date().toISOString() },
-        ];
-        // Back-fill kind on legacy categories
-        for (const c of (s.categories || [])) { c.kind ||= 'sports'; }
-        // Back-fill challenge_type on legacy categories
-        for (const c of (s.categories || [])) { c.challenge_type ||= 'standard'; }
-        // Back-fill new calisthenics categories if missing
-        const existingCatIds = new Set((s.categories || []).map(c => c.id));
-        const newCats = [
-          { id: 'c6',  name: 'Leg Raises',     emoji: '🦵', kind: 'sports', challenge_type: 'standard'       },
-          { id: 'c7',  name: 'HSPU',           emoji: '🤸', kind: 'sports', challenge_type: 'standard'       },
-          { id: 'c8',  name: 'Dips',           emoji: '🔽', kind: 'sports', challenge_type: 'standard'       },
-          { id: 'c9',  name: 'Tom Holland',    emoji: '🦸', kind: 'sports', challenge_type: 'tom_holland'    },
-          { id: 'c10', name: 'Bring Sally Up', emoji: '🌸', kind: 'sports', challenge_type: 'bring_sally_up' },
-        ];
-        for (const nc of newCats) {
-          if (!existingCatIds.has(nc.id)) s.categories.push(nc);
-        }
-        // Back-fill plan_slots and rotation_config if missing
-        s.plan_slots ||= [
-          { id: 'ps01', week_index: 0, category_id: 'c2',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 1 },
-          { id: 'ps02', week_index: 0, category_id: 'c8',  start_target: 60,  bonus_max: 0, growth_pct: 10, position: 2 },
-          { id: 'ps03', week_index: 0, category_id: 'c1',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 },
-          { id: 'ps04', week_index: 0, category_id: 'c6',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 4 },
-          { id: 'ps05', week_index: 0, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 },
-          { id: 'ps06', week_index: 0, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 },
-          { id: 'ps07', week_index: 0, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 },
-          { id: 'ps11', week_index: 1, category_id: 'c1',  start_target: 80,  bonus_max: 0, growth_pct: 10, position: 1 },
-          { id: 'ps12', week_index: 1, category_id: 'c6',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 2 },
-          { id: 'ps13', week_index: 1, category_id: 'c2',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 },
-          { id: 'ps14', week_index: 1, category_id: 'c8',  start_target: 40,  bonus_max: 0, growth_pct: 5,  position: 4 },
-          { id: 'ps15', week_index: 1, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 },
-          { id: 'ps16', week_index: 1, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 },
-          { id: 'ps17', week_index: 1, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 },
-        ];
-        s.rotation_config ||= { id: 1, start_date: new Date().toISOString().slice(0,10), enabled: true };
-        return s;
-      }
-    } catch (e) {}
-    return {
-      categories: [
-        { id: 'c1',  name: 'Liegestütze',    emoji: '🤜', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c2',  name: 'Klimmzüge',      emoji: '🆙', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c3',  name: 'Sit-ups',        emoji: '🧘', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c4',  name: 'Kniebeugen',     emoji: '🦵', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c5',  name: 'Burpees',        emoji: '🔥', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c6',  name: 'Leg Raises',     emoji: '🦵', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c7',  name: 'HSPU',           emoji: '🤸', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c8',  name: 'Dips',           emoji: '🔽', kind: 'sports', challenge_type: 'standard'       },
-        { id: 'c9',  name: 'Tom Holland',    emoji: '🦸', kind: 'sports', challenge_type: 'tom_holland'    },
-        { id: 'c10', name: 'Bring Sally Up', emoji: '🌸', kind: 'sports', challenge_type: 'bring_sally_up' },
-      ],
-      project_tags: [
-        { id: 'pt1', name: 'IBM',           emoji: '🏢', created_at: new Date().toISOString() },
-        { id: 'pt2', name: 'Bauerlieferant', emoji: '🚜', created_at: new Date().toISOString() },
-        { id: 'pt3', name: 'FarmerOS',      emoji: '🌱', created_at: new Date().toISOString() },
-      ],
-      tool_tags: [
-        { id: 'tt1', name: 'Claude Code', emoji: '🤖', created_at: new Date().toISOString() },
-        { id: 'tt2', name: 'Codex',       emoji: '⚡', created_at: new Date().toISOString() },
-        { id: 'tt3', name: 'Bob',         emoji: '🦾', created_at: new Date().toISOString() },
-      ],
-      challenges: [],
-      sets: [],
-      reactions: [],
-      penalty_config: defaultPenaltyConfig(),
-      penalties: [],
-      week_closures: [],
-      payouts: [],
-      // 2-week Calisthenics rotation:
-      // Week 0: Klimmzüge (Fokus) + Dips (Fokus) + Liegestütze + Leg Raises + HSPU + Tom Holland + Bring Sally Up
-      // Week 1: Liegestütze (Fokus) + Leg Raises (Fokus) + Klimmzüge + Dips + HSPU + Tom Holland + Bring Sally Up
-      plan_slots: [
-        // ── Week index 0: Klimmzüge + Dips Fokus ──────────────────────────
-        { id: 'ps01', week_index: 0, category_id: 'c2',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 1 }, // Klimmzüge (Fokus)
-        { id: 'ps02', week_index: 0, category_id: 'c8',  start_target: 60,  bonus_max: 0, growth_pct: 10, position: 2 }, // Dips (Fokus)
-        { id: 'ps03', week_index: 0, category_id: 'c1',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 }, // Liegestütze
-        { id: 'ps04', week_index: 0, category_id: 'c6',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 4 }, // Leg Raises
-        { id: 'ps05', week_index: 0, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 }, // HSPU
-        { id: 'ps06', week_index: 0, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 }, // Tom Holland (Pflicht)
-        { id: 'ps07', week_index: 0, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 }, // Bring Sally Up (Pflicht)
-        // ── Week index 1: Liegestütze + Leg Raises Fokus ──────────────────
-        { id: 'ps11', week_index: 1, category_id: 'c1',  start_target: 80,  bonus_max: 0, growth_pct: 10, position: 1 }, // Liegestütze (Fokus)
-        { id: 'ps12', week_index: 1, category_id: 'c6',  start_target: 50,  bonus_max: 0, growth_pct: 10, position: 2 }, // Leg Raises (Fokus)
-        { id: 'ps13', week_index: 1, category_id: 'c2',  start_target: 30,  bonus_max: 0, growth_pct: 5,  position: 3 }, // Klimmzüge
-        { id: 'ps14', week_index: 1, category_id: 'c8',  start_target: 40,  bonus_max: 0, growth_pct: 5,  position: 4 }, // Dips
-        { id: 'ps15', week_index: 1, category_id: 'c7',  start_target: 20,  bonus_max: 0, growth_pct: 5,  position: 5 }, // HSPU
-        { id: 'ps16', week_index: 1, category_id: 'c9',  start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 6 }, // Tom Holland (Pflicht)
-        { id: 'ps17', week_index: 1, category_id: 'c10', start_target: 1,   bonus_max: 0, growth_pct: 0,  position: 7 }, // Bring Sally Up (Pflicht)
-      ],
-      rotation_config: { id: 1, start_date: new Date().toISOString().slice(0,10), enabled: true },
-    };
-  }
-  function saveDemo(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
-  function uid() { return 'id_' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+  const PAGE = 1000;
 
   function mondayOf(date) {
     const d = new Date(date);
@@ -137,10 +25,32 @@
     const day = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
+  function addDays(iso, n) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return isoDate(d);
+  }
+
+  // ── Teilnehmer & Fair Share ─────────────────────────────────────────
+  // Wer zählt für eine Woche? Mitglieder, die spätestens am Sonntag der Woche
+  // beigetreten sind und nicht vor ihrem Montag ausgetreten sind.
+  function participantsFor(members, weekStart) {
+    if (!members?.length) return [];
+    const weekEnd = addDays(weekStart, 6);
+    const active = members.filter(m => {
+      const joined = m.joined_at ? isoDate(new Date(m.joined_at)) : '0000-00-00';
+      const left = m.left_at ? isoDate(new Date(m.left_at)) : null;
+      return joined <= weekEnd && (!left || left >= weekStart);
+    });
+    return active.length ? active : members.filter(m => !m.left_at);
+  }
+
+  // Gemeinsames Wochenziel, jeder schuldet seinen Anteil.
+  function fairShareOf(targetReps, participantCount = 2) {
+    return Math.ceil(targetReps / Math.max(1, participantCount));
+  }
 
   // ── Penalty system: pure computation ────────────────────────────────
-  function fairShareOf(targetReps) { return Math.ceil(targetReps / 2); }
-
   function repsForAthleteOnChallenge(sets, athlete, challengeId) {
     let total = 0;
     for (const s of sets) {
@@ -152,7 +62,7 @@
   }
 
   // Returns penalty descriptors for one athlete on one week.
-  function computePenalties(challenges, sets, athlete, cfg) {
+  function computePenalties(challenges, sets, athlete, cfg, participantCount = 2) {
     if (!challenges || !challenges.length) return [];
     const mode = cfg.rule_mode;
     const amount = cfg.amount_cents;
@@ -161,7 +71,7 @@
       const out = [];
       for (const ch of challenges) {
         const reps = repsForAthleteOnChallenge(sets, athlete, ch.id);
-        const share = fairShareOf(ch.target_reps);
+        const share = fairShareOf(ch.target_reps, participantCount);
         if (reps < share) out.push({
           athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
           reason: `${share - reps} unter fairShare`,
@@ -172,7 +82,7 @@
 
     const perCh = challenges.map(ch => {
       const reps = repsForAthleteOnChallenge(sets, athlete, ch.id);
-      const share = fairShareOf(ch.target_reps);
+      const share = fairShareOf(ch.target_reps, participantCount);
       return { ch, reps, share, missed: reps < share };
     });
 
@@ -195,740 +105,620 @@
       : [];
   }
 
-  function createDemoAPI() {
-    const listeners = new Set();
-    function emit() { listeners.forEach(fn => fn()); }
-
-    return {
-      mode: 'demo',
-      mondayOf, isoDate,
-
-      async getCategories() {
-        return loadDemo().categories;
-      },
-      async addCategory(name, emoji='💪', kind='sports') {
-        const s = loadDemo();
-        if (s.categories.find(c => c.name.toLowerCase() === name.toLowerCase())) {
-          throw new Error('Kategorie existiert bereits');
-        }
-        const cat = { id: uid(), name, emoji, kind };
-        s.categories.push(cat);
-        saveDemo(s); emit();
-        return cat;
-      },
-      async updateCategory(id, { name, emoji, kind }) {
-        const s = loadDemo();
-        const cat = s.categories.find(c => c.id === id);
-        if (!cat) throw new Error('Kategorie nicht gefunden');
-        if (name  !== undefined) cat.name  = name;
-        if (emoji !== undefined) cat.emoji = emoji;
-        if (kind  !== undefined) cat.kind  = kind;
-        saveDemo(s); emit();
-        return cat;
-      },
-      async deleteCategory(id) {
-        const s = loadDemo();
-        const used = s.challenges.find(c => c.category_id === id);
-        if (used) throw new Error('Kategorie wird in einer Woche genutzt – kann nicht gelöscht werden');
-        s.categories = s.categories.filter(c => c.id !== id);
-        saveDemo(s); emit();
-      },
-      async getProjectTags() {
-        return [...loadDemo().project_tags];
-      },
-      async addProjectTag(name, emoji = '📁') {
-        const s = loadDemo();
-        const tag = { id: uid(), name, emoji, created_at: new Date().toISOString() };
-        s.project_tags.push(tag);
-        saveDemo(s); emit();
-        return tag;
-      },
-      async updateProjectTag(id, { name, emoji }) {
-        const s = loadDemo();
-        const tag = s.project_tags.find(t => t.id === id);
-        if (!tag) throw new Error('Tag nicht gefunden');
-        if (name  !== undefined) tag.name  = name;
-        if (emoji !== undefined) tag.emoji = emoji;
-        saveDemo(s); emit();
-        return tag;
-      },
-      async deleteProjectTag(id) {
-        const s = loadDemo();
-        s.project_tags = s.project_tags.filter(t => t.id !== id);
-        saveDemo(s); emit();
-      },
-      async getToolTags() {
-        return [...loadDemo().tool_tags];
-      },
-      async addToolTag(name, emoji = '🔧') {
-        const s = loadDemo();
-        const tag = { id: uid(), name, emoji, created_at: new Date().toISOString() };
-        s.tool_tags.push(tag);
-        saveDemo(s); emit();
-        return tag;
-      },
-      async updateToolTag(id, { name, emoji }) {
-        const s = loadDemo();
-        const tag = s.tool_tags.find(t => t.id === id);
-        if (!tag) throw new Error('Tag nicht gefunden');
-        if (name  !== undefined) tag.name  = name;
-        if (emoji !== undefined) tag.emoji = emoji;
-        saveDemo(s); emit();
-        return tag;
-      },
-      async deleteToolTag(id) {
-        const s = loadDemo();
-        s.tool_tags = s.tool_tags.filter(t => t.id !== id);
-        saveDemo(s); emit();
-      },
-      async getChallengeForWeek(weekStart) {
-        const s = loadDemo();
-        return s.challenges.filter(c => c.week_start === weekStart);
-      },
-      async upsertChallenge({ id, week_start, category_id, chosen_by, target_reps }) {
-        const s = loadDemo();
-        let ch;
-        if (id) {
-          ch = s.challenges.find(c => c.id === id);
-          if (!ch) throw new Error('Ziel nicht gefunden');
-          Object.assign(ch, { category_id, chosen_by, target_reps });
-        } else {
-          const dupe = s.challenges.find(c => c.week_start === week_start && c.category_id === category_id);
-          if (dupe) throw new Error('Diese Kategorie existiert in dieser Woche bereits');
-          ch = { id: uid(), week_start, category_id, chosen_by, target_reps, created_at: new Date().toISOString() };
-          s.challenges.push(ch);
-        }
-        saveDemo(s); emit();
-        return ch;
-      },
-      async deleteChallenge(id) {
-        const s = loadDemo();
-        s.challenges = s.challenges.filter(c => c.id !== id);
-        s.sets = s.sets.filter(x => x.challenge_id !== id);
-        saveDemo(s); emit();
-      },
-      async listChallenges() {
-        return [...loadDemo().challenges].sort((a,b) => {
-          const w = b.week_start.localeCompare(a.week_start);
-          if (w !== 0) return w;
-          return (a.created_at || '').localeCompare(b.created_at || '');
-        });
-      },
-      async listSets(challengeId) {
-        return loadDemo().sets.filter(x => x.challenge_id === challengeId)
-          .sort((a,b) => b.created_at.localeCompare(a.created_at));
-      },
-      async addSet({ challenge_id, athlete, reps, note, created_at, duration_minutes, project_tag_id, tool_tag_id }) {
-        const s = loadDemo();
-        const set = {
-          id: uid(), challenge_id, athlete,
-          reps: reps ?? null,
-          note: note || null,
-          duration_minutes: duration_minutes ?? null,
-          project_tag_id: project_tag_id ?? null,
-          tool_tag_id: tool_tag_id ?? null,
-          created_at: created_at || new Date().toISOString(),
-        };
-        s.sets.push(set);
-        saveDemo(s); emit();
-        return set;
-      },
-      async updateSet(id, patch) {
-        const s = loadDemo();
-        const set = s.sets.find(x => x.id === id);
-        if (!set) throw new Error('Satz nicht gefunden');
-        Object.assign(set, patch);
-        saveDemo(s); emit();
-        return set;
-      },
-      async deleteSet(id) {
-        const s = loadDemo();
-        s.sets = s.sets.filter(x => x.id !== id);
-        saveDemo(s); emit();
-      },
-      async recentFeed(limit=50) {
-        const s = loadDemo();
-        const catById = Object.fromEntries(s.categories.map(c => [c.id, c]));
-        const chById = Object.fromEntries(s.challenges.map(c => [c.id, c]));
-        const reactions = s.reactions || [];
-        const reactionsBySet = {};
-        for (const r of reactions) (reactionsBySet[r.set_id] ||= []).push(r);
-        return [...s.sets]
-          .sort((a,b) => b.created_at.localeCompare(a.created_at))
-          .slice(0, limit)
-          .map(set => {
-            const ch = chById[set.challenge_id];
-            const cat = ch ? catById[ch.category_id] : null;
-            return { ...set, category: cat, challenge: ch, reactions: reactionsBySet[set.id] || [] };
-          });
-      },
-      async getAllSets() {
-        return [...loadDemo().sets];
-      },
-      async addReaction({ set_id, athlete, emoji }) {
-        const s = loadDemo();
-        s.reactions = s.reactions || [];
-        if (s.reactions.find(r => r.set_id === set_id && r.athlete === athlete && r.emoji === emoji)) {
-          return null; // already exists, no-op
-        }
-        const r = { id: uid(), set_id, athlete, emoji, created_at: new Date().toISOString() };
-        s.reactions.push(r);
-        saveDemo(s); emit();
-        return r;
-      },
-      async removeReaction({ set_id, athlete, emoji }) {
-        const s = loadDemo();
-        s.reactions = (s.reactions || []).filter(r => !(r.set_id === set_id && r.athlete === athlete && r.emoji === emoji));
-        saveDemo(s); emit();
-      },
-      // ── Rotation plan ─────────────────────────────────────────────────
-      async getPlanSlots() {
-        const s = loadDemo();
-        return [...(s.plan_slots || [])].sort((a,b) => a.week_index - b.week_index || a.position - b.position);
-      },
-      async addPlanSlot({ week_index, category_id, start_target, bonus_max, position }) {
-        const s = loadDemo();
-        s.plan_slots = s.plan_slots || [];
-        const slot = { id: uid(), week_index, category_id, start_target: start_target||100, bonus_max: bonus_max??0, growth_pct: 0, position: position||0, created_at: new Date().toISOString() };
-        s.plan_slots.push(slot);
-        saveDemo(s); emit();
-        return slot;
-      },
-      async updatePlanSlot(id, patch) {
-        const s = loadDemo();
-        const slot = (s.plan_slots||[]).find(x => x.id === id);
-        if (!slot) throw new Error('Slot nicht gefunden');
-        Object.assign(slot, patch);
-        saveDemo(s); emit();
-        return slot;
-      },
-      async deletePlanSlot(id) {
-        const s = loadDemo();
-        s.plan_slots = (s.plan_slots||[]).filter(x => x.id !== id);
-        saveDemo(s); emit();
-      },
-      async getRotationConfig() {
-        const s = loadDemo();
-        return s.rotation_config || { id: 1, start_date: isoDate(mondayOf(new Date())), enabled: true };
-      },
-      async setRotationConfig(patch) {
-        const s = loadDemo();
-        s.rotation_config = { ...(s.rotation_config || { id: 1, enabled: true, start_date: isoDate(mondayOf(new Date())) }), ...patch };
-        saveDemo(s); emit();
-        return s.rotation_config;
-      },
-      async upsertDeviceToken(_payload) { /* no-op in demo mode */ },
-      async deleteDeviceToken(_token) { /* no-op in demo mode */ },
-      // ── Penalty system ─────────────────────────────────────────────────
-      async getPenaltyConfig() { return { ...loadDemo().penalty_config }; },
-      async setPenaltyConfig(patch) {
-        const s = loadDemo();
-        const { _by, ...rest } = patch;
-        Object.assign(s.penalty_config, rest, { updated_at: new Date().toISOString() });
-        if (patch.enabled === true) {
-          const today = new Date(); today.setHours(0,0,0,0);
-          const monday = mondayOf(today);
-          const pastWeeks = new Set();
-          for (const ch of s.challenges) {
-            if (ch.week_start < isoDate(monday)) pastWeeks.add(ch.week_start);
-          }
-          for (const w of pastWeeks) {
-            if (!s.week_closures.find(c => c.week_start === w)) {
-              s.week_closures.push({ week_start: w, closed_at: new Date().toISOString(), closed_by: _by || 'Benny' });
-            }
-          }
-        }
-        saveDemo(s); emit();
-        return { ...s.penalty_config };
-      },
-      async previewWeekClose(weekStart) {
-        const s = loadDemo();
-        const cfg = s.penalty_config;
-        const chs = s.challenges.filter(c => c.week_start === weekStart);
-        const chIds = new Set(chs.map(c => c.id));
-        const wkSets = s.sets.filter(x => chIds.has(x.challenge_id));
-        if (!cfg.enabled) return { penalties: [], cfg };
-        const pens = [];
-        for (const a of ['Benny','Jonas']) pens.push(...computePenalties(chs, wkSets, a, cfg));
-        return { penalties: pens, cfg };
-      },
-      async closeWeek(weekStart, by) {
-        const s = loadDemo();
-        if (s.week_closures.find(c => c.week_start === weekStart)) throw new Error('Woche bereits abgeschlossen');
-        const cfg = s.penalty_config;
-        const chs = s.challenges.filter(c => c.week_start === weekStart);
-        const chIds = new Set(chs.map(c => c.id));
-        const wkSets = s.sets.filter(x => chIds.has(x.challenge_id));
-        if (cfg.enabled) {
-          for (const a of ['Benny','Jonas']) {
-            for (const p of computePenalties(chs, wkSets, a, cfg)) {
-              s.penalties.push({
-                id: uid(), week_start: weekStart, athlete: p.athlete,
-                challenge_id: p.challenge_id, amount_cents: p.amount_cents,
-                rule_mode: p.rule_mode, created_at: new Date().toISOString(),
-                paid: false, paid_at: null, paid_by: null, note: null,
-              });
-            }
-          }
-        }
-        s.week_closures.push({ week_start: weekStart, closed_at: new Date().toISOString(), closed_by: by });
-        saveDemo(s); emit();
-        return { closed: true };
-      },
-      async reopenWeek(weekStart) {
-        const s = loadDemo();
-        s.penalties = s.penalties.filter(p => !(p.week_start === weekStart && !p.paid));
-        s.week_closures = s.week_closures.filter(c => c.week_start !== weekStart);
-        saveDemo(s); emit();
-      },
-      async listPenalties() {
-        return [...loadDemo().penalties]
-          .sort((a,b) => b.week_start.localeCompare(a.week_start) || b.created_at.localeCompare(a.created_at));
-      },
-      async markPenaltyPaid(id, { note, by }) {
-        const s = loadDemo();
-        const p = s.penalties.find(x => x.id === id);
-        if (!p) throw new Error('Strafe nicht gefunden');
-        p.paid = true; p.paid_at = new Date().toISOString(); p.paid_by = by; p.note = note ?? p.note;
-        saveDemo(s); emit();
-        return { ...p };
-      },
-      async unmarkPenaltyPaid(id) {
-        const s = loadDemo();
-        const p = s.penalties.find(x => x.id === id);
-        if (!p) throw new Error('Strafe nicht gefunden');
-        p.paid = false; p.paid_at = null; p.paid_by = null;
-        saveDemo(s); emit();
-        return { ...p };
-      },
-      async deletePenalty(id) {
-        const s = loadDemo();
-        s.penalties = s.penalties.filter(p => p.id !== id);
-        saveDemo(s); emit();
-      },
-      async listClosures() {
-        return [...loadDemo().week_closures].sort((a,b) => b.week_start.localeCompare(a.week_start));
-      },
-      async listOpenClosures() {
-        const s = loadDemo();
-        const today = new Date(); today.setHours(0,0,0,0);
-        const monday = mondayOf(today);
-        const closed = new Set(s.week_closures.map(c => c.week_start));
-        const weeks = new Set();
-        for (const ch of s.challenges) {
-          if (ch.week_start < isoDate(monday) && !closed.has(ch.week_start)) weeks.add(ch.week_start);
-        }
-        return [...weeks].sort();
-      },
-      async listPayouts() {
-        const s = loadDemo();
-        return [...(s.payouts || [])].sort((a,b) => b.paid_at.localeCompare(a.paid_at));
-      },
-      async addPayout({ athlete, amount_cents, note }) {
-        const s = loadDemo();
-        s.payouts ||= [];
-        const row = { id: uid(), athlete, amount_cents, paid_at: new Date().toISOString(), note: note || null, created_at: new Date().toISOString() };
-        s.payouts.push(row);
-        saveDemo(s); emit();
-        return row;
-      },
-      async deletePayout(id) {
-        const s = loadDemo();
-        s.payouts = (s.payouts || []).filter(p => p.id !== id);
-        saveDemo(s); emit();
-      },
-      onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    };
+  // ── Row normalisation ───────────────────────────────────────────────
+  function withAthlete(row) {
+    if (!row) return row;
+    if ('user_id' in row) row.athlete = row.user_id;
+    return row;
+  }
+  function normSet(row) {
+    withAthlete(row);
+    if (row.reactions) row.reactions = row.reactions.map(withAthlete);
+    return row;
+  }
+  function normChallenge(row) {
+    if (row && 'chosen_by_user' in row) row.chosen_by = row.chosen_by_user;
+    return row;
+  }
+  function normPenalty(row) {
+    withAthlete(row);
+    if (row && 'paid_by_user' in row) row.paid_by = row.paid_by_user;
+    return row;
   }
 
-  function createSupabaseAPI(client) {
-    const listeners = new Set();
-    function emit() { listeners.forEach(fn => fn()); }
+  function friendlyError(error) {
+    const msg = error?.message || String(error);
+    const map = {
+      invalid_code: 'Code nicht gefunden.',
+      competition_full: 'Diese Challenge ist schon voll.',
+      team_full: 'Dieses Team ist schon voll.',
+      invalid_team: 'Ungültiges Team.',
+      forbidden: 'Das darf nur der Ersteller der Challenge.',
+      not_authenticated: 'Bitte zuerst anmelden.',
+      'Invalid login credentials': 'E-Mail oder Passwort falsch.',
+      'User already registered': 'Für diese E-Mail gibt es schon einen Account.',
+      'Email not confirmed': 'E-Mail ist noch nicht bestätigt.',
+    };
+    const wrap = (text) => { const e = new Error(text); e.code = error?.code; return e; };
+    for (const [k, v] of Object.entries(map)) if (msg.includes(k)) return wrap(v);
+    if (/Password should be at least/i.test(msg)) return wrap('Passwort muss mindestens 6 Zeichen haben.');
+    if (/Token has expired or is invalid/i.test(msg)) return wrap('Code ungültig oder abgelaufen.');
+    return error instanceof Error ? error : wrap(msg);
+  }
+  function check({ data, error }) {
+    if (error) throw friendlyError(error);
+    return data;
+  }
 
-    // Subscribe to realtime
-    client.channel('pt-sets')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sets' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_challenges' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'plan_slots' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rotation_config' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'penalties' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'week_closures' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'penalty_config' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payouts' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tags' }, emit)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tool_tags' }, emit)
-      .subscribe();
+  // Paged select — PostgREST liefert max. 1000 Zeilen pro Request.
+  async function selectAll(buildQuery) {
+    const out = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+      if (error) throw friendlyError(error);
+      out.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
+    return out;
+  }
 
-    return {
+  // Session-Storage: in der iOS-App @capacitor/preferences (überlebt WebView-
+  // Cache-Bereinigung), im Browser localStorage.
+  const sessionStorageAdapter = {
+    async getItem(key) {
+      const prefs = await (window.PTPreferencesReady || Promise.resolve(null));
+      if (prefs) return (await prefs.Preferences.get({ key })).value;
+      try { return localStorage.getItem(key); } catch { return null; }
+    },
+    async setItem(key, value) {
+      const prefs = await (window.PTPreferencesReady || Promise.resolve(null));
+      if (prefs) return prefs.Preferences.set({ key, value });
+      try { localStorage.setItem(key, value); } catch {}
+    },
+    async removeItem(key) {
+      const prefs = await (window.PTPreferencesReady || Promise.resolve(null));
+      if (prefs) return prefs.Preferences.remove({ key });
+      try { localStorage.removeItem(key); } catch {}
+    },
+  };
+
+  function createAPI(client) {
+    let currentUserId = null;
+    client.auth.onAuthStateChange((_evt, session) => { currentUserId = session?.user?.id || null; });
+    const uid = () => {
+      if (!currentUserId) throw new Error('Bitte zuerst anmelden.');
+      return currentUserId;
+    };
+
+    const base = {
       mode: 'supabase',
       client,
       mondayOf, isoDate,
 
+      // ── Auth ─────────────────────────────────────────────────────────
+      async getSession() {
+        const { data } = await client.auth.getSession();
+        currentUserId = data.session?.user?.id || null;
+        return data.session;
+      },
+      onAuthChange(fn) {
+        const { data } = client.auth.onAuthStateChange((evt, session) => {
+          currentUserId = session?.user?.id || null;
+          fn(session, evt);
+        });
+        return () => data.subscription.unsubscribe();
+      },
+      async signUp({ email, password, displayName }) {
+        const data = check(await client.auth.signUp({
+          email: email.trim(), password,
+          options: { data: { display_name: displayName.trim() } },
+        }));
+        if (!data.session) {
+          throw new Error('Account angelegt, aber E-Mail-Bestätigung ist aktiv. Bitte im Supabase-Dashboard unter Auth → Providers → Email „Confirm email“ ausschalten oder den Link in der Mail bestätigen.');
+        }
+        return data.session;
+      },
+      async signIn({ email, password }) {
+        return check(await client.auth.signInWithPassword({ email: email.trim(), password })).session;
+      },
+      async signOut() {
+        await client.auth.signOut();
+        currentUserId = null;
+      },
+      // Passwort vergessen: Mail enthält einen 6-stelligen Code ({{ .Token }}),
+      // der in der App eingegeben wird — kein Deep Link nötig.
+      async requestPasswordReset(email) {
+        check(await client.auth.resetPasswordForEmail(email.trim()));
+      },
+      async resetPasswordWithCode({ email, code, password }) {
+        check(await client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' }));
+        check(await client.auth.updateUser({ password }));
+      },
+
+      // ── Profile ──────────────────────────────────────────────────────
+      async getMyProfile() {
+        const id = uid();
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { data, error } = await client.from('profiles').select('*').eq('id', id).maybeSingle();
+          if (error) throw friendlyError(error);
+          if (data) return data;
+          // Trigger on_auth_user_created läuft async zur Session — kurz warten.
+          await new Promise(r => setTimeout(r, 400));
+        }
+        throw new Error('Profil nicht gefunden. Ist Migration A eingespielt?');
+      },
+      async updateProfile(patch) {
+        return check(await client.from('profiles').update(patch).eq('id', uid()).select().single());
+      },
+      async uploadAvatar(blob) {
+        const path = `${uid()}/avatar-${Date.now()}.jpg`;
+        check(await client.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true }));
+        const { data } = client.storage.from('avatars').getPublicUrl(path);
+        return base.updateProfile({ avatar_url: data.publicUrl });
+      },
+
+      // ── Challenges ───────────────────────────────────────────────────
+      async listMyCompetitions() {
+        const rows = check(await client.from('competition_members')
+          .select('role, team, joined_at, competition:competition_id(*)')
+          .eq('user_id', uid())
+          .is('left_at', null));
+        return (rows || [])
+          .filter(r => r.competition)
+          .map(r => ({ ...r.competition, my_role: r.role, my_team: r.team }))
+          .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+      },
+      async getMembers(competitionId) {
+        const rows = check(await client.from('competition_members')
+          .select('user_id, role, team, joined_at, left_at, profile:user_id(id, display_name, avatar_url, color)')
+          .eq('competition_id', competitionId)
+          .order('joined_at'));
+        return rows || [];
+      },
+      async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+        return check(await client.rpc('create_competition', {
+          p_name: name, p_emoji: emoji, p_mode: mode,
+          p_rotation: !!rotation, p_penalties: !!penalties, p_work: !!work,
+          p_start_date: startDate || isoDate(new Date()), p_end_date: endDate || null,
+        }));
+      },
+      async previewCompetition(code) {
+        return check(await client.rpc('preview_competition', { p_code: code }));
+      },
+      async joinCompetition(code, team = null) {
+        return check(await client.rpc('join_competition', { p_code: code, p_team: team }));
+      },
+      async updateCompetition(id, patch) {
+        return check(await client.from('competitions').update(patch).eq('id', id).select().single());
+      },
+      async setMemberTeam(competitionId, userId, team) {
+        check(await client.rpc('set_member_team', { p_competition: competitionId, p_user: userId, p_team: team }));
+      },
+      async removeMember(competitionId, userId) {
+        check(await client.rpc('remove_member', { p_competition: competitionId, p_user: userId }));
+      },
+      async leaveCompetition(competitionId) {
+        check(await client.rpc('leave_competition', { p_competition: competitionId }));
+      },
+      async regenerateInviteCode(competitionId) {
+        return check(await client.rpc('regenerate_invite_code', { p_competition: competitionId }));
+      },
+
+      // ── Cross-Challenge-Daten für All-Time- und Duell-Stats ──────────
+      async getStatsBundle(competitionIds) {
+        if (!competitionIds.length) return { members: [], challenges: [], sets: [], categories: [] };
+        const [members, challenges, sets, categories] = await Promise.all([
+          selectAll(() => client.from('competition_members')
+            .select('competition_id, user_id, role, team, joined_at, left_at, profile:user_id(id, display_name, avatar_url, color)')
+            .in('competition_id', competitionIds)),
+          selectAll(() => client.from('weekly_challenges').select('*')
+            .in('competition_id', competitionIds).order('week_start', { ascending: false }).order('created_at')),
+          selectAll(() => client.from('sets')
+            .select('id, challenge_id, competition_id, user_id, reps, duration_minutes, created_at')
+            .in('competition_id', competitionIds).order('created_at', { ascending: false })),
+          selectAll(() => client.from('categories').select('*').order('created_at')),
+        ]);
+        return {
+          members,
+          challenges: challenges.map(normChallenge),
+          sets: sets.map(withAthlete),
+          categories,
+        };
+      },
+
+      // ── Push notification device tokens ──────────────────────────────
+      async upsertDeviceToken({ token, platform }) {
+        return check(await client.from('device_tokens')
+          .upsert({ token, user_id: uid(), platform, last_seen: new Date().toISOString() }, { onConflict: 'token' })
+          .select().single());
+      },
+      async deleteDeviceToken(token) {
+        check(await client.from('device_tokens').delete().eq('token', token));
+      },
+
+      forCompetition(competitionId) {
+        return createCompetitionAPI(client, competitionId, uid);
+      },
+    };
+    return base;
+  }
+
+  function createCompetitionAPI(client, cid, uid) {
+    const listeners = new Set();
+    let emitTimer = null;
+    function emit() {
+      // Realtime feuert bei Batch-Operationen viele Events — bündeln.
+      clearTimeout(emitTimer);
+      emitTimer = setTimeout(() => listeners.forEach(fn => fn()), 120);
+    }
+
+    const filter = `competition_id=eq.${cid}`;
+    let channel = null;
+    function subscribe() {
+      if (channel) return;
+      channel = client.channel(`pt-${cid}`);
+      for (const table of ['sets','weekly_challenges','plan_slots','rotation_config','penalties','week_closures',
+                           'penalty_config','payouts','project_tags','tool_tags','competition_members','categories']) {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table, filter }, emit);
+      }
+      channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, emit)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions', filter: `id=eq.${cid}` }, emit)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, emit)
+        .subscribe();
+    }
+
+    async function ensureClosures(rows) {
+      if (!rows.length) return;
+      const { data: existing } = await client.from('week_closures').select('week_start').eq('competition_id', cid);
+      const have = new Set((existing || []).map(r => r.week_start));
+      const missing = rows.filter(r => !have.has(r.week_start));
+      if (missing.length) check(await client.from('week_closures').insert(missing));
+    }
+
+    const api = {
+      mode: 'supabase',
+      client,
+      competitionId: cid,
+      mondayOf, isoDate,
+
+      async getCompetition() {
+        return check(await client.from('competitions').select('*').eq('id', cid).single());
+      },
+      async getMembers() {
+        return check(await client.from('competition_members')
+          .select('user_id, role, team, joined_at, left_at, profile:user_id(id, display_name, avatar_url, color)')
+          .eq('competition_id', cid)
+          .order('joined_at')) || [];
+      },
+
       async getCategories() {
-        const { data, error } = await client.from('categories').select('*').order('created_at');
-        if (error) throw error;
-        return data;
+        return check(await client.from('categories').select('*')
+          .or(`competition_id.is.null,competition_id.eq.${cid}`)
+          .order('created_at'));
       },
       async addCategory(name, emoji='💪', kind='sports') {
-        const { data, error } = await client.from('categories').insert({ name, emoji, kind }).select().single();
-        if (error) throw error;
+        const data = check(await client.from('categories')
+          .insert({ name, emoji, kind, competition_id: cid, created_by: uid() }).select().single());
         emit();
         return data;
       },
       async updateCategory(id, patch) {
-        const { data, error } = await client.from('categories').update(patch).eq('id', id).select().single();
-        if (error) throw error;
+        const { data, error } = await client.from('categories').update(patch).eq('id', id).select();
+        if (error) throw friendlyError(error);
+        if (!data?.length) throw new Error('Standard-Kategorien können nicht bearbeitet werden.');
         emit();
-        return data;
+        return data[0];
       },
       async deleteCategory(id) {
-        const { error } = await client.from('categories').delete().eq('id', id);
+        const { data, error } = await client.from('categories').delete().eq('id', id).select('id');
         if (error) throw new Error(error.message.includes('foreign') ? 'Kategorie wird genutzt – nicht löschbar' : error.message);
+        if (!data?.length) throw new Error('Standard-Kategorien können nicht gelöscht werden.');
         emit();
       },
+
       async getProjectTags() {
-        const { data, error } = await client.from('project_tags').select('*').order('created_at');
-        if (error) throw error;
-        return data;
+        return check(await client.from('project_tags').select('*').eq('competition_id', cid).order('created_at'));
       },
       async addProjectTag(name, emoji = '📁') {
-        const { data, error } = await client.from('project_tags').insert({ name, emoji }).select().single();
-        if (error) throw error;
-        emit();
-        return data;
+        const data = check(await client.from('project_tags').insert({ name, emoji, competition_id: cid }).select().single());
+        emit(); return data;
       },
       async updateProjectTag(id, patch) {
-        const { data, error } = await client.from('project_tags').update(patch).eq('id', id).select().single();
-        if (error) throw error;
-        emit();
-        return data;
+        const data = check(await client.from('project_tags').update(patch).eq('id', id).select().single());
+        emit(); return data;
       },
       async deleteProjectTag(id) {
-        const { error } = await client.from('project_tags').delete().eq('id', id);
-        if (error) throw error;
-        emit();
+        check(await client.from('project_tags').delete().eq('id', id)); emit();
       },
       async getToolTags() {
-        const { data, error } = await client.from('tool_tags').select('*').order('created_at');
-        if (error) throw error;
-        return data;
+        return check(await client.from('tool_tags').select('*').eq('competition_id', cid).order('created_at'));
       },
       async addToolTag(name, emoji = '🔧') {
-        const { data, error } = await client.from('tool_tags').insert({ name, emoji }).select().single();
-        if (error) throw error;
-        emit();
-        return data;
+        const data = check(await client.from('tool_tags').insert({ name, emoji, competition_id: cid }).select().single());
+        emit(); return data;
       },
       async updateToolTag(id, patch) {
-        const { data, error } = await client.from('tool_tags').update(patch).eq('id', id).select().single();
-        if (error) throw error;
-        emit();
-        return data;
+        const data = check(await client.from('tool_tags').update(patch).eq('id', id).select().single());
+        emit(); return data;
       },
       async deleteToolTag(id) {
-        const { error } = await client.from('tool_tags').delete().eq('id', id);
-        if (error) throw error;
-        emit();
+        check(await client.from('tool_tags').delete().eq('id', id)); emit();
       },
+
+      // ── Wochenziele (Tabelle weekly_challenges) ──────────────────────
       async getChallengeForWeek(weekStart) {
-        const { data, error } = await client.from('weekly_challenges')
-          .select('*').eq('week_start', weekStart);
-        if (error) throw error;
-        return data || [];
+        const data = check(await client.from('weekly_challenges').select('*')
+          .eq('competition_id', cid).eq('week_start', weekStart));
+        return (data || []).map(normChallenge);
       },
       async upsertChallenge(payload) {
-        const isUpdate = !!payload.id;
-        const q = isUpdate
-          ? client.from('weekly_challenges').update(payload).eq('id', payload.id).select().single()
-          : client.from('weekly_challenges').insert(payload).select().single();
-        const { data, error } = await q;
+        const row = {
+          category_id: payload.category_id,
+          target_reps: payload.target_reps,
+          chosen_by_user: payload.chosen_by || uid(),
+        };
+        if (payload.id) {
+          const data = check(await client.from('weekly_challenges').update(row).eq('id', payload.id).select().single());
+          emit();
+          return normChallenge(data);
+        }
+        const { data, error } = await client.from('weekly_challenges')
+          .insert({ ...row, week_start: payload.week_start, competition_id: cid }).select().single();
         if (error) {
-          // Unique constraint: category already exists this week — fetch and return the existing row
-          if (error.code === '23505' && payload.week_start && payload.category_id) {
-            const { data: existing } = await client.from('weekly_challenges')
-              .select('*').eq('week_start', payload.week_start).eq('category_id', payload.category_id).single();
-            if (existing) { emit(); return existing; }
+          // Kategorie existiert in dieser Woche schon — bestehende Zeile zurückgeben
+          if (error.code === '23505') {
+            const { data: existing } = await client.from('weekly_challenges').select('*')
+              .eq('competition_id', cid).eq('week_start', payload.week_start).eq('category_id', payload.category_id)
+              .maybeSingle();
+            if (existing) { emit(); return normChallenge(existing); }
           }
-          throw error;
+          throw friendlyError(error);
         }
         emit();
-        return data;
+        return normChallenge(data);
       },
       async deleteChallenge(id) {
-        const { error } = await client.from('weekly_challenges').delete().eq('id', id);
-        if (error) throw error;
+        check(await client.from('weekly_challenges').delete().eq('id', id));
         emit();
       },
       async listChallenges() {
-        const { data, error } = await client.from('weekly_challenges')
-          .select('*')
+        const data = await selectAll(() => client.from('weekly_challenges').select('*')
+          .eq('competition_id', cid)
           .order('week_start', { ascending: false })
-          .order('created_at', { ascending: true });
-        if (error) throw error;
-        return data;
+          .order('created_at', { ascending: true }));
+        return data.map(normChallenge);
       },
+
+      // ── Sätze ────────────────────────────────────────────────────────
       async listSets(challengeId) {
-        const { data, error } = await client.from('sets')
-          .select('*').eq('challenge_id', challengeId)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data;
+        const data = check(await client.from('sets').select('*').eq('challenge_id', challengeId)
+          .order('created_at', { ascending: false }));
+        return (data || []).map(normSet);
       },
-      async addSet(payload) {
-        const { data, error } = await client.from('sets').insert(payload).select().single();
-        if (error) throw error;
+      async addSet({ athlete, ...payload }) {
+        const data = check(await client.from('sets')
+          .insert({ ...payload, user_id: uid(), competition_id: cid }).select().single());
         emit();
-        return data;
+        return normSet(data);
       },
       async updateSet(id, patch) {
-        const { data, error } = await client.from('sets').update(patch).eq('id', id).select().single();
-        if (error) throw error;
+        const { athlete, ...rest } = patch;
+        const data = check(await client.from('sets').update(rest).eq('id', id).select().single());
         emit();
-        return data;
+        return normSet(data);
       },
       async deleteSet(id) {
-        const { error } = await client.from('sets').delete().eq('id', id);
-        if (error) throw error;
+        check(await client.from('sets').delete().eq('id', id));
         emit();
       },
       async recentFeed(limit=50) {
-        const { data, error } = await client.from('sets')
-          .select('*, challenge:challenge_id(*, category:category_id(*)), reactions(id, athlete, emoji)')
+        const data = check(await client.from('sets')
+          .select('*, challenge:challenge_id(*, category:category_id(*)), reactions(id, user_id, emoji)')
+          .eq('competition_id', cid)
           .order('created_at', { ascending: false })
-          .limit(limit);
-        if (error) throw error;
-        return (data || []).map(s => ({
-          ...s,
-          category: s.challenge?.category,
-          challenge: s.challenge,
-          reactions: s.reactions || [],
-        }));
+          .limit(limit));
+        return (data || []).map(s => {
+          normSet(s);
+          return { ...s, category: s.challenge?.category, challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
+        });
       },
       async getAllSets() {
-        const { data, error } = await client.from('sets')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(0, 9999);
-        if (error) throw error;
-        return data || [];
+        const data = await selectAll(() => client.from('sets').select('*')
+          .eq('competition_id', cid)
+          .order('created_at', { ascending: false }));
+        return data.map(normSet);
       },
-      async addReaction(payload) {
+      async addReaction({ set_id, emoji }) {
         const { data, error } = await client.from('reactions')
-          .insert(payload)
-          .select()
-          .single();
+          .insert({ set_id, emoji, user_id: uid() }).select().single();
         if (error) {
           if (error.code === '23505') return null; // unique violation, already exists
-          throw error;
+          throw friendlyError(error);
         }
         emit();
-        return data;
+        return withAthlete(data);
       },
-      async removeReaction({ set_id, athlete, emoji }) {
-        const { error } = await client.from('reactions')
-          .delete()
-          .match({ set_id, athlete, emoji });
-        if (error) throw error;
+      async removeReaction({ set_id, emoji }) {
+        check(await client.from('reactions').delete().match({ set_id, emoji, user_id: uid() }));
         emit();
       },
-      // ── Rotation plan ─────────────────────────────────────────────────
+
+      // ── Rotation plan ────────────────────────────────────────────────
       async getPlanSlots() {
-        const { data, error } = await client.from('plan_slots').select('*').order('week_index').order('position');
-        if (error) throw error;
-        return data || [];
+        return check(await client.from('plan_slots').select('*')
+          .eq('competition_id', cid).order('week_index').order('position')) || [];
       },
       async addPlanSlot(payload) {
-        const { data, error } = await client.from('plan_slots').insert({
+        const data = check(await client.from('plan_slots').insert({
+          competition_id: cid,
           week_index: payload.week_index,
           category_id: payload.category_id,
           start_target: payload.start_target || 100,
           bonus_max: payload.bonus_max ?? 0,
           position: payload.position || 0,
-        }).select().single();
-        if (error) throw error;
+        }).select().single());
         emit();
         return data;
       },
       async updatePlanSlot(id, patch) {
-        const { data, error } = await client.from('plan_slots').update(patch).eq('id', id).select().single();
-        if (error) throw error;
+        const data = check(await client.from('plan_slots').update(patch).eq('id', id).select().single());
         emit();
         return data;
       },
       async deletePlanSlot(id) {
-        const { error } = await client.from('plan_slots').delete().eq('id', id);
-        if (error) throw error;
+        check(await client.from('plan_slots').delete().eq('id', id));
         emit();
       },
       async getRotationConfig() {
-        const { data, error } = await client.from('rotation_config').select('*').eq('id', 1).maybeSingle();
-        if (error) throw error;
+        const data = check(await client.from('rotation_config').select('*').eq('competition_id', cid).maybeSingle());
         if (data) return data;
-        // bootstrap
-        const ins = await client.from('rotation_config').insert({ id: 1, start_date: isoDate(mondayOf(new Date())), enabled: true }).select().single();
-        return ins.data;
+        return check(await client.from('rotation_config')
+          .insert({ competition_id: cid, start_date: isoDate(mondayOf(new Date())), enabled: true })
+          .select().single());
       },
       async setRotationConfig(patch) {
-        const { data, error } = await client.from('rotation_config').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1).select().single();
-        if (error) throw error;
+        const data = check(await client.from('rotation_config')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('competition_id', cid).select().single());
         emit();
         return data;
       },
-      // ── Push notification device tokens ───────────────────────────────
-      async upsertDeviceToken({ token, athlete, platform }) {
-        const { data, error } = await client.from('device_tokens')
-          .upsert({ token, athlete, platform, last_seen: new Date().toISOString() }, { onConflict: 'token' })
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      },
-      async deleteDeviceToken(token) {
-        const { error } = await client.from('device_tokens').delete().eq('token', token);
-        if (error) throw error;
-      },
-      // ── Penalty system ─────────────────────────────────────────────────
+
+      // ── Penalty system ───────────────────────────────────────────────
       async getPenaltyConfig() {
-        const { data, error } = await client.from('penalty_config').select('*').eq('id', 1).single();
-        if (error) throw error;
-        return data;
+        const data = check(await client.from('penalty_config').select('*').eq('competition_id', cid).maybeSingle());
+        if (data) return data;
+        return check(await client.from('penalty_config')
+          .insert({ competition_id: cid, enabled: false }).select().single());
       },
       async setPenaltyConfig(patch) {
         const { _by, ...rest } = patch;
-        const { data: cfg, error } = await client.from('penalty_config')
+        const cfg = check(await client.from('penalty_config')
           .update({ ...rest, updated_at: new Date().toISOString() })
-          .eq('id', 1).select().single();
-        if (error) throw error;
+          .eq('competition_id', cid).select().single());
         if (patch.enabled === true) {
-          const today = new Date(); today.setHours(0,0,0,0);
-          const monday = mondayOf(today);
+          // Aktivierung wirkt nicht rückwirkend: vergangene Wochen als abgeschlossen markieren.
+          const monday = isoDate(mondayOf(new Date()));
           const { data: chs } = await client.from('weekly_challenges')
-            .select('week_start').lt('week_start', isoDate(monday));
-          const seen = new Set();
-          const rows = [];
-          for (const c of chs || []) {
-            if (!seen.has(c.week_start)) {
-              seen.add(c.week_start);
-              rows.push({ week_start: c.week_start, closed_by: _by || 'Benny' });
-            }
-          }
-          if (rows.length) {
-            await client.from('week_closures').upsert(rows, { onConflict: 'week_start', ignoreDuplicates: true });
-          }
+            .select('week_start').eq('competition_id', cid).lt('week_start', monday);
+          const weeks = [...new Set((chs || []).map(c => c.week_start))];
+          await ensureClosures(weeks.map(w => ({ week_start: w, competition_id: cid, closed_by_user: uid() })));
         }
         emit();
         return cfg;
       },
       async previewWeekClose(weekStart) {
-        const cfg = await this.getPenaltyConfig();
-        const { data: chs } = await client.from('weekly_challenges').select('*').eq('week_start', weekStart);
-        const chIds = (chs || []).map(c => c.id);
+        const cfg = await api.getPenaltyConfig();
+        if (!cfg.enabled) return { penalties: [], cfg };
+        const [chsRaw, members] = await Promise.all([
+          api.getChallengeForWeek(weekStart),
+          api.getMembers(),
+        ]);
+        const chs = chsRaw || [];
+        const chIds = chs.map(c => c.id);
         let wkSets = [];
         if (chIds.length) {
-          const { data } = await client.from('sets').select('*').in('challenge_id', chIds);
-          wkSets = data || [];
+          const data = check(await client.from('sets').select('*').in('challenge_id', chIds));
+          wkSets = (data || []).map(normSet);
         }
-        if (!cfg.enabled) return { penalties: [], cfg };
+        const participants = participantsFor(members, weekStart);
         const pens = [];
-        for (const a of ['Benny','Jonas']) pens.push(...computePenalties(chs || [], wkSets, a, cfg));
+        for (const m of participants) {
+          pens.push(...computePenalties(chs, wkSets, m.user_id, cfg, participants.length));
+        }
         return { penalties: pens, cfg };
       },
-      async closeWeek(weekStart, by) {
-        const { error: clErr } = await client.from('week_closures').insert({ week_start: weekStart, closed_by: by });
+      async closeWeek(weekStart) {
+        const { error: clErr } = await client.from('week_closures')
+          .insert({ week_start: weekStart, competition_id: cid, closed_by_user: uid() });
         if (clErr) {
           if (clErr.code === '23505') throw new Error('Woche bereits abgeschlossen');
-          throw clErr;
+          throw friendlyError(clErr);
         }
-        const { penalties } = await this.previewWeekClose(weekStart);
+        const { penalties } = await api.previewWeekClose(weekStart);
         if (penalties.length) {
-          const rows = penalties.map(p => ({
-            week_start: weekStart, athlete: p.athlete, challenge_id: p.challenge_id,
+          check(await client.from('penalties').insert(penalties.map(p => ({
+            competition_id: cid, week_start: weekStart, user_id: p.athlete, challenge_id: p.challenge_id,
             amount_cents: p.amount_cents, rule_mode: p.rule_mode,
-          }));
-          const { error: pErr } = await client.from('penalties').insert(rows);
-          if (pErr) throw pErr;
+          }))));
         }
         emit();
         return { closed: true };
       },
       async reopenWeek(weekStart) {
-        await client.from('penalties').delete().eq('week_start', weekStart).eq('paid', false);
-        await client.from('week_closures').delete().eq('week_start', weekStart);
+        await client.from('penalties').delete().eq('competition_id', cid).eq('week_start', weekStart).eq('paid', false);
+        await client.from('week_closures').delete().eq('competition_id', cid).eq('week_start', weekStart);
         emit();
       },
       async listPenalties() {
-        const { data, error } = await client.from('penalties').select('*')
+        const data = check(await client.from('penalties').select('*')
+          .eq('competition_id', cid)
           .order('week_start', { ascending: false })
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        return data || [];
+          .order('created_at', { ascending: false }));
+        return (data || []).map(normPenalty);
       },
-      async markPenaltyPaid(id, { note, by }) {
-        const { data, error } = await client.from('penalties')
-          .update({ paid: true, paid_at: new Date().toISOString(), paid_by: by, note: note ?? null })
-          .eq('id', id).select().single();
-        if (error) throw error;
+      async markPenaltyPaid(id, { note }) {
+        const data = check(await client.from('penalties')
+          .update({ paid: true, paid_at: new Date().toISOString(), paid_by_user: uid(), note: note ?? null })
+          .eq('id', id).select().single());
         emit();
-        return data;
+        return normPenalty(data);
       },
       async unmarkPenaltyPaid(id) {
-        const { data, error } = await client.from('penalties')
-          .update({ paid: false, paid_at: null, paid_by: null })
-          .eq('id', id).select().single();
-        if (error) throw error;
+        const data = check(await client.from('penalties')
+          .update({ paid: false, paid_at: null, paid_by_user: null })
+          .eq('id', id).select().single());
         emit();
-        return data;
+        return normPenalty(data);
       },
       async deletePenalty(id) {
-        const { error } = await client.from('penalties').delete().eq('id', id);
-        if (error) throw error;
+        check(await client.from('penalties').delete().eq('id', id));
         emit();
       },
       async listClosures() {
-        const { data, error } = await client.from('week_closures').select('*')
-          .order('week_start', { ascending: false });
-        if (error) throw error;
-        return data || [];
+        return check(await client.from('week_closures').select('*')
+          .eq('competition_id', cid).order('week_start', { ascending: false })) || [];
       },
       async listOpenClosures() {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const monday = mondayOf(today);
-        const [chsRes, clRes] = await Promise.all([
-          client.from('weekly_challenges').select('week_start').lt('week_start', isoDate(monday)),
-          client.from('week_closures').select('week_start'),
+        const monday = isoDate(mondayOf(new Date()));
+        const [chs, cls] = await Promise.all([
+          client.from('weekly_challenges').select('week_start').eq('competition_id', cid).lt('week_start', monday),
+          client.from('week_closures').select('week_start').eq('competition_id', cid),
         ]);
-        if (chsRes.error) throw chsRes.error;
-        if (clRes.error) throw clRes.error;
-        const closed = new Set((clRes.data || []).map(c => c.week_start));
+        const chsData = check(chs), clsData = check(cls);
+        const closed = new Set((clsData || []).map(c => c.week_start));
         const weeks = new Set();
-        for (const ch of chsRes.data || []) if (!closed.has(ch.week_start)) weeks.add(ch.week_start);
+        for (const ch of chsData || []) if (!closed.has(ch.week_start)) weeks.add(ch.week_start);
         return [...weeks].sort();
       },
       async listPayouts() {
-        const { data, error } = await client.from('payouts').select('*')
-          .order('paid_at', { ascending: false });
-        if (error) {
-          if (error.code === '42P01') return []; // table not yet created
-          throw error;
-        }
-        return data || [];
+        const data = check(await client.from('payouts').select('*')
+          .eq('competition_id', cid).order('paid_at', { ascending: false }));
+        return (data || []).map(withAthlete);
       },
       async addPayout({ athlete, amount_cents, note }) {
-        const { data, error } = await client.from('payouts')
-          .insert({ athlete, amount_cents, note: note || null })
-          .select().single();
-        if (error) throw error;
+        const data = check(await client.from('payouts')
+          .insert({ competition_id: cid, user_id: athlete, amount_cents, note: note || null })
+          .select().single());
         emit();
-        return data;
+        return withAthlete(data);
       },
       async deletePayout(id) {
-        const { error } = await client.from('payouts').delete().eq('id', id);
-        if (error) throw error;
+        check(await client.from('payouts').delete().eq('id', id));
         emit();
       },
-      onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+
+      onChange(fn) {
+        subscribe();
+        listeners.add(fn);
+        return () => {
+          listeners.delete(fn);
+          if (!listeners.size && channel) { client.removeChannel(channel); channel = null; }
+        };
+      },
     };
+    return api;
   }
 
   // ── Week template helper (pure) ─────────────────────────────────────
@@ -971,19 +761,13 @@
 
   window.PTData = {
     init({ url, key }) {
-      const hasReal = url && key && !url.includes('DEIN-PROJEKT') && !key.startsWith('DEIN-');
-      if (hasReal && window.supabase) {
-        try {
-          const client = window.supabase.createClient(url, key, {
-            realtime: { params: { eventsPerSecond: 5 } },
-          });
-          return createSupabaseAPI(client);
-        } catch (e) {
-          console.warn('Supabase init failed, falling back to demo:', e);
-        }
-      }
-      return createDemoAPI();
+      if (!url || !key || !window.supabase) return null;
+      const client = window.supabase.createClient(url, key, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storage: sessionStorageAdapter },
+        realtime: { params: { eventsPerSecond: 5 } },
+      });
+      return createAPI(client);
     },
-    mondayOf, isoDate, uid, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf,
+    mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
   };
 })();

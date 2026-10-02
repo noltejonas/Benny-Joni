@@ -5,24 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="theme-color" content="#F4F3F8" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>Projekt Terminator</title>
   <script>
     try {
-      var t = localStorage.getItem('pt:theme');
-      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      var t = localStorage.getItem('pt:theme2') || 'light';
+      document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
     } catch (e) {}
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="redesign.css" />
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- Supabase client (loaded; used only if keys are set in app.jsx) -->
+  <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+  <script>
+    // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
+    // @capacitor/preferences, im Browser localStorage (Wert null).
+    window.PTPreferencesReady = new Promise(function (resolve) { window.__ptResolvePreferences = resolve; });
+  </script>
+  <script type="module">
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/preferences@8/+esm');
+        window.__ptResolvePreferences(mod);
+      } else {
+        window.__ptResolvePreferences(null);
+      }
+    } catch (e) {
+      window.__ptResolvePreferences(null);
+    }
+  </script>
 
   <script type="module">
     // Expose Capacitor Haptics globally for our non-module JSX files.
@@ -56,12 +78,14 @@
 
   <!-- Data layer -->
   <script src="data.js"></script>
+  <script src="demo.js"></script>
 
   <!-- Tweaks shell -->
   <script type="text/babel" src="tweaks-panel.jsx"></script>
 
   <!-- Shared components -->
   <script type="text/babel" src="components.jsx"></script>
+  <script type="text/babel" src="people.jsx"></script>
   <script type="text/babel" src="celebration.jsx"></script>
 
   <!-- Screens -->
@@ -71,8 +95,9 @@
   <!-- Settings / rotation plan -->
   <script type="text/babel" src="settings.jsx"></script>
 
-  <!-- Account switch effect (must load before app.jsx so window.useAccountSwitch is defined) -->
-  <script type="text/babel" src="account-switch.jsx"></script>
+  <!-- Login, Challenges, Stats über alle Challenges -->
+  <script type="text/babel" src="competitions.jsx"></script>
+  <script type="text/babel" src="stats-global.jsx"></script>
 
   <!-- App -->
   <script type="text/babel" src="app.jsx"></script>

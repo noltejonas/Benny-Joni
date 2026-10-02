@@ -1,4 +1,4 @@
-/* global React, Ring, Icon, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting, formatDuration */
+/* global React, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser */
 const { useState, useEffect, useMemo } = React;
 
 // Per-athlete-per-category quick-log values, stored locally.
@@ -102,17 +102,21 @@ function dayIndexInWeek(weekStart, today = new Date()) {
   return Math.max(1, Math.min(7, diff));
 }
 
-function repsOnLocalDate(sets, athlete, dateStr) {
+// athletes: eine User-ID oder eine Liste (Team).
+function repsOnLocalDate(sets, athletes, dateStr) {
+  const ids = Array.isArray(athletes) ? athletes : [athletes];
   return sets
-    .filter(s => s.athlete === athlete && localDateOf(s.created_at) === dateStr)
+    .filter(s => ids.includes(s.athlete) && localDateOf(s.created_at) === dateStr)
     .reduce((sum, s) => sum + (s.reps ?? s.duration_minutes ?? 0), 0);
 }
 
-// Mo-first weekly breakdown of reps per athlete for a given set of sets.
+// Mo-first weekly breakdown per group (Liste von User-ID-Listen) → day.vals[i].
 // Future days are forced to zero so a stray future-dated set never inflates a bar.
-function dailyBreakdownFor(weekStart, sets) {
+function dailyBreakdownFor(weekStart, sets, groups) {
   const ws = weekStart || localDateOf(PTData.mondayOf(new Date()));
   const todayIso = localDateOf(new Date());
+  const groupOf = {};
+  groups.forEach((ids, i) => ids.forEach(id => { groupOf[id] = i; }));
   const days = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(ws + 'T00:00:00');
@@ -120,7 +124,7 @@ function dailyBreakdownFor(weekStart, sets) {
     const iso = localDateOf(d);
     days.push({
       iso, dow: d.getDay(),
-      Benny: 0, Jonas: 0,
+      vals: groups.map(() => 0),
       isFuture: iso > todayIso,
       isToday: iso === todayIso,
     });
@@ -129,7 +133,8 @@ function dailyBreakdownFor(weekStart, sets) {
   for (const s of sets) {
     const day = localDateOf(s.created_at);
     const bucket = byIso[day];
-    if (bucket && !bucket.isFuture) bucket[s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
+    const g = groupOf[s.athlete];
+    if (bucket && !bucket.isFuture && g != null) bucket.vals[g] += (s.reps ?? s.duration_minutes ?? 0);
   }
   const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   return days
@@ -174,19 +179,107 @@ function WeekCloseBanner({ weekStart, onClose }) {
   );
 }
 
-function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], layout,
+// Rangliste für „Jeder gegen jeden“ (statt Tauziehen).
+function RankList({ sides, stats, target, sideShares, fmtVal, total, remaining }) {
+  const order = sides.map((s, i) => i).sort((a, b) => stats[b].done - stats[a].done);
+  const max = Math.max(1, ...stats.map(s => s.done));
+  return (
+    <div className="mu-rank">
+      <div className="mu-rank-head mono">
+        <span>Gesamt {fmtVal(total)} / {fmtVal(target)}</span>
+        <span className={remaining === 0 ? 'done' : ''}>{remaining === 0 ? '🎉 erreicht' : `noch ${fmtVal(remaining)}`}</span>
+      </div>
+      {order.map((i, rank) => {
+        const side = sides[i];
+        const s = stats[i];
+        const doneShare = s.done >= sideShares[i];
+        return (
+          <div key={side.key} className={`mu-rank-row ${side.cls} ${side.isMine ? 'mine' : ''}`} style={sideStyle(side)}>
+            <span className="mu-rank-pos mono">{rank + 1}</span>
+            <SideAvatar side={side} size={26} />
+            <span className="mu-rank-name">{side.isMine ? 'Du' : side.label}</span>
+            <span className="mu-rank-bar"><span className="mu-rank-fill" style={{ width: `${(s.done / max) * 100}%`, background: side.color }} /></span>
+            <span className="mu-rank-val mono">{fmtVal(s.done)}{doneShare ? ' ✓' : ''}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const challengeCount = (n) => n === 1 ? 'eine Challenge' : `${n} Challenges`;
+
+// Vergleichskarte auf „Heute“. Zwei Seiten (1v1, 2v2): Duell mit Score und geteiltem Balken.
+// Mehr Seiten (Jeder gegen jeden): Rangliste. entries[0] ist immer die eigene Seite.
+function DuelCard({ entries, title, meta }) {
+  const total = entries.reduce((a, e) => a + e.reps, 0);
+
+  if (entries.length !== 2) {
+    const ranked = [...entries].sort((x, y) => y.reps - x.reps);
+    const max = Math.max(1, ranked[0]?.reps || 0);
+    const myRank = ranked.findIndex(e => e.side.isMine) + 1;
+    return (
+      <section className="rd-card rd-duel" aria-label="Rangliste diese Woche">
+        <div className="rd-duel-head"><span>{title}</span><span>{meta}</span></div>
+        <p className="rd-duel-line">{total === 0 ? 'Noch nichts geloggt. Wer legt vor?' : `Du bist auf Platz ${myRank}.`}</p>
+        <ol className="rd-rank">
+          {ranked.map((e, i) => (
+            <li key={e.side.key} className={e.side.isMine ? 'is-me' : ''} style={sideStyle(e.side)}>
+              <span className="rd-rank-pos">{i + 1}</span>
+              <SideAvatar side={e.side} size={32} />
+              <span className="rd-rank-body">
+                <span className="rd-rank-name">{e.side.isMine && e.side.userIds.length === 1 ? 'Du' : e.side.label}</span>
+                <span className="rd-rank-track"><span className="rd-rank-fill" style={{ width: `${(e.reps / max) * 100}%` }} /></span>
+              </span>
+              <span className="rd-rank-val"><CountUp value={e.reps} /></span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    );
+  }
+
+  const [a, b] = entries;
+  const we = a.side.userIds.length > 1;
+  const lead = a.wins - b.wins;
+  const line = total === 0 ? 'Noch nichts geloggt. Wer legt vor?'
+    : lead > 0 ? `${we ? 'Ihr liegt' : 'Du liegst'} ${challengeCount(lead)} vorne.`
+    : lead < 0 ? `${b.side.label} ${b.side.userIds.length > 1 ? 'liegen' : 'liegt'} ${challengeCount(-lead)} vorne.`
+    : 'Gleichstand. Jetzt zählt jeder Satz.';
+  const aShare = total ? Math.round((a.reps / total) * 100) : 50;
+  return (
+    <section className="rd-card rd-duel" aria-label="Duell diese Woche">
+      <div className="rd-duel-head"><span>{title}</span><span>{meta}</span></div>
+      <div className="rd-duel-main">
+        {[a, null, b].map((e, i) => e ? (
+          <div key={e.side.key} className="rd-duel-player">
+            <SideAvatar side={e.side} size={we || e.side.userIds.length > 1 ? 48 : 64} />
+            <span>{e.side.label}</span>
+          </div>
+        ) : (
+          <div key="score" className="rd-duel-score">
+            <div className="rd-duel-num"><CountUp value={a.wins} /> : <CountUp value={b.wins} /></div>
+            <div className="rd-duel-cap">Challenges vorne</div>
+          </div>
+        ))}
+      </div>
+      <p className="rd-duel-line">{line}</p>
+      <div className="rd-split" role="img" aria-label={`${a.side.label} ${a.reps} Reps, ${b.side.label} ${b.reps} Reps`}>
+        <div className="rd-split-a" style={{ width: `${aShare}%`, ...sideStyle(a.side) }} />
+        <div className="rd-split-b" style={sideStyle(b.side)} />
+      </div>
+      <div className="rd-split-legend">
+        <span><CountUp value={a.reps} /> Reps</span>
+        <span><CountUp value={b.reps} /> Reps</span>
+      </div>
+    </section>
+  );
+}
+
+function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = [], categories = [], allSets = [], layout,
   weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   openClosures = [], onCloseWeek,
-  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog,
-  // back-compat with old prop names if file got reverted
-  challenge, category, sets, onSetup, onLog }) {
-  // If invoked with old single-challenge API, normalize to new shape
-  if (!challenges?.length && challenge) {
-    challenges = [challenge];
-    allSets = sets || [];
-    categories = category ? [category] : categories;
-    onAddGoal = onSetup; onEditChallenge = () => onSetup?.(); onLogChallenge = () => onLog?.();
-  }
+  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog }) {
   const [timerRunning, setTimerRunning] = React.useState(() => {
     const v = localStorage.getItem('pt_work_timer_start');
     const parsed = v ? parseInt(v) : null;
@@ -209,289 +302,197 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     return (cat?.kind || 'sports') === 'sports';
   });
   const celebration = useCelebration(challenges, allSets, me, categories);
-  const scrollerRef = React.useRef(null);
-  const [activeIdx, setActiveIdx] = React.useState(0);
-  React.useEffect(() => {
-    const el = scrollerRef.current; if (!el) return;
-    const onScroll = () => {
-      const w = el.clientWidth; if (!w) return;
-      setActiveIdx(Math.round(el.scrollLeft / w));
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, [tabChallenges.length]);
-  const goTo = (i) => {
-    const el = scrollerRef.current; if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
-  };
+  const focusRef = React.useRef(null);
+  const [selectedId, setSelectedId] = React.useState(null);
 
-  // Pro Challenge die Summe aller geloggten Reps einmal ermitteln,
-  // dann erfüllte (total >= target_reps) ans Ende sortieren.
-  // Gleiche Quelle für Swiper UND Overview, kein Mehrfach-Filter.
-  const { sortedChallenges, totalsByChallenge } = React.useMemo(() => {
-    const catKind = Object.fromEntries(tabChallenges.map(c => [c.id, catById[c.category_id]?.kind || 'sports']));
-    const totals = new Map(tabChallenges.map(c => [c.id, 0]));
-    for (const s of allSets) {
-      if (totals.has(s.challenge_id)) {
-        const v = catKind[s.challenge_id] === 'work' ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
-        totals.set(s.challenge_id, totals.get(s.challenge_id) + v);
-      }
-    }
-    const open = [], done = [];
-    for (const ch of tabChallenges) {
-      if ((totals.get(ch.id) ?? 0) >= ch.target_reps) done.push(ch); else open.push(ch);
-    }
-    return { sortedChallenges: [...open, ...done], totalsByChallenge: totals };
-  }, [tabChallenges, allSets]);
+  // Kennzahlen pro Wochenziel einmal berechnen; Liste, Fokus-Karte und Duell lesen daraus.
+  const rows = React.useMemo(() => tabChallenges.map(ch => {
+    const cat = catById[ch.category_id];
+    const isWork = cat?.kind === 'work';
+    const val = (x) => isWork ? (x.duration_minutes ?? 0) : (x.reps ?? 0);
+    const csets = allSets.filter(x => x.challenge_id === ch.id);
+    const doneBySide = totalsBySide(csets, sides, val);
+    const total = csets.reduce((a, x) => a + val(x), 0);
+    // Fairer Anteil pro Person (Ziel / aktive Teilnehmer)
+    const share = PTData.fairShareOf(ch.target_reps, participantCount || sides.length || 1);
+    const expectedByEod = Math.ceil(share * dayIndexInWeek(ch.week_start) / 7);
+    const catType = cat?.challenge_type || 'standard';
+    const isObligatory = catType === 'tom_holland' || catType === 'bring_sally_up';
+    const mine = csets.filter(x => x.athlete === me);
+    const myDone = mine.reduce((a, x) => a + val(x), 0);
+    const myDoneThisWeek = mine.some(x => x.created_at && localDateOf(x.created_at) >= ch.week_start);
+    const meFinished = isObligatory ? myDoneThisWeek : myDone >= share;
+    return {
+      ch, cat, isWork, catType, isObligatory, total, doneBySide, share,
+      leader: uniqueMaxIndex(doneBySide),
+      myDone, meFinished,
+      myTodayLeft: Math.max(0, expectedByEod - myDone),
+      fmt: (v) => isWork ? formatDuration(v) : v,
+    };
+  }), [tabChallenges, allSets, me, sides, participantCount]);
+
+  const orderedRows = React.useMemo(
+    () => [...rows.filter(r => !r.meFinished), ...rows.filter(r => r.meFinished)],
+    [rows]
+  );
+  const focus = rows.find(r => r.ch.id === selectedId)
+    || orderedRows.find(r => r.isObligatory && !r.meFinished)
+    || orderedRows[0];
+
+  const duelEntries = React.useMemo(() => sides.map((side, i) => ({
+    side,
+    wins: rows.filter(r => r.leader === i).length,
+    reps: rows.reduce((a, r) => a + (r.isWork ? 0 : r.doneBySide[i]), 0),
+  })), [rows, sides]);
+
+  // Tagesbalken: bei mehr als zwei Seiten „Du vs. Ø der anderen“
+  const twoSided = sides.length === 2;
+  const othersCount = Math.max(1, sides.length - 1);
+  const week = React.useMemo(() => {
+    const groups = twoSided || sides.length < 2
+      ? sides.map(s => s.statUserIds || s.userIds)
+      : [sides[0].statUserIds, sides.slice(1).flatMap(s => s.statUserIds)];
+    const ids = new Set(tabChallenges.map(c => c.id));
+    const ws = tabChallenges[0]?.week_start || weekStart;
+    const days = dailyBreakdownFor(ws, allSets.filter(x => ids.has(x.challenge_id)), groups);
+    if (!twoSided && sides.length > 2) for (const d of days) d.vals[1] = Math.round(d.vals[1] / othersCount);
+    return days;
+  }, [tabChallenges, allSets, weekStart, sides]);
+  const weekSeries = twoSided || sides.length < 2
+    ? sides.map(s => ({ key: s.key, label: s.isMine && s.userIds.length === 1 ? 'Du' : s.label, style: sideStyle(s) }))
+    : [{ key: 'me', label: 'Du', style: sideStyle(sides[0]) }, { key: 'avg', label: 'Ø andere', style: { '--sc': 'var(--text-4)' } }];
+  const weekMax = Math.max(1, ...week.flatMap(d => d.vals));
+  const daysLeft = week.filter(d => d.isFuture).length;
+  const finishedCount = rows.filter(r => r.meFinished).length;
+  const nameOf = (id) => id === me ? 'dir' : PTPeople.firstNameOf(id);
+
+  const pick = (id) => {
+    setSelectedId(id);
+    focusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   // Rules of Hooks: this early return must come AFTER all hooks above.
   if (!tabChallenges.length) {
     return (
-      <div className="empty">
-        <div className="emoji">🏁</div>
-        <div className="title">Diese Woche ist offen</div>
-        <div style={{marginBottom: 24}}>Legt euer erstes Wochenziel fest.</div>
+      <div className="rd-empty">
+        <div className="rd-empty-title">Diese Woche ist noch offen</div>
+        <div className="rd-empty-text">Legt euer erstes Wochenziel fest.</div>
         <button className="btn" onClick={onAddGoal}>Ziel anlegen</button>
       </div>
     );
   }
 
+  const fPct = focus ? Math.min(1, focus.total / focus.ch.target_reps) : 0;
+
   return (
     <>
       {timerRunning && (
-        <div className="timer-banner" onClick={onAddGoal}>
+        <button type="button" className="timer-banner" onClick={onAddGoal}>
           <span className="timer-banner-dot" />
-          <span>⏱️ Timer läuft · tippe zum Loggen</span>
-        </div>
+          <span>Timer läuft · tippe zum Loggen</span>
+        </button>
       )}
-    <div className={`layout-${layout} home-swiper-wrap`}>
-      {sortedChallenges.length >= 2 && (
-        <div className="challenge-overview">
-          {sortedChallenges.map((ch, i) => {
-            const cat = catById[ch.category_id];
-            const total = totalsByChallenge.get(ch.id) ?? 0;
-            const done = total >= ch.target_reps;
-            const pct = Math.min(1, total / ch.target_reps);
-            const pctInt = Math.round(pct * 100);
+
+      {sides.length >= 2 && (
+        <DuelCard entries={duelEntries}
+          title={`KW ${weekNumber(tabChallenges[0].week_start)} · ${twoSided ? 'Duell' : 'Rangliste'}`}
+          meta={daysLeft === 0 ? 'letzter Tag' : daysLeft === 1 ? 'noch 1 Tag' : `noch ${daysLeft} Tage`} />
+      )}
+
+      {focus && (
+        <section ref={focusRef} className="rd-focus" aria-label={focus.isObligatory ? 'Pflicht-Challenge' : 'Wochenziel im Fokus'}>
+          <div className="rd-focus-top">
+            <div className="rd-focus-text">
+              <div className="rd-overline">{focus.isObligatory ? 'Pflicht-Challenge' : 'Im Fokus'}</div>
+              <h2 className="rd-focus-title">{focus.cat?.name}</h2>
+              {focus.ch.chosen_by && <div className="rd-focus-sub">gewählt von {nameOf(focus.ch.chosen_by)}</div>}
+            </div>
+            <MiniRing pct={fPct} size={72} stroke={7} color="#fff" track="rgba(255,255,255,0.22)">
+              {Math.round(fPct * 100)}%
+            </MiniRing>
+          </div>
+          <div className="rd-focus-chips">
+            <span className="rd-chip-glass">{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}{focus.isWork || focus.isObligatory ? '' : ' Reps'}</span>
+            <span className="rd-chip-glass">
+              {focus.meFinished ? 'dein Teil ist erledigt'
+                : focus.isObligatory ? 'einmal diese Woche'
+                : focus.myTodayLeft > 0 ? `heute noch ${focus.fmt(focus.myTodayLeft)}` : 'du bist auf Kurs'}
+            </span>
+            <button className="rd-icon-glass" aria-label={`${focus.cat?.name} bearbeiten`} onClick={() => onEditChallenge(focus.ch)}>
+              <Icon name="edit" size={16} />
+            </button>
+          </div>
+          {focus.isObligatory ? (
+            <button className="rd-btn-white" onClick={() => onLogChallenge(focus.ch)}>
+              <Icon name="play" size={18} />
+              {focus.catType === 'tom_holland' ? 'Workout starten' : 'Bring Sally Up starten'}
+            </button>
+          ) : (
+            <QuickLogRow me={me} catId={focus.ch.category_id}
+              onQuick={(v) => onQuickLog?.(focus.ch, v)} onLog={() => onLogChallenge(focus.ch)} />
+          )}
+        </section>
+      )}
+
+      <section className="rd-section" aria-label="Deine Übungen">
+        <div className="rd-section-head">
+          <h2>Deine Übungen</h2>
+          <span>{finishedCount} von {rows.length} erledigt</span>
+        </div>
+        <ul className="rd-card rd-list">
+          {orderedRows.map(r => {
+            const isFocus = focus && r.ch.id === focus.ch.id;
+            const sub = r.isObligatory
+              ? (r.meFinished ? 'diese Woche erledigt' : 'einmal diese Woche')
+              : r.meFinished
+                ? `${r.fmt(r.myDone)} von ${r.fmt(r.share)}`
+                : `${r.fmt(r.myDone)} von ${r.fmt(r.share)} · ${r.myTodayLeft > 0 ? `heute noch ${r.fmt(r.myTodayLeft)}` : 'auf Kurs'}`;
             return (
-              <button
-                key={ch.id}
-                type="button"
-                className={`co-row ${done ? 'done' : ''} ${i === activeIdx ? 'active' : ''}`}
-                onClick={() => goTo(i)}
-                aria-label={`Zu ${cat?.name} springen, ${done ? 'erfüllt' : pctInt + ' Prozent'}`}>
-                <span className="co-name">{cat?.name}</span>
-                <span className="co-bar"><span className="co-bar-fill" style={{width: `${pct*100}%`}}/></span>
-                <span className="co-val mono">{done ? '✓' : `${pctInt}%`}</span>
-              </button>
+              <li key={r.ch.id}>
+                <button type="button" className={`rd-row${r.meFinished ? ' is-done' : ''}${isFocus ? ' is-focus' : ''}`}
+                  aria-pressed={isFocus} onClick={() => pick(r.ch.id)}>
+                  <span className="rd-tile">
+                    <Icon name={r.isObligatory ? 'timer' : r.isWork ? 'laptop' : 'dumbbell'} size={20} />
+                  </span>
+                  <span className="rd-row-text">
+                    <span className="rd-row-name">{r.cat?.name}</span>
+                    <span className="rd-row-sub">{sub}</span>
+                  </span>
+                  {r.meFinished ? (
+                    <span className="rd-check" aria-label="Erledigt"><Icon name="check" size={16} strokeWidth={3} /></span>
+                  ) : (
+                    <MiniRing pct={r.isObligatory ? 0 : r.myDone / r.share} />
+                  )}
+                </button>
+              </li>
             );
           })}
+        </ul>
+      </section>
+
+      <section className="rd-section" aria-label="Diese Woche">
+        <div className="rd-section-head">
+          <h2>Diese Woche</h2>
+          <span className="rd-legend">
+            {weekSeries.map(s => <span key={s.key} style={s.style}><i />{s.label}</span>)}
+          </span>
         </div>
-      )}
-      <div className="challenge-swiper" ref={scrollerRef}>
-      {sortedChallenges.map(ch => {
-        const cat = catById[ch.category_id];
-        const csets = allSets.filter(s => s.challenge_id === ch.id);
-        const chDailyBreakdown = dailyBreakdownFor(ch.week_start, csets);
-        const total = totalsByChallenge.get(ch.id) ?? 0;
-        const isWorkCh = cat?.kind === 'work';
-        const sumVal = (s) => isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
-        const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((a,x)=>a+sumVal(x), 0);
-        const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((a,x)=>a+sumVal(x), 0);
-        const fmtVal = (v) => isWorkCh ? formatDuration(v) : v;
-        const pct = Math.min(1, total / ch.target_reps);
-        const pctInt = Math.round(pct * 100);
-        const remaining = Math.max(0, ch.target_reps - total);
-        const fairShare = Math.ceil(ch.target_reps / 2);
-        const todayStr = localDateOf(new Date());
-        const dayIdx = dayIndexInWeek(ch.week_start);
-        const dailyTarget = Math.ceil(fairShare / 7);
-        const expectedByEod = Math.ceil(fairShare * dayIdx / 7);
-
-        const bennyToday = repsOnLocalDate(csets, 'Benny', todayStr);
-        const bennyTrackDelta = bennyDone - expectedByEod;
-
-        const jonasToday = repsOnLocalDate(csets, 'Jonas', todayStr);
-        const jonasTrackDelta = jonasDone - expectedByEod;
-
-        // Active user goes left in comparisons.
-        const leftA  = me === 'Jonas' ? 'Jonas' : 'Benny';
-        const rightA = leftA === 'Benny' ? 'Jonas' : 'Benny';
-        const stats = {
-          Benny: { done: bennyDone, today: bennyToday, trackDelta: bennyTrackDelta },
-          Jonas: { done: jonasDone, today: jonasToday, trackDelta: jonasTrackDelta },
-        };
-        const widths = {
-          Benny: Math.min(100, (bennyDone/ch.target_reps)*100),
-          Jonas: Math.min(100, (jonasDone/ch.target_reps)*100),
-        };
-        const tugSide = (athlete, isRight) => {
-          const cls = athlete.toLowerCase();
-          const s = stats[athlete];
-          return (
-            <div className={`tug-side ${cls}${isRight ? ' is-right' : ''}`}>
-              <div className="tug-who">
-                {isRight
-                  ? <>{athlete}<img src={`uploads/${cls}.jpg`} alt={athlete} className="tug-avatar"/></>
-                  : <><img src={`uploads/${cls}.jpg`} alt={athlete} className="tug-avatar"/>{athlete}</>}
+        <div className="rd-card rd-week">
+          {week.map((d, i) => (
+            <div key={d.iso} className={`rd-week-day${d.isToday ? ' is-today' : ''}${d.isFuture ? ' is-future' : ''}`}
+              aria-label={d.isFuture ? `${d.label}: noch offen` : `${d.label}: ${weekSeries.map((s, j) => `${s.label} ${d.vals[j] ?? 0}`).join(', ')}`}>
+              <div className="rd-week-bars">
+                {weekSeries.map((s, j) => (
+                  <div key={s.key} className="rd-bar"
+                    style={{ ...s.style, height: d.isFuture || !d.vals[j] ? 4 : Math.max(6, (d.vals[j] / weekMax) * 88), animationDelay: `${i * 40}ms` }} />
+                ))}
               </div>
-              <div className="tug-reps mono">{fmtVal(s.done)}</div>
-              <DailyStatus variant="tug" done={s.done} fairShare={fairShare}
-                dailyTarget={dailyTarget} todayReps={s.today} trackDelta={s.trackDelta}/>
+              <div className="rd-week-label">{d.label}</div>
             </div>
-          );
-        };
-        const splitCell = (athlete) => {
-          const cls = athlete.toLowerCase();
-          const s = stats[athlete];
-          return (
-            <div className={`split-cell ${cls}`}>
-              <div className="who"><img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/>{athlete}</div>
-              <div className="v mono">{fmtVal(s.done)}<span className="owe-of"> / {fmtVal(fairShare)}</span></div>
-              <DailyStatus variant="cell" done={s.done} fairShare={fairShare}
-                dailyTarget={dailyTarget} todayReps={s.today} trackDelta={s.trackDelta}/>
-            </div>
-          );
-        };
-        const catType = cat?.challenge_type || 'standard';
-        const isObligatory = catType === 'tom_holland' || catType === 'bring_sally_up';
-        // Check if athlete already logged this challenge this week
-        const thisWeekStr = ch.week_start;
-        const myDoneThisWeek = csets.filter(s => s.athlete === me && s.created_at && localDateOf(s.created_at) >= thisWeekStr).length > 0;
-
-        return (
-          <div key={ch.id} className="challenge-slide"><div className={`hero-card ${isObligatory ? 'hero-card--obligatory' : ''} ${celebration.getPersistentStyle(ch) ? 'pm-' + celebration.getPersistentStyle(ch) : ''}`}>
-            <SparkleLayer active={celebration.getPersistentStyle(ch) === 'sparkle'} />
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:20,fontWeight:700,letterSpacing:'-0.03em'}}>
-                  <span style={{marginRight:8}}>{cat?.emoji}</span>{cat?.name}
-                  {isObligatory && (
-                    <span className={`obligatory-badge${myDoneThisWeek ? ' done' : ''}`}>
-                      {myDoneThisWeek ? '✓ diese Woche' : 'Pflicht'}
-                    </span>
-                  )}
-                </div>
-                <div className="subtitle" style={{marginTop:2,fontSize:13,fontWeight:500}}>Gewählt von {ch.chosen_by}</div>
-              </div>
-              <button className="icon-btn" aria-label="Bearbeiten" onClick={() => onEditChallenge(ch)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              </button>
-            </div>
-            {celebration.getPersistentStyle(ch) === 'trophy' ? (
-              <div className="pm-trophy-hero">
-                <div className="pm-trophy-icon">🏆</div>
-                <div className="pm-trophy-title">ZIEL ERREICHT</div>
-                <div className="pm-trophy-sub">{cat?.emoji} {cat?.name} • Diese Woche</div>
-                <div className="pm-trophy-stats">
-                  <div>
-                    <div className="pm-trophy-stat-v">{isWorkCh ? formatDuration(total) : total.toLocaleString('de-DE')}</div>
-                    <div className="pm-trophy-stat-l">{isWorkCh ? 'Zeit' : 'Reps'}</div>
-                  </div>
-                  <div>
-                    <div className="pm-trophy-stat-v">{fmtVal(stats[leftA].done)}</div>
-                    <div className="pm-trophy-stat-l">{leftA}</div>
-                  </div>
-                  <div>
-                    <div className="pm-trophy-stat-v">{fmtVal(stats[rightA].done)}</div>
-                    <div className="pm-trophy-stat-l">{rightA}</div>
-                  </div>
-                </div>
-              </div>
-            ) : (<>
-              {layout==='rings' && (
-                <div className={`tug-section${bennyDone > jonasDone ? ' lead-benny' : jonasDone > bennyDone ? ' lead-jonas' : ''}`}>
-                  <div className="tug-labels">
-                    {tugSide(leftA, false)}
-                    <div className="tug-side team">
-                      <div className="tug-who">Gesamt</div>
-                      <div className="tug-reps mono">{fmtVal(total)}</div>
-                      <div className={`tug-foot mono ${remaining===0?'done':''}`}>{remaining===0?'✓ erledigt':`noch ${fmtVal(remaining)}`}</div>
-                    </div>
-                    {tugSide(rightA, true)}
-                  </div>
-                  {(() => {
-                    let lW = widths[leftA];
-                    let rW = widths[rightA];
-                    if (lW + rW > 100) { const s = 100 / (lW + rW); lW *= s; rW *= s; }
-                    const teamRemaining = Math.max(0, ch.target_reps - total);
-                    return (
-                      <>
-                        <div className="tug-bar opposing">
-                          <div className={`tug-fill ${leftA.toLowerCase()}`} style={{width:`${lW}%`}}/>
-                          <div className={`tug-fill ${rightA.toLowerCase()} from-right`} style={{width:`${rW}%`}}/>
-                        </div>
-                        <div className="tug-summary mono">
-                          {teamRemaining===0 ? (
-                            <span className="tug-summary-done">🎉 Gesamtziel erreicht!</span>
-                          ) : (
-                            <>Wochenziel <span className="tug-summary-target">{fmtVal(ch.target_reps)}</span></>
-                          )}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-              {layout==='bar' && <>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:12}}>
-                  <div className="display mono" style={{fontSize:44,lineHeight:1}}>{pctInt}%</div>
-                  <div className="subtitle mono">{fmtVal(total)} / {fmtVal(ch.target_reps)}</div></div>
-                <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct*100}%`}}/></div>
-                <div className="subtitle" style={{fontSize:13,fontWeight:500}}>{remaining>0?`Noch ${fmtVal(remaining)} ${isWorkCh?'':'Reps'}`:'🎉 Ziel erreicht!'}</div></>}
-              {layout==='numeric' && <div style={{textAlign:'center',marginTop:12}}>
-                <div className="big-number mono" style={{fontSize:72}}>{pctInt}%</div>
-                <div className="of mono">{fmtVal(total)} / {fmtVal(ch.target_reps)} {isWorkCh?'':'Reps'}</div>
-                <div style={{marginTop:8,fontSize:13,color:'var(--text-2)'}}>{remaining>0?`Noch ${fmtVal(remaining)}`:'🎉 Ziel erreicht'}</div></div>}
-              {layout!=='rings' && <div className="split-row">
-                {splitCell(leftA)}
-                {splitCell(rightA)}
-              </div>}
-            </>)}
-            {catType === 'tom_holland' || catType === 'bring_sally_up' ? (
-              <div style={{ marginTop: 16 }}>
-                <button className="btn" style={{ width: '100%' }} onClick={() => onLogChallenge(ch)}>
-                  {catType === 'tom_holland' ? '▶ Workout starten' : '▶ Bring Sally Up starten'}
-                </button>
-              </div>
-            ) : (
-              <QuickLogRow me={me} catId={ch.category_id} onQuick={(v) => onQuickLog?.(ch, v)} onLog={() => onLogChallenge(ch)} />
-            )}
-          </div>
-          {(() => {
-            const maxV = Math.max(1, ...chDailyBreakdown.flatMap(d => [d.Benny, d.Jonas]));
-            return (
-              <div className="daily-breakdown">
-                <div className="db-header">
-                  <span className="db-eyebrow">Diese Woche · pro Tag</span>
-                </div>
-                <div className="db-grid">
-                  {chDailyBreakdown.map(d => {
-                    const bH = d.Benny ? Math.max(6, (d.Benny / maxV) * 38) : 0;
-                    const jH = d.Jonas ? Math.max(6, (d.Jonas / maxV) * 38) : 0;
-                    return (
-                      <div key={d.iso} className={`db-day${d.isToday ? ' today' : ''}${d.isFuture ? ' future' : ''}`}>
-                        <div className="db-bars">
-                          <div className="db-bar benny" style={{height: `${bH}px`}} title={`Benny: ${d.Benny}`} />
-                          <div className="db-bar jonas" style={{height: `${jH}px`}} title={`Jonas: ${d.Jonas}`} />
-                        </div>
-                        <div className="db-values">
-                          <div className="db-val benny mono">{d.isFuture ? '—' : d.Benny}</div>
-                          <div className="db-val jonas mono">{d.isFuture ? '—' : d.Jonas}</div>
-                        </div>
-                        <div className="db-label">{d.label}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
+          ))}
         </div>
-        );
-      })}
-      </div>
-    </div>
+      </section>
+
     {openClosures.length > 0 && openClosures.map(w => (
       <WeekCloseBanner key={w} weekStart={w} onClose={onCloseWeek}/>
     ))}
@@ -504,36 +505,37 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
       const daysUntil = Math.max(0, Math.round((monday - today) / 86400000));
       const whenLabel = daysUntil === 0 ? 'heute' : daysUntil === 1 ? 'morgen' : `in ${daysUntil} Tagen`;
       return (
-        <div className="next-week-preview">
-          <div className="nwp-header">
-            <span className="nwp-eyebrow">Nächste Woche</span>
-            <span className="nwp-when">{whenLabel}</span>
+        <section className="rd-section" aria-label="Nächste Woche">
+          <div className="rd-section-head">
+            <h2>Nächste Woche</h2>
+            <span>KW {weekNumber(nextWeekStart)} · {whenLabel}{!isConfirmed && ' · Vorschau'}</span>
           </div>
-          <div className="nwp-subtitle">
-            KW {weekNumber(nextWeekStart)} · ab {formatWeek(nextWeekStart).split(' – ')[0]}
-            {!isConfirmed && ' · Vorschau'}
-          </div>
-          <div className="nwp-items">
+          <ul className="rd-card rd-list">
             {items.map((ch, i) => {
               const cat = catById[ch.category_id];
+              const ctype = cat?.challenge_type || 'standard';
               return (
-                <div className="nwp-item" key={ch.id || `p-${i}`}>
-                  <span className="nwp-emoji">{cat?.emoji}</span>
-                  <div className="nwp-meta">
-                    <div className="nwp-name">{cat?.name}</div>
-                    <div className="nwp-picker">{isConfirmed && ch.chosen_by ? `von ${ch.chosen_by}` : 'noch offen'}</div>
+                <li key={ch.id || `p-${i}`}>
+                  <div className="rd-row is-static">
+                    <span className="rd-tile">
+                      <Icon name={ctype !== 'standard' ? 'timer' : cat?.kind === 'work' ? 'laptop' : 'dumbbell'} size={20} />
+                    </span>
+                    <span className="rd-row-text">
+                      <span className="rd-row-name">{cat?.name}</span>
+                      <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? `gewählt von ${nameOf(ch.chosen_by)}` : 'noch offen'}</span>
+                    </span>
+                    <span className="rd-row-value">
+                      {!isConfirmed && ch.bonus_max > 0
+                        ? <>{ch.target_reps}–{ch.target_reps + ch.bonus_max}</>
+                        : ch.target_reps}
+                      <small>Reps</small>
+                    </span>
                   </div>
-                  <div className="nwp-target">
-                    {!isConfirmed && ch.bonus_max > 0
-                      ? <span className="mono">{ch.target_reps}&ndash;{ch.target_reps + ch.bonus_max}</span>
-                      : <span className="mono">{ch.target_reps}</span>}
-                    <span className="nwp-target-unit">Reps</span>
-                  </div>
-                </div>
+                </li>
               );
             })}
-          </div>
-        </div>
+          </ul>
+        </section>
       );
     })()}
     {celebration.pendingCelebration && (
@@ -546,129 +548,11 @@ function HomeScreen({ api, me, challenges = [], categories = [], allSets = [], l
     </>
   );
 }
-function _HomeScreenOld_unused({ api, me, challenge, category, sets, layout, onSetup, onLog, onSwitchUser }) {
-  const total = (sets||[]).reduce((s, x) => s + x.reps, 0);
-  const bennyDone = sets.filter((s) => s.athlete === 'Benny').reduce((s, x) => s + x.reps, 0);
-  const jonasDone = sets.filter((s) => s.athlete === 'Jonas').reduce((s, x) => s + x.reps, 0);
-  const pct = challenge ? Math.min(1, total / challenge.target_reps) : 0;
-  const pctInt = Math.round(pct * 100);
-  const remaining = challenge ? Math.max(0, challenge.target_reps - total) : 0;
-  const fairShare = challenge ? Math.ceil(challenge.target_reps / 2) : 0;
-  const bennyOwed = Math.max(0, fairShare - bennyDone);
-  const jonasOwed = Math.max(0, fairShare - jonasDone);
 
-  if (!challenge) {
-    return (
-      <div className="empty">
-        <div className="emoji">🏁</div>
-        <div className="title">Diese Woche ist offen</div>
-        <div style={{ marginBottom: 24 }}>Wer legt Kategorie & Ziel fest?</div>
-        <button className="btn" onClick={onSetup}>Woche starten</button>
-      </div>);
-
-  }
-
-  return (
-    <div className={`layout-${layout}`}>
-      <div className="hero-card" style={{ borderRadius: "14px" }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <div>
-            <div className="label">Diese Woche</div>
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em', marginTop: 2 }}>
-              <span style={{ marginRight: 8 }}>{category?.emoji}</span>{category?.name}
-            </div>
-            <div className="subtitle" style={{ marginTop: 2, fontSize: 15, fontWeight: 500 }}>
-              Gewählt von {challenge.chosen_by}
-            </div>
-          </div>
-          <button className="btn-ghost" style={{ padding: '6px 0' }} onClick={onSetup}>Ändern</button>
-        </div>
-
-        {layout === 'rings' &&
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
-            <Ring pct={pct} size={220} stroke={22}>
-              <div className="display mono" style={{ fontSize: 56, lineHeight: 1 }}>{pctInt}%</div>
-              <div className="subtitle mono" style={{ marginTop: 4, fontSize: 15 }}>{total} / {challenge.target_reps}</div>
-            </Ring>
-          </div>
-        }
-
-        {layout === 'bar' &&
-        <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 16 }}>
-              <div className="display mono" style={{ fontSize: 56, lineHeight: 1 }}>{pctInt}%</div>
-              <div className="subtitle mono">{total} / {challenge.target_reps}</div>
-            </div>
-            <div className="progress-bar-wrap">
-              <div className="progress-bar-fill" style={{ width: `${pct * 100}%` }} />
-            </div>
-            <div className="subtitle" style={{ fontSize: 15, fontWeight: 500 }}>
-              {remaining > 0 ? `Noch ${remaining} Reps` : '🎉 Ziel erreicht!'}
-            </div>
-          </>
-        }
-
-        {layout === 'numeric' &&
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <div className="big-number mono">{pctInt}%</div>
-            <div className="of mono">{total} / {challenge.target_reps} Reps</div>
-            <div style={{ marginTop: 10, fontSize: 15, color: 'var(--text-2)' }}>
-              {remaining > 0 ? `Noch ${remaining} bis zum Wochenziel` : '🎉 Ziel erreicht'}
-            </div>
-          </div>
-        }
-
-        <div className="split-row">
-          <div className="split-cell benny">
-            <div className="who">Benny</div>
-            <div className="v mono">{bennyDone}<span className="owe-of"> / {fairShare}</span></div>
-            <div className={`owe mono ${bennyOwed === 0 ? 'done' : ''}`}>
-              {bennyOwed === 0 ? '✓ erledigt' : `noch ${bennyOwed}`}
-            </div>
-          </div>
-          <div className="split-cell jonas">
-            <div className="who">Jonas</div>
-            <div className="v mono">{jonasDone}<span className="owe-of"> / {fairShare}</span></div>
-            <div className={`owe mono ${jonasOwed === 0 ? 'done' : ''}`}>
-              {jonasOwed === 0 ? '✓ erledigt' : `noch ${jonasOwed}`}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ margin: "14px 0px", borderRadius: "1px" }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div className="label">Deine Sätze diese Woche</div>
-          <div className="conn-pill">{sets.filter((s) => s.athlete === me).length} Sätze</div>
-        </div>
-        {sets.filter((s) => s.athlete === me).length === 0 ?
-        <div style={{ color: 'var(--text-2)', fontSize: 15, padding: '10px 0' }}>
-            Noch nichts geloggt. Tipp unten auf „Satz loggen".
-          </div> :
-
-        sets.filter((s) => s.athlete === me).slice(0, 5).map((s) =>
-        <div className="list-item" key={s.id}>
-              <div className="left">
-                <div className="display mono" style={{ fontSize: 20, color: 'var(--accent)', minWidth: 50 }}>+{s.reps}</div>
-                <div>
-                  <div className="what">{s.note || 'Satz'}</div>
-                  <div className="when">{formatRelative(s.created_at)}</div>
-                </div>
-              </div>
-              <button className="del-btn" onClick={() => api.deleteSet(s.id)}>✕</button>
-            </div>
-        )
-        }
-      </div>
-    </div>);
-
-}
-
-// ─── SETUP WEEK ─────────────────────────────────────────────────────────────
-function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved, onDeleted, onAddCategory }) {
+function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing, onClose, onSaved, onDeleted, onAddCategory }) {
   const [catId, setCatId] = useState(existing?.category_id || categories[0]?.id || '');
   const [target, setTarget] = useState(existing?.target_reps || 100);
-  const [chosenBy, setChosenBy] = useState(existing?.chosen_by || me);
+  const chosenBy = existing?.chosen_by || me;
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatEmoji, setNewCatEmoji] = useState('💪');
@@ -761,15 +645,6 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
       <h2 className="title" style={{ marginBottom: 4 }}>Wochen-Ziel festlegen</h2>
       <div className="subtitle" style={{ marginBottom: 18, fontSize: 15 }}>{formatWeek(weekStart)}</div>
 
-      <div className="label" style={{ marginBottom: 8 }}>Wer hat gewählt?</div>
-      <div className="segmented" style={{ marginBottom: 16 }}>
-        {['Benny', 'Jonas'].map((n) =>
-        <button key={n} className={chosenBy === n ? 'active' : ''} onClick={() => setChosenBy(n)}>
-            {n}
-          </button>
-        )}
-      </div>
-
       <div className="label" style={{ marginBottom: 8 }}>Kategorie</div>
 
       <div className="cat-grid">
@@ -784,10 +659,12 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
                     <div className="emoji">{c.emoji}</div>
                     <div className="name">{c.name}</div>
                   </button>
-                  <button className="cat-edit" aria-label="Bearbeiten"
-                    onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-                    ✎
-                  </button>
+                  {c.competition_id && (
+                    <button className="cat-edit" aria-label="Bearbeiten"
+                      onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
+                      ✎
+                    </button>
+                  )}
                 </div>
               ))}
               {work.length > 0 && (
@@ -799,10 +676,12 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
                         <div className="emoji">{c.emoji}</div>
                         <div className="name">{c.name}</div>
                       </button>
-                      <button className="cat-edit" aria-label="Bearbeiten"
-                        onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-                        ✎
-                      </button>
+                      {c.competition_id && (
+                        <button className="cat-edit" aria-label="Bearbeiten"
+                          onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
+                          ✎
+                        </button>
+                      )}
                     </div>
                   ))}
                 </>
@@ -839,10 +718,12 @@ function SetupSheet({ api, me, categories, weekStart, existing, onClose, onSaved
           <input className="input" placeholder="Name (z.B. Dips)" autoFocus
             value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
-          <div className="segmented" style={{ flexShrink: 0 }}>
-            <button className={newCatKind === 'sports' ? 'active' : ''} onClick={() => setNewCatKind('sports')}>🏋️</button>
-            <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
-          </div>
+          {allowWork && (
+            <div className="segmented" style={{ flexShrink: 0 }}>
+              <button className={newCatKind === 'sports' ? 'active' : ''} onClick={() => setNewCatKind('sports')}>🏋️</button>
+              <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
+            </div>
+          )}
           <button className="new-cat-add" onClick={addNewCat} aria-label="Hinzufügen">✓</button>
         </div>
       }
@@ -989,7 +870,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
       <>
         <h2 className="title" style={{ marginBottom: 4 }}>Session loggen</h2>
         <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-          {category?.emoji} {category?.name} · {me}
+          {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
         </div>
 
         {/* Timer */}
@@ -1066,7 +947,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>Satz loggen</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        {category?.emoji} {category?.name} · {me}
+        {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
       </div>
       <input
         className="input input-lg mono"
@@ -1274,7 +1155,7 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>Tom Holland Workout</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        🦸 5 Klimmzüge · 10 Liegestütze · 15 Squats · {me}
+        🦸 5 Klimmzüge · 10 Liegestütze · 15 Squats · {PTPeople.firstNameOf(me)}
       </div>
 
       {/* Countdown display */}
@@ -1376,7 +1257,7 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>Bring Sally Up</h2>
       <div className="subtitle" style={{ marginBottom: 24, fontSize: 15 }}>
-        🌸 Liegestütze zum Song · {me} · Max: 3:24
+        🌸 Liegestütze zum Song · {PTPeople.firstNameOf(me)} · Max: 3:24
       </div>
 
       {/* Success button */}
@@ -1448,46 +1329,44 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
 }
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
-function WeekRecap({ recap, me }) {
-  const { week_start, challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges, analysis, bennyByCat = [], jonasByCat = [], bennySetCount = 0, jonasSetCount = 0, bennyMaxSet = 0, jonasMaxSet = 0, weekNumber, bennyPenCents = 0, jonasPenCents = 0 } = recap;
+function WeekRecap({ recap, me, sides = [] }) {
+  const { week_start, challStats, totals = [], winnerIdx, sumAll, hitCount, totalChallenges, analysis,
+    perSide = [], penCentsBySide = [], weekNumber } = recap;
   const isWorkWeek = challStats.length > 0 && challStats.every(c => c.cat?.kind === 'work');
   const unit = isWorkWeek ? 'min' : 'Reps';
   const fmtRecapVal = (v) => isWorkWeek ? formatDuration(v) : v;
-  const penCents = { Benny: bennyPenCents, Jonas: jonasPenCents };
   const formatEuroCents = (c) => (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
-  const leftA  = me === 'Jonas' ? 'Jonas' : 'Benny';
-  const rightA = leftA === 'Benny' ? 'Jonas' : 'Benny';
-  const tallyTotals = { Benny: bennyTotal, Jonas: jonasTotal };
-  const recapTallySide = (athlete, isRight) => {
-    const cls = athlete.toLowerCase();
-    return (
-      <div className={`recap-tally-side ${cls}${isRight ? ' is-right' : ''} ${winner === athlete ? 'win' : ''}`}>
-        <div className="recap-tally-who">
-          {isRight
-            ? <>{athlete}<img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/></>
-            : <><img src={`uploads/${cls}.jpg`} alt={athlete} className="cell-avatar"/>{athlete}</>}
-        </div>
-        <div className="recap-tally-v mono">{fmtRecapVal(tallyTotals[athlete])}</div>
+  const winner = winnerIdx != null ? sides[winnerIdx] : null;
+  const twoSided = sides.length === 2;
+  const order = sides.map((s, i) => i).sort((a, b) => (totals[b] || 0) - (totals[a] || 0));
+  const recapTallySide = (side, isRight) => (
+    <div className={`recap-tally-side ${side.cls}${isRight ? ' is-right' : ''} ${winnerIdx === side.index ? 'win' : ''}`} style={sideStyle(side)}>
+      <div className="recap-tally-who">
+        {isRight
+          ? <>{side.label}<SideAvatar side={side} size={22} className="cell-avatar"/></>
+          : <><SideAvatar side={side} size={22} className="cell-avatar"/>{side.label}</>}
       </div>
-    );
-  };
+      <div className="recap-tally-v mono">{fmtRecapVal(totals[side.index] || 0)}</div>
+    </div>
+  );
   const monday = new Date(week_start + 'T00:00:00');
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
   const fmtD = (d) => `${d.getDate()}.${d.getMonth()+1}.`;
-  const winnerCls = winner ? winner.toLowerCase() : 'tie';
+  const winnerCls = winner ? winner.cls : 'tie';
   // Confetti pieces (only when there's a winner)
   const confetti = winner ? Array.from({ length: 28 }, (_, i) => {
     const dx = (Math.random() * 240 - 120).toFixed(0);
     const delay = (Math.random() * 1.4).toFixed(2);
     const dur = (1.8 + Math.random() * 1.6).toFixed(2);
     const left = (Math.random() * 100).toFixed(0);
-    const palette = ['var(--accent)', 'var(--accent-3)', 'var(--warning)', 'var(--accent-2)', '#fff'];
+    const palette = ['var(--side0)', 'var(--side1)', 'var(--primary)', 'var(--player-3)', 'var(--player-7)'];
     const c = palette[i % palette.length];
     const rot = Math.floor(Math.random() * 720 + 360);
     return { dx, delay, dur, left, c, rot };
   }) : [];
+  const anyPenalty = penCentsBySide.some(c => c > 0);
   return (
-    <div className={`recap-card recap-${winnerCls}`}>
+    <div className={`recap-card recap-${winnerCls}`} style={sideStyle(winner)}>
       {confetti.map((p, i) => (
         <span key={i} className="recap-confetti" style={{
           left: `${p.left}%`,
@@ -1509,83 +1388,87 @@ function WeekRecap({ recap, me }) {
         {winner ? (
           <>
             <div className="recap-winner-avatar-wrap">
-              <img src={`uploads/${winner.toLowerCase()}.jpg`} alt={winner} className="recap-winner-avatar"/>
+              <SideAvatar side={winner} size={64} className="recap-winner-avatar"/>
               <span className="recap-winner-crown">👑</span>
             </div>
-            <div className={`recap-winner-name ${winnerCls}`}>{winner}</div>
-            <div className="recap-winner-sub">gewinnt die Woche</div>
+            <div className={`recap-winner-name ${winnerCls}`} style={sideStyle(winner)}>{winner.label}</div>
+            <div className="recap-winner-sub">{winner.userIds.length > 1 ? 'gewinnen die Woche' : 'gewinnt die Woche'}</div>
           </>
         ) : (
           <>
             <div className="recap-trophy">🤝</div>
             <div className="recap-winner-name tie">Unentschieden</div>
-            <div className="recap-winner-sub">{fmtRecapVal(sumAll)} {unit} · beide gleichauf</div>
+            <div className="recap-winner-sub">{fmtRecapVal(sumAll)} {unit} · gleichauf an der Spitze</div>
           </>
         )}
       </div>
-      <div className="recap-tally">
-        {recapTallySide(leftA, false)}
-        <div className="recap-tally-vs">vs</div>
-        {recapTallySide(rightA, true)}
-      </div>
+      {twoSided ? (
+        <div className="recap-tally">
+          {recapTallySide(sides[0], false)}
+          <div className="recap-tally-vs">vs</div>
+          {recapTallySide(sides[1], true)}
+        </div>
+      ) : (
+        <div className="mu-recap-podium">
+          {order.map((i, rank) => (
+            <div key={sides[i].key} className={`mu-recap-podium-row ${winnerIdx === i ? 'win' : ''}`} style={sideStyle(sides[i])}>
+              <span className="mono mu-rank-pos">{rank + 1}</span>
+              <SideAvatar side={sides[i]} size={22} />
+              <span className="mu-rank-name">{sides[i].label}</span>
+              <span className="mono mu-recap-podium-v" style={{ color: sides[i].color }}>{fmtRecapVal(totals[i] || 0)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="recap-challs">
         {challStats.map((c, i) => (
           <div className="recap-chall" key={i}>
             <span className="recap-chall-emoji">{c.cat?.emoji}</span>
             <span className="recap-chall-name">{c.cat?.name || '—'}</span>
             <span className="recap-chall-tally mono">
-              <span style={{color:'var(--accent)'}}>{fmtRecapVal(c.bennyDone)}</span>
-              {' · '}
-              <span style={{color:'var(--accent-3)'}}>{fmtRecapVal(c.jonasDone)}</span>
+              {twoSided ? <>
+                <span style={{color:'var(--side0-ink)'}}>{fmtRecapVal(c.doneBySide[0])}</span>
+                {' · '}
+                <span style={{color:'var(--side1-ink)'}}>{fmtRecapVal(c.doneBySide[1])}</span>
+              </> : <span>{fmtRecapVal(c.total)}</span>}
               {' / '}{fmtRecapVal(c.ch.target_reps)}
             </span>
-            <span className={`recap-chall-badge ${c.hit?'hit':'miss'}`}>{c.hit?'✓':(c.bennyHit||c.jonasHit?'½':'🚧')}</span>
+            <span className={`recap-chall-badge ${c.hit?'hit':'miss'}`}>{c.hit?'✓':(c.hitBySide.some(Boolean)?'½':'🚧')}</span>
           </div>
         ))}
       </div>
       <div className="recap-athlete-stats">
-        <div className="recap-athlete-line">
-          <img src="uploads/benny.jpg" alt="Benny" className="recap-athlete-mini-avatar"/>
-          <div className="recap-athlete-stats-text">
-            <div>
-              {bennyByCat.length === 0 ? '— keine Reps —' : bennyByCat.map((x, i) => (
-                <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
-              ))}
-            </div>
-            {bennySetCount > 0 && (
-              <div className="recap-athlete-meta">
-                in <span className="mono">{bennySetCount}</span> {bennySetCount === 1 ? 'Satz' : 'Sätzen'} · größter <span className="mono">+{bennyMaxSet}</span>
+        {sides.map((side, i) => {
+          const ps = perSide[i] || { byCat: [], setCount: 0, maxSet: 0 };
+          return (
+            <div className="recap-athlete-line" key={side.key}>
+              <SideAvatar side={side} size={22} className="recap-athlete-mini-avatar"/>
+              <div className="recap-athlete-stats-text">
+                <div>
+                  {ps.byCat.length === 0 ? '— keine Reps —' : ps.byCat.map((x, j) => (
+                    <span key={j}>{j > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
+                  ))}
+                </div>
+                {ps.setCount > 0 && (
+                  <div className="recap-athlete-meta">
+                    in <span className="mono">{ps.setCount}</span> {ps.setCount === 1 ? 'Satz' : 'Sätzen'} · größter <span className="mono">+{ps.maxSet}</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-        <div className="recap-athlete-line">
-          <img src="uploads/jonas.jpg" alt="Jonas" className="recap-athlete-mini-avatar"/>
-          <div className="recap-athlete-stats-text">
-            <div>
-              {jonasByCat.length === 0 ? '— keine Reps —' : jonasByCat.map((x, i) => (
-                <span key={i}>{i > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
-              ))}
             </div>
-            {jonasSetCount > 0 && (
-              <div className="recap-athlete-meta">
-                in <span className="mono">{jonasSetCount}</span> {jonasSetCount === 1 ? 'Satz' : 'Sätzen'} · größter <span className="mono">+{jonasMaxSet}</span>
-              </div>
-            )}
-          </div>
-        </div>
+          );
+        })}
       </div>
       <div className="recap-analysis">{analysis}</div>
-      {(bennyPenCents > 0 || jonasPenCents > 0) && (
+      {anyPenalty && (
         <div className="recap-penalties">
           <div className="recap-penalties-label">Neue Schulden</div>
-          <div className="recap-penalties-row">
-            <span className={`b ${penCents[leftA] > 0 ? 'has' : ''}`}>
-              {leftA} {penCents[leftA] > 0 ? `–${formatEuroCents(penCents[leftA])}` : '✓'}
-            </span>
-            <span className={`j ${penCents[rightA] > 0 ? 'has' : ''}`}>
-              {rightA} {penCents[rightA] > 0 ? `–${formatEuroCents(penCents[rightA])}` : '✓'}
-            </span>
+          <div className="recap-penalties-row mu-wrap">
+            {sides.map((side, i) => (
+              <span key={side.key} className={`${i === 0 ? 'b' : 'j'} ${penCentsBySide[i] > 0 ? 'has' : ''}`}>
+                {side.label} {penCentsBySide[i] > 0 ? `–${formatEuroCents(penCentsBySide[i])}` : '✓'}
+              </span>
+            ))}
           </div>
         </div>
       )}
@@ -1657,7 +1540,7 @@ function EmojiPickerSheet({ onPick, onClose }) {
   );
 }
 
-function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
+function FeedScreen({ feed, me, sides = [], categories = [], projectTags = [], toolTags = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
   const [editId, setEditId] = React.useState(null);
   const [editVal, setEditVal] = React.useState('');
   // Snapshot last-seen timestamp; on tab-unmount, persist "now" so next visit
@@ -1669,6 +1552,7 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
     setLastSeen(localStorage.getItem(key) || '');
     return () => { localStorage.setItem(key, new Date().toISOString()); };
   }, [me]);
+  const sideIdx = React.useMemo(() => sideIndexByUser(sides), [sides]);
   const trackingNumById = React.useMemo(() => {
     const counters = {};
     const out = {};
@@ -1682,10 +1566,9 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
     return out;
   }, [feed]);
   if (feed.length === 0) {
-    return <div className="empty">
-      <div className="emoji">📭</div>
-      <div className="title">Noch keine Aktivität</div>
-      <div>Logge den ersten Satz, um den Feed zu starten.</div>
+    return <div className="rd-empty">
+      <div className="rd-empty-title">Noch keine Aktivität</div>
+      <div className="rd-empty-text">Logge den ersten Satz, dann geht es hier los.</div>
     </div>;
   }
   const isWorkSet = (s) => s.duration_minutes != null;
@@ -1699,29 +1582,39 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
     }
     setEditId(null);
   };
+  const todayIso = localDateOf(new Date());
+  const yesterdayIso = localDateOf(new Date(Date.now() - 86400000));
+  const dayLabel = (iso) => iso === todayIso ? 'Heute' : iso === yesterdayIso ? 'Gestern'
+    : new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  let lastDay = null;
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <div className="label">Live-Feed</div>
+    <div className="rd-feed">
+      <div className="rd-section-head">
+        <h2>Aktivität</h2>
         {onBackfill && me && (
           <button className="btn-link" onClick={onBackfill}>Nachtrag</button>
         )}
       </div>
       {feed.map((s) => {
-        if (s.kind === 'recap') return <WeekRecap key={s.id} recap={s} me={me} />;
+        const day = s.created_at ? localDateOf(s.created_at) : null;
+        const heading = day && day !== lastDay ? <h3 className="rd-day-label">{dayLabel(day)}</h3> : null;
+        if (day) lastDay = day;
+        if (s.kind === 'recap') return <React.Fragment key={s.id}>{heading}<WeekRecap recap={s} me={me} sides={sides} /></React.Fragment>;
         const mine = !me || s.athlete === me;
         const editing = editId === s.id;
         const trackingNum = trackingNumById[s.id];
         const isToday = s.created_at && localDateOf(s.created_at) === localDateOf(new Date());
         const fireTier = trackingNum >= 15 ? 3 : trackingNum >= 10 ? 2 : trackingNum >= 5 ? 1 : 0;
-        const flames = fireTier === 0 ? '' : fireTier === 1 ? '🔥' : `${fireTier}x 🔥`;
         const isNew = !!me && s.athlete !== me && lastSeen && String(s.created_at) > lastSeen;
+        const side = sides[sideIdx[s.athlete]];
+        const sideCls = side ? side.cls : 'side-n';
         return (
-        <div className={`feed-item fire-${fireTier} ${editing?'editing':''} ${isNew ? 'is-new' : ''}`} key={s.id}>
-          <div className={`feed-avatar ${s.athlete.toLowerCase()}`}><img src={`uploads/${s.athlete.toLowerCase()}.jpg`} alt={s.athlete} className="avatar-img"/></div>
+        <React.Fragment key={s.id}>{heading}
+        <div className={`feed-item fire-${fireTier} ${editing?'editing':''} ${isNew ? 'is-new' : ''}`}>
+          <div className={`feed-avatar ${sideCls}`} style={sideStyle(side)}><Avatar userId={s.athlete} size={36} className="avatar-img"/></div>
           <div className="feed-content">
             <div className="feed-title">
-              <strong>{s.athlete}</strong> · {s.category?.name || '—'}
+              <strong>{s.athlete === me ? 'Du' : PTPeople.nameOf(s.athlete)}</strong> · {s.category?.name || '—'}
             </div>
             <div className="feed-meta">
               {formatRelative(s.created_at)}
@@ -1731,7 +1624,7 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
                   {' · '}
                   <span className="feed-meta-tracking">
                     {trackingNum}. Tracking{isToday ? ' heute' : ''}
-                    {flames && <span className="reps-fire"> {flames}</span>}
+                    {fireTier > 0 && <span className="reps-fire" aria-label={`Serie Stufe ${fireTier}`}> <Icon name="flame" size={12} />{fireTier > 1 ? `×${fireTier}` : ''}</span>}
                   </span>
                 </>
               )}
@@ -1749,14 +1642,14 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
                 onBlur={() => commitEdit(s)} />
             </div>
           ) : (
-            <div className={`feed-reps ${s.athlete.toLowerCase()} mono`}>
+            <div className={`feed-reps ${sideCls} mono`} style={sideStyle(side)}>
               <div className="feed-reps-val">
                 {s.duration_minutes != null
                   ? formatDuration(s.duration_minutes)
                   : s.category?.challenge_type === 'tom_holland'
                     ? `${s.reps} Rd.`
                     : s.category?.challenge_type === 'bring_sally_up'
-                      ? (s.reps >= BSU_MAX_SEC ? '✅ 3:24' : bsuFmt(s.reps))
+                      ? (s.reps >= BSU_MAX_SEC ? '3:24' : bsuFmt(s.reps))
                       : `+${s.reps}`}
               </div>
               {(s.project_tag_id || s.tool_tag_id) && (
@@ -1783,17 +1676,19 @@ function FeedScreen({ feed, me, categories = [], projectTags = [], toolTags = []
               </button>
             </div>
           )}
-        </div>);
+        </div>
+        </React.Fragment>);
       })}
     </div>);
 
 }
 
 // ─── HISTORY ────────────────────────────────────────────────────────────────
-function StatsChart({ benny, jonas, days, accent, accent3 }) {
-  // benny/jonas: array of {date: 'YYYY-MM-DD', reps: number} length == days
+// series: [{ key, label, color, data: [{date: 'YYYY-MM-DD', reps: number}] }] — alle gleich lang
+function StatsChart({ series, days }) {
   const W = 320, H = 140, PAD_X = 28, PAD_Y = 18;
-  const maxV = Math.max(1, ...benny.map(d => d.reps), ...jonas.map(d => d.reps));
+  const axis = series[0]?.data || [];
+  const maxV = Math.max(1, ...series.flatMap(s => s.data.map(d => d.reps)));
   const xStep = (W - PAD_X * 2) / Math.max(1, days - 1);
   const yScale = (v) => H - PAD_Y - (v / maxV) * (H - PAD_Y * 2);
   const xPos = (i) => PAD_X + i * xStep;
@@ -1804,28 +1699,28 @@ function StatsChart({ benny, jonas, days, accent, accent3 }) {
   const gridLines = [0.25, 0.5, 0.75, 1].map(f => H - PAD_Y - f * (H - PAD_Y * 2));
 
   // x labels — 4-5 evenly spaced
-  const labelIdx = days <= 7 ? benny.map((_, i) => i) : [0, Math.floor(days/4), Math.floor(days/2), Math.floor(3*days/4), days - 1];
+  const labelIdx = days <= 7 ? axis.map((_, i) => i) : [0, Math.floor(days/4), Math.floor(days/2), Math.floor(3*days/4), days - 1];
   const fmt = (s) => { const d = new Date(s); return `${d.getDate()}.${d.getMonth()+1}`; };
 
   // Week boundaries — Mondays within the range
   const weekMarks = [];
-  for (let i = 0; i < benny.length; i++) {
-    const d = new Date(benny[i].date);
-    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(benny[i].date) });
+  for (let i = 0; i < axis.length; i++) {
+    const d = new Date(axis[i].date);
+    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
   }
   const showWeekLabels = weekMarks.length <= 5;
+  // Flächen nur bei wenigen Linien, sonst wird es unleserlich
+  const showArea = series.length <= 2;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart" preserveAspectRatio="none">
       <defs>
-        <linearGradient id="grad-benny" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.35"/>
-          <stop offset="100%" stopColor={accent} stopOpacity="0"/>
-        </linearGradient>
-        <linearGradient id="grad-jonas" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={accent3} stopOpacity="0.35"/>
-          <stop offset="100%" stopColor={accent3} stopOpacity="0"/>
-        </linearGradient>
+        {series.map((s, i) => (
+          <linearGradient key={s.key} id={`grad-s${i}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={s.color} stopOpacity="0.35"/>
+            <stop offset="100%" stopColor={s.color} stopOpacity="0"/>
+          </linearGradient>
+        ))}
       </defs>
       {gridLines.map((y, i) => <line key={i} x1={PAD_X} x2={W - PAD_X} y1={y} y2={y} stroke="var(--border)" strokeWidth="0.5"/>)}
       {weekMarks.map(({idx, kw}) => (
@@ -1836,12 +1731,12 @@ function StatsChart({ benny, jonas, days, accent, accent3 }) {
           )}
         </g>
       ))}
-      <path d={areaFor(benny)} fill="url(#grad-benny)"/>
-      <path d={areaFor(jonas)} fill="url(#grad-jonas)"/>
-      <path d={pathFor(benny)} fill="none" stroke={accent} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-      <path d={pathFor(jonas)} fill="none" stroke={accent3} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-      {labelIdx.map(i => benny[i] && (
-        <text key={i} x={xPos(i)} y={H - 4} fill="var(--text-2)" fontSize="9" textAnchor="middle">{fmt(benny[i].date)}</text>
+      {showArea && series.map((s, i) => <path key={`a${s.key}`} d={areaFor(s.data)} fill={`url(#grad-s${i})`}/>)}
+      {series.map(s => (
+        <path key={`l${s.key}`} d={pathFor(s.data)} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+      ))}
+      {labelIdx.map(i => axis[i] && (
+        <text key={i} x={xPos(i)} y={H - 4} fill="var(--text-2)" fontSize="9" textAnchor="middle">{fmt(axis[i].date)}</text>
       ))}
       <text x={PAD_X - 4} y={yScale(maxV) + 3} fill="var(--text-2)" fontSize="9" textAnchor="end">{maxV}</text>
       <text x={PAD_X - 4} y={H - PAD_Y + 3} fill="var(--text-2)" fontSize="9" textAnchor="end">0</text>
@@ -1853,13 +1748,14 @@ function StatsChart({ benny, jonas, days, accent, accent3 }) {
 // Changing this value updates both the rendered chart and the touch-to-data-index mapping.
 const FULLSCREEN_PAD_X = 44;
 
-function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, vh }) {
+function FullscreenChart({ series, days, activeIdx, vw, vh }) {
   // Viewport-driven sizing. vw/vh are the body container's pixel size.
   const W = Math.max(300, vw);
   const H = Math.max(200, vh);
   const PAD_X = FULLSCREEN_PAD_X;
   const PAD_Y = 32;
-  const maxV = Math.max(1, ...benny.map(d => d.reps), ...jonas.map(d => d.reps));
+  const axis = series[0]?.data || [];
+  const maxV = Math.max(1, ...series.flatMap(s => s.data.map(d => d.reps)));
   const xStep = (W - PAD_X * 2) / Math.max(1, days - 1);
   const yScale = (v) => H - PAD_Y - (v / maxV) * (H - PAD_Y * 2);
   const xPos = (i) => PAD_X + i * xStep;
@@ -1872,7 +1768,7 @@ function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, v
   // X labels — more of them than the inline chart (we have space)
   const labelCount = days <= 7 ? days : days <= 30 ? 7 : 9;
   const labelIdx = days <= 7
-    ? benny.map((_, i) => i)
+    ? axis.map((_, i) => i)
     : Array.from({ length: labelCount }, (_, k) => Math.round((k * (days - 1)) / (labelCount - 1)));
   const fmt = (s) => { const d = new Date(s); return `${d.getDate()}.${d.getMonth() + 1}`; };
 
@@ -1881,22 +1777,21 @@ function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, v
 
   // Week boundaries — Mondays within the range
   const weekMarks = [];
-  for (let i = 0; i < benny.length; i++) {
-    const d = new Date(benny[i].date);
-    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(benny[i].date) });
+  for (let i = 0; i < axis.length; i++) {
+    const d = new Date(axis[i].date);
+    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
   }
+  const showArea = series.length <= 2;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <defs>
-        <linearGradient id="grad-benny-fs" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.35"/>
-          <stop offset="100%" stopColor={accent} stopOpacity="0"/>
-        </linearGradient>
-        <linearGradient id="grad-jonas-fs" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={accent3} stopOpacity="0.35"/>
-          <stop offset="100%" stopColor={accent3} stopOpacity="0"/>
-        </linearGradient>
+        {series.map((s, i) => (
+          <linearGradient key={s.key} id={`grad-fs-s${i}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={s.color} stopOpacity="0.35"/>
+            <stop offset="100%" stopColor={s.color} stopOpacity="0"/>
+          </linearGradient>
+        ))}
       </defs>
       {gridLines.map((y, i) => <line key={i} x1={PAD_X} x2={W - PAD_X} y1={y} y2={y} stroke="var(--border)" strokeWidth="0.5"/>)}
       {weekMarks.map(({idx, kw}) => (
@@ -1905,33 +1800,30 @@ function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, v
           <text x={xPos(idx)} y={PAD_Y * 0.6} fill="var(--text-2)" fontSize="10" textAnchor="middle" opacity="0.8">KW {kw}</text>
         </g>
       ))}
-      <path d={areaFor(benny)} fill="url(#grad-benny-fs)"/>
-      <path d={areaFor(jonas)} fill="url(#grad-jonas-fs)"/>
-      <path d={pathFor(benny)} fill="none" stroke={accent} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
-      <path d={pathFor(jonas)} fill="none" stroke={accent3} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
-      {labelIdx.map(i => benny[i] && (
-        <text key={`x${i}`} x={xPos(i)} y={H - 8} fill="var(--text-2)" fontSize="11" textAnchor="middle">{fmt(benny[i].date)}</text>
+      {showArea && series.map((s, i) => <path key={`a${s.key}`} d={areaFor(s.data)} fill={`url(#grad-fs-s${i})`}/>)}
+      {series.map(s => (
+        <path key={`l${s.key}`} d={pathFor(s.data)} fill="none" stroke={s.color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+      ))}
+      {labelIdx.map(i => axis[i] && (
+        <text key={`x${i}`} x={xPos(i)} y={H - 8} fill="var(--text-2)" fontSize="11" textAnchor="middle">{fmt(axis[i].date)}</text>
       ))}
       {yTicks.map((v, i) => (
         <text key={`y${i}`} x={PAD_X - 8} y={yScale(v) + 4} fill="var(--text-2)" fontSize="11" textAnchor="end">{v}</text>
       ))}
-      {activeIdx !== null && activeIdx >= 0 && activeIdx < benny.length && (
+      {activeIdx !== null && activeIdx >= 0 && activeIdx < axis.length && (
         <g>
           <line
             className="chart-scrubber-line"
             x1={xPos(activeIdx)} x2={xPos(activeIdx)}
             y1={PAD_Y * 0.5} y2={H - PAD_Y * 0.6}
           />
-          <circle
-            className="chart-scrubber-dot"
-            cx={xPos(activeIdx)} cy={yScale(benny[activeIdx].reps)}
-            r="5" fill={accent}
-          />
-          <circle
-            className="chart-scrubber-dot"
-            cx={xPos(activeIdx)} cy={yScale(jonas[activeIdx].reps)}
-            r="5" fill={accent3}
-          />
+          {series.map(s => (
+            <circle key={s.key}
+              className="chart-scrubber-dot"
+              cx={xPos(activeIdx)} cy={yScale(s.data[activeIdx].reps)}
+              r="5" fill={s.color}
+            />
+          ))}
         </g>
       )}
     </svg>
@@ -1939,10 +1831,9 @@ function FullscreenChart({ benny, jonas, days, accent, accent3, activeIdx, vw, v
 }
 
 function ChartFullscreen({
-  bennySeries, jonasSeries, bennyCumSeries, jonasCumSeries, totalDays,
+  title, series, cumSeries, totalDays,
   range, setRange,
   cumulative, setCumulative,
-  accent, accent3,
   onClose,
 }) {
   const [activeIdx, setActiveIdx] = useState(null);
@@ -1972,8 +1863,8 @@ function ChartFullscreen({
   useEffect(() => { setActiveIdx(null); }, [totalDays]);
 
   // Resolve which series to render based on cumulative flag.
-  const benny = cumulative ? bennyCumSeries : bennySeries;
-  const jonas = cumulative ? jonasCumSeries : jonasSeries;
+  const shown = cumulative ? cumSeries : series;
+  const axis = shown[0]?.data || [];
 
   // Scrubber pointer handlers.
   const handlePointer = (e) => {
@@ -1998,7 +1889,7 @@ function ChartFullscreen({
     <div className="chart-fs">
       <div className="chart-fs-top">
         <button className="chart-fs-close" onClick={onClose} aria-label="Schließen">✕</button>
-        <div className="chart-fs-title">Benny vs. Jonas</div>
+        <div className="chart-fs-title">{title}</div>
         <div className="chart-fs-controls">
           <div className="segmented segmented-sm">
             <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>7T</button>
@@ -2022,11 +1913,8 @@ function ChartFullscreen({
         onPointerMove={(e) => { if (e.buttons) handlePointer(e); }}
       >
         <FullscreenChart
-          benny={benny}
-          jonas={jonas}
+          series={shown}
           days={totalDays}
-          accent={accent}
-          accent3={accent3}
           activeIdx={activeIdx}
           vw={bodySize.w}
           vh={bodySize.h}
@@ -2038,9 +1926,10 @@ function ChartFullscreen({
           <div className="chart-fs-hint">Tippe in das Diagramm für Tageswerte</div>
         ) : (
           <div className="chart-fs-values">
-            <span className="chart-fs-date">{fmtDate(benny[activeIdx].date)}</span>
-            <span className="chart-fs-val benny">Benny: <b>{benny[activeIdx].reps}</b></span>
-            <span className="chart-fs-val jonas">Jonas: <b>{jonas[activeIdx].reps}</b></span>
+            <span className="chart-fs-date">{fmtDate(axis[activeIdx].date)}</span>
+            {shown.map(s => (
+              <span key={s.key} className="chart-fs-val side-n" style={{ '--sc': s.color }}>{s.label}: <b>{s.data[activeIdx].reps}</b></span>
+            ))}
           </div>
         )}
       </div>
@@ -2048,20 +1937,13 @@ function ChartFullscreen({
   );
 }
 
-function HistoryScreen({ challenges, categories, allSets }) {
-  const [kindTab, setKindTab] = React.useState(() =>
-    sessionStorage.getItem('pt_history_kind') || 'all'
-  );
-  const switchKind = (k) => { setKindTab(k); sessionStorage.setItem('pt_history_kind', k); };
-
-  // Determine which categories exist across all data (to decide whether to show the toggle)
-  const hasWork   = useMemo(() => categories.some(c => c.kind === 'work'), [categories]);
-  const hasSports = useMemo(() => categories.some(c => (c.kind || 'sports') === 'sports'), [categories]);
-  const showToggle = hasWork && hasSports;
+// title: Überschrift der Vergleichskarte (z.B. „Benny vs. Jonas“)
+function HistoryScreen({ challenges, categories, allSets, sides = [], title }) {
+  // Stats zeigen nur Sport. Work-Kategorien bleiben im Datenmodell, fließen hier aber nicht ein.
+  const kindTab = 'sports';
 
   // Apply kind filter to challenges + sets
   const filteredChallenges = useMemo(() => {
-    if (kindTab === 'all') return challenges;
     return challenges.filter(ch => {
       const cat = categories.find(c => c.id === ch.category_id);
       return (cat?.kind || 'sports') === kindTab;
@@ -2071,8 +1953,8 @@ function HistoryScreen({ challenges, categories, allSets }) {
   const filteredChallengeIds = useMemo(() => new Set(filteredChallenges.map(c => c.id)), [filteredChallenges]);
 
   const filteredAllSets = useMemo(() =>
-    kindTab === 'all' ? allSets : allSets.filter(s => filteredChallengeIds.has(s.challenge_id)),
-    [allSets, filteredChallengeIds, kindTab]
+    allSets.filter(s => filteredChallengeIds.has(s.challenge_id)),
+    [allSets, filteredChallengeIds]
   );
 
   const catById = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
@@ -2116,7 +1998,7 @@ function HistoryScreen({ challenges, categories, allSets }) {
       .map(ch => ch.week_start)
   ).size;
 
-  if (challenges.length === 0) {
+  if (challenges.length === 0 || !sides.length) {
     return <div className="empty">
       <div className="emoji">📅</div>
       <div className="title">Noch keine Historie</div>
@@ -2124,32 +2006,19 @@ function HistoryScreen({ challenges, categories, allSets }) {
     </div>;
   }
 
-  const emptyFilter = filteredChallenges.length === 0;
-  const kindLabel = kindTab === 'work' ? 'Work' : 'Sports';
+  if (filteredChallenges.length === 0) {
+    return <div className="rd-empty">
+      <div className="rd-empty-title">Noch keine Sport-Challenges</div>
+      <div className="rd-empty-text">Sobald ihr Sport-Ziele loggt, erscheinen hier eure Stats.</div>
+    </div>;
+  }
 
   return (
-    <>
-      {showToggle && (
-        <div className="work-tab-toggle" style={{marginBottom: 12}}>
-          <button className={`work-tab-btn${kindTab === 'all' ? ' active' : ''}`} onClick={() => switchKind('all')}>Alle</button>
-          <button className={`work-tab-btn${kindTab === 'sports' ? ' active' : ''}`} onClick={() => switchKind('sports')}>🏋️ Sports</button>
-          <button className={`work-tab-btn${kindTab === 'work' ? ' active' : ''}`} onClick={() => switchKind('work')}>💻 Work</button>
-        </div>
-      )}
-      {emptyFilter ? (
-        <div className="empty">
-          <div className="emoji">{kindTab === 'work' ? '💻' : '🏋️'}</div>
-          <div className="title">Keine {kindLabel}-Challenges</div>
-          <div>Starte eine {kindLabel}-Challenge, um hier Daten zu sehen.</div>
-        </div>
-      ) : (
-        <HistoryView {...{challenges: filteredChallenges, categories, allSets: filteredAllSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab}} />
-      )}
-    </>
+    <HistoryView {...{challenges: filteredChallenges, categories, allSets: filteredAllSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab, sides, title}} />
   );
 }
 
-function HistoryView({ challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab = 'all' }) {
+function HistoryView({ challenges, categories, allSets, catById, setsByCh, streak, totalReps, weeksDone, kindTab = 'all', sides, title }) {
   const [range, setRange] = useState('30'); // '7', '30', 'all'
   const [selectedCats, setSelectedCats] = useState([]); // [] = alle
 
@@ -2164,15 +2033,22 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
   const [cumulative, setCumulative] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
 
-  // Resolve accent colors from CSS vars (read at render time)
-  const [accentColors, setAccentColors] = useState({ accent: '#30D158', accent3: '#FFD60A' });
+  // Seite 0/1 folgen den Theme-Akzenten, alle weiteren ihrer festen Farbe.
+  const [accentColors, setAccentColors] = useState({ accent: '#2B8A9A', accent3: '#E8914A' });
   useEffect(() => {
     const s = getComputedStyle(document.documentElement);
     setAccentColors({
-      accent: s.getPropertyValue('--accent').trim() || '#30D158',
-      accent3: s.getPropertyValue('--accent-3').trim() || '#FFD60A',
+      accent: s.getPropertyValue('--side0').trim() || '#2B8A9A',
+      accent3: s.getPropertyValue('--side1').trim() || '#E8914A',
     });
   }, []);
+  const colorOf = (i) => i === 0 ? accentColors.accent : i === 1 ? accentColors.accent3 : sides[i].color;
+  const sideIdx = useMemo(() => sideIndexByUser(sides), [sides]);
+  const twoSided = sides.length === 2;
+  const N = sides.length;
+  const zeros = () => sides.map(() => 0);
+  const val = (s) => s.reps ?? s.duration_minutes ?? 0;
+  const cardTitle = title || (twoSided ? `${sides[0].label} vs. ${sides[1].label}` : 'Rangliste');
 
   const days = range === '7' ? 7 : range === '30' ? 30 : null;
 
@@ -2192,8 +2068,8 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     return allSets.filter(s => set.has(chCatMap[s.challenge_id]));
   }, [allSets, selectedCats, chCatMap]);
 
-  // Compute date-range buckets (per day, per athlete)
-  const { bennySeries, jonasSeries, bennyCumSeries, jonasCumSeries, rangeStart, totalDays } = useMemo(() => {
+  // Compute date-range buckets (per day, per side)
+  const { series, cumSeries, rangeStart, totalDays } = useMemo(() => {
     let start, total;
     if (days) {
       const d = new Date(); d.setHours(0,0,0,0);
@@ -2216,85 +2092,90 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
         start = d2;
       }
     }
-    const bennyArr = [], jonasArr = [];
+    const arrs = sides.map(() => []);
     for (let i = 0; i < total; i++) {
       const d = new Date(start); d.setDate(d.getDate() + i);
       const iso = PTData.isoDate(d);
-      bennyArr.push({ date: iso, reps: 0 });
-      jonasArr.push({ date: iso, reps: 0 });
+      arrs.forEach(a => a.push({ date: iso, reps: 0 }));
     }
     for (const s of filteredSets) {
+      const si = sideIdx[s.athlete];
+      if (si == null) continue;
       const day = PTData.isoDate(new Date(s.created_at));
       const i = Math.round((new Date(day + 'T00:00:00') - start) / 86400000);
       if (i < 0 || i >= total) continue;
-      const arr = s.athlete === 'Benny' ? bennyArr : jonasArr;
-      arr[i].reps += (s.reps ?? s.duration_minutes ?? 0);
+      arrs[si][i].reps += val(s);
     }
-    // Cumulative variants (running sum within the range)
-    let bennyAcc = 0, jonasAcc = 0;
-    const bennyCumArr = bennyArr.map(d => ({ date: d.date, reps: (bennyAcc += d.reps) }));
-    const jonasCumArr = jonasArr.map(d => ({ date: d.date, reps: (jonasAcc += d.reps) }));
-    return { bennySeries: bennyArr, jonasSeries: jonasArr, bennyCumSeries: bennyCumArr, jonasCumSeries: jonasCumArr, rangeStart: start, totalDays: total };
-  }, [filteredSets, days, range]);
+    const cum = arrs.map(arr => { let acc = 0; return arr.map(d => ({ date: d.date, reps: (acc += d.reps) })); });
+    return { series: arrs, cumSeries: cum, rangeStart: start, totalDays: total };
+  }, [filteredSets, days, range, sides, sideIdx]);
+
+  const asSeries = (arrs) => arrs.map((data, i) => ({
+    key: sides[i].key, label: sides[i].isMine && sides[i].userIds.length === 1 ? 'Du' : sides[i].label,
+    color: colorOf(i), data,
+  }));
 
   // Range-scoped sets (apply both range + category filter)
   const setsInRange = useMemo(() => {
     return filteredSets.filter(s => new Date(String(s.created_at).slice(0,10)) >= rangeStart);
   }, [filteredSets, rangeStart]);
 
-  const bennyStats = useMemo(() => computeAthleteStats(setsInRange, 'Benny', bennySeries), [setsInRange, bennySeries]);
-  const jonasStats = useMemo(() => computeAthleteStats(setsInRange, 'Jonas', jonasSeries), [setsInRange, jonasSeries]);
+  const sideStats = useMemo(
+    () => sides.map((side, i) => computeAthleteStats(setsInRange, side.statUserIds || side.userIds, series[i])),
+    [setsInRange, series, sides]
+  );
 
-  // ⌀ Sätze bis Ziel: for each challenge where an athlete reached the target,
+  // ⌀ Sätze bis Ziel: for each challenge where a side reached the target,
   // count the sets they needed to first hit target_reps. Respect category filter.
   const setsToTarget = useMemo(() => {
     const catSet = selectedCats.length ? new Set(selectedCats) : null;
-    const acc = { Benny: { totalSets: 0, hits: 0 }, Jonas: { totalSets: 0, hits: 0 } };
+    const acc = sides.map(() => ({ totalSets: 0, hits: 0 }));
     for (const ch of challenges) {
       if (catSet && !catSet.has(ch.category_id)) continue;
-      for (const athlete of ['Benny', 'Jonas']) {
-        const own = allSets
-          .filter(s => s.challenge_id === ch.id && s.athlete === athlete)
-          .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+      const chSets = (setsByCh[ch.id] || [])
+        .slice()
+        .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+      sides.forEach((_, si) => {
+        const own = chSets.filter(s => sideIdx[s.athlete] === si);
         let sum = 0;
         for (let i = 0; i < own.length; i++) {
-          sum += (own[i].reps ?? own[i].duration_minutes ?? 0);
+          sum += val(own[i]);
           if (sum >= ch.target_reps) {
-            acc[athlete].totalSets += i + 1;
-            acc[athlete].hits += 1;
+            acc[si].totalSets += i + 1;
+            acc[si].hits += 1;
             break;
           }
         }
-      }
+      });
     }
-    const avg = (a) => a.hits ? Math.round((a.totalSets / a.hits) * 10) / 10 : 0;
-    return {
-      benny: avg(acc.Benny),
-      jonas: avg(acc.Jonas),
-      bennyHits: acc.Benny.hits,
-      jonasHits: acc.Jonas.hits,
-    };
-  }, [challenges, allSets, selectedCats]);
-  const maxReps = Math.max(bennyStats.total, jonasStats.total, 1);
-  const leader = bennyStats.total > jonasStats.total ? 'Benny' : jonasStats.total > bennyStats.total ? 'Jonas' : null;
-  const diff = Math.abs(bennyStats.total - jonasStats.total);
+    return acc.map(a => ({ avg: a.hits ? Math.round((a.totalSets / a.hits) * 10) / 10 : 0, hits: a.hits }));
+  }, [challenges, setsByCh, selectedCats, sides, sideIdx]);
+
+  const totals = sideStats.map(s => s.total);
+  const maxReps = Math.max(...totals, 1);
+  const leaderIdx = uniqueMaxIndex(totals);
+  const sortedTotals = [...totals].sort((a, b) => b - a);
+  const diff = N > 1 ? sortedTotals[0] - sortedTotals[1] : 0;
 
   // Momentum: who's gaining in the last 7 days?
   // Only meaningful when the range is ≥ 2 weeks — otherwise "last 7" ≈ "all" and the line just repeats the headline.
   const momentum = useMemo(() => {
-    if (!leader || totalDays < 14) return null;
+    if (leaderIdx == null || totalDays < 14 || N < 2) return null;
     const W = 7;
-    const rB = bennySeries.slice(-W).reduce((a, x) => a + x.reps, 0);
-    const rJ = jonasSeries.slice(-W).reduce((a, x) => a + x.reps, 0);
-    if (rB === rJ) return null;
-    const recentLeader = rB > rJ ? 'Benny' : 'Jonas';
-    const gap = Math.abs(rB - rJ);
-    const isCatchingUp = recentLeader !== leader;
-    const daysToOvertake = isCatchingUp && gap >= 5 && (diff / gap) <= 8
-      ? Math.max(0.1, Math.round((diff / gap) * 7 * 10) / 10)
+    const recent = series.map(arr => arr.slice(-W).reduce((a, x) => a + x.reps, 0));
+    const recentIdx = uniqueMaxIndex(recent);
+    if (recentIdx == null) return null;
+    const isCatchingUp = recentIdx !== leaderIdx;
+    const gap = isCatchingUp
+      ? recent[recentIdx] - recent[leaderIdx]
+      : recent[recentIdx] - Math.max(...recent.filter((_, i) => i !== recentIdx));
+    if (gap <= 0) return null;
+    const behind = totals[leaderIdx] - totals[recentIdx];
+    const daysToOvertake = isCatchingUp && gap >= 5 && (behind / gap) <= 8
+      ? Math.max(0.1, Math.round((behind / gap) * 7 * 10) / 10)
       : null;
-    return { who: recentLeader, gap, isCatchingUp, daysToOvertake };
-  }, [bennySeries, jonasSeries, totalDays, leader, diff]);
+    return { idx: recentIdx, gap, isCatchingUp, daysToOvertake };
+  }, [series, totalDays, leaderIdx, totals, N]);
 
   // All-time lead history: who currently leads overall, since when, and weekly tally.
   // Uses filteredSets (category filter applied) but ignores the range selector — these are
@@ -2303,32 +2184,32 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     if (!filteredSets.length) return null;
     const dayMap = new Map();
     for (const s of filteredSets) {
+      const si = sideIdx[s.athlete];
+      if (si == null) continue;
       const day = String(s.created_at).slice(0, 10);
-      if (!dayMap.has(day)) dayMap.set(day, { Benny: 0, Jonas: 0 });
-      dayMap.get(day)[s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
+      if (!dayMap.has(day)) dayMap.set(day, zeros());
+      dayMap.get(day)[si] += val(s);
     }
-    const days = Array.from(dayMap.keys()).sort();
-    let cumB = 0, cumJ = 0;
+    const dayKeys = Array.from(dayMap.keys()).sort();
+    const cum = zeros();
     let currentLeader = null;
     let leaderSinceDate = null;
-    for (const day of days) {
-      const dd = dayMap.get(day);
-      cumB += dd.Benny;
-      cumJ += dd.Jonas;
-      const todayLeader = cumB > cumJ ? 'Benny' : cumJ > cumB ? 'Jonas' : null;
+    for (const day of dayKeys) {
+      dayMap.get(day).forEach((v, i) => { cum[i] += v; });
+      const todayLeader = uniqueMaxIndex(cum);
       if (todayLeader !== currentLeader) {
         currentLeader = todayLeader;
         leaderSinceDate = day;
       }
     }
-    if (!currentLeader) return null;
+    if (currentLeader == null) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const since = new Date(leaderSinceDate);
     const daysSince = Math.max(1, Math.round((today - since) / 86400000) + 1);
     return { leader: currentLeader, sinceDate: leaderSinceDate, daysSince };
-  }, [filteredSets]);
+  }, [filteredSets, sideIdx]);
 
-  // Per-week win tally: for each completed calendar week, who had more reps in
+  // Per-week win tally: for each completed calendar week, who had the most reps in
   // that week's challenges? Skips the current (in-progress) week and applies the
   // category filter via selectedCats.
   const weeklyTally = useMemo(() => {
@@ -2337,22 +2218,24 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     for (const ch of challenges) {
       if (catSet && !catSet.has(ch.category_id)) continue;
       const wk = ch.week_start;
-      if (!byWeek.has(wk)) byWeek.set(wk, { Benny: 0, Jonas: 0 });
-      const sets = setsByCh[ch.id] || [];
-      for (const s of sets) byWeek.get(wk)[s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
+      if (!byWeek.has(wk)) byWeek.set(wk, zeros());
+      for (const s of setsByCh[ch.id] || []) {
+        const si = sideIdx[s.athlete];
+        if (si != null) byWeek.get(wk)[si] += val(s);
+      }
     }
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    let bennyWins = 0, jonasWins = 0, ties = 0;
+    const wins = zeros();
+    let ties = 0;
     for (const [wkStart, t] of byWeek) {
       const wEnd = new Date(wkStart); wEnd.setHours(0, 0, 0, 0); wEnd.setDate(wEnd.getDate() + 6);
       if (wEnd >= today) continue; // skip current/future week
-      if (t.Benny === 0 && t.Jonas === 0) continue; // no activity
-      if (t.Benny > t.Jonas) bennyWins++;
-      else if (t.Jonas > t.Benny) jonasWins++;
-      else ties++;
+      if (t.every(v => v === 0)) continue; // no activity
+      const w = uniqueMaxIndex(t);
+      if (w == null) ties++; else wins[w]++;
     }
-    return { bennyWins, jonasWins, ties };
-  }, [challenges, setsByCh, selectedCats]);
+    return { wins, ties };
+  }, [challenges, setsByCh, selectedCats, sideIdx]);
 
   const fmtDateShort = (iso) => {
     const d = new Date(iso);
@@ -2364,16 +2247,18 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
   // Per-category breakdown in range
   const perCat = useMemo(() => {
     const m = {};
+    const chById = Object.fromEntries(challenges.map(c => [c.id, c]));
     for (const s of setsInRange) {
-      const ch = challenges.find(c => c.id === s.challenge_id);
-      if (!ch) continue;
-      m[ch.category_id] ||= { Benny: 0, Jonas: 0 };
-      m[ch.category_id][s.athlete] = (m[ch.category_id][s.athlete] || 0) + (s.reps ?? s.duration_minutes ?? 0);
+      const ch = chById[s.challenge_id];
+      const si = sideIdx[s.athlete];
+      if (!ch || si == null) continue;
+      m[ch.category_id] ||= zeros();
+      m[ch.category_id][si] += val(s);
     }
     return Object.entries(m)
-      .map(([cid, v]) => ({ cat: catById[cid], ...v, total: v.Benny + v.Jonas }))
+      .map(([cid, v]) => ({ cat: catById[cid], vals: v, total: v.reduce((a, x) => a + x, 0) }))
       .sort((a,b) => b.total - a.total);
-  }, [setsInRange, challenges, catById]);
+  }, [setsInRange, challenges, catById, sideIdx]);
 
   // Hall of Fame: all-time records. Respects category filter, ignores date range.
   // Each medal goes to a single winner; ties yield no medal.
@@ -2382,22 +2267,23 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     const chMap = new Map(challenges.map(c => [c.id, c]));
     const relevant = allSets.filter(s => {
       const ch = chMap.get(s.challenge_id);
-      return ch && (!catSet || catSet.has(ch.category_id));
+      return ch && (!catSet || catSet.has(ch.category_id)) && sideIdx[s.athlete] != null;
     });
-    const maxSet = { Benny: 0, Jonas: 0 };
-    const byDay = { Benny: {}, Jonas: {} };
+    const maxSet = zeros();
+    const byDay = sides.map(() => ({}));
     for (const s of relevant) {
-      const val = s.reps ?? s.duration_minutes ?? 0;
-      if (val > maxSet[s.athlete]) maxSet[s.athlete] = val;
+      const si = sideIdx[s.athlete];
+      const v = val(s);
+      if (v > maxSet[si]) maxSet[si] = v;
       const d = PTData.isoDate(new Date(s.created_at));
-      byDay[s.athlete][d] = (byDay[s.athlete][d] || 0) + val;
+      byDay[si][d] = (byDay[si][d] || 0) + v;
     }
-    const bestDay = { Benny: 0, Jonas: 0 };
-    const longestStreak = { Benny: 0, Jonas: 0 };
-    for (const a of ['Benny', 'Jonas']) {
-      const days = Object.keys(byDay[a]).sort();
+    const bestDay = zeros();
+    const longestStreak = zeros();
+    sides.forEach((_, a) => {
+      const dayKeys = Object.keys(byDay[a]).sort();
       let cur = 0, best = 0, prev = null;
-      for (const d of days) {
+      for (const d of dayKeys) {
         if (byDay[a][d] > bestDay[a]) bestDay[a] = byDay[a][d];
         const dt = new Date(d + 'T00:00:00');
         if (prev && Math.round((dt - prev) / 86400000) === 1) cur++; else cur = 1;
@@ -2405,18 +2291,19 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
         prev = dt;
       }
       longestStreak[a] = best;
-    }
+    });
     const perCatAll = {};
     for (const s of relevant) {
       const ch = chMap.get(s.challenge_id);
-      perCatAll[ch.category_id] ||= { Benny: 0, Jonas: 0 };
-      perCatAll[ch.category_id][s.athlete] += (s.reps ?? s.duration_minutes ?? 0);
+      perCatAll[ch.category_id] ||= zeros();
+      perCatAll[ch.category_id][sideIdx[s.athlete]] += val(s);
     }
-    const catWins = { Benny: 0, Jonas: 0 };
+    const catWins = zeros();
     for (const v of Object.values(perCatAll)) {
-      if (v.Benny > v.Jonas) catWins.Benny++;
-      else if (v.Jonas > v.Benny) catWins.Jonas++;
+      const w = uniqueMaxIndex(v);
+      if (w != null) catWins[w]++;
     }
+    const runnerUp = (arr, w) => Math.max(...arr.filter((_, i) => i !== w), 0);
     const medals = [];
     const push = (m) => medals.push(m);
     if (leadHistory) push({
@@ -2425,59 +2312,61 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       value: `${leadHistory.daysSince} ${leadHistory.daysSince === 1 ? 'Tag' : 'Tage'}`,
       sub: `seit ${fmtDateShort(leadHistory.sinceDate)}`,
     });
-    if (weeklyTally.bennyWins !== weeklyTally.jonasWins && (weeklyTally.bennyWins || weeklyTally.jonasWins)) {
-      const w = weeklyTally.bennyWins > weeklyTally.jonasWins ? 'Benny' : 'Jonas';
-      const loser = w === 'Benny' ? weeklyTally.jonasWins : weeklyTally.bennyWins;
+    const weeklyWinner = uniqueMaxIndex(weeklyTally.wins);
+    if (weeklyWinner != null) {
+      const w = weeklyWinner;
       push({
         key: 'weekly', icon: '🏆', title: 'Wochenkönig', tier: 'gold',
         winner: w,
-        value: `${w === 'Benny' ? weeklyTally.bennyWins : weeklyTally.jonasWins} Siege`,
-        sub: `gegen ${loser}${weeklyTally.ties ? ` · ${weeklyTally.ties}× geteilt` : ''}`,
+        value: `${weeklyTally.wins[w]} Siege`,
+        sub: `${N === 2 ? 'gegen' : 'nächster:'} ${runnerUp(weeklyTally.wins, w)}${weeklyTally.ties ? ` · ${weeklyTally.ties}× geteilt` : ''}`,
       });
     }
-    if (setsToTarget.bennyHits !== setsToTarget.jonasHits && (setsToTarget.bennyHits || setsToTarget.jonasHits)) {
-      const w = setsToTarget.bennyHits > setsToTarget.jonasHits ? 'Benny' : 'Jonas';
+    const hitsWinner = uniqueMaxIndex(setsToTarget.map(x => x.hits));
+    if (hitsWinner != null) {
       push({
         key: 'hits', icon: '🎯', title: 'Zielgenau', tier: 'gold',
-        winner: w,
-        value: `${w === 'Benny' ? setsToTarget.bennyHits : setsToTarget.jonasHits} Ziele`,
+        winner: hitsWinner,
+        value: `${setsToTarget[hitsWinner].hits} Ziele`,
         sub: 'erreicht',
       });
     }
-    if (catWins.Benny !== catWins.Jonas && (catWins.Benny || catWins.Jonas)) {
-      const w = catWins.Benny > catWins.Jonas ? 'Benny' : 'Jonas';
+    const catWinner = uniqueMaxIndex(catWins);
+    if (catWinner != null) {
       push({
         key: 'cats', icon: '🥇', title: 'Kategoriekönig', tier: 'gold',
-        winner: w,
-        value: `${catWins[w]} ${catWins[w] === 1 ? 'Kategorie' : 'Kategorien'}`,
+        winner: catWinner,
+        value: `${catWins[catWinner]} ${catWins[catWinner] === 1 ? 'Kategorie' : 'Kategorien'}`,
         sub: 'angeführt',
       });
     }
-    if (maxSet.Benny !== maxSet.Jonas && (maxSet.Benny || maxSet.Jonas)) {
-      const w = maxSet.Benny > maxSet.Jonas ? 'Benny' : 'Jonas';
+    const maxSetWinner = uniqueMaxIndex(maxSet);
+    if (maxSetWinner != null) {
       push({
         key: 'maxSet', icon: '💪', title: 'Rekord-Satz', tier: 'silver',
-        winner: w, value: `${maxSet[w]} ${unitLabel}`, sub: 'in einem Satz',
+        winner: maxSetWinner, value: `${maxSet[maxSetWinner]} ${unitLabel}`, sub: 'in einem Satz',
       });
     }
-    if (bestDay.Benny !== bestDay.Jonas && (bestDay.Benny || bestDay.Jonas)) {
-      const w = bestDay.Benny > bestDay.Jonas ? 'Benny' : 'Jonas';
+    const bestDayWinner = uniqueMaxIndex(bestDay);
+    if (bestDayWinner != null) {
       push({
         key: 'bestDay', icon: '📅', title: 'Bester Tag', tier: 'silver',
-        winner: w, value: `${bestDay[w]} ${unitLabel}`, sub: 'an einem Tag',
+        winner: bestDayWinner, value: `${bestDay[bestDayWinner]} ${unitLabel}`, sub: 'an einem Tag',
       });
     }
-    if (longestStreak.Benny !== longestStreak.Jonas && (longestStreak.Benny || longestStreak.Jonas)) {
-      const w = longestStreak.Benny > longestStreak.Jonas ? 'Benny' : 'Jonas';
+    const streakWinner = uniqueMaxIndex(longestStreak);
+    if (streakWinner != null) {
       push({
         key: 'streak', icon: '🔥', title: 'Streak-King', tier: 'silver',
-        winner: w,
-        value: `${longestStreak[w]} ${longestStreak[w] === 1 ? 'Tag' : 'Tage'}`,
+        winner: streakWinner,
+        value: `${longestStreak[streakWinner]} ${longestStreak[streakWinner] === 1 ? 'Tag' : 'Tage'}`,
         sub: 'in Folge',
       });
     }
     return medals;
-  }, [challenges, allSets, selectedCats, leadHistory, weeklyTally, setsToTarget]);
+  }, [challenges, allSets, selectedCats, leadHistory, weeklyTally, setsToTarget, sides, sideIdx]);
+
+  const shortName = (side) => side.isMine && side.userIds.length === 1 ? 'Du' : side.label.split(/\s+/)[0];
 
   return (
     <>
@@ -2498,7 +2387,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
 
       <div className="card">
         <div className="vs-head">
-          <div className="label" style={{margin: 0}}>Benny vs. Jonas</div>
+          <div className="label" style={{margin: 0}}>{cardTitle}</div>
           <div className="vs-toggles">
             <div className="segmented segmented-sm">
               <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
@@ -2530,18 +2419,18 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           </div>
         )}
 
-        {leader && diff > 0 && (
+        {leaderIdx != null && diff > 0 && N > 1 && (
           <div className="winner-banner">
             <div className="winner-avatar-wrap">
-              <img src={`uploads/${leader.toLowerCase()}.jpg`} alt={leader} className="winner-avatar"/>
+              <SideAvatar side={sides[leaderIdx]} size={52} className="winner-avatar"/>
               <span className="winner-crown">👑</span>
             </div>
             <div className="winner-text">
-              <div className="winner-name">{leader}</div>
+              <div className="winner-name">{sides[leaderIdx].label}</div>
               <div className="winner-lead">führt mit <span className="mono">+{diff}</span> {unitLabel}</div>
               {momentum && (
-                <div className={`winner-momentum ${momentum.who.toLowerCase()}`}>
-                  {momentum.isCatchingUp ? '📈' : '🔒'} {momentum.who} {momentum.isCatchingUp ? 'holt auf' : 'baut aus'} · <span className="mono">+{momentum.gap}</span> in 7T
+                <div className={`winner-momentum ${sides[momentum.idx].cls}`} style={sideStyle(sides[momentum.idx])}>
+                  {momentum.isCatchingUp ? '📈' : '🔒'} {sides[momentum.idx].label} {momentum.isCatchingUp ? 'holt auf' : 'baut aus'} · <span className="mono">+{momentum.gap}</span> in 7T
                   {momentum.daysToOvertake != null && (
                     <> · überholt in ~<span className="mono">{momentum.daysToOvertake.toFixed(1)}</span>T</>
                   )}
@@ -2551,106 +2440,106 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           </div>
         )}
 
-        <div className="vs-row">
-          <div className="vs-side benny">
-            <div className="vs-name">Benny</div>
-            <div className="vs-reps mono">{bennyStats.total}</div>
-            <div className="vs-meta mono">{bennyStats.sets} Sätze · ⌀ {bennyStats.avgSet}/Satz</div>
+        {N <= 2 ? (
+          <div className="vs-row">
+            {sides.map((side, i) => (
+              <div className={`vs-side ${side.cls}`} key={side.key}>
+                <div className="vs-name">{side.label}</div>
+                <div className="vs-reps mono">{sideStats[i].total}</div>
+                <div className="vs-meta mono">{sideStats[i].sets} Sätze · ⌀ {sideStats[i].avgSet}/Satz</div>
+              </div>
+            ))}
           </div>
-          <div className="vs-side jonas">
-            <div className="vs-name">Jonas</div>
-            <div className="vs-reps mono">{jonasStats.total}</div>
-            <div className="vs-meta mono">{jonasStats.sets} Sätze · ⌀ {jonasStats.avgSet}/Satz</div>
+        ) : (
+          <div className="mu-rank" style={{ marginTop: 6 }}>
+            {sides.map((s, i) => i).sort((a, b) => totals[b] - totals[a]).map((i, rank) => (
+              <div key={sides[i].key} className={`mu-rank-row ${sides[i].isMine ? 'mine' : ''}`}>
+                <span className="mu-rank-pos mono">{rank + 1}</span>
+                <SideAvatar side={sides[i]} size={24} />
+                <span className="mu-rank-name">{shortName(sides[i])}</span>
+                <span className="mu-rank-bar"><span className="mu-rank-fill" style={{ width: `${(totals[i] / maxReps) * 100}%`, background: colorOf(i) }} /></span>
+                <span className="mu-rank-val mono">{totals[i]}</span>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
 
-        <div className="vs-bar">
-          <div className="vs-bar-benny" style={{flex: bennyStats.total / maxReps}} />
-          <div className="vs-bar-jonas" style={{flex: jonasStats.total / maxReps}} />
-        </div>
+        {N <= 2 && (
+          <div className="vs-bar">
+            {sides.map((side, i) => (
+              <div key={side.key} className={`vs-bar-${side.cls}`} style={{flex: totals[i] / maxReps}} />
+            ))}
+          </div>
+        )}
 
         <div className="chart-wrap" onClick={() => setFullscreen(true)} role="button" tabIndex={0}>
           <div className="chart-legend">
-            <span><span className="dot" style={{background: accentColors.accent}}/>Benny</span>
-            <span><span className="dot" style={{background: accentColors.accent3}}/>Jonas</span>
+            {sides.map((side, i) => (
+              <span key={side.key}><span className="dot" style={{background: colorOf(i)}}/>{shortName(side)}</span>
+            ))}
             <span className="chart-title">{cumulative ? 'Kumuliert' : `${unitLabel} pro Tag`}</span>
             <Icon name="expand" size={14} color="var(--text-2)" />
           </div>
-          <StatsChart
-            benny={cumulative ? bennyCumSeries : bennySeries}
-            jonas={cumulative ? jonasCumSeries : jonasSeries}
-            days={totalDays}
-            accent={accentColors.accent}
-            accent3={accentColors.accent3}
-          />
+          <StatsChart series={asSeries(cumulative ? cumSeries : series)} days={totalDays} />
         </div>
 
         {(() => {
           const rows = [
-            { label: 'Aktive Tage', b: bennyStats.activeDays, j: jonasStats.activeDays },
-            { label: 'Bester Tag', b: bennyStats.bestDay, j: jonasStats.bestDay },
-            { label: 'Größter Satz', b: bennyStats.maxSet, j: jonasStats.maxSet },
-            { label: `⌀ ${unitLabel}/Tag`, b: bennyStats.avgDay, j: jonasStats.avgDay },
-            {
-              label: '⌀ Sätze bis Ziel',
-              b: setsToTarget.bennyHits ? setsToTarget.benny : null,
-              j: setsToTarget.jonasHits ? setsToTarget.jonas : null,
-              lowerWins: true,
-            },
-            { label: 'Ziele erreicht', b: setsToTarget.bennyHits, j: setsToTarget.jonasHits },
+            { label: 'Aktive Tage', vals: sideStats.map(s => s.activeDays) },
+            { label: 'Bester Tag', vals: sideStats.map(s => s.bestDay) },
+            { label: 'Größter Satz', vals: sideStats.map(s => s.maxSet) },
+            { label: `⌀ ${unitLabel}/Tag`, vals: sideStats.map(s => s.avgDay) },
+            { label: '⌀ Sätze bis Ziel', vals: setsToTarget.map(x => x.hits ? x.avg : null), lowerWins: true },
+            { label: 'Ziele erreicht', vals: setsToTarget.map(x => x.hits) },
           ];
-          const winnerOf = (r) => {
-            if (r.b == null || r.j == null || r.b === r.j) return null;
-            const benWins = r.lowerWins ? r.b < r.j : r.b > r.j;
-            return benWins ? 'benny' : 'jonas';
-          };
           return (
-            <table className="stats-table">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th className="benny">Benny</th>
-                  <th className="jonas">Jonas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => {
-                  const w = winnerOf(r);
-                  return (
-                    <tr key={i}>
-                      <td className="st-label">
-                        {r.label}
-                        {r.hint && <span className="st-hint">{r.hint}</span>}
-                      </td>
-                      <td className={`st-val mono benny${w === 'benny' ? ' win' : w === 'jonas' ? ' lose' : ''}`}>
-                        <span className="st-pill">{r.b == null ? '–' : r.b}</span>
-                      </td>
-                      <td className={`st-val mono jonas${w === 'jonas' ? ' win' : w === 'benny' ? ' lose' : ''}`}>
-                        <span className="st-pill">{r.j == null ? '–' : r.j}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className={N > 3 ? 'mu-table-scroll' : ''}>
+              <table className="stats-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    {sides.map((side, i) => (
+                      <th key={side.key} className={side.cls} style={i > 1 ? { color: side.color } : undefined}>{shortName(side)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, ri) => {
+                    const w = uniqueMaxIndex(r.vals, r.lowerWins);
+                    return (
+                      <tr key={ri}>
+                        <td className="st-label">{r.label}</td>
+                        {sides.map((side, i) => (
+                          <td key={side.key} className={`st-val mono ${side.cls}${w === i ? ' win' : w != null ? ' lose' : ''}`} style={sideStyle(side)}>
+                            <span className="st-pill">{r.vals[i] == null ? '–' : r.vals[i]}</span>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           );
         })()}
 
         {perCat.length > 0 && (
           <div style={{marginTop: 18}}>
             <div className="label" style={{marginBottom: 8}}>Nach Kategorie</div>
-            {perCat.map(({cat, Benny, Jonas, total}) => {
-              const m = Math.max(Benny, Jonas, 1);
-              const catLeader = Benny === Jonas ? null : (Benny > Jonas ? 'Benny' : 'Jonas');
-              const catDiff = Math.abs(Benny - Jonas);
+            {perCat.map(({cat, vals, total}) => {
+              const m = Math.max(...vals, 1);
+              const catLeader = uniqueMaxIndex(vals);
+              const sortedVals = [...vals].sort((a, b) => b - a);
+              const catDiff = N > 1 ? sortedVals[0] - sortedVals[1] : 0;
+              const leaderSide = catLeader != null ? sides[catLeader] : null;
               return (
-                <div className={`vs-cat${catLeader ? ` leader-${catLeader.toLowerCase()}` : ''}`} key={cat?.id || total}>
+                <div className={`vs-cat${leaderSide && catLeader < 2 ? ` leader-${leaderSide.cls}` : ''}`} key={cat?.id || total}>
                   <div className="vs-cat-head">
                     <div className="vs-cat-name">{cat?.emoji} {cat?.name}</div>
-                    {catLeader ? (
-                      <div className={`vs-cat-leader ${catLeader.toLowerCase()}`}>
+                    {leaderSide ? (
+                      <div className={`vs-cat-leader ${leaderSide.cls}`} style={sideStyle(leaderSide)}>
                         <span className="vs-cat-leader-crown">👑</span>
-                        <span className="vs-cat-leader-name">{catLeader}</span>
+                        <span className="vs-cat-leader-name">{shortName(leaderSide)}</span>
                         <span className="vs-cat-leader-diff mono">+{catDiff}</span>
                       </div>
                     ) : (
@@ -2658,16 +2547,13 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                     )}
                   </div>
                   <div className="vs-cat-bars">
-                    <div className={`vs-cat-row${catLeader === 'Benny' ? ' lead' : catLeader === 'Jonas' ? ' trail' : ''}`}>
-                      <span className="vs-cat-label benny">B</span>
-                      <div className="vs-cat-track"><div className="vs-cat-fill benny" style={{width: `${(Benny/m)*100}%`}}/></div>
-                      <span className="vs-cat-val mono">{Benny}</span>
-                    </div>
-                    <div className={`vs-cat-row${catLeader === 'Jonas' ? ' lead' : catLeader === 'Benny' ? ' trail' : ''}`}>
-                      <span className="vs-cat-label jonas">J</span>
-                      <div className="vs-cat-track"><div className="vs-cat-fill jonas" style={{width: `${(Jonas/m)*100}%`}}/></div>
-                      <span className="vs-cat-val mono">{Jonas}</span>
-                    </div>
+                    {sides.map((side, i) => (
+                      <div key={side.key} className={`vs-cat-row${catLeader === i ? ' lead' : catLeader != null ? ' trail' : ''}`}>
+                        <span className={`vs-cat-label ${side.cls}`} style={sideStyle(side)}>{side.short}</span>
+                        <div className="vs-cat-track"><div className={`vs-cat-fill ${side.cls}`} style={{...sideStyle(side), width: `${(vals[i]/m)*100}%`}}/></div>
+                        <span className="vs-cat-val mono">{vals[i]}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
@@ -2682,21 +2568,22 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
             <div className="hof-eyebrow">Hall of Fame</div>
             <div className="hof-sub">{hallOfFame.length} {hallOfFame.length === 1 ? 'Trophäe vergeben' : 'Trophäen vergeben'}</div>
           </div>
-          <div className="hof-halls">
-            {['Benny', 'Jonas'].map(athlete => {
-              const meds = hallOfFame.filter(m => m.winner === athlete);
+          <div className={`hof-halls ${N > 2 ? 'mu-hof-many' : ''}`}>
+            {sides.map((side, si) => {
+              const meds = hallOfFame.filter(m => m.winner === si);
+              if (N > 2 && !meds.length) return null;
               return (
-                <div className={`hof-hall ${athlete.toLowerCase()}`} key={athlete}>
+                <div className={`hof-hall ${side.cls}`} style={sideStyle(side)} key={side.key}>
                   <div className="hof-hall-head">
-                    <img className="hof-avatar" src={`uploads/${athlete.toLowerCase()}.jpg`} alt={athlete} />
-                    <div className="hof-hall-name">{athlete}</div>
+                    <SideAvatar side={side} size={28} className="hof-avatar" />
+                    <div className="hof-hall-name">{shortName(side)}</div>
                     <div className="hof-hall-count mono">{meds.length}</div>
                   </div>
                   <div className="hof-shelf">
                     {meds.length === 0 ? (
                       <div className="hof-empty">Keine Trophäen</div>
                     ) : meds.map(m => (
-                      <div className={`trophy tier-${m.tier} ${athlete.toLowerCase()}`} key={m.key}>
+                      <div className={`trophy tier-${m.tier} ${side.cls}`} key={m.key}>
                         <div className="trophy-icon">{m.icon}</div>
                         <div className="trophy-body">
                           <div className="trophy-title">{m.title}</div>
@@ -2710,13 +2597,10 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
               );
             })}
           </div>
-          {(weeklyTally.bennyWins || weeklyTally.jonasWins || weeklyTally.ties) > 0 && (() => {
-            const total = weeklyTally.bennyWins + weeklyTally.jonasWins + weeklyTally.ties;
-            const bennyPct = Math.round((weeklyTally.bennyWins / total) * 100);
-            const jonasPct = Math.round((weeklyTally.jonasWins / total) * 100);
-            const tiePct = Math.max(0, 100 - bennyPct - jonasPct);
-            const bennyLead = weeklyTally.bennyWins > weeklyTally.jonasWins;
-            const jonasLead = weeklyTally.jonasWins > weeklyTally.bennyWins;
+          {(weeklyTally.wins.some(Boolean) || weeklyTally.ties > 0) && (() => {
+            const total = weeklyTally.wins.reduce((a, x) => a + x, 0) + weeklyTally.ties;
+            const pct = (n) => Math.round((n / total) * 100);
+            const best = uniqueMaxIndex(weeklyTally.wins);
             return (
               <div className="hof-weekly">
                 <div className="hof-weekly-head">
@@ -2726,37 +2610,30 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                   </div>
                 </div>
                 <div className="hof-weekly-bar" aria-hidden="true">
-                  {weeklyTally.bennyWins > 0 && (
-                    <div className="hof-weekly-seg benny" style={{flex: weeklyTally.bennyWins}}>
-                      {bennyPct >= 18 && <span className="hof-weekly-seg-label mono">{bennyPct}%</span>}
+                  {sides.map((side, i) => weeklyTally.wins[i] > 0 && (
+                    <div key={side.key} className={`hof-weekly-seg ${side.cls}`} style={{...sideStyle(side), flex: weeklyTally.wins[i]}}>
+                      {pct(weeklyTally.wins[i]) >= 18 && <span className="hof-weekly-seg-label mono">{pct(weeklyTally.wins[i])}%</span>}
                     </div>
-                  )}
+                  ))}
                   {weeklyTally.ties > 0 && (
                     <div className="hof-weekly-seg tie" style={{flex: weeklyTally.ties}}>
-                      {tiePct >= 18 && <span className="hof-weekly-seg-label mono">{tiePct}%</span>}
-                    </div>
-                  )}
-                  {weeklyTally.jonasWins > 0 && (
-                    <div className="hof-weekly-seg jonas" style={{flex: weeklyTally.jonasWins}}>
-                      {jonasPct >= 18 && <span className="hof-weekly-seg-label mono">{jonasPct}%</span>}
+                      {pct(weeklyTally.ties) >= 18 && <span className="hof-weekly-seg-label mono">{pct(weeklyTally.ties)}%</span>}
                     </div>
                   )}
                 </div>
-                <div className="hof-weekly-legend">
-                  <div className={`hof-weekly-card benny${bennyLead ? ' lead' : jonasLead ? ' trail' : ''}`}>
-                    <div className="hof-weekly-card-num mono">{weeklyTally.bennyWins}</div>
-                    <div className="hof-weekly-card-name">Benny</div>
-                  </div>
+                <div className="hof-weekly-legend mu-wrap">
+                  {sides.map((side, i) => (
+                    <div key={side.key} className={`hof-weekly-card ${side.cls}${best === i ? ' lead' : best != null ? ' trail' : ''}`} style={sideStyle(side)}>
+                      <div className="hof-weekly-card-num mono">{weeklyTally.wins[i]}</div>
+                      <div className="hof-weekly-card-name">{shortName(side)}</div>
+                    </div>
+                  ))}
                   {weeklyTally.ties > 0 && (
                     <div className="hof-weekly-card tie">
                       <div className="hof-weekly-card-num mono">{weeklyTally.ties}</div>
                       <div className="hof-weekly-card-name">Geteilt</div>
                     </div>
                   )}
-                  <div className={`hof-weekly-card jonas${jonasLead ? ' lead' : bennyLead ? ' trail' : ''}`}>
-                    <div className="hof-weekly-card-num mono">{weeklyTally.jonasWins}</div>
-                    <div className="hof-weekly-card-name">Jonas</div>
-                  </div>
                 </div>
               </div>
             );
@@ -2773,32 +2650,23 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           else groups.push({ weekStart: ch.week_start, items: [ch] });
         }
         const currentWeekStart = PTData.isoDate(PTData.mondayOf(new Date()));
-        const challengeIsDone = (ch) => {
-          const sets = setsByCh[ch.id] || [];
-          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
-          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
-          return bT >= ch.target_reps && jT >= ch.target_reps;
-        };
+        const sideTotalsFor = (ch) => totalsBySide(setsByCh[ch.id] || [], sides);
+        const challengeIsDone = (ch) => sideTotalsFor(ch).every(v => v >= ch.target_reps);
         const progressRows = (ch) => {
-          const sets = setsByCh[ch.id] || [];
-          const bT = sets.filter(s => s.athlete === 'Benny').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
-          const jT = sets.filter(s => s.athlete === 'Jonas').reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
-          const bPct = Math.round(100 * bT / ch.target_reps);
-          const jPct = Math.round(100 * jT / ch.target_reps);
-          const bDone = bT >= ch.target_reps;
-          const jDone = jT >= ch.target_reps;
+          const ts = sideTotalsFor(ch);
           return (
             <div className="right">
-              <div style={{display:'flex',justifyContent:'flex-end',alignItems:'baseline',gap:8}}>
-                <span className="mono" style={{color:'var(--accent)',fontWeight:700,fontSize:15}}>B</span>
-                <span className={`pct mono ${bDone ? 'done' : bPct < 50 ? 'miss' : ''}`} style={{fontSize:18}}>{bPct}%</span>
-                <span className="wk mono" style={{minWidth:72,textAlign:'right'}}>{bT}/{ch.target_reps}</span>
-              </div>
-              <div style={{display:'flex',justifyContent:'flex-end',alignItems:'baseline',gap:8,marginTop:4}}>
-                <span className="mono" style={{color:'var(--accent-3)',fontWeight:700,fontSize:15}}>J</span>
-                <span className={`pct mono ${jDone ? 'done' : jPct < 50 ? 'miss' : ''}`} style={{fontSize:18}}>{jPct}%</span>
-                <span className="wk mono" style={{minWidth:72,textAlign:'right'}}>{jT}/{ch.target_reps}</span>
-              </div>
+              {sides.map((side, i) => {
+                const pctV = Math.round(100 * ts[i] / ch.target_reps);
+                const done = ts[i] >= ch.target_reps;
+                return (
+                  <div key={side.key} style={{display:'flex',justifyContent:'flex-end',alignItems:'baseline',gap:8,marginTop: i ? 4 : 0}}>
+                    <span className="mono" style={{color: colorOf(i),fontWeight:700,fontSize:15}}>{side.short}</span>
+                    <span className={`pct mono ${done ? 'done' : pctV < 50 ? 'miss' : ''}`} style={{fontSize:18}}>{pctV}%</span>
+                    <span className="wk mono" style={{minWidth:72,textAlign:'right'}}>{ts[i]}/{ch.target_reps}</span>
+                  </div>
+                );
+              })}
             </div>
           );
         };
@@ -2814,7 +2682,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                 <div>
                   <div className="wk">KW {weekNumber(ch.week_start)} · {formatWeek(ch.week_start)}</div>
                   <div className="cat">{cat?.emoji} {cat?.name}</div>
-                  <div className="wk" style={{ marginTop: 4 }}>Ziel {ch.target_reps} / Person</div>
+                  <div className="wk" style={{ marginTop: 4 }}>Ziel {ch.target_reps}</div>
                 </div>
                 {progressRows(ch)}
               </div>
@@ -2835,7 +2703,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                   <div className="week-group-item" key={ch.id}>
                     <div>
                       <div className="cat">{cat?.emoji} {cat?.name}</div>
-                      <div className="wk" style={{ marginTop: 2 }}>Ziel {ch.target_reps} / Person</div>
+                      <div className="wk" style={{ marginTop: 2 }}>Ziel {ch.target_reps}</div>
                     </div>
                     {progressRows(ch)}
                   </div>
@@ -2847,17 +2715,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       })()}
       {fullscreen && (
         <ChartFullscreen
-          bennySeries={bennySeries}
-          jonasSeries={jonasSeries}
-          bennyCumSeries={bennyCumSeries}
-          jonasCumSeries={jonasCumSeries}
+          title={cardTitle}
+          series={asSeries(series)}
+          cumSeries={asSeries(cumSeries)}
           totalDays={totalDays}
           range={range}
           setRange={setRange}
           cumulative={cumulative}
           setCumulative={setCumulative}
-          accent={accentColors.accent}
-          accent3={accentColors.accent3}
           onClose={() => setFullscreen(false)}
         />
       )}
@@ -2865,8 +2730,10 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
 
 }
 
-function computeAthleteStats(sets, athlete, series) {
-  const own = sets.filter(s => s.athlete === athlete);
+// athletes: Liste von User-IDs (eine Seite)
+function computeAthleteStats(sets, athletes, series) {
+  const ids = Array.isArray(athletes) ? athletes : [athletes];
+  const own = sets.filter(s => ids.includes(s.athlete));
   const total = own.reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
   const setCount = own.length;
   const avgSet = setCount ? Math.round(total / setCount) : 0;
@@ -2878,7 +2745,7 @@ function computeAthleteStats(sets, athlete, series) {
   }
   const activeDays = Object.keys(byDay).length;
   const bestDay = Object.values(byDay).reduce((m, v) => Math.max(m, v), 0);
-  const avgDay = series.length ? Math.round(total / series.length) : 0;
+  const avgDay = series?.length ? Math.round(total / series.length) : 0;
   return { total, sets: setCount, avgSet, maxSet, activeDays, bestDay, avgDay };
 }
 

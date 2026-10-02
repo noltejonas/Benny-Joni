@@ -17,8 +17,9 @@ const RIVAL_THRESHOLD = 100;
 interface SetRecord {
   id: string;
   challenge_id: string;
-  athlete: string;
-  reps: number;
+  competition_id: string | null;
+  user_id: string | null;
+  reps: number | null;
   note: string | null;
   created_at: string;
 }
@@ -31,13 +32,10 @@ interface WebhookPayload {
   old_record: SetRecord | null;
 }
 
-// Binary by design — the app is hard-wired to two athletes. If a third
-// athlete is ever added, recipient resolution must move to a pair/challenge
-// model rather than extending this helper.
-function otherAthlete(name: string): string {
-  if (name === "Benny") return "Jonas";
-  if (name === "Jonas") return "Benny";
-  throw new Error(`unknown athlete: ${name}`);
+interface Member {
+  user_id: string;
+  team: string | null;
+  profile: { display_name: string } | null;
 }
 
 Deno.serve(async (req) => {
@@ -72,13 +70,15 @@ Deno.serve(async (req) => {
   }
 
   const record = payload.record;
-  const recipient = otherAthlete(record.athlete);
+  if (!record.user_id || !record.competition_id) {
+    return Response.json({ ignored: true, reason: "legacy_record" });
+  }
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // 1. Sender daily total
+  // 1. Sender daily total in this challenge
   const { data: senderToday, error: senderErr } = await supabase.rpc(
-    "athlete_reps_today",
-    { p_athlete: record.athlete },
+    "user_reps_today",
+    { p_user: record.user_id, p_competition: record.competition_id },
   );
   if (senderErr) {
     return Response.json({ error: "sender_rpc", detail: senderErr.message }, { status: 500 });
@@ -93,64 +93,34 @@ Deno.serve(async (req) => {
     });
   }
 
-  // 2. Recipient daily total
-  const { data: recipientToday, error: recipientErr } = await supabase.rpc(
-    "athlete_reps_today",
-    { p_athlete: recipient },
+  // 2. Challenge + Mitglieder. Empfänger sind die Gegner: alle anderen aktiven
+  //    Mitglieder, bei 2v2 nur das andere Team.
+  const [{ data: competition }, { data: members, error: memErr }] = await Promise.all([
+    supabase.from("competitions").select("id, name, emoji, mode").eq("id", record.competition_id).single(),
+    supabase.from("competition_members")
+      .select("user_id, team, profile:user_id(display_name)")
+      .eq("competition_id", record.competition_id)
+      .is("left_at", null),
+  ]);
+  if (memErr || !competition) {
+    return Response.json({ error: "members", detail: memErr?.message }, { status: 500 });
+  }
+  const all = (members ?? []) as unknown as Member[];
+  const sender = all.find((m) => m.user_id === record.user_id);
+  const senderName = sender?.profile?.display_name ?? "Jemand";
+  const opponents = all.filter((m) =>
+    m.user_id !== record.user_id &&
+    !(competition.mode === "2v2" && sender?.team && m.team === sender.team)
   );
-  if (recipientErr) {
-    return Response.json({ error: "recipient_rpc", detail: recipientErr.message }, { status: 500 });
-  }
-  if ((recipientToday ?? 0) > 0) {
-    return Response.json({
-      ignored: true,
-      reason: "recipient_active",
-      recipientToday,
-    });
+  if (opponents.length === 0) {
+    return Response.json({ ignored: true, reason: "no_opponents" });
   }
 
-  // 3. Recipient tokens — load these BEFORE claiming the daily slot so we don't
-  //    burn the slot when the recipient has no device registered yet.
-  const { data: tokens } = await supabase
-    .from("device_tokens")
-    .select("token, platform")
-    .eq("athlete", recipient);
-
-  const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios");
-  if (iosTokens.length === 0) {
-    return Response.json({ ignored: true, reason: "no_recipient_tokens" });
-  }
-
-  // 4. Today's Berlin date
+  // 3. Today's Berlin date
   const { data: today, error: todayErr } = await supabase.rpc("berlin_today");
   if (todayErr || !today) {
     return Response.json({ error: "today_rpc", detail: todayErr?.message }, { status: 500 });
   }
-
-  // 5. Dedup: push_log insert claims the daily slot
-  const { error: logErr } = await supabase
-    .from("push_log")
-    .insert({ athlete: recipient, kind: "rival", day: today });
-  if (logErr) {
-    if (logErr.code === "23505") {
-      return Response.json({ ignored: true, reason: "already_sent_today" });
-    }
-    return Response.json({ error: "log_insert", detail: logErr.message }, { status: 500 });
-  }
-
-  // 6. APNs push
-  const title = `🔥 ${record.athlete} ist los`;
-  const body = `Schon ${senderToday} Reps heute — du noch bei 0.`;
-
-  const apsPayload = {
-    aps: {
-      alert: { title, body },
-      sound: "default",
-    },
-    kind: "rival",
-    athlete: record.athlete,
-    sender_today: senderToday,
-  };
 
   const jwt = await buildApnsJwt({
     keyId: APNS_KEY_ID,
@@ -158,38 +128,84 @@ Deno.serve(async (req) => {
     privateKeyPem: APNS_PRIVATE_KEY,
   });
 
-  const results = await Promise.all(
-    iosTokens.map((t) =>
-      sendApns({
-        deviceToken: t.token,
-        jwt,
-        bundleId: APNS_BUNDLE_ID,
-        env: APNS_ENV,
-        payload: apsPayload,
-      })
-    ),
-  );
+  const outcome: Record<string, unknown>[] = [];
+  const dead: string[] = [];
 
-  const dead = results
-    .filter((r) =>
-      r.status === 410 ||
-      r.reason === "BadDeviceToken" ||
-      r.reason === "Unregistered"
-    )
-    .map((r) => r.deviceToken);
+  for (const recipient of opponents) {
+    // Nur wer heute in dieser Challenge noch bei 0 ist
+    const { data: recipientToday, error: recipientErr } = await supabase.rpc(
+      "user_reps_today",
+      { p_user: recipient.user_id, p_competition: record.competition_id },
+    );
+    if (recipientErr) {
+      outcome.push({ user: recipient.user_id, error: recipientErr.message });
+      continue;
+    }
+    if ((recipientToday ?? 0) > 0) {
+      outcome.push({ user: recipient.user_id, ignored: "recipient_active" });
+      continue;
+    }
+
+    // Tokens BEFORE claiming the daily slot so we don't burn the slot when the
+    // recipient has no device registered yet.
+    const { data: tokens } = await supabase
+      .from("device_tokens")
+      .select("token, platform")
+      .eq("user_id", recipient.user_id);
+    const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios");
+    if (iosTokens.length === 0) {
+      outcome.push({ user: recipient.user_id, ignored: "no_tokens" });
+      continue;
+    }
+
+    // Dedup: push_log insert claims the daily slot per recipient + challenge
+    const { error: logErr } = await supabase
+      .from("push_log")
+      .insert({ user_id: recipient.user_id, competition_id: record.competition_id, kind: "rival", day: today });
+    if (logErr) {
+      outcome.push({ user: recipient.user_id, ignored: logErr.code === "23505" ? "already_sent_today" : logErr.message });
+      continue;
+    }
+
+    const apsPayload = {
+      aps: {
+        alert: {
+          title: `🔥 ${senderName} ist los`,
+          subtitle: `${competition.emoji} ${competition.name}`,
+          body: `Schon ${senderToday} Reps heute — du noch bei 0.`,
+        },
+        sound: "default",
+      },
+      kind: "rival",
+      competition_id: record.competition_id,
+      sender_id: record.user_id,
+      sender_today: senderToday,
+    };
+
+    const results = await Promise.all(
+      iosTokens.map((t) =>
+        sendApns({
+          deviceToken: t.token,
+          jwt,
+          bundleId: APNS_BUNDLE_ID,
+          env: APNS_ENV,
+          payload: apsPayload,
+        })
+      ),
+    );
+    for (const r of results) {
+      if (r.status === 410 || r.reason === "BadDeviceToken" || r.reason === "Unregistered") dead.push(r.deviceToken);
+    }
+    outcome.push({
+      user: recipient.user_id,
+      sent: results.filter((r) => r.status === 200).length,
+      failures: results.filter((r) => r.status !== 200).map((r) => ({ status: r.status, reason: r.reason })),
+    });
+  }
 
   if (dead.length > 0) {
     await supabase.from("device_tokens").delete().in("token", dead);
   }
 
-  const sent = results.filter((r) => r.status === 200).length;
-  return Response.json({
-    sent,
-    cleaned: dead.length,
-    attempted: results.length,
-    senderToday,
-    failures: results
-      .filter((r) => r.status !== 200)
-      .map((r) => ({ status: r.status, reason: r.reason })),
-  });
+  return Response.json({ senderToday, cleaned: dead.length, recipients: outcome });
 });
