@@ -1,4 +1,4 @@
-/* global React, PTData, Sheet, PTPeople */
+/* global React, PTData, Sheet, PTPeople, Avatar, Icon, CountUp */
 const { useState } = React;
 
 function formatEuro(cents) {
@@ -57,13 +57,13 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
       <div className="strafkonto-screen">
         <div className="strafkonto-header">
           <div className="title">Strafkonto</div>
-          <button className="icon-btn" aria-label="Einstellungen" onClick={onOpenSettings}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+          <button className="icon-btn" aria-label="Strafregeln einstellen" onClick={onOpenSettings}>
+            <Icon name="settings" size={20} />
           </button>
         </div>
-        <div className="strafkonto-empty">
-          <div className="emoji">🧼</div>
-          <div>Noch sauber. Lasst es so.</div>
+        <div className="rd-empty">
+          <div className="rd-empty-title">Noch sauber.</div>
+          <div className="rd-empty-text">Lasst es so.</div>
         </div>
       </div>
     );
@@ -73,63 +73,55 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
     <div className="strafkonto-screen">
       <div className="strafkonto-header">
         <div className="title">Strafkonto</div>
-        <button className="icon-btn" aria-label="Einstellungen" onClick={onOpenSettings}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+        <button className="icon-btn" aria-label="Strafregeln einstellen" onClick={onOpenSettings}>
+          <Icon name="settings" size={20} />
         </button>
       </div>
 
-      <div className="strafkonto-pot">
-        <div className="strafkonto-pot-amount mono">{formatEuro(Math.max(0, potOpen))}</div>
-        <div className="strafkonto-pot-label">offen</div>
+      <section className="rd-card rd-balance" aria-label="Kontostand">
+        <div className="rd-overline">Offen</div>
+        <div className="rd-balance-amount mono"><CountUp value={Math.max(0, potOpen)} format={formatEuro} /></div>
+        <div className="rd-balance-sub">
+          {penalties.length === 1 ? '1 Strafe' : `${penalties.length} Strafen`}
+          {payouts.length > 0 && ` · ${formatEuro(totalPayouts)} eingezahlt`}
+        </div>
         {anyPen && (
-          <div className="strafkonto-stats">
-            <div className="strafkonto-stat">
-              <div className="strafkonto-stat-label">Schulden (Beitrag)</div>
-              <div className="strafkonto-stat-row mu-wrap">
-                {people.map(x => <span key={x.id} className={cls(x.id)}>{who(x.id)} {formatEuro(x.pen)}</span>)}
-              </div>
-            </div>
-            {anyPay && (
-              <div className="strafkonto-stat">
-                <div className="strafkonto-stat-label">Eingezahlt</div>
-                <div className="strafkonto-stat-row mu-wrap">
-                  {people.map(x => <span key={x.id} className={cls(x.id)}>{who(x.id)} {formatEuro(x.pay)}</span>)}
+          <div className="rd-balance-split">
+            {people.map(x => {
+              const saldo = x.pen - x.pay;
+              return (
+                <div key={x.id} className="rd-balance-person">
+                  <Avatar userId={x.id} size={32} />
+                  <div>
+                    <div className="rd-balance-person-name">{who(x.id)}</div>
+                    <div className="rd-balance-person-val mono">{saldo > 0 ? formatEuro(saldo) : 'beglichen'}</div>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="strafkonto-stat">
-              <div className="strafkonto-stat-label">Saldo</div>
-              <div className="strafkonto-stat-row mu-wrap">
-                {people.map(x => (
-                  <span key={x.id} className={`${cls(x.id)} ${x.pen - x.pay <= 0 ? 'positive' : ''}`}>
-                    {who(x.id)} {x.pen - x.pay > 0 ? '–' : ''}{formatEuro(Math.abs(x.pen - x.pay))}
-                  </span>
-                ))}
-              </div>
-            </div>
+              );
+            })}
           </div>
         )}
-      </div>
-
-      <button className="btn" style={{width:'100%',marginTop:8,marginBottom:14}} onClick={() => setAddPayout(true)}>
-        + Einzahlung verbuchen
-      </button>
+        <button className="btn" onClick={() => setAddPayout(true)}>Begleichen</button>
+      </section>
 
       {openClosures.length > 0 && (
         <div className="strafkonto-section">
           <div className="strafkonto-section-label">Offene Abschlüsse</div>
+          <div className="rd-card rd-list">
           {openClosures.map(w => (
             <div key={w} className="open-closure-row" onClick={() => setClosing(w)}>
               <span className="open-closure-label">{weekLabel(w)} abschließen</span>
-              <span className="open-closure-chev">▸</span>
+              <span className="open-closure-chev"><Icon name="chevron" size={18} /></span>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {penalties.length > 0 && (
         <div className="strafkonto-section">
           <div className="strafkonto-section-label">Strafen</div>
+          <div className="rd-card rd-list">
           {penalties.map(p => (
             <div key={p.id} className="penalty-row" onClick={() => setPenaltyEdit(p)}>
               <div className="penalty-row-main">
@@ -141,12 +133,14 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {payouts.length > 0 && (
         <div className="strafkonto-section">
           <div className="strafkonto-section-label">Einzahlungen</div>
+          <div className="rd-card rd-list">
           {payouts.map(p => (
             <div key={p.id} className="penalty-row payout" onClick={() => setPayoutEdit(p)}>
               <div className="penalty-row-main">
@@ -160,20 +154,23 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {closuresWithoutPenalty.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Abgeschlossene Wochen — straffrei</div>
+          <div className="strafkonto-section-label">Straffreie Wochen</div>
+          <div className="rd-card rd-list">
           {closuresWithoutPenalty.map(c => (
             <div key={c.week_start} className="penalty-row" onClick={() => setReopenWk(c.week_start)}>
               <div className="penalty-row-main">
-                <div className="penalty-row-head">✓ {weekLabel(c.week_start)} · alles geschafft</div>
+                <div className="penalty-row-head">{weekLabel(c.week_start)} · straffrei</div>
               </div>
-              <span className="penalty-row-reopen" aria-label="Woche neu öffnen">↻</span>
+              <span className="penalty-row-reopen" aria-label="Woche neu öffnen"><Icon name="history" size={18} /></span>
             </div>
           ))}
+          </div>
         </div>
       )}
 
