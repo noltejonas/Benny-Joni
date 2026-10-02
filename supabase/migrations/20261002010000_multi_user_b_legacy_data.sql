@@ -22,11 +22,11 @@ begin
   if v_benny is null then raise exception 'Kein Account für %', c_benny_email; end if;
   if v_jonas is null then raise exception 'Kein Account für %', c_jonas_email; end if;
 
-  update profiles set legacy_athlete = 'Benny',
+  update profiles set legacy_athlete = 'Benny', display_name = 'Benny',
                       avatar_url = coalesce(avatar_url, 'uploads/benny.jpg'),
                       color = '#32d74b'
     where id = v_benny;
-  update profiles set legacy_athlete = 'Jonas',
+  update profiles set legacy_athlete = 'Jonas', display_name = 'Jonas',
                       avatar_url = coalesce(avatar_url, 'uploads/jonas.jpg'),
                       color = '#0a84ff'
     where id = v_jonas;
