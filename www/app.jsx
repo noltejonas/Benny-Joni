@@ -37,23 +37,20 @@ function App() {
   // Theme: end-user preference persists in localStorage (override of tweak default).
   // Settings dispatches 'pt:theme-change' to update without reload.
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem('pt:theme') || t.theme || 'dark'; }
-    catch (e) { return t.theme || 'dark'; }
+    try { return localStorage.getItem('pt:theme2') || 'light'; }
+    catch (e) { return 'light'; }
   });
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    try { localStorage.setItem('pt:theme', theme); } catch (e) {}
+    try { localStorage.setItem('pt:theme2', theme); } catch (e) {}
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#000000');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#16151F' : '#F4F3F8');
   }, [theme]);
   useEffect(() => {
     const onChange = (e) => { if (e?.detail?.theme) setTheme(e.detail.theme); };
     window.addEventListener('pt:theme-change', onChange);
     return () => window.removeEventListener('pt:theme-change', onChange);
   }, []);
-  useEffect(() => {
-    document.documentElement.style.setProperty('--accent', t.accent);
-  }, [t.accent]);
 
   const api = useMemo(() => PTData.init({ url: SUPABASE_URL, key: SUPABASE_ANON_KEY }), []);
 
@@ -533,22 +530,20 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
   return (
     <div className="app">
       <header className="app-header">
-        <button className="mu-header-title" onClick={onOpenSwitcher} aria-label="Challenge wechseln">
-          <div className="greeting">{todayGreeting()}, {profile.display_name.split(/\s+/)[0]}</div>
-          <div className="date mu-header-comp">
-            <span className="mu-header-emoji">{competition.emoji}</span>
-            <span className="mu-header-name">{competition.name}</span>
-            <span className="mu-header-caret">▾</span>
-          </div>
+        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={`Challenge wechseln, aktuell ${competition.name}`}>
+          <span className="date">
+            {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {new Date().toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}
+          </span>
+          <span className="greeting">
+            <span className="app-header-name">{competition.name}</span>
+            <Icon name="chevron" size={20} strokeWidth={2.5} />
+          </span>
         </button>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="icon-btn header-gear" aria-label="Einstellungen" onClick={() => setTab('settings')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </button>
-          <button className="avatar-btn side-0" onClick={onOpenSwitcher} title="Challenges & Profil">
-            <Avatar userId={me} profile={profile} size={36} className="avatar-img" />
-          </button>
-        </div>
+        <button className={`avatar-btn${tab === 'settings' ? ' is-active' : ''}`}
+          onClick={() => setTab(tab === 'settings' ? 'home' : 'settings')}
+          aria-label="Profil und Einstellungen">
+          <Avatar userId={me} profile={profile} size={44} />
+        </button>
       </header>
 
       <main className="app-main">
@@ -656,23 +651,24 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
         </>)}
       </main>
 
-      <nav className="tabbar">
+      <nav className="tabbar" aria-label="Hauptnavigation">
         <div className="tabbar-inner">
-          <button className={`tab-btn ${tab === 'home' ? 'active' : ''}`} onClick={() => setTab('home')}>
-            <Icon name="home" /> Heute
-          </button>
-          <button className={`tab-btn ${tab === 'feed' ? 'active' : ''}`} onClick={() => setTab('feed')}>
-            <Icon name="feed" /> Feed
-          </button>
-          <button className={`tab-btn ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
-            <Icon name="trophy" /> Stats
-          </button>
-          {usePenalties && (
-            <button className={`tab-btn ${tab === 'strafkonto' ? 'active' : ''}`} onClick={() => setTab('strafkonto')}>
-              <Icon name="scale" /> Strafkonto
-              {openPenaltyCount > 0 && <span className="tab-badge">{openPenaltyCount}</span>}
+          {[
+            { id: 'home', icon: 'home', label: 'Heute' },
+            { id: 'feed', icon: 'feed', label: 'Feed' },
+            { id: 'history', icon: 'stats', label: 'Stats' },
+            ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: 'Strafkonto', badge: openPenaltyCount }] : []),
+          ].map(t => (
+            <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`}
+              aria-current={tab === t.id ? 'page' : undefined}
+              onClick={() => setTab(t.id)}>
+              <span className="tab-icon">
+                <Icon name={t.icon} size={22} />
+                {t.badge > 0 && <span className="tab-badge" aria-label={`${t.badge} offene Strafen`}>{t.badge}</span>}
+              </span>
+              {t.label}
             </button>
-          )}
+          ))}
         </div>
       </nav>
 

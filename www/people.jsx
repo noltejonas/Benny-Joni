@@ -8,11 +8,11 @@
 // Eine „Seite“ ist, was im Vergleich gegeneinander antritt:
 //   1v1 / Jeder gegen jeden → eine Person pro Seite
 //   2v2                     → ein Team pro Seite
-// Seite 0 ist immer ich bzw. mein Team (grün), Seite 1 der Gegner (blau),
+// Seite 0 ist immer ich bzw. mein Team (Petrol), Seite 1 der Gegner (Apricot),
 // weitere Seiten bekommen Farben aus SIDE_COLORS über die CSS-Variable --sc.
 
-const SIDE_COLORS = ['#32d74b', '#0a84ff', '#ff9f0a', '#bf5af2', '#ff375f', '#64d2ff',
-                     '#ffd60a', '#ac8e68', '#30b0c7', '#ff6482', '#5e5ce6', '#a2845e'];
+const SIDE_COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0',
+                     '#C9A23F', '#5D6F87', '#3FA38C', '#C77A5A', '#6C6FD1', '#A08A6A'];
 
 const PTPeople = (() => {
   let byId = {};

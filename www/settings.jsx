@@ -3,10 +3,10 @@ const { useState, useEffect, useMemo } = React;
 
 function AppearanceCard() {
   const [theme, setThemeState] = useState(() => {
-    try { return localStorage.getItem('pt:theme') || 'dark'; } catch (e) { return 'dark'; }
+    try { return localStorage.getItem('pt:theme2') || 'light'; } catch (e) { return 'light'; }
   });
   const applyTheme = (next) => {
-    try { localStorage.setItem('pt:theme', next); } catch (e) {}
+    try { localStorage.setItem('pt:theme2', next); } catch (e) {}
     window.dispatchEvent(new CustomEvent('pt:theme-change', { detail: { theme: next } }));
     setThemeState(next);
   };
@@ -14,8 +14,8 @@ function AppearanceCard() {
     <div className="card">
       <div className="label" style={{margin:0, marginBottom:10}}>Erscheinungsbild</div>
       <div className="segmented">
-        <button className={theme==='dark'?'active':''} onClick={() => applyTheme('dark')}>Dunkel</button>
         <button className={theme==='light'?'active':''} onClick={() => applyTheme('light')}>Hell</button>
+        <button className={theme==='dark'?'active':''} onClick={() => applyTheme('dark')}>Dunkel</button>
       </div>
     </div>
   );
