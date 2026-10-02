@@ -1,9 +1,10 @@
-/* global React, ReactDOM, PTData, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, AuthScreen, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
-// User edits these to point to their Supabase project. Empty = demo mode.
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjenl5dXB4eHFyZGdiZWlmY3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDYyMjgsImV4cCI6MjA5NDA4MjIyOH0.2Bz6R3N3p3evHXB7j5cKamq2egHrE1zYfgLcV2R8awg";
+
+const ACTIVE_KEY = 'pt_active_competition';
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "theme": "dark",
@@ -12,9 +13,18 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "notifications": true
 } /*EDITMODE-END*/;
 
+function Loader({ text = 'Lade Daten…' }) {
+  return (
+    <div className="app-loader" role="status" aria-live="polite">
+      <div className="app-loader-spinner" aria-hidden="true" />
+      <div className="app-loader-text">{text}</div>
+    </div>
+  );
+}
+
+// ─── Hülle: Session, Profil, Challenge-Auswahl ──────────────────────────────
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { switching, triggerSwitch } = window.useAccountSwitch();
 
   useEffect(() => {
     if (!sessionStorage.getItem('pt_persistent_style_v1')) {
@@ -45,12 +55,237 @@ function App() {
     document.documentElement.style.setProperty('--accent', t.accent);
   }, [t.accent]);
 
-  // Data API (Supabase or demo)
   const api = useMemo(() => PTData.init({ url: SUPABASE_URL, key: SUPABASE_ANON_KEY }), []);
 
-  // Current user
-  const [me, setMe] = useState(() => localStorage.getItem('pt_me') || null);
-  useEffect(() => {if (me) localStorage.setItem('pt_me', me);}, [me]);
+  const [session, setSession] = useState(undefined); // undefined = lädt, null = abgemeldet
+  const [profile, setProfile] = useState(null);
+  const [competitions, setCompetitions] = useState(null);
+  const [activeId, setActiveId] = useState(null);
+  const [accountError, setAccountError] = useState('');
+  const [sheet, setSheet] = useState(null); // 'switcher' | 'create' | 'join' | 'profile'
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!api) return;
+    api.getSession().then(setSession).catch(() => setSession(null));
+    return api.onAuthChange((s) => setSession(s));
+  }, [api]);
+
+  const userId = session?.user?.id || null;
+
+  // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
+  const pickActive = useCallback((p, list, current) => {
+    const usable = list.filter(c => !c.archived_at);
+    const valid = (id) => id && list.some(c => c.id === id);
+    if (valid(current)) return current;
+    if (valid(p.main_competition_id) && usable.some(c => c.id === p.main_competition_id)) return p.main_competition_id;
+    let last = null;
+    try { last = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+    if (valid(last)) return last;
+    return usable[0]?.id || null;
+  }, []);
+
+  const loadAccount = useCallback(async (preferId) => {
+    if (!api || !userId) return;
+    try {
+      const [p, list] = await Promise.all([api.getMyProfile(), api.listMyCompetitions()]);
+      PTPeople.set([p]);
+      setProfile(p);
+      setCompetitions(list);
+      setActiveId(cur => pickActive(p, list, preferId ?? cur));
+      setAccountError('');
+    } catch (e) {
+      console.error('loadAccount failed', e);
+      setAccountError(e.message || String(e));
+    }
+  }, [api, userId, pickActive]);
+
+  useEffect(() => {
+    if (userId) loadAccount();
+    else { setProfile(null); setCompetitions(null); setActiveId(null); }
+  }, [userId, loadAccount]);
+
+  useEffect(() => {
+    if (activeId) { try { localStorage.setItem(ACTIVE_KEY, activeId); } catch (e) {} }
+  }, [activeId]);
+
+  // Push-Tap mit competition_id → passende Challenge öffnen
+  useEffect(() => {
+    const onOpen = (e) => {
+      const id = e?.detail?.competitionId;
+      if (id && competitions?.some(c => c.id === id)) setActiveId(id);
+    };
+    window.addEventListener('pt:open-competition', onOpen);
+    return () => window.removeEventListener('pt:open-competition', onOpen);
+  }, [competitions]);
+
+  async function signOut() {
+    if (!confirm('Abmelden?')) return;
+    try {
+      const saved = localStorage.getItem('pt_apns_token');
+      if (saved) { await api.deleteDeviceToken(saved).catch(() => {}); localStorage.removeItem('pt_apns_token'); }
+    } catch (e) {}
+    setSheet(null);
+    await api.signOut();
+  }
+
+  async function setMain(id) {
+    try {
+      const p = await api.updateProfile({ main_competition_id: id });
+      setProfile(p);
+      setToast(id ? 'Haupt-Challenge gesetzt ★' : 'Haupt-Challenge entfernt');
+    } catch (e) { alert(e.message); }
+  }
+
+  if (!api) {
+    return (
+      <div className="name-picker">
+        <div className="brand">Projekt Terminator</div>
+        <h1>Keine Verbindung</h1>
+        <p className="sub">Die App braucht Internet, um deine Challenges zu laden.</p>
+        <button className="btn" onClick={() => location.reload()}>Erneut versuchen</button>
+      </div>
+    );
+  }
+  if (session === undefined) return <Loader text="Starte…" />;
+  if (!session) return <AuthScreen api={api} />;
+  if (accountError && !profile) {
+    return (
+      <div className="name-picker">
+        <div className="brand">Projekt Terminator</div>
+        <h1>Laden fehlgeschlagen</h1>
+        <p className="sub">{accountError}</p>
+        <button className="btn" onClick={() => loadAccount()}>Erneut versuchen</button>
+        <button className="btn-link" style={{ marginTop: 16 }} onClick={() => api.signOut()}>Abmelden</button>
+      </div>
+    );
+  }
+  if (!profile || !competitions) return <Loader text="Lade Profil…" />;
+
+  const active = competitions.find(c => c.id === activeId) || null;
+
+  const sheets = (
+    <>
+      <ChallengeSwitcherSheet open={sheet === 'switcher'} onClose={() => setSheet(null)}
+        profile={profile} competitions={competitions} activeId={activeId}
+        onSelect={(id) => { setActiveId(id); setSheet(null); }}
+        onSetMain={setMain}
+        onCreate={() => setSheet('create')}
+        onJoin={() => setSheet('join')}
+        onProfile={() => setSheet('profile')}
+        onSignOut={signOut} />
+      <CreateCompetitionSheet open={sheet === 'create'} api={api} onClose={() => setSheet(null)}
+        onCreated={async (c) => { setSheet(null); await loadAccount(c.id); setActiveId(c.id); }} />
+      <JoinCompetitionSheet open={sheet === 'join'} api={api} onClose={() => setSheet(null)}
+        onJoined={async (id) => { setSheet(null); await loadAccount(id); setActiveId(id); setToast('Willkommen in der Challenge 💪'); }} />
+      <ProfileSheet open={sheet === 'profile'} api={api} profile={profile} onClose={() => setSheet(null)}
+        onSignOut={signOut}
+        onSaved={(p, opts) => { PTPeople.set([p]); setProfile(p); if (!opts?.keepOpen) { setSheet(null); setToast('Profil gespeichert'); } }} />
+      <Toast message={toast} onDone={() => setToast('')} />
+    </>
+  );
+
+  if (!active) {
+    return (
+      <>
+        <OnboardingScreen profile={profile}
+          onCreate={() => setSheet('create')} onJoin={() => setSheet('join')}
+          onProfile={() => setSheet('profile')} onSignOut={signOut} />
+        {sheets}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <CompetitionApp key={active.id}
+        api={api} competition={active} profile={profile} me={profile.id}
+        competitions={competitions}
+        t={t} setTweak={setTweak}
+        onOpenSwitcher={() => setSheet('switcher')}
+        onCompetitionChanged={() => loadAccount()}
+        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }} />
+      {sheets}
+    </>
+  );
+}
+
+// ─── Wochen-Recaps (pure) ───────────────────────────────────────────────────
+function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides, members }) {
+  if (!allChallenges.length || !sides.length) return [];
+  const byWeek = {};
+  for (const ch of allChallenges) (byWeek[ch.week_start] ||= []).push(ch);
+  const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+  const firstWeekStart = Object.keys(byWeek).sort()[0];
+  const firstMonday = new Date(firstWeekStart + 'T00:00:00');
+  const now = new Date();
+  const out = [];
+  for (const ws of Object.keys(byWeek)) {
+    const monday = new Date(ws + 'T00:00:00');
+    const sundayEnd = new Date(monday); sundayEnd.setDate(monday.getDate() + 6); sundayEnd.setHours(23,59,59,999);
+    if (now <= sundayEnd) continue;
+    const challs = byWeek[ws];
+    const participants = PTData.participantsFor(members, ws);
+    const challStats = challs.map(ch => {
+      const isWorkCh = (catById[ch.category_id]?.kind || 'sports') === 'work';
+      const val = (s) => isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
+      const csets = allSets.filter(s => s.challenge_id === ch.id);
+      const doneBySide = totalsBySide(csets, sides, val);
+      const total = doneBySide.reduce((a, x) => a + x, 0);
+      const hitBySide = doneBySide.map(d => d >= ch.target_reps);
+      const fairShare = PTData.fairShareOf(ch.target_reps, participants.length || sides.length);
+      return { ch, cat: catById[ch.category_id], total, doneBySide, hitBySide, hit: hitBySide.every(Boolean), isWorkCh, val, fairShare };
+    });
+    const totals = sides.map((_, i) => challStats.reduce((s, x) => s + x.doneBySide[i], 0));
+    const sumAll = totals.reduce((a, x) => a + x, 0);
+    const winnerIdx = uniqueMaxIndex(totals);
+    const ranked = totals.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
+    const diff = ranked.length > 1 ? ranked[0].v - ranked[1].v : ranked[0]?.v || 0;
+    const hitCount = challStats.filter(c => c.hit).length;
+    const allWork = challStats.length > 0 && challStats.every(c => c.isWorkCh);
+    const unit = allWork ? 'min' : 'Reps';
+    const winnerLabel = winnerIdx != null ? sides[winnerIdx].label : null;
+    let analysis;
+    if (sumAll === 0) analysis = 'Stille Woche. Auf in die nächste!';
+    else if (winnerIdx == null) analysis = 'Unentschieden an der Spitze — perfekt ausbalanciert.';
+    else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winnerLabel} dominiert mit ${diff} ${unit} Vorsprung.`;
+    else if (diff / sumAll > 0.15) analysis = `${winnerLabel} setzt sich durch — ${diff} ${unit} Vorsprung.`;
+    else analysis = `Knapper Sieg für ${winnerLabel} — nur ${diff} ${unit} Unterschied.`;
+
+    const weekSets = allSets.filter(s => challs.some(ch => ch.id === s.challenge_id));
+    const sideIdx = window.sideIndexByUser(sides);
+    const perSide = sides.map((side, i) => {
+      const own = weekSets.filter(s => sideIdx[s.athlete] === i);
+      const byCat = challStats
+        .filter(c => c.doneBySide[i] > 0)
+        .map(c => ({ name: c.cat?.name || '—', reps: c.doneBySide[i] }))
+        .sort((a, b) => b.reps - a.reps);
+      const maxSet = own.reduce((m, s) => {
+        const stat = challStats.find(c => c.ch.id === s.challenge_id);
+        return Math.max(m, stat ? stat.val(s) : (s.reps ?? 0));
+      }, 0);
+      return { byCat, setCount: own.length, maxSet };
+    });
+    const weekPens = penalties.filter(p => p.week_start === ws);
+    const penCentsBySide = sides.map((_, i) =>
+      weekPens.filter(p => sideIdx[p.athlete] === i).reduce((a, p) => a + p.amount_cents, 0));
+    const weekNumber = Math.round((monday - firstMonday) / (7 * 86400000)) + 1;
+    out.push({
+      kind: 'recap', id: `recap-${ws}`, week_start: ws, created_at: sundayEnd.toISOString(),
+      weekNumber, challStats, totals, winnerIdx, diff, sumAll, hitCount, totalChallenges: challs.length,
+      perSide, penCentsBySide, analysis,
+    });
+  }
+  return out;
+}
+
+// ─── App pro Challenge ──────────────────────────────────────────────────────
+function CompetitionApp({ api, competition: initialCompetition, profile, me, t, setTweak,
+  onOpenSwitcher, onCompetitionChanged, onLeft }) {
+  const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
+
+  const [competition, setCompetition] = useState(initialCompetition);
+  useEffect(() => { setCompetition(c => ({ ...c, ...initialCompetition })); }, [initialCompetition]);
 
   // Tabs
   const [tab, setTab] = useState(() => {
@@ -59,8 +294,12 @@ function App() {
   useEffect(() => {
     try { sessionStorage.setItem('pt:tab', tab); } catch {}
   }, [tab]);
+  useEffect(() => {
+    if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
+  }, [tab, competition.penalties_enabled]);
 
   // Data
+  const [members, setMembers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [allChallenges, setAllChallenges] = useState([]);
   const [feed, setFeed] = useState([]);
@@ -70,7 +309,6 @@ function App() {
   const [penalties, setPenalties] = useState([]);
   const [closures, setClosures] = useState([]);
   const [openClosures, setOpenClosures] = useState([]);
-  const [penaltyConfig, setPenaltyConfig] = useState(null);
   const [payouts, setPayouts] = useState([]);
   const [projectTags, setProjectTags] = useState([]);
   const [toolTags, setToolTags]       = useState([]);
@@ -86,113 +324,36 @@ function App() {
   const [toast, setToast] = useState('');
   const lastFeedRef = React.useRef(null);
 
+  const sides = useMemo(() => buildSides(competition, members, me), [competition, members, me]);
+  const allowWork = !!competition.work_enabled;
+  const usePenalties = !!competition.penalties_enabled;
+  const useRotation = !!competition.rotation_enabled;
+
   // This week
   const weekStart = PTData.isoDate(PTData.mondayOf(new Date()));
   const currentChallenges = allChallenges.filter((c) => c.week_start === weekStart);
+  const participantsNow = useMemo(() => PTData.participantsFor(members, weekStart), [members, weekStart]);
 
   const weekTemplate = useMemo(() => {
-    if (!PTData.weekTemplateFor || !rotationConfig || !planSlots.length) return [];
+    if (!useRotation || !rotationConfig || !planSlots.length) return [];
     return PTData.weekTemplateFor({ weekStart, slots: planSlots, config: rotationConfig });
-  }, [weekStart, planSlots, rotationConfig]);
+  }, [useRotation, weekStart, planSlots, rotationConfig]);
 
   // Next week preview — actual challenges if already set up, otherwise rotation suggestions.
-  const nextWeekStart = useMemo(() => {
-    const d = new Date(weekStart + 'T00:00:00');
-    d.setDate(d.getDate() + 7);
-    return PTData.isoDate(d);
-  }, [weekStart]);
+  const nextWeekStart = useMemo(() => PTData.addDays(weekStart, 7), [weekStart]);
   const nextWeekChallenges = useMemo(
     () => allChallenges.filter(c => c.week_start === nextWeekStart),
     [allChallenges, nextWeekStart]
   );
   const nextWeekProposals = useMemo(() => {
-    if (!PTData.suggestForWeek || !rotationConfig || !planSlots.length) return [];
+    if (!useRotation || !rotationConfig || !planSlots.length) return [];
     return PTData.suggestForWeek({ weekStart: nextWeekStart, slots: planSlots, config: rotationConfig });
-  }, [nextWeekStart, planSlots, rotationConfig]);
+  }, [useRotation, nextWeekStart, planSlots, rotationConfig]);
 
-  // Wochenabschluss-Recaps für jede abgeschlossene Woche (Sonntag 23:59:59 < jetzt)
-  const weekRecaps = useMemo(() => {
-    if (!allChallenges.length) return [];
-    const byWeek = {};
-    for (const ch of allChallenges) {
-      (byWeek[ch.week_start] ||= []).push(ch);
-    }
-    const catById = Object.fromEntries(categories.map(c => [c.id, c]));
-    const firstWeekStart = Object.keys(byWeek).sort()[0];
-    const firstMonday = new Date(firstWeekStart + 'T00:00:00');
-    const now = new Date();
-    const out = [];
-    for (const ws of Object.keys(byWeek)) {
-      const monday = new Date(ws + 'T00:00:00');
-      const sundayEnd = new Date(monday); sundayEnd.setDate(monday.getDate() + 6); sundayEnd.setHours(23,59,59,999);
-      if (now <= sundayEnd) continue;
-      const challs = byWeek[ws];
-      const challStats = challs.map(ch => {
-        const isWorkCh = (catById[ch.category_id]?.kind || 'sports') === 'work';
-        const val = (s) => isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
-        const csets = allSets.filter(s => s.challenge_id === ch.id);
-        const bennyDone = csets.filter(s => s.athlete === 'Benny').reduce((a,x)=>a+val(x), 0);
-        const jonasDone = csets.filter(s => s.athlete === 'Jonas').reduce((a,x)=>a+val(x), 0);
-        const total = bennyDone + jonasDone;
-        const bennyHit = bennyDone >= ch.target_reps;
-        const jonasHit = jonasDone >= ch.target_reps;
-        return { ch, cat: catById[ch.category_id], total, bennyDone, jonasDone, bennyHit, jonasHit, hit: bennyHit && jonasHit, isWorkCh, val };
-      });
-      const bennyTotal = challStats.reduce((s,x)=>s+x.bennyDone,0);
-      const jonasTotal = challStats.reduce((s,x)=>s+x.jonasDone,0);
-      const sumAll = bennyTotal + jonasTotal;
-      const winner = bennyTotal === jonasTotal ? null : (bennyTotal > jonasTotal ? 'Benny' : 'Jonas');
-      const diff = Math.abs(bennyTotal - jonasTotal);
-      const hitCount = challStats.filter(c => c.hit).length;
-      const allWork = challStats.length > 0 && challStats.every(c => c.isWorkCh);
-      const unit = allWork ? 'min' : 'Reps';
-      let analysis;
-      if (sumAll === 0) analysis = 'Stille Woche. Auf in die nächste!';
-      else if (!winner) analysis = 'Unentschieden — perfekt ausbalanciert.';
-      else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winner} dominiert mit ${diff} ${unit} Vorsprung.`;
-      else if (diff / sumAll > 0.15) analysis = `${winner} setzt sich durch — ${diff} ${unit} Vorsprung.`;
-      else analysis = `Knapper Sieg für ${winner} — nur ${diff} ${unit} Unterschied.`;
-      const bennyByCat = challStats
-        .filter(c => c.bennyDone > 0)
-        .map(c => ({ name: c.cat?.name || '—', reps: c.bennyDone }))
-        .sort((a, b) => b.reps - a.reps);
-      const jonasByCat = challStats
-        .filter(c => c.jonasDone > 0)
-        .map(c => ({ name: c.cat?.name || '—', reps: c.jonasDone }))
-        .sort((a, b) => b.reps - a.reps);
-      // Per-athlete set-level aggregates across all challenges this week
-      const weekSets = allSets.filter(s => challs.some(ch => ch.id === s.challenge_id));
-      const bennySets = weekSets.filter(s => s.athlete === 'Benny');
-      const jonasSets = weekSets.filter(s => s.athlete === 'Jonas');
-      const bennySetCount = bennySets.length;
-      const jonasSetCount = jonasSets.length;
-      const bennyMaxSet = bennySets.reduce((m, s) => {
-        const stat = challStats.find(c => c.ch.id === s.challenge_id);
-        return Math.max(m, stat ? stat.val(s) : (s.reps ?? 0));
-      }, 0);
-      const jonasMaxSet = jonasSets.reduce((m, s) => {
-        const stat = challStats.find(c => c.ch.id === s.challenge_id);
-        return Math.max(m, stat ? stat.val(s) : (s.reps ?? 0));
-      }, 0);
-      const weekNumber = Math.round((monday - firstMonday) / (7 * 86400000)) + 1;
-      const weekPens = penalties.filter(p => p.week_start === ws);
-      const bennyPenCents = weekPens.filter(p => p.athlete === 'Benny').reduce((a,p)=>a+p.amount_cents, 0);
-      const jonasPenCents = weekPens.filter(p => p.athlete === 'Jonas').reduce((a,p)=>a+p.amount_cents, 0);
-      out.push({
-        kind: 'recap',
-        id: `recap-${ws}`,
-        week_start: ws,
-        created_at: sundayEnd.toISOString(),
-        weekNumber,
-        challStats, bennyTotal, jonasTotal, winner, diff, sumAll, hitCount, totalChallenges: challs.length,
-        bennyByCat, jonasByCat,
-        bennySetCount, jonasSetCount, bennyMaxSet, jonasMaxSet,
-        bennyPenCents, jonasPenCents,
-        analysis,
-      });
-    }
-    return out;
-  }, [allChallenges, allSets, categories, penalties]);
+  const weekRecaps = useMemo(
+    () => buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides, members }),
+    [allChallenges, allSets, categories, penalties, sides, members]
+  );
 
   const feedItems = useMemo(() => {
     // Past-week sets are represented by their WeekRecap card — drop the
@@ -210,40 +371,39 @@ function App() {
     try {
       for (const p of picks) {
         if (currentChallenges.find(c => c.category_id === p.category_id)) continue;
-        try {
-          await api.upsertChallenge({
-            week_start: weekStart,
-            category_id: p.category_id,
-            chosen_by: me,
-            target_reps: p.target_reps,
-          });
-        } catch (inner) {
-          // Unique constraint = already exists, skip silently
-          if (!inner.message?.includes('bereits')) throw inner;
-        }
+        await capi.upsertChallenge({
+          week_start: weekStart,
+          category_id: p.category_id,
+          chosen_by: me,
+          target_reps: p.target_reps,
+        });
       }
-      setToast(`Woche fixiert – los geht's, ${me}!`);
+      setToast(`Woche fixiert – los geht's, ${profile.display_name.split(/\s+/)[0]}!`);
       reload();
     } catch (e) { alert(e.message); }
   }
 
   const reload = useCallback(async () => {
     try {
-      const [cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, penCfg, pys, projTags, toolTagsData] = await Promise.all([
-      api.getCategories(),
-      api.listChallenges(),
-      api.recentFeed(100),
-      api.getAllSets ? api.getAllSets() : api.recentFeed(10000),
-      api.getPlanSlots ? api.getPlanSlots() : [],
-      api.getRotationConfig ? api.getRotationConfig() : null,
-      api.listPenalties ? api.listPenalties() : [],
-      api.listClosures ? api.listClosures() : [],
-      api.listOpenClosures ? api.listOpenClosures() : [],
-      api.getPenaltyConfig ? api.getPenaltyConfig() : null,
-      api.listPayouts ? api.listPayouts() : [],
-      api.getProjectTags ? api.getProjectTags() : [],
-      api.getToolTags    ? api.getToolTags()    : [],
+      const [comp, mems, cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, pys, projTags, toolTagsData] = await Promise.all([
+        capi.getCompetition(),
+        capi.getMembers(),
+        capi.getCategories(),
+        capi.listChallenges(),
+        capi.recentFeed(100),
+        capi.getAllSets(),
+        capi.getPlanSlots(),
+        capi.getRotationConfig(),
+        capi.listPenalties(),
+        capi.listClosures(),
+        capi.listOpenClosures(),
+        capi.listPayouts(),
+        capi.getProjectTags(),
+        capi.getToolTags(),
       ]);
+      PTPeople.set(mems.map(m => m.profile).filter(Boolean));
+      setCompetition(comp);
+      setMembers(mems);
       setCategories(cats);
       setAllChallenges(challs);
       setFeed(feedData);
@@ -253,7 +413,6 @@ function App() {
       setPenalties(pens || []);
       setClosures(cls || []);
       setOpenClosures(openCls || []);
-      setPenaltyConfig(penCfg);
       setPayouts(pys || []);
       setProjectTags(projTags || []);
       setToolTags(toolTagsData || []);
@@ -264,20 +423,26 @@ function App() {
         notify(feedData[0]);
       }
       lastFeedRef.current = feedData[0]?.id || null;
+
+      // Mitgliedschaft beendet (entfernt oder Challenge gelöscht)
+      if (!mems.some(m => m.user_id === me && !m.left_at)) onLeft?.();
     } catch (e) {
       console.error('reload failed', e);
+      // Challenge nicht mehr sichtbar (entfernt worden) → zurück zur Auswahl
+      if (e?.code === 'PGRST116') onLeft?.();
     } finally {
       setLoading(false);
     }
-  }, [api, me, t.notifications]);
+  }, [capi, me, t.notifications]);
 
   function notify(set) {
     const isWork = set.category?.kind === 'work';
+    const who = PTPeople.firstNameOf(set.athlete);
     const valStr = isWork ? window.formatDuration?.(set.duration_minutes) ?? `${set.duration_minutes}m` : `+${set.reps}`;
-    setToast(`${set.athlete}: ${valStr} ${set.category?.name || ''}`);
+    setToast(`${who}: ${valStr} ${set.category?.name || ''}`);
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`${isWork ? '💻' : '💪'} ${set.athlete} hat geliefert`, {
-        body: `${valStr} ${set.category?.name || (isWork ? 'min' : 'Reps')}`,
+      new Notification(`${isWork ? '💻' : '💪'} ${who} hat geliefert`, {
+        body: `${valStr} ${set.category?.name || (isWork ? 'min' : 'Reps')} · ${competition.name}`,
         icon: '/favicon.ico'
       });
     }
@@ -285,24 +450,22 @@ function App() {
 
   useEffect(() => {
     reload();
-    const off = api.onChange(reload);
+    const off = capi.onChange(reload);
     return off;
-  }, [api, reload]);
+  }, [capi, reload]);
 
   // Ask for notification permission on first interaction
   useEffect(() => {
-    if (!me) return;
     if (!('Notification' in window)) return;
     if (Notification.permission === 'default' && t.notifications) {
       // Defer to first user gesture to avoid blocking
       const ask = () => {Notification.requestPermission();document.removeEventListener('click', ask);};
       document.addEventListener('click', ask, { once: true });
     }
-  }, [me, t.notifications]);
+  }, [t.notifications]);
 
   // Native APNs registration (Capacitor only — web uses the Notification API above)
   useEffect(() => {
-    if (!me) return;
     const Push = window.PTPushNotifications?.PushNotifications;
     if (!Push) return; // not running natively, nothing to do
 
@@ -334,14 +497,16 @@ function App() {
 
         const onReg = await Push.addListener('registration', async (info) => {
           try {
-            await api.upsertDeviceToken({ token: info.value, athlete: me, platform: 'ios' });
+            await api.upsertDeviceToken({ token: info.value, platform: 'ios' });
             localStorage.setItem('pt_apns_token', info.value);
           } catch (e) { console.warn('upsertDeviceToken failed', e); }
         });
         const onErr = await Push.addListener('registrationError', (e) => {
           console.warn('Push registrationError', e);
         });
-        const onTap = await Push.addListener('pushNotificationActionPerformed', () => {
+        const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
+          const competitionId = action?.notification?.data?.competition_id;
+          if (competitionId) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId } }));
           window.dispatchEvent(new CustomEvent('pt:nav-feed'));
         });
         // Foreground deliveries: do nothing here. Supabase Realtime + the
@@ -362,68 +527,41 @@ function App() {
     return () => window.removeEventListener('pt:nav-feed', onNavFeed);
   }, []);
 
-  // ─── Name picker (initial) ────────────────────────────────────────────────
-  if (!me) {
-    return (
-      <div className="name-picker">
-        <div className="brand">Projekt Terminator</div>
-        <h1>Wer trainiert?</h1>
-        <p className="sub">Wähle deinen Namen aus. Beide trainieren auf das gleiche Wochenziel hin.</p>
-        <div className="name-tiles">
-          <button className="name-tile benny" onClick={() => setMe('Benny')}>
-            <div className="name-tile-initial">B</div>
-            Benny
-          </button>
-          <button className="name-tile jonas" onClick={() => setMe('Jonas')}>
-            <div className="name-tile-initial">J</div>
-            Jonas
-          </button>
-        </div>
-      </div>);
-
-  }
-
-  const other = me === 'Benny' ? 'Jonas' : 'Benny';
+  const setupCategories = allowWork ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
+  const openPenaltyCount = usePenalties ? penalties.filter(p => !p.paid).length : 0;
 
   return (
     <div className="app">
       <header className="app-header">
-        <div>
-          <div className="greeting">{todayGreeting()}, {me}</div>
-          <div className="date">{new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-        </div>
+        <button className="mu-header-title" onClick={onOpenSwitcher} aria-label="Challenge wechseln">
+          <div className="greeting">{todayGreeting()}, {profile.display_name.split(/\s+/)[0]}</div>
+          <div className="date mu-header-comp">
+            <span className="mu-header-emoji">{competition.emoji}</span>
+            <span className="mu-header-name">{competition.name}</span>
+            <span className="mu-header-caret">▾</span>
+          </div>
+        </button>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span className={`conn-pill ${api.mode === 'demo' ? 'demo' : ''}`}>
-            <span className="dot"></span> {api.mode === 'demo' ? 'Demo' : 'Live'}
-          </span>
           <button className="icon-btn header-gear" aria-label="Einstellungen" onClick={() => setTab('settings')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
-          <button
-            className={`avatar-btn ${me.toLowerCase()}${switching ? ' switching' : ''}`}
-            onClick={(e) => triggerSwitch(other, e.currentTarget, setMe)}
-            disabled={switching}
-            title="Benutzer wechseln">
-            <img src={`uploads/${me.toLowerCase()}.jpg`} alt={me} className="avatar-img" />
+          <button className="avatar-btn side-0" onClick={onOpenSwitcher} title="Challenges & Profil">
+            <Avatar userId={me} profile={profile} size={36} className="avatar-img" />
           </button>
         </div>
       </header>
 
       <main className="app-main">
-        {loading ? (
-          <div className="app-loader" role="status" aria-live="polite">
-            <div className="app-loader-spinner" aria-hidden="true" />
-            <div className="app-loader-text">Lade Daten…</div>
-          </div>
-        ) : (<>
-        {api.mode === 'demo' && tab === 'home' &&
-        <div className="banner">
-            <div className="banner-icon">!</div>
-            <div className="banner-text" style={{ borderRadius: "14px" }}>
-              <strong>Demo-Modus.</strong> Trag in <code>index.html</code> deine Supabase-URL & Key ein. Siehe SETUP.md.
+        {loading ? <Loader /> : (<>
+        {tab === 'home' && sides.length < 2 && (
+          <div className="banner mu-invite-banner">
+            <div className="banner-icon">👋</div>
+            <div className="banner-text">
+              <strong>Noch allein hier.</strong> Lade Freunde mit dem Code <span className="mono">{competition.invite_code}</span> ein.
+              <button className="btn-link" onClick={() => window.shareInvite(competition)}>Einladen</button>
             </div>
           </div>
-        }
+        )}
 
         {tab === 'home' && !currentChallenges.length && !proposalDismissed && weekTemplate.length > 0 &&
           <WeekFixCard template={weekTemplate} categories={categories} me={me}
@@ -433,8 +571,10 @@ function App() {
 
         {tab === 'home' &&
         <HomeScreen
-          api={api}
+          api={capi}
           me={me}
+          sides={sides}
+          participantCount={participantsNow.length}
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
@@ -443,7 +583,7 @@ function App() {
           nextWeekStart={nextWeekStart}
           nextWeekChallenges={nextWeekChallenges}
           nextWeekProposals={nextWeekProposals}
-          openClosures={openClosures}
+          openClosures={usePenalties ? openClosures : []}
           onCloseWeek={(w) => setClosingWeek(w)}
           onAddGoal={() => setSetupForChallenge({})}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
@@ -453,19 +593,18 @@ function App() {
               const cat = categories.find(c => c.id === ch.category_id);
               const isWork = cat?.kind === 'work';
               const payload = isWork
-                ? { challenge_id: ch.id, athlete: me, reps: null, duration_minutes: parseInt(val), note: null }
-                : { challenge_id: ch.id, athlete: me, reps: parseInt(val), note: null };
-              await api.addSet(payload);
+                ? { challenge_id: ch.id, reps: null, duration_minutes: parseInt(val), note: null }
+                : { challenge_id: ch.id, reps: parseInt(val), note: null };
+              await capi.addSet(payload);
               setToast(`+${val} ${isWork ? 'min 💻' : 'geloggt 💪'}`);
               reload();
             } catch (e) { alert(e.message); }
           }} />
-
         }
 
-        {tab === 'strafkonto' &&
+        {tab === 'strafkonto' && usePenalties &&
         <StrafkontoScreen
-          api={api} me={me}
+          api={capi} me={me} sides={sides} members={members}
           penalties={penalties}
           closures={closures}
           openClosures={openClosures}
@@ -474,16 +613,15 @@ function App() {
           onOpenSettings={() => setTab('settings')} />
         }
 
-        {tab === 'feed' && <FeedScreen feed={feedItems} me={me} categories={categories}
+        {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}
           projectTags={projectTags} toolTags={toolTags}
-          onEditSet={async (s, patch) => { try { await api.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
-          onDeleteSet={async (s) => { try { await api.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
+          onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
+          onDeleteSet={async (s) => { try { await capi.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
           onToggleReaction={async (s, emoji) => {
-            if (!me) { alert('Bitte zuerst Athlet wählen'); return; }
             const mineHas = (s.reactions || []).some(r => r.athlete === me && r.emoji === emoji);
             try {
-              if (mineHas) await api.removeReaction({ set_id: s.id, athlete: me, emoji });
-              else await api.addReaction({ set_id: s.id, athlete: me, emoji });
+              if (mineHas) await capi.removeReaction({ set_id: s.id, emoji });
+              else await capi.addReaction({ set_id: s.id, emoji });
               reload();
             } catch (e) { alert(e.message); }
           }}
@@ -491,20 +629,28 @@ function App() {
           onBackfill={() => setBackfillOpen(true)} />}
 
         {tab === 'history' &&
-        <HistoryScreen
+        <StatsTab
+          api={api}
+          me={me}
+          profile={profile}
+          competition={competition}
+          sides={sides}
           challenges={allChallenges}
           categories={categories}
           allSets={allSets} />
-
         }
 
         {tab === 'settings' &&
-        <SettingsScreen api={api} categories={categories} onAddCategory={reload}
+        <SettingsScreen api={capi} baseApi={api} categories={categories} onAddCategory={reload}
           me={me}
+          competition={competition}
+          members={members}
           notificationsEnabled={t.notifications}
           onSetNotifications={(v) => setTweak('notifications', v)}
           projectTags={projectTags}
           toolTags={toolTags}
+          onCompetitionChanged={() => { reload(); onCompetitionChanged?.(); }}
+          onLeft={onLeft}
           reload={reload} />
         }
         </>)}
@@ -521,26 +667,27 @@ function App() {
           <button className={`tab-btn ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
             <Icon name="trophy" /> Stats
           </button>
-          <button className={`tab-btn ${tab === 'strafkonto' ? 'active' : ''}`} onClick={() => setTab('strafkonto')}>
-            <Icon name="scale" /> Strafkonto
-            {penalties.filter(p => !p.paid).length > 0 && (
-              <span className="tab-badge">{penalties.filter(p => !p.paid).length}</span>
-            )}
-          </button>
+          {usePenalties && (
+            <button className={`tab-btn ${tab === 'strafkonto' ? 'active' : ''}`} onClick={() => setTab('strafkonto')}>
+              <Icon name="scale" /> Strafkonto
+              {openPenaltyCount > 0 && <span className="tab-badge">{openPenaltyCount}</span>}
+            </button>
+          )}
         </div>
       </nav>
 
       {closingWeek && (
-        <WeekCloseSheet weekStart={closingWeek} api={api} me={me}
+        <WeekCloseSheet weekStart={closingWeek} api={capi} me={me}
           onClose={() => setClosingWeek(null)}
           onDone={() => { setClosingWeek(null); setToast('Woche abgeschlossen'); reload(); }} />
       )}
 
       <Sheet open={!!setupForChallenge} onClose={() => setSetupForChallenge(null)}>
         <SetupSheet
-          api={api}
+          api={capi}
           me={me}
-          categories={categories}
+          categories={setupCategories}
+          allowWork={allowWork}
           weekStart={weekStart}
           existing={setupForChallenge?.id ? setupForChallenge : null}
           usedCategoryIds={currentChallenges.filter(c => c.id !== setupForChallenge?.id).map(c => c.category_id)}
@@ -560,7 +707,7 @@ function App() {
           if (ctype === 'tom_holland') {
             return (
               <TomHollandSheet
-                api={api}
+                api={capi}
                 me={me}
                 challenge={logForChallenge}
                 allSets={allSets}
@@ -575,7 +722,7 @@ function App() {
           if (ctype === 'bring_sally_up') {
             return (
               <BringSallySheet
-                api={api}
+                api={capi}
                 me={me}
                 challenge={logForChallenge}
                 allSets={allSets}
@@ -590,7 +737,7 @@ function App() {
           }
           return (
             <LogSheet
-              api={api}
+              api={capi}
               me={me}
               challenge={logForChallenge}
               category={logCat}
@@ -609,10 +756,12 @@ function App() {
 
       <Sheet open={backfillOpen} onClose={() => setBackfillOpen(false)}>
         <BackfillSheet
-          api={api}
+          api={capi}
           me={me}
           challenges={currentChallenges}
           categories={categories}
+          projectTags={projectTags}
+          toolTags={toolTags}
           onClose={() => setBackfillOpen(false)}
           onSaved={(r) => {setBackfillOpen(false);setToast(`+${r} nachgetragen`);reload();}} />
       </Sheet>
@@ -621,9 +770,9 @@ function App() {
         <EmojiPickerSheet
           onClose={() => setPickerForSet(null)}
           onPick={async (emoji) => {
-            if (!me || !pickerForSet) { setPickerForSet(null); return; }
+            if (!pickerForSet) { setPickerForSet(null); return; }
             try {
-              await api.addReaction({ set_id: pickerForSet.id, athlete: me, emoji });
+              await capi.addReaction({ set_id: pickerForSet.id, emoji });
               setPickerForSet(null);
               reload();
             } catch (e) { alert(e.message); }

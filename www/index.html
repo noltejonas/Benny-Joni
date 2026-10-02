@@ -21,8 +21,26 @@
 <body>
   <div id="root"></div>
 
-  <!-- Supabase client (loaded; used only if keys are set in app.jsx) -->
+  <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+  <script>
+    // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
+    // @capacitor/preferences, im Browser localStorage (Wert null).
+    window.PTPreferencesReady = new Promise(function (resolve) { window.__ptResolvePreferences = resolve; });
+  </script>
+  <script type="module">
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/preferences@8/+esm');
+        window.__ptResolvePreferences(mod);
+      } else {
+        window.__ptResolvePreferences(null);
+      }
+    } catch (e) {
+      window.__ptResolvePreferences(null);
+    }
+  </script>
 
   <script type="module">
     // Expose Capacitor Haptics globally for our non-module JSX files.
@@ -62,6 +80,7 @@
 
   <!-- Shared components -->
   <script type="text/babel" src="components.jsx"></script>
+  <script type="text/babel" src="people.jsx"></script>
   <script type="text/babel" src="celebration.jsx"></script>
 
   <!-- Screens -->
@@ -71,8 +90,9 @@
   <!-- Settings / rotation plan -->
   <script type="text/babel" src="settings.jsx"></script>
 
-  <!-- Account switch effect (must load before app.jsx so window.useAccountSwitch is defined) -->
-  <script type="text/babel" src="account-switch.jsx"></script>
+  <!-- Login, Challenges, Stats über alle Challenges -->
+  <script type="text/babel" src="competitions.jsx"></script>
+  <script type="text/babel" src="stats-global.jsx"></script>
 
   <!-- App -->
   <script type="text/babel" src="app.jsx"></script>

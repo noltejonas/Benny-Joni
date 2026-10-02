@@ -28,7 +28,7 @@ function NotificationsCard({ enabled, onChange }) {
         <div>
           <div className="label" style={{margin:0}}>Benachrichtigungen</div>
           <div className="subtitle" style={{fontSize:13,marginTop:2}}>
-            Push, wenn der/die andere heute schon &gt;100 Reps hat und du noch bei 0 bist. Max 1×/Tag.
+            Push, wenn jemand aus deiner Challenge heute schon &gt;100 Reps hat und du noch bei 0 bist. Max 1×/Tag pro Challenge.
           </div>
         </div>
         <label className="toggle-switch">
@@ -127,7 +127,7 @@ function WorkTagsCard({ api, projectTags, toolTags, reload }) {
   );
 }
 
-function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, onSetNotifications, me, projectTags, toolTags, reload: reloadProp }) {
+function SettingsScreen({ api, baseApi, competition, members = [], onCompetitionChanged, onLeft, categories, onAddCategory, notificationsEnabled, onSetNotifications, me, projectTags, toolTags, reload: reloadProp }) {
   const [slots, setSlots] = useState([]);
   const [config, setConfig] = useState(null);
   const [penaltyCfg, setPenaltyCfg] = useState(null);
@@ -244,7 +244,7 @@ function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, 
         if (match) {
           await api.upsertChallenge({ id: match.id, week_start: weekStart, category_id: t.category_id, chosen_by: match.chosen_by, target_reps: t.base_reps });
         } else {
-          await api.upsertChallenge({ week_start: weekStart, category_id: t.category_id, chosen_by: 'Benny', target_reps: t.base_reps });
+          await api.upsertChallenge({ week_start: weekStart, category_id: t.category_id, chosen_by: me, target_reps: t.base_reps });
         }
       }
     } catch (e) { if (!silent) alert(e.message); }
@@ -254,12 +254,17 @@ function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, 
 
   return (
     <div>
+      {competition && baseApi && window.CompetitionSettingsCard && (
+        <CompetitionSettingsCard api={baseApi} capi={api} competition={competition} members={members} me={me}
+          onChanged={() => { onCompetitionChanged?.(); reload(); }} onLeft={onLeft} />
+      )}
       <AppearanceCard />
       <NotificationsCard enabled={notificationsEnabled} onChange={onSetNotifications}/>
-      {penaltyCfg !== null && window.PenaltyConfigCard && (
+      {competition?.penalties_enabled && penaltyCfg !== null && window.PenaltyConfigCard && (
         <PenaltyConfigCard api={api} cfg={penaltyCfg} me={me} onChange={reloadPenalty}/>
       )}
-      {reloadProp && <WorkTagsCard api={api} projectTags={projectTags || []} toolTags={toolTags || []} reload={reloadProp} />}
+      {competition?.work_enabled && reloadProp && <WorkTagsCard api={api} projectTags={projectTags || []} toolTags={toolTags || []} reload={reloadProp} />}
+      {competition?.rotation_enabled && <>
       <div className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
@@ -323,6 +328,8 @@ function SettingsScreen({ api, categories, onAddCategory, notificationsEnabled, 
           Aktuelle Woche auf Basis-Reps setzen
         </button>
       )}
+
+      </>}
 
       {error && <div style={{color:'var(--danger)', marginTop:12}}>{error}</div>}
     </div>
@@ -442,7 +449,7 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
         <div>
           <div className="weekfix-label">Neue Woche</div>
           <div className="weekfix-title">Reps für diese Woche fixieren</div>
-          <div className="weekfix-sub">Wer zuerst da ist, setzt das Ziel für beide.</div>
+          <div className="weekfix-sub">Wer zuerst da ist, setzt das Ziel für alle.</div>
         </div>
         {onDismiss && (
           <button className="weekfix-dismiss" aria-label="Später" onClick={onDismiss}>×</button>

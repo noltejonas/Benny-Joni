@@ -1,4 +1,4 @@
-/* global React, PTData, Sheet */
+/* global React, PTData, Sheet, PTPeople */
 const { useState } = React;
 
 function formatEuro(cents) {
@@ -25,7 +25,7 @@ function reasonText(p) {
   }
 }
 
-function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts = [], onChange, onOpenSettings }) {
+function StrafkontoScreen({ api, me, members = [], penalties, closures, openClosures, payouts = [], onChange, onOpenSettings }) {
   const [closing, setClosing] = useState(null);
   const [penaltyEdit, setPenaltyEdit] = useState(null);
   const [reopenWk, setReopenWk] = useState(null);
@@ -36,10 +36,19 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts 
   const totalPayouts   = payouts.reduce((a, p) => a + p.amount_cents, 0);
   const potOpen        = totalPenalties - totalPayouts;
 
-  const penBenny = penalties.filter(p => p.athlete === 'Benny').reduce((a, p) => a + p.amount_cents, 0);
-  const penJonas = penalties.filter(p => p.athlete === 'Jonas').reduce((a, p) => a + p.amount_cents, 0);
-  const payBenny = payouts.filter(p => p.athlete === 'Benny').reduce((a, p) => a + p.amount_cents, 0);
-  const payJonas = payouts.filter(p => p.athlete === 'Jonas').reduce((a, p) => a + p.amount_cents, 0);
+  // Pro Person (auch Ausgetretene, solange sie Strafen/Einzahlungen haben); ich zuerst.
+  const people = [...new Set([me, ...members.map(m => m.user_id), ...penalties.map(p => p.athlete), ...payouts.map(p => p.athlete)])]
+    .filter(Boolean)
+    .map(id => ({
+      id,
+      pen: penalties.filter(p => p.athlete === id).reduce((a, p) => a + p.amount_cents, 0),
+      pay: payouts.filter(p => p.athlete === id).reduce((a, p) => a + p.amount_cents, 0),
+    }))
+    .filter(x => x.id === me || x.pen > 0 || x.pay > 0 || members.some(m => m.user_id === x.id && !m.left_at));
+  const anyPen = people.some(x => x.pen > 0);
+  const anyPay = people.some(x => x.pay > 0);
+  const who = (id) => id === me ? 'Du' : PTPeople.firstNameOf(id);
+  const cls = (id) => id === me ? 'b' : 'j';
 
   const closuresWithoutPenalty = closures.filter(c => !penalties.find(p => p.week_start === c.week_start));
 
@@ -72,33 +81,30 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts 
       <div className="strafkonto-pot">
         <div className="strafkonto-pot-amount mono">{formatEuro(Math.max(0, potOpen))}</div>
         <div className="strafkonto-pot-label">offen</div>
-        {(penBenny > 0 || penJonas > 0) && (
+        {anyPen && (
           <div className="strafkonto-stats">
             <div className="strafkonto-stat">
               <div className="strafkonto-stat-label">Schulden (Beitrag)</div>
-              <div className="strafkonto-stat-row">
-                <span className="b">Benny {formatEuro(penBenny)}</span>
-                <span className="j">Jonas {formatEuro(penJonas)}</span>
+              <div className="strafkonto-stat-row mu-wrap">
+                {people.map(x => <span key={x.id} className={cls(x.id)}>{who(x.id)} {formatEuro(x.pen)}</span>)}
               </div>
             </div>
-            {(payBenny > 0 || payJonas > 0) && (
+            {anyPay && (
               <div className="strafkonto-stat">
                 <div className="strafkonto-stat-label">Eingezahlt</div>
-                <div className="strafkonto-stat-row">
-                  <span className="b">Benny {formatEuro(payBenny)}</span>
-                  <span className="j">Jonas {formatEuro(payJonas)}</span>
+                <div className="strafkonto-stat-row mu-wrap">
+                  {people.map(x => <span key={x.id} className={cls(x.id)}>{who(x.id)} {formatEuro(x.pay)}</span>)}
                 </div>
               </div>
             )}
             <div className="strafkonto-stat">
               <div className="strafkonto-stat-label">Saldo</div>
-              <div className="strafkonto-stat-row">
-                <span className={`b ${penBenny - payBenny <= 0 ? 'positive' : ''}`}>
-                  Benny {penBenny - payBenny > 0 ? '–' : ''}{formatEuro(Math.abs(penBenny - payBenny))}
-                </span>
-                <span className={`j ${penJonas - payJonas <= 0 ? 'positive' : ''}`}>
-                  Jonas {penJonas - payJonas > 0 ? '–' : ''}{formatEuro(Math.abs(penJonas - payJonas))}
-                </span>
+              <div className="strafkonto-stat-row mu-wrap">
+                {people.map(x => (
+                  <span key={x.id} className={`${cls(x.id)} ${x.pen - x.pay <= 0 ? 'positive' : ''}`}>
+                    {who(x.id)} {x.pen - x.pay > 0 ? '–' : ''}{formatEuro(Math.abs(x.pen - x.pay))}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -127,10 +133,10 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts 
           {penalties.map(p => (
             <div key={p.id} className="penalty-row" onClick={() => setPenaltyEdit(p)}>
               <div className="penalty-row-main">
-                <div className="penalty-row-head">{weekLabel(p.week_start)} · {p.athlete}</div>
+                <div className="penalty-row-head">{weekLabel(p.week_start)} · {PTPeople.nameOf(p.athlete)}</div>
                 <div className="penalty-row-meta">{reasonText(p)}</div>
               </div>
-              <div className={`penalty-row-amount mono ${p.athlete === 'Benny' ? 'b' : 'j'}`}>
+              <div className={`penalty-row-amount mono ${cls(p.athlete)}`}>
                 –{formatEuro(p.amount_cents)}
               </div>
             </div>
@@ -145,11 +151,11 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts 
             <div key={p.id} className="penalty-row payout" onClick={() => setPayoutEdit(p)}>
               <div className="penalty-row-main">
                 <div className="penalty-row-head">
-                  {p.athlete} · {new Date(p.paid_at).toLocaleDateString('de-DE')}
+                  {PTPeople.nameOf(p.athlete)} · {new Date(p.paid_at).toLocaleDateString('de-DE')}
                 </div>
                 {p.note && <div className="penalty-row-meta">„{p.note}"</div>}
               </div>
-              <div className={`penalty-row-amount mono ${p.athlete === 'Benny' ? 'b' : 'j'}`}>
+              <div className={`penalty-row-amount mono ${cls(p.athlete)}`}>
                 +{formatEuro(p.amount_cents)}
               </div>
             </div>
@@ -188,7 +194,7 @@ function StrafkontoScreen({ api, me, penalties, closures, openClosures, payouts 
           onDone={() => { setReopenWk(null); onChange?.(); }}/>
       )}
       {addPayout && (
-        <PayoutSheet api={api} me={me} potOpen={potOpen}
+        <PayoutSheet api={api} me={me} members={members} potOpen={potOpen}
           onClose={() => setAddPayout(false)}
           onDone={() => { setAddPayout(false); onChange?.(); }}/>
       )}
@@ -213,7 +219,7 @@ function PenaltyEditSheet({ penalty, api, onClose, onReopen, onDone }) {
     <Sheet open={true} onClose={onClose}>
       <h2 className="title" style={{marginBottom:8}}>Strafe</h2>
       <div className="subtitle" style={{marginBottom:18}}>
-        {weekLabel(penalty.week_start)} · {penalty.athlete} · {formatEuro(penalty.amount_cents)}
+        {weekLabel(penalty.week_start)} · {PTPeople.nameOf(penalty.athlete)} · {formatEuro(penalty.amount_cents)}
       </div>
       <div style={{color:'var(--text-2)',marginBottom:18,fontSize:15}}>
         {reasonText(penalty)} · gebucht {new Date(penalty.created_at).toLocaleDateString('de-DE')}
@@ -246,7 +252,7 @@ function ReopenSheet({ weekStart, api, penalties, onClose, onDone }) {
           {weekPenalties.length} Strafe(n) dieser Woche werden ebenfalls gelöscht:
           <ul style={{margin:'6px 0 0 18px',padding:0}}>
             {weekPenalties.map(p => (
-              <li key={p.id}>{p.athlete} — {formatEuro(p.amount_cents)}</li>
+              <li key={p.id}>{PTPeople.nameOf(p.athlete)} — {formatEuro(p.amount_cents)}</li>
             ))}
           </ul>
         </div>
@@ -259,8 +265,9 @@ function ReopenSheet({ weekStart, api, penalties, onClose, onDone }) {
   );
 }
 
-function PayoutSheet({ api, me, potOpen, onClose, onDone }) {
-  const [athlete, setAthlete] = useState(me === 'Jonas' ? 'Jonas' : 'Benny');
+function PayoutSheet({ api, me, members = [], potOpen, onClose, onDone }) {
+  const [athlete, setAthlete] = useState(me);
+  const active = members.filter(m => !m.left_at);
   const defaultEur = potOpen > 0 ? Math.round(potOpen / 100) : 5;
   const [amount, setAmount] = useState(String(defaultEur));
   const [note, setNote] = useState('');
@@ -279,10 +286,12 @@ function PayoutSheet({ api, me, potOpen, onClose, onDone }) {
       <h2 className="title" style={{marginBottom:8}}>Einzahlung verbuchen</h2>
       <div className="subtitle" style={{marginBottom:18}}>Wer hat wieviel beglichen?</div>
 
-      <div className="label" style={{marginBottom:8}}>Athlet</div>
-      <div className="segmented" style={{marginBottom:16}}>
-        {['Benny','Jonas'].map(n => (
-          <button key={n} className={athlete===n?'active':''} onClick={() => setAthlete(n)}>{n}</button>
+      <div className="label" style={{marginBottom:8}}>Wer?</div>
+      <div className="chip-row" style={{marginBottom:16, flexWrap:'wrap'}}>
+        {active.map(m => (
+          <button key={m.user_id} className={`chip ${athlete===m.user_id?'chip-active':''}`} onClick={() => setAthlete(m.user_id)}>
+            {m.user_id === me ? 'Ich' : m.profile?.display_name}
+          </button>
         ))}
       </div>
 
@@ -317,7 +326,7 @@ function PayoutEditSheet({ payout, api, onClose, onDone }) {
     <Sheet open={true} onClose={onClose}>
       <h2 className="title" style={{marginBottom:8}}>Einzahlung</h2>
       <div className="subtitle" style={{marginBottom:18}}>
-        {payout.athlete} · {formatEuro(payout.amount_cents)} · {new Date(payout.paid_at).toLocaleDateString('de-DE')}
+        {PTPeople.nameOf(payout.athlete)} · {formatEuro(payout.amount_cents)} · {new Date(payout.paid_at).toLocaleDateString('de-DE')}
       </div>
       {payout.note && (
         <div style={{marginBottom:18,color:'var(--text-2)',fontSize:15}}>„{payout.note}"</div>
@@ -342,7 +351,7 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
 
   async function confirm() {
     setBusy(true);
-    try { await api.closeWeek(weekStart, me); onDone(); }
+    try { await api.closeWeek(weekStart); onDone(); }
     catch (e) { alert(e.message); onClose(); } finally { setBusy(false); }
   }
 
@@ -357,14 +366,14 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
           <div className="subtitle" style={{marginBottom:12}}>Folgende Strafen werden gebucht:</div>
           {pens.map((p, i) => (
             <div key={i} style={{padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-              <div style={{fontWeight:600}}>{p.athlete} — {formatEuro(p.amount_cents)}</div>
+              <div style={{fontWeight:600}}>{PTPeople.nameOf(p.athlete)} — {formatEuro(p.amount_cents)}</div>
               <div style={{fontSize:13,color:'var(--text-2)',marginTop:2}}>{p.reason}</div>
             </div>
           ))}
           <div style={{marginTop:12,fontWeight:700,fontSize:17}}>Gesamt: {formatEuro(total)}</div>
         </>
       ) : (
-        <div className="subtitle">✓ Beide haben geschafft. Keine Strafen.</div>
+        <div className="subtitle">✓ Alle haben ihren Anteil geschafft. Keine Strafen.</div>
       )}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:18}}>
         <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
