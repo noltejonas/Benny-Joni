@@ -229,9 +229,10 @@ button, input, select, textarea { font-family: inherit; }
 .icon-btn:hover { background: var(--surface-3); color: var(--text); }
 
 .input {
-  background: var(--surface-2); border: 1.5px solid transparent;
+  background: var(--surface); border: 1.5px solid var(--border);
   border-radius: 14px; color: var(--text);
 }
+.card .input, .sheet .input { background: var(--surface-2); border-color: transparent; }
 .input:focus { border-color: var(--primary); background: var(--surface); }
 
 .segmented {
