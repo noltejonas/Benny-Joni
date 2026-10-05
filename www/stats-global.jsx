@@ -53,7 +53,8 @@ function AllTimeStats({ me, profile, bundle, comps }) {
     const chById = Object.fromEntries(bundle.challenges.map(c => [c.id, c]));
     const isWork = (s) => catById[chById[s.challenge_id]?.category_id]?.kind === 'work';
     const mine = bundle.sets.filter(s => s.athlete === me);
-    const sport = mine.filter(s => !isWork(s));
+    // Pflicht-Workouts (Sekunden/Runden) zählen nicht als Wiederholungen.
+    const sport = mine.filter(s => !isWork(s) && !s.workout);
     const work = mine.filter(isWork);
     const totalReps = sport.reduce((a, s) => a + (s.reps ?? 0), 0);
     const totalMinutes = work.reduce((a, s) => a + (s.duration_minutes ?? 0), 0);
@@ -81,12 +82,16 @@ function AllTimeStats({ me, profile, bundle, comps }) {
       if (!cid) continue;
       const v = s.reps ?? s.duration_minutes ?? 0;
       const e = perCat[cid] ||= { cat: catById[cid], total: 0, sets: 0, best: 0, bestDay: 0 };
+      // Workout: total = Durchgänge, best = längste Zeit bzw. meiste Runden
+      if (s.workout) { e.total += 1; e.sets++; e.best = Math.max(e.best, v); continue; }
       e.total += v; e.sets++; e.best = Math.max(e.best, v);
       const k = `${cid}|${PTData.isoDate(new Date(s.created_at))}`;
       byDayCat[k] = (byDayCat[k] || 0) + v;
       e.bestDay = Math.max(e.bestDay, byDayCat[k]);
     }
-    const cats = Object.values(perCat).sort((a, b) => b.total - a.total);
+    const allCats = Object.values(perCat).sort((a, b) => b.total - a.total);
+    const cats = allCats.filter(e => !PTData.isWorkoutType(e.cat?.challenge_type));
+    const workouts = allCats.filter(e => PTData.isWorkoutType(e.cat?.challenge_type));
 
     // Wochen pro Challenge: Sieg, Podium, fairer Anteil geschafft
     const monday = PTData.isoDate(PTData.mondayOf(new Date()));
@@ -116,19 +121,20 @@ function AllTimeStats({ me, profile, bundle, comps }) {
         if (sides.length > 2 && rank <= 3) podiums++;
         const n = Math.max(1, participants.length);
         const metAll = chs.every(ch => {
-          const mineVal = wSets.filter(s => s.challenge_id === ch.id && s.athlete === me)
-            .reduce((a, s) => a + (s.reps ?? s.duration_minutes ?? 0), 0);
+          const mySets = wSets.filter(s => s.challenge_id === ch.id && s.athlete === me);
+          if (ch.workout) return mySets.length >= 1;
+          const mineVal = mySets.reduce((a, s) => a + (s.reps ?? s.duration_minutes ?? 0), 0);
           return mineVal >= PTData.fairShareOf(ch.target_reps, n);
         });
         if (metAll) sharesMet++;
       }
       weeksPlayed += played; weeksWon += wins;
-      const myTotal = compSets.filter(s => s.athlete === me).reduce((a, s) => a + (s.reps ?? s.duration_minutes ?? 0), 0);
+      const myTotal = compSets.filter(s => s.athlete === me).reduce((a, s) => a + PTData.setValue(s), 0);
       const allTotals = totalsBySide(compSets, sides);
       const rank = 1 + allTotals.filter(v => v > allTotals[0]).length;
       perComp.push({ c, played, wins, myTotal, rank, of: sides.length });
     }
-    return { totalReps, totalMinutes, activeDays: days.length, streak, longest, cats, weeksPlayed, weeksWon, podiums, sharesMet, perComp, setCount: mine.length };
+    return { totalReps, totalMinutes, activeDays: days.length, streak, longest, cats, workouts, weeksPlayed, weeksWon, podiums, sharesMet, perComp, setCount: mine.length };
   }, [bundle, comps, me]);
 
   if (!stats.setCount) {
@@ -174,6 +180,21 @@ function AllTimeStats({ me, profile, bundle, comps }) {
           </div>
         ))}
       </div>
+
+      {stats.workouts.length > 0 && (
+        <div className="card">
+          <div className="label" style={{ margin: 0, marginBottom: 10 }}>Workouts</div>
+          {stats.workouts.map(e => (
+            <div className="mu-cat-stat" key={e.cat?.id}>
+              <div className="mu-cat-stat-name">{e.cat?.emoji} {e.cat?.name}</div>
+              <div className="mu-cat-stat-vals mono">
+                <span><b>{e.total}×</b> gemacht</span>
+                <span>Bestwert {PTData.workoutValueLabel(e.cat.challenge_type, e.best)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="card">
         <div className="label" style={{ margin: 0, marginBottom: 10 }}>Pro Challenge</div>
