@@ -71,3 +71,54 @@ test('workoutPeopleDone zählt Personen mit mindestens einem Durchgang', () => {
   assert.equal(P.workoutPeopleDone(sets, ['u1', 'u2']), 1);
   assert.equal(P.workoutPeopleDone(sets, ['u1', 'u3']), 2);
 });
+
+const cfg = (rule_mode) => ({ rule_mode, amount_cents: 500 });
+
+test('per_challenge: Workout erfüllt mit einem Durchgang, fehlendes kostet', () => {
+  const challenges = weekChallenges();
+  const sets = [
+    { challenge_id: 'w-push', athlete: 'u1', reps: 60 },
+    { challenge_id: 'w-sally', athlete: 'u1', reps: 90 },
+  ];
+  P.annotateWorkouts(sets, challenges, cats);
+  const pens = P.computePenalties(challenges, sets, 'u1', cfg('per_challenge'), 2);
+  // Arrays aus dem vm-Kontext haben einen eigenen Prototyp → in normale Arrays übernehmen
+  assert.deepEqual([...pens.map(p => p.challenge_id)], ['w-th']);
+  assert.equal(pens[0].reason, 'Pflicht-Workout fehlt');
+});
+
+test('per_week_aggregate: fehlendes Workout lässt sich nicht mit Wiederholungen ausgleichen', () => {
+  const challenges = weekChallenges();
+  const sets = [
+    { challenge_id: 'w-push', athlete: 'u1', reps: 500 },
+    { challenge_id: 'w-sally', athlete: 'u1', reps: 120 },
+  ];
+  P.annotateWorkouts(sets, challenges, cats);
+  const pens = P.computePenalties(challenges, sets, 'u1', cfg('per_week_aggregate'), 2);
+  assert.equal(pens.length, 1);
+  assert.equal(pens[0].reason, 'Pflicht-Workout fehlt');
+});
+
+test('per_week_aggregate: Sally-Sekunden zählen nicht als Wiederholungen', () => {
+  const challenges = weekChallenges();
+  const sets = [
+    { challenge_id: 'w-push', athlete: 'u1', reps: 10 },
+    { challenge_id: 'w-sally', athlete: 'u1', reps: 204 },
+    { challenge_id: 'w-th', athlete: 'u1', reps: 9 },
+  ];
+  P.annotateWorkouts(sets, challenges, cats);
+  const pens = P.computePenalties(challenges, sets, 'u1', cfg('per_week_aggregate'), 2);
+  assert.equal(pens.length, 1);
+  assert.match(pens[0].reason, /unter fairShare/);
+});
+
+test('per_week_aggregate: alles erledigt ergibt keine Strafe', () => {
+  const challenges = weekChallenges();
+  const sets = [
+    { challenge_id: 'w-push', athlete: 'u1', reps: 50 },
+    { challenge_id: 'w-sally', athlete: 'u1', reps: 30 },
+    { challenge_id: 'w-th', athlete: 'u1', reps: 4 },
+  ];
+  P.annotateWorkouts(sets, challenges, cats);
+  assert.deepEqual([...P.computePenalties(challenges, sets, 'u1', cfg('per_week_aggregate'), 2)], []);
+});

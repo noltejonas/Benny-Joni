@@ -15,7 +15,7 @@
     if (localStorage.getItem('pt_demo') !== '1') return;
   } catch (e) { return; }
 
-  const { mondayOf, isoDate, addDays, computePenalties, participantsFor } = window.PTData;
+  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts } = window.PTData;
   const DB_KEY = 'pt_demo_db_v1';
   const ME = 'u-benny';
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
@@ -163,6 +163,7 @@
         week_closures.push({ competition_id: c.id, week_start: ws, closed_by_user: ME, created_at: addDays(ws, 7) + 'T09:00:00Z' });
         const chs = weekly_challenges.filter(x => x.competition_id === c.id && x.week_start === ws);
         const ss = sets.filter(x => chs.some(ch => ch.id === x.challenge_id)).map(x => ({ ...x, athlete: x.user_id }));
+        annotateWorkouts(ss, chs, categories);
         const parts = participantsFor(ms, ws);
         for (const m of parts) for (const p of computePenalties(chs, ss, m.user_id, cfg, parts.length)) {
           penalties.push({ id: id('p'), competition_id: c.id, week_start: ws, user_id: p.athlete, challenge_id: p.challenge_id,
@@ -424,6 +425,7 @@
         if (!cfg.enabled) return { penalties: [], cfg };
         const chs = mine('weekly_challenges').filter(c => c.week_start === ws);
         const ss = db.sets.filter(s => chs.some(c => c.id === s.challenge_id)).map(withAthlete);
+        annotateWorkouts(ss, chs, db.categories);
         const parts = participantsFor(membersOf(cid), ws);
         const pens = [];
         for (const m of parts) pens.push(...computePenalties(chs, ss, m.user_id, cfg, parts.length));

@@ -108,14 +108,19 @@
   }
 
   // ── Penalty system: pure computation ────────────────────────────────
-  function repsForAthleteOnChallenge(sets, athlete, challengeId) {
+  // Pflicht-Workouts (ch.workout, s. annotateWorkouts) zählen Durchgänge und
+  // verlangen einen pro Person.
+  function doneOnChallenge(sets, athlete, ch) {
     let total = 0;
     for (const s of sets) {
-      if (s.challenge_id === challengeId && s.athlete === athlete) {
-        total += s.reps ?? s.duration_minutes ?? 0;
+      if (s.challenge_id === ch.id && s.athlete === athlete) {
+        total += ch.workout ? 1 : (s.reps ?? s.duration_minutes ?? 0);
       }
     }
     return total;
+  }
+  function shareOn(ch, participantCount) {
+    return ch.workout ? 1 : fairShareOf(ch.target_reps, participantCount);
   }
 
   // Returns penalty descriptors for one athlete on one week.
@@ -127,19 +132,19 @@
     if (mode === 'per_challenge') {
       const out = [];
       for (const ch of challenges) {
-        const reps = repsForAthleteOnChallenge(sets, athlete, ch.id);
-        const share = fairShareOf(ch.target_reps, participantCount);
+        const reps = doneOnChallenge(sets, athlete, ch);
+        const share = shareOn(ch, participantCount);
         if (reps < share) out.push({
           athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
-          reason: `${share - reps} unter fairShare`,
+          reason: ch.workout ? 'Pflicht-Workout fehlt' : `${share - reps} unter fairShare`,
         });
       }
       return out;
     }
 
     const perCh = challenges.map(ch => {
-      const reps = repsForAthleteOnChallenge(sets, athlete, ch.id);
-      const share = fairShareOf(ch.target_reps, participantCount);
+      const reps = doneOnChallenge(sets, athlete, ch);
+      const share = shareOn(ch, participantCount);
       return { ch, reps, share, missed: reps < share };
     });
 
@@ -150,11 +155,14 @@
     } else if (mode === 'per_week_all') {
       failed = perCh.every(x => x.missed);
       reason = failed ? 'alle Challenges verfehlt' : '';
-    } else { // per_week_aggregate
-      const totalReps  = perCh.reduce((a, x) => a + x.reps, 0);
-      const totalShare = perCh.reduce((a, x) => a + x.share, 0);
-      failed = totalReps < totalShare;
-      reason = failed ? `aggregiert ${totalShare - totalReps} unter fairShare` : '';
+    } else { // per_week_aggregate — ein fehlendes Pflicht-Workout gleichen Wiederholungen nicht aus
+      const repCh = perCh.filter(x => !x.ch.workout);
+      const totalReps  = repCh.reduce((a, x) => a + x.reps, 0);
+      const totalShare = repCh.reduce((a, x) => a + x.share, 0);
+      const workoutMissed = perCh.some(x => x.ch.workout && x.missed);
+      failed = totalReps < totalShare || workoutMissed;
+      reason = totalReps < totalShare ? `aggregiert ${totalShare - totalReps} unter fairShare`
+        : workoutMissed ? 'Pflicht-Workout fehlt' : '';
     }
 
     return failed
@@ -668,9 +676,10 @@
       async previewWeekClose(weekStart) {
         const cfg = await api.getPenaltyConfig();
         if (!cfg.enabled) return { penalties: [], cfg };
-        const [chsRaw, members] = await Promise.all([
+        const [chsRaw, members, cats] = await Promise.all([
           api.getChallengeForWeek(weekStart),
           api.getMembers(),
+          api.getCategories(),
         ]);
         const chs = chsRaw || [];
         const chIds = chs.map(c => c.id);
@@ -679,6 +688,7 @@
           const data = check(await client.from('sets').select('*').in('challenge_id', chIds));
           wkSets = (data || []).map(normSet);
         }
+        annotateWorkouts(wkSets, chs, cats);
         const participants = participantsFor(members, weekStart);
         const pens = [];
         for (const m of participants) {
