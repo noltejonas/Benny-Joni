@@ -309,23 +309,30 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const rows = React.useMemo(() => tabChallenges.map(ch => {
     const cat = catById[ch.category_id];
     const isWork = cat?.kind === 'work';
+    const catType = cat?.challenge_type || 'standard';
+    // Pflicht-Workout: jeder Eintrag ist ein Durchgang, Ziel ist einer pro Person.
+    const isObligatory = PTData.isWorkoutType(catType);
     const val = (x) => isWork ? (x.duration_minutes ?? 0) : (x.reps ?? 0);
     const csets = allSets.filter(x => x.challenge_id === ch.id);
-    const doneBySide = totalsBySide(csets, sides, val);
-    const total = csets.reduce((a, x) => a + val(x), 0);
+    const doneBySide = isObligatory
+      ? sides.map(side => PTData.workoutPeopleDone(csets, side.statUserIds || side.userIds))
+      : totalsBySide(csets, sides, val);
+    const total = isObligatory
+      ? doneBySide.reduce((a, x) => a + x, 0)
+      : csets.reduce((a, x) => a + val(x), 0);
+    const people = participantCount || sides.length || 1;
     // Fairer Anteil pro Person (Ziel / aktive Teilnehmer)
-    const share = PTData.fairShareOf(ch.target_reps, participantCount || sides.length || 1);
+    const share = isObligatory ? 1 : PTData.fairShareOf(ch.target_reps, people);
+    const goal = isObligatory ? people : ch.target_reps;
     const expectedByEod = Math.ceil(share * dayIndexInWeek(ch.week_start) / 7);
-    const catType = cat?.challenge_type || 'standard';
-    const isObligatory = catType === 'tom_holland' || catType === 'bring_sally_up';
     const mine = csets.filter(x => x.athlete === me);
-    const myDone = mine.reduce((a, x) => a + val(x), 0);
-    const myDoneThisWeek = mine.some(x => x.created_at && localDateOf(x.created_at) >= ch.week_start);
-    const meFinished = isObligatory ? myDoneThisWeek : myDone >= share;
+    const myDone = isObligatory ? mine.length : mine.reduce((a, x) => a + val(x), 0);
+    const meFinished = myDone >= share;
     return {
-      ch, cat, isWork, catType, isObligatory, total, doneBySide, share,
-      leader: uniqueMaxIndex(doneBySide),
+      ch, cat, isWork, catType, isObligatory, total, goal, doneBySide, share,
+      leader: isObligatory ? null : uniqueMaxIndex(doneBySide),
       myDone, meFinished,
+      mySummary: isObligatory ? PTData.workoutSummary(catType, mine) : '',
       myTodayLeft: Math.max(0, expectedByEod - myDone),
       fmt: (v) => isWork ? formatDuration(v) : v,
     };
@@ -342,7 +349,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const duelEntries = React.useMemo(() => sides.map((side, i) => ({
     side,
     wins: rows.filter(r => r.leader === i).length,
-    reps: rows.reduce((a, r) => a + (r.isWork ? 0 : r.doneBySide[i]), 0),
+    reps: rows.reduce((a, r) => a + (r.isWork || r.isObligatory ? 0 : r.doneBySide[i]), 0),
   })), [rows, sides]);
 
   // Tagesbalken: bei mehr als zwei Seiten „Du vs. Ø der anderen“
@@ -382,7 +389,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     );
   }
 
-  const fPct = focus ? Math.min(1, focus.total / focus.ch.target_reps) : 0;
+  const fPct = focus ? Math.min(1, focus.total / Math.max(1, focus.goal)) : 0;
 
   return (
     <>
@@ -412,10 +419,14 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
             </MiniRing>
           </div>
           <div className="rd-focus-chips">
-            <span className="rd-chip-glass">{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}{focus.isWork || focus.isObligatory ? '' : ' Reps'}</span>
             <span className="rd-chip-glass">
-              {focus.meFinished ? 'dein Teil ist erledigt'
-                : focus.isObligatory ? 'einmal diese Woche'
+              {focus.isObligatory
+                ? `${focus.total} von ${focus.goal} erledigt`
+                : <>{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}{focus.isWork ? '' : ' Reps'}</>}
+            </span>
+            <span className="rd-chip-glass">
+              {focus.isObligatory ? (focus.meFinished ? `du: ${focus.mySummary}` : 'einmal diese Woche')
+                : focus.meFinished ? 'dein Teil ist erledigt'
                 : focus.myTodayLeft > 0 ? `heute noch ${focus.fmt(focus.myTodayLeft)}` : 'du bist auf Kurs'}
             </span>
             <button className="rd-icon-glass" aria-label={`${focus.cat?.name} bearbeiten`} onClick={() => onEditChallenge(focus.ch)}>
@@ -443,7 +454,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
           {orderedRows.map(r => {
             const isFocus = focus && r.ch.id === focus.ch.id;
             const sub = r.isObligatory
-              ? (r.meFinished ? 'diese Woche erledigt' : 'einmal diese Woche')
+              ? (r.meFinished ? `erledigt · ${r.mySummary}` : 'einmal diese Woche')
               : r.meFinished
                 ? `${r.fmt(r.myDone)} von ${r.fmt(r.share)}`
                 : `${r.fmt(r.myDone)} von ${r.fmt(r.share)} · ${r.myTodayLeft > 0 ? `heute noch ${r.fmt(r.myTodayLeft)}` : 'auf Kurs'}`;
