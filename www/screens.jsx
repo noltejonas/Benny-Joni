@@ -536,10 +536,12 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
                       <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? `gewählt von ${nameOf(ch.chosen_by)}` : 'noch offen'}</span>
                     </span>
                     <span className="rd-row-value">
-                      {!isConfirmed && ch.bonus_max > 0
-                        ? <>{ch.target_reps}–{ch.target_reps + ch.bonus_max}</>
-                        : ch.target_reps}
-                      <small>Reps</small>
+                      {PTData.isWorkoutType(ctype) ? <>1×<small>pro Person</small></> : <>
+                        {!isConfirmed && ch.bonus_max > 0
+                          ? <>{ch.target_reps}–{ch.target_reps + ch.bonus_max}</>
+                          : ch.target_reps}
+                        <small>Reps</small>
+                      </>}
                     </span>
                   </div>
                 </li>
