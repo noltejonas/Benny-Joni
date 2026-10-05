@@ -200,6 +200,7 @@ function App() {
         competitions={competitions}
         t={t} setTweak={setTweak}
         onOpenSwitcher={() => setSheet('switcher')}
+        onOpenProfile={() => setSheet('profile')}
         onCompetitionChanged={() => loadAccount()}
         onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }} />
       {sheets}
@@ -285,7 +286,7 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
 
 // ─── App pro Challenge ──────────────────────────────────────────────────────
 function CompetitionApp({ api, competition: initialCompetition, profile, me, t, setTweak,
-  onOpenSwitcher, onCompetitionChanged, onLeft }) {
+  onOpenSwitcher, onOpenProfile, onCompetitionChanged, onLeft }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
 
   const [competition, setCompetition] = useState(initialCompetition);
@@ -656,6 +657,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
           toolTags={toolTags}
           onCompetitionChanged={() => { reload(); onCompetitionChanged?.(); }}
           onLeft={onLeft}
+          profile={profile}
+          onProfile={onOpenProfile}
           reload={reload} />
         }
         </>)}

@@ -127,7 +127,7 @@ function WorkTagsCard({ api, projectTags, toolTags, reload }) {
   );
 }
 
-function SettingsScreen({ api, baseApi, competition, members = [], onCompetitionChanged, onLeft, categories, onAddCategory, notificationsEnabled, onSetNotifications, me, projectTags, toolTags, reload: reloadProp }) {
+function SettingsScreen({ api, baseApi, competition, members = [], onCompetitionChanged, onLeft, categories, onAddCategory, notificationsEnabled, onSetNotifications, me, projectTags, toolTags, reload: reloadProp, profile, onProfile }) {
   const [slots, setSlots] = useState([]);
   const [config, setConfig] = useState(null);
   const [penaltyCfg, setPenaltyCfg] = useState(null);
@@ -254,6 +254,16 @@ function SettingsScreen({ api, baseApi, competition, members = [], onCompetition
 
   return (
     <div>
+      {profile && onProfile && (
+        <button className="mu-profile-row" style={{ marginBottom: 14 }} onClick={onProfile}>
+          <Avatar profile={profile} size={44} />
+          <span className="mu-profile-text">
+            <span className="mu-profile-name">{profile.display_name}</span>
+            <span className="mu-profile-sub">Profilbild, Name und Farbe ändern</span>
+          </span>
+          <span className="mu-chev">›</span>
+        </button>
+      )}
       {competition && baseApi && window.CompetitionSettingsCard && (
         <CompetitionSettingsCard api={baseApi} capi={api} competition={competition} members={members} me={me}
           onChanged={() => { onCompetitionChanged?.(); reload(); }} onLeft={onLeft} />
