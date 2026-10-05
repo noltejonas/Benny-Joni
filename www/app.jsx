@@ -224,14 +224,21 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
     const challs = byWeek[ws];
     const participants = PTData.participantsFor(members, ws);
     const challStats = challs.map(ch => {
-      const isWorkCh = (catById[ch.category_id]?.kind || 'sports') === 'work';
-      const val = (s) => isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
+      const cat = catById[ch.category_id];
+      const isWorkCh = (cat?.kind || 'sports') === 'work';
+      // Pflicht-Workouts fließen nicht in die Wiederholungs-Wertung; erreicht = jede Person ein Durchgang.
+      const workout = PTData.isWorkoutType(cat?.challenge_type) ? cat.challenge_type : null;
+      const val = (s) => workout ? 0 : isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
       const csets = allSets.filter(s => s.challenge_id === ch.id);
       const doneBySide = totalsBySide(csets, sides, val);
       const total = doneBySide.reduce((a, x) => a + x, 0);
-      const hitBySide = doneBySide.map(d => d >= ch.target_reps);
-      const fairShare = PTData.fairShareOf(ch.target_reps, participants.length || sides.length);
-      return { ch, cat: catById[ch.category_id], total, doneBySide, hitBySide, hit: hitBySide.every(Boolean), isWorkCh, val, fairShare };
+      const idsOf = (side) => side.statUserIds || side.userIds;
+      const countBySide = workout ? sides.map(side => csets.filter(s => idsOf(side).includes(s.athlete)).length) : null;
+      const hitBySide = workout
+        ? sides.map(side => PTData.workoutPeopleDone(csets, idsOf(side)) === idsOf(side).length)
+        : doneBySide.map(d => d >= ch.target_reps);
+      const fairShare = workout ? 1 : PTData.fairShareOf(ch.target_reps, participants.length || sides.length);
+      return { ch, cat, total, doneBySide, countBySide, hitBySide, hit: hitBySide.every(Boolean), isWorkCh, workout, val, fairShare };
     });
     const totals = sides.map((_, i) => challStats.reduce((s, x) => s + x.doneBySide[i], 0));
     const sumAll = totals.reduce((a, x) => a + x, 0);

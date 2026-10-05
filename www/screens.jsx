@@ -1437,12 +1437,18 @@ function WeekRecap({ recap, me, sides = [] }) {
             <span className="recap-chall-emoji">{c.cat?.emoji}</span>
             <span className="recap-chall-name">{c.cat?.name || '—'}</span>
             <span className="recap-chall-tally mono">
-              {twoSided ? <>
-                <span style={{color:'var(--side0-ink)'}}>{fmtRecapVal(c.doneBySide[0])}</span>
+              {c.workout ? (twoSided ? <>
+                <span style={{color:'var(--side0-ink)'}}>{c.countBySide[0]}×</span>
                 {' · '}
-                <span style={{color:'var(--side1-ink)'}}>{fmtRecapVal(c.doneBySide[1])}</span>
-              </> : <span>{fmtRecapVal(c.total)}</span>}
-              {' / '}{fmtRecapVal(c.ch.target_reps)}
+                <span style={{color:'var(--side1-ink)'}}>{c.countBySide[1]}×</span>
+              </> : <span>{c.countBySide.reduce((a, x) => a + x, 0)}×</span>) : <>
+                {twoSided ? <>
+                  <span style={{color:'var(--side0-ink)'}}>{fmtRecapVal(c.doneBySide[0])}</span>
+                  {' · '}
+                  <span style={{color:'var(--side1-ink)'}}>{fmtRecapVal(c.doneBySide[1])}</span>
+                </> : <span>{fmtRecapVal(c.total)}</span>}
+                {' / '}{fmtRecapVal(c.ch.target_reps)}
+              </>}
             </span>
             <span className={`recap-chall-badge ${c.hit?'hit':'miss'}`}>{c.hit?'✓':(c.hitBySide.some(Boolean)?'½':'🚧')}</span>
           </div>
