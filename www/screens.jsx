@@ -1650,7 +1650,9 @@ function FeedScreen({ feed, me, sides = [], categories = [], projectTags = [], t
           </div>
           {editing ? (
             <div className="feed-edit">
-              <div className="feed-edit-unit">{isWorkSet(s) ? 'min' : 'reps'}</div>
+              <div className="feed-edit-unit">{isWorkSet(s) ? 'min'
+                : s.category?.challenge_type === 'bring_sally_up' ? 'Sek.'
+                : s.category?.challenge_type === 'tom_holland' ? 'Runden' : 'reps'}</div>
               <input className="input mono" type="number" inputMode="numeric"
                 value={editVal} autoFocus
                 onChange={e => setEditVal(e.target.value)}
@@ -1720,11 +1722,14 @@ function StatsChart({ series, days }) {
   const fmt = (s) => { const d = new Date(s); return `${d.getDate()}.${d.getMonth()+1}`; };
 
   // Week boundaries — Mondays within the range
-  const weekMarks = [];
+  const allWeekMarks = [];
   for (let i = 0; i < axis.length; i++) {
     const d = new Date(axis[i].date);
-    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
+    if (d.getDay() === 1) allWeekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
   }
+  // Bei langen Zeiträumen nur jede n-te Woche markieren
+  const weekStep = Math.max(1, Math.ceil(allWeekMarks.length / 13));
+  const weekMarks = allWeekMarks.filter((_, k) => k % weekStep === 0);
   const showWeekLabels = weekMarks.length <= 5;
   // Flächen nur bei wenigen Linien, sonst wird es unleserlich
   const showArea = series.length <= 2;
@@ -1793,11 +1798,14 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * maxV));
 
   // Week boundaries — Mondays within the range
-  const weekMarks = [];
+  const allWeekMarks = [];
   for (let i = 0; i < axis.length; i++) {
     const d = new Date(axis[i].date);
-    if (d.getDay() === 1) weekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
+    if (d.getDay() === 1) allWeekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
   }
+  // Bei langen Zeiträumen nur jede n-te Woche beschriften
+  const weekStep = Math.max(1, Math.ceil(allWeekMarks.length / 12));
+  const weekMarks = allWeekMarks.filter((_, k) => k % weekStep === 0);
   const showArea = series.length <= 2;
 
   return (
@@ -2072,7 +2080,8 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
   // Which categories were actually used at some point — filter chip source
   const usedCats = useMemo(() => {
     const ids = new Set(challenges.map(c => c.category_id));
-    return categories.filter(c => ids.has(c.id));
+    // Pflicht-Workouts haben keine Wiederholungen — als Filter wären sie leer.
+    return categories.filter(c => ids.has(c.id) && !PTData.isWorkoutType(c.challenge_type));
   }, [categories, challenges]);
 
   // Map challenge_id -> category_id for fast filtering
@@ -2094,7 +2103,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       start = d;
       total = days;
     } else {
-      // all time — from earliest set
+      // all time — ab dem ersten Satz, ohne Obergrenze (Kennzahlen gelten für alles)
       const earliest = filteredSets.length
         ? new Date(filteredSets.reduce((m, s) => s.created_at < m ? s.created_at : m, filteredSets[0].created_at))
         : new Date();
@@ -2102,12 +2111,6 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
       start = earliest;
       const now = new Date(); now.setHours(0,0,0,0);
       total = Math.max(1, Math.round((now - start) / 86400000) + 1);
-      total = Math.min(total, 90); // cap for chart
-      if (total >= 90) {
-        const d2 = new Date(); d2.setHours(0,0,0,0);
-        d2.setDate(d2.getDate() - 89);
-        start = d2;
-      }
     }
     const arrs = sides.map(() => []);
     for (let i = 0; i < total; i++) {
@@ -2149,6 +2152,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     const acc = sides.map(() => ({ totalSets: 0, hits: 0 }));
     for (const ch of challenges) {
       if (catSet && !catSet.has(ch.category_id)) continue;
+      if (PTData.isWorkoutType(catById[ch.category_id]?.challenge_type)) continue;
       const chSets = (setsByCh[ch.id] || [])
         .slice()
         .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
@@ -2268,7 +2272,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
     for (const s of setsInRange) {
       const ch = chById[s.challenge_id];
       const si = sideIdx[s.athlete];
-      if (!ch || si == null) continue;
+      if (!ch || si == null || s.workout) continue;
       m[ch.category_id] ||= zeros();
       m[ch.category_id][si] += val(s);
     }
@@ -2667,20 +2671,34 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
           else groups.push({ weekStart: ch.week_start, items: [ch] });
         }
         const currentWeekStart = PTData.isoDate(PTData.mondayOf(new Date()));
-        const sideTotalsFor = (ch) => totalsBySide(setsByCh[ch.id] || [], sides);
-        const challengeIsDone = (ch) => sideTotalsFor(ch).every(v => v >= ch.target_reps);
+        const workoutOf = (ch) => {
+          const t = catById[ch.category_id]?.challenge_type;
+          return PTData.isWorkoutType(t) ? t : null;
+        };
+        const idsOf = (side) => side.statUserIds || side.userIds;
+        const goalFor = (ch, i) => workoutOf(ch) ? idsOf(sides[i]).length : ch.target_reps;
+        const goalLabel = (ch) => workoutOf(ch) ? 'Pflicht · 1× pro Person' : `Ziel ${ch.target_reps}`;
+        const sideTotalsFor = (ch) => workoutOf(ch)
+          ? sides.map(side => PTData.workoutPeopleDone(setsByCh[ch.id] || [], idsOf(side)))
+          : totalsBySide(setsByCh[ch.id] || [], sides);
+        const challengeIsDone = (ch) => sideTotalsFor(ch).every((v, i) => v >= goalFor(ch, i));
         const progressRows = (ch) => {
           const ts = sideTotalsFor(ch);
+          const workout = workoutOf(ch);
           return (
             <div className="right">
               {sides.map((side, i) => {
-                const pctV = Math.round(100 * ts[i] / ch.target_reps);
-                const done = ts[i] >= ch.target_reps;
+                const goal = goalFor(ch, i);
+                const pctV = Math.round(100 * ts[i] / Math.max(1, goal));
+                const done = ts[i] >= goal;
+                const valueText = workout
+                  ? PTData.workoutSummary(workout, (setsByCh[ch.id] || []).filter(s => idsOf(side).includes(s.athlete)))
+                  : `${ts[i]}/${ch.target_reps}`;
                 return (
                   <div key={side.key} style={{display:'flex',justifyContent:'flex-end',alignItems:'baseline',gap:8,marginTop: i ? 4 : 0}}>
                     <span className="mono" style={{color: colorOf(i),fontWeight:700,fontSize:15}}>{side.short}</span>
-                    <span className={`pct mono ${done ? 'done' : pctV < 50 ? 'miss' : ''}`} style={{fontSize:18}}>{pctV}%</span>
-                    <span className="wk mono" style={{minWidth:72,textAlign:'right'}}>{ts[i]}/{ch.target_reps}</span>
+                    <span className={`pct mono ${done ? 'done' : pctV < 50 ? 'miss' : ''}`} style={{fontSize:18}}>{workout ? (done ? '✓' : '–') : `${pctV}%`}</span>
+                    <span className="wk mono" style={{minWidth:72,textAlign:'right'}}>{valueText}</span>
                   </div>
                 );
               })}
@@ -2699,7 +2717,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                 <div>
                   <div className="wk">KW {weekNumber(ch.week_start)} · {formatWeek(ch.week_start)}</div>
                   <div className="cat">{cat?.emoji} {cat?.name}</div>
-                  <div className="wk" style={{ marginTop: 4 }}>Ziel {ch.target_reps}</div>
+                  <div className="wk" style={{ marginTop: 4 }}>{goalLabel(ch)}</div>
                 </div>
                 {progressRows(ch)}
               </div>
@@ -2720,7 +2738,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
                   <div className="week-group-item" key={ch.id}>
                     <div>
                       <div className="cat">{cat?.emoji} {cat?.name}</div>
-                      <div className="wk" style={{ marginTop: 2 }}>Ziel {ch.target_reps}</div>
+                      <div className="wk" style={{ marginTop: 2 }}>{goalLabel(ch)}</div>
                     </div>
                     {progressRows(ch)}
                   </div>
