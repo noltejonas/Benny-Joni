@@ -116,7 +116,7 @@ test('workoutPeopleDone zählt Personen mit mindestens einem Durchgang', () => {
 
 - [ ] **Step 2: Test laufen lassen, muss fehlschlagen**
 
-Run: `node --test tests/`
+Run: `node --test tests/*.test.cjs` (Node 25 braucht Dateipfade, kein Verzeichnis)
 Expected: FAIL, `P.isWorkoutType is not a function`.
 
 - [ ] **Step 3: Helfer implementieren** — in `www/data.js` direkt nach der Funktion `fairShareOf` (endet mit `return Math.ceil(targetReps / Math.max(1, participantCount));\n  }`) einfügen:
@@ -196,7 +196,7 @@ durch:
 
 - [ ] **Step 4: Tests grün**
 
-Run: `node --test tests/`
+Run: `node --test tests/*.test.cjs` (Node 25 braucht Dateipfade, kein Verzeichnis)
 Expected: alle 6 Tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -269,7 +269,7 @@ test('per_week_aggregate: alles erledigt ergibt keine Strafe', () => {
 
 - [ ] **Step 2: Tests laufen, die neuen schlagen fehl**
 
-Run: `node --test tests/`
+Run: `node --test tests/*.test.cjs` (Node 25 braucht Dateipfade, kein Verzeichnis)
 Expected: FAIL bei den drei `per_week_aggregate`/`per_challenge`-Tests (alte Logik summiert Sekunden).
 
 - [ ] **Step 3: `computePenalties` umbauen** — in `www/data.js` den Block von `// ── Penalty system: pure computation` bis einschließlich der Zeile `reason = failed ? \`aggregiert ${totalShare - totalReps} unter fairShare\` : '';` und der folgenden `}` ersetzen durch:
@@ -416,7 +416,7 @@ durch
 
 - [ ] **Step 6: Tests grün**
 
-Run: `node --test tests/`
+Run: `node --test tests/*.test.cjs` (Node 25 braucht Dateipfade, kein Verzeichnis)
 Expected: alle 10 Tests PASS.
 
 - [ ] **Step 7: Commit**
@@ -585,7 +585,7 @@ und in `getPersistentStyle`:
     if (total < challenge.target_reps) return null;
 ```
 
-- [ ] **Step 6: Tests weiter grün** — `node --test tests/` → PASS (JSX wird in Task 11 im Browser geprüft).
+- [ ] **Step 6: Tests weiter grün** — `node --test tests/*.test.cjs` → PASS (JSX wird in Task 11 im Browser geprüft).
 
 - [ ] **Step 7: Commit**
 
@@ -1363,7 +1363,7 @@ git commit -m "fix(ios): Push-Entitlement im App-Target einbinden"
     },
 ```
 
-- [ ] **Step 2: Starten** — `preview_start` mit Name `www (python, ohne npm)`, dann `http://localhost:8010/?demo=reset` und anschließend `http://localhost:8010/?demo` öffnen.
+- [ ] **Step 2: Starten** — Hinweis aus der Umsetzung: Der Vorschau-Prozess darf unter macOS nicht auf `~/Downloads` zugreifen (`os.getcwd()` → PermissionError). Deshalb `www/` per `rsync` in den Scratchpad kopieren und dort mit `/bin/sh -c "cd <kopie> && exec python3 -m http.server 8010"` starten; die `launch.json`-Änderung danach verwerfen statt committen. `preview_start` mit Name `www (python, ohne npm)`, dann `http://localhost:8010/?demo=reset` und anschließend `http://localhost:8010/?demo` öffnen.
 
 - [ ] **Step 3: Prüfen** (mit `read_page`, `read_console_messages`, Screenshots):
   - Konsole ohne Fehler.
