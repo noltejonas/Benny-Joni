@@ -50,6 +50,63 @@
     return Math.ceil(targetReps / Math.max(1, participantCount));
   }
 
+  // ── Pflicht-Workouts (Bring Sally Up, Tom Holland) ──────────────────
+  // Ein Satz dieser Kategorien ist ein Durchgang; `reps` hält den Wert des
+  // Durchgangs (Sally: Sekunden, Tom Holland: Runden). Workouts zählen nie in
+  // Wiederholungs-Summen, ihr Wochenziel ist ein Durchgang pro Person.
+  const WORKOUT_TYPES = ['bring_sally_up', 'tom_holland'];
+  const SALLY_FULL_SECONDS = 204;
+
+  function isWorkoutType(type) {
+    return WORKOUT_TYPES.includes(type);
+  }
+
+  // Setzt `workout` (Typ oder null) auf Sätzen und Wochen-Challenges.
+  function annotateWorkouts(sets, challenges, categories) {
+    const typeByCat = {};
+    for (const c of categories || []) typeByCat[c.id] = c.challenge_type;
+    const typeByCh = {};
+    for (const ch of challenges || []) {
+      const t = typeByCat[ch.category_id];
+      ch.workout = isWorkoutType(t) ? t : null;
+      typeByCh[ch.id] = ch.workout;
+    }
+    for (const s of sets || []) {
+      const t = typeByCh[s.challenge_id] ?? s.category?.challenge_type ?? null;
+      s.workout = isWorkoutType(t) ? t : null;
+    }
+    return sets;
+  }
+
+  // Wert eines Satzes für Wiederholungs- und Minuten-Summen.
+  function setValue(s) {
+    return s.workout ? 0 : (s.reps ?? s.duration_minutes ?? 0);
+  }
+
+  function workoutValueLabel(type, value) {
+    const v = value ?? 0;
+    if (type === 'bring_sally_up') {
+      return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}${v >= SALLY_FULL_SECONDS ? ' ✓' : ''}`;
+    }
+    if (type === 'tom_holland') return `${v} Runden`;
+    return String(v);
+  }
+
+  // „2× · 3:00, 3:24 ✓“ für die Durchgänge einer Person, älteste zuerst.
+  function workoutSummary(type, sets) {
+    if (!sets.length) return '0×';
+    const vals = [...sets]
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+      .map(s => workoutValueLabel(type, s.reps));
+    return `${sets.length}× · ${vals.join(', ')}`;
+  }
+
+  // Wie viele der Personen haben mindestens einen Durchgang? `sets` = Sätze einer Challenge.
+  function workoutPeopleDone(sets, userIds) {
+    const did = new Set(sets.map(s => s.athlete));
+    return userIds.filter(id => did.has(id)).length;
+  }
+
   // ── Penalty system: pure computation ────────────────────────────────
   function repsForAthleteOnChallenge(sets, athlete, challengeId) {
     let total = 0;
@@ -769,5 +826,6 @@
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
+    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, workoutSummary, workoutPeopleDone,
   };
 })();
