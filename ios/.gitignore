@@ -11,3 +11,12 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# fastlane
+App/vendor
+App/.bundle
+App/fastlane/.env
+App/fastlane/report.xml
+App/fastlane/Preview.html
+App/fastlane/screenshots
+App/fastlane/test_output

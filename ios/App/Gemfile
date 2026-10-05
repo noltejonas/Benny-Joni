@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+# fastlane für TestFlight-Uploads (siehe docs/FASTLANE_TESTFLIGHT.md).
+# Gemfile.lock pinnt alle Gems auf Releases, die beim Anlegen mindestens
+# 14 Tage alt waren — Updates nur mit derselben Wartezeit.
+gem "fastlane", "2.240.1"
