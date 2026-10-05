@@ -18,7 +18,7 @@ Stand 2026-10-04. Ein gemeinsamer TestFlight-Build 1.4 (11) mit vier Korrekturen
 
 - „All“ beginnt beim ersten Satz der gefilterten Menge, ohne 90-Tage-Grenze.
 - Summen, Kennzahlen und Ranglisten im Verlauf gelten für den gewählten Zeitraum, bei „All“ also für alles.
-- Das Diagramm fasst bei mehr als 90 Tagen pro Woche zusammen (ein Punkt je Woche), damit es lesbar bleibt. 7T und 30T bleiben tageweise.
+- Das Diagramm zeigt den ganzen Zeitraum tageweise (Standard ist „Kumuliert“, also eine glatte Kurve). Bei vielen Wochen werden KW-Linien und -Beschriftungen ausgedünnt (höchstens ~13 im kleinen, ~12 im Vollbild-Diagramm).
 - Die Voreinstellung bleibt 30T.
 
 ## 2. Pflicht-Workouts (Bring Sally Up, Tom Holland)
@@ -26,8 +26,11 @@ Stand 2026-10-04. Ein gemeinsamer TestFlight-Build 1.4 (11) mit vier Korrekturen
 Gemeinsame Helfer in `www/data.js` (exportiert über `PTData`), damit alle Stellen gleich rechnen:
 
 - `isWorkoutType(type)` — `true` für `bring_sally_up` und `tom_holland`.
+- `annotateWorkouts(sets, challenges, categories)` — setzt beim Laden `workout` (Typ oder `null`) auf Sätzen und Wochen-Challenges.
+- `setValue(set)` — Wert für Wiederholungs-/Minuten-Summen; Workout-Sätze liefern 0. `valOfSet` in `people.jsx` (Standard von `totalsBySide`) nutzt ihn.
 - `workoutValueLabel(type, value)` — Sally `m:ss` (ab 204 s mit „✓“), Tom Holland `N Runden`.
-- `challengeProgress({ challenge, category, sets, userId, participantCount })` — liefert `{ done, goal, unit }`: Standard `done` = Summe `reps`/`duration_minutes`, `goal` = fairer Anteil; Workout `done` = Anzahl Durchgänge, `goal` = 1, `unit` = „Durchgang“.
+- `workoutSummary(type, sets)` — „2× · 3:00, 3:24 ✓“, älteste zuerst.
+- `workoutPeopleDone(sets, userIds)` — wie viele der Personen mindestens einen Durchgang haben.
 
 Verhalten:
 
@@ -62,7 +65,7 @@ Verhalten:
 ## Tests
 
 - Demo-Modus: Verlauf „All“ zeigt die Summe aller Demo-Sätze; Sally/Tom Holland loggen → Anzeige als Durchgänge mit Zeit/Runden, Ziel „1/1 ✓“, keine Erhöhung von „Reps gesamt“; Strafkonto-Vorschau einer Woche ohne Workout-Durchgang zeigt die Strafe; Profil-Karte öffnet den Dialog.
-- Rechenhelfer: kleine Node-Prüfung von `challengeProgress`, `workoutValueLabel` und `computePenalties` mit Standard- und Workout-Challenges.
+- Rechenhelfer: Node-Tests (`node --test tests/`) für die Workout-Helfer und `computePenalties` mit Standard- und Workout-Challenges.
 - iOS: Build läuft durch; signierte App enthält `aps-environment`.
 
 ## Nicht im Umfang
