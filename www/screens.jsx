@@ -107,7 +107,7 @@ function repsOnLocalDate(sets, athletes, dateStr) {
   const ids = Array.isArray(athletes) ? athletes : [athletes];
   return sets
     .filter(s => ids.includes(s.athlete) && localDateOf(s.created_at) === dateStr)
-    .reduce((sum, s) => sum + (s.reps ?? s.duration_minutes ?? 0), 0);
+    .reduce((sum, s) => sum + PTData.setValue(s), 0);
 }
 
 // Mo-first weekly breakdown per group (Liste von User-ID-Listen) → day.vals[i].
@@ -134,7 +134,7 @@ function dailyBreakdownFor(weekStart, sets, groups) {
     const day = localDateOf(s.created_at);
     const bucket = byIso[day];
     const g = groupOf[s.athlete];
-    if (bucket && !bucket.isFuture && g != null) bucket.vals[g] += (s.reps ?? s.duration_minutes ?? 0);
+    if (bucket && !bucket.isFuture && g != null) bucket.vals[g] += PTData.setValue(s);
   }
   const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   return days
@@ -1989,7 +1989,7 @@ function HistoryScreen({ challenges, categories, allSets, sides = [], title }) {
     return s;
   }, [filteredAllSets]);
 
-  const totalReps = filteredAllSets.reduce((s, x) => s + (x.reps ?? x.duration_minutes ?? 0), 0);
+  const totalReps = filteredAllSets.reduce((s, x) => s + PTData.setValue(x), 0);
   // Wochen: jede Kalenderwoche zählt, in der mindestens ein Satz geloggt wurde
   // (unabhängig davon, ob das Wochenziel erreicht wurde).
   const weeksDone = new Set(
@@ -2047,7 +2047,7 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
   const twoSided = sides.length === 2;
   const N = sides.length;
   const zeros = () => sides.map(() => 0);
-  const val = (s) => s.reps ?? s.duration_minutes ?? 0;
+  const val = PTData.setValue;
   const cardTitle = title || (twoSided ? `${sides[0].label} vs. ${sides[1].label}` : 'Rangliste');
 
   const days = range === '7' ? 7 : range === '30' ? 30 : null;
@@ -2734,14 +2734,14 @@ function HistoryView({ challenges, categories, allSets, catById, setsByCh, strea
 function computeAthleteStats(sets, athletes, series) {
   const ids = Array.isArray(athletes) ? athletes : [athletes];
   const own = sets.filter(s => ids.includes(s.athlete));
-  const total = own.reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
+  const total = own.reduce((a, x) => a + PTData.setValue(x), 0);
   const setCount = own.length;
   const avgSet = setCount ? Math.round(total / setCount) : 0;
-  const maxSet = own.reduce((m, x) => Math.max(m, x.reps ?? x.duration_minutes ?? 0), 0);
+  const maxSet = own.reduce((m, x) => Math.max(m, PTData.setValue(x)), 0);
   const byDay = {};
   for (const s of own) {
     const d = String(s.created_at).slice(0, 10);
-    byDay[d] = (byDay[d] || 0) + (s.reps ?? s.duration_minutes ?? 0);
+    byDay[d] = (byDay[d] || 0) + PTData.setValue(s);
   }
   const activeDays = Object.keys(byDay).length;
   const bestDay = Object.values(byDay).reduce((m, v) => Math.max(m, v), 0);

@@ -398,6 +398,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
         capi.getProjectTags(),
         capi.getToolTags(),
       ]);
+      // Pflicht-Workouts markieren, damit Summen sie erkennen (PTData.setValue).
+      PTData.annotateWorkouts(allSetsData, challs, cats);
+      PTData.annotateWorkouts(feedData, challs, cats);
       PTPeople.set(mems.map(m => m.profile).filter(Boolean));
       setCompetition(comp);
       setMembers(mems);

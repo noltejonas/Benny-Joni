@@ -16,6 +16,7 @@ function StatsTab({ api, me, profile, competition, sides, challenges, categories
     try {
       const list = await api.listMyCompetitions();
       const b = await api.getStatsBundle(list.map(c => c.id));
+      PTData.annotateWorkouts(b.sets, b.challenges, b.categories);
       PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
       setComps(list);
       setBundle(b);

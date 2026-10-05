@@ -110,7 +110,8 @@ function sideIndexByUser(sides) {
   return out;
 }
 
-const valOfSet = (s) => s.reps ?? s.duration_minutes ?? 0;
+// Workouts (Sekunden/Runden) zählen nicht mit — siehe PTData.setValue.
+const valOfSet = (s) => PTData.setValue(s);
 
 // Summe pro Seite, optional mit eigener Wertfunktion (Work = Minuten).
 function totalsBySide(sets, sides, val = valOfSet) {

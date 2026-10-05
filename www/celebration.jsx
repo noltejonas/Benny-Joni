@@ -32,11 +32,12 @@ function useCelebration(challenges, allSets, me, categories) {
     const sorted = [...challenges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
     for (const ch of sorted) {
       if (flags[ch.id]) continue;
+      const cat = (categories || []).find(c => c.id === ch.category_id);
+      if (PTData.isWorkoutType(cat?.challenge_type)) continue; // Pflicht-Workout: kein Wiederholungsziel
       const total = (allSets || [])
         .filter(s => s.challenge_id === ch.id)
         .reduce((sum, s) => sum + s.reps, 0);
       if (total >= ch.target_reps && ch.target_reps > 0) {
-        const cat = (categories || []).find(c => c.id === ch.category_id);
         return { challenge: ch, category: cat || { name: '', emoji: '🏆' }, total };
       }
     }
@@ -54,7 +55,7 @@ function useCelebration(challenges, allSets, me, categories) {
     if (!challenge) return null;
     const total = (allSets || [])
       .filter(s => s.challenge_id === challenge.id)
-      .reduce((sum, s) => sum + s.reps, 0);
+      .reduce((sum, s) => sum + (s.workout ? 0 : s.reps), 0);
     if (total < challenge.target_reps) return null;
     return sessionStorage.getItem(PT_PERSISTENT_STYLE_KEY) || 'gold';
   }, [allSets]);
