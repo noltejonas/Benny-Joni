@@ -14,7 +14,7 @@
 --      kein Ordner <uid> mehr; select count(*) from profiles where id = '<uid>' → 0.
 --   4. Meldet die App „Konto konnte nicht gelöscht werden“ und steht im Postgres-Log
 --      „permission denied for table users“: Edge Function deployen
---        supabase functions deploy delete-account
+--        supabase functions deploy delete-account --project-ref jczyyupxxqrdgbeifcwe
 --      Sie ruft prepare_account_deletion() mit dem Nutzer-Token auf und löscht das Konto
 --      danach mit auth.admin.deleteUser. Die App weicht bei 42501 selbst darauf aus.
 --      Nennt der Fehler „objects_owner_fkey“ (alter Storage-Fremdschlüssel): die Dateien

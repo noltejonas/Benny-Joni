@@ -211,9 +211,13 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    **AUS** sein. Sonst kann sich niemand ohne Mail registrieren, auch nicht der
    Prüfer.
 4. Später im Gerätetest (Schritt 12) mit einem Wegwerf-Konto „Konto löschen“
-   testen. Scheitert es mit einem Rechtefehler auf `auth.users`: Function
-   `delete-account` deployen (siehe „Supabase-Funktionen“ unten). Die App nutzt
-   sie dann automatisch.
+   testen. Scheitert es mit einem Rechtefehler auf `auth.users` (Postgres-Log
+   „permission denied for table users“): `npx supabase login`, dann
+   `npx supabase functions deploy delete-account --project-ref jczyyupxxqrdgbeifcwe`
+   (verlangt die CLI Docker: `--use-api` anhängen). Die JWT-Prüfung darf hier
+   AN bleiben: Die App ruft mit dem Nutzer-Token auf, die Function prüft es
+   selbst per `auth.getUser`. Danach „Konto löschen“ erneut testen; die App
+   weicht bei 42501 automatisch auf die Function aus.
 
 **Jetzt NICHT einspielen:** `20261021000100_launch_optional.sql` (nur noch
 Abschnitt 4 `client_errors`, nach dem Launch), `20261021001000_daily_nudge_cron.sql` (ab 22.10.),
@@ -478,7 +482,7 @@ kein Entwurfs-Kasten mehr da ist.
 | Migration vor dem Review (Avatar-Listing, Kategorie) | `supabase/migrations/20261021000050_launch_vor_review.sql` | Schritt 8, **P0** |
 | „Confirm email“ AUS | Authentication → Providers → Email | Schritt 8, **P0** |
 | AV-Vertrag (DPA) | Organization → Legal Documents | Schritt 5 |
-| Function `delete-account` | `supabase/functions/delete-account/` | nur falls die Löschung mit Rechtefehler scheitert |
+| Function `delete-account` | `supabase/functions/delete-account/`; `npx supabase functions deploy delete-account --project-ref jczyyupxxqrdgbeifcwe` | nur falls die Löschung mit Rechtefehler scheitert |
 | Function `notify-set` (neue Version) | `supabase/functions/notify-set/` + `_shared/`. Deploy nur mit `--no-verify-jwt` | Schritt 14, P1 |
 | Secret `RIVAL_THRESHOLD` | optional, Standard 10 | Schritt 14 |
 | Secrets `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_ENV`, `APNS_PRIVATE_KEY` | sollten schon gesetzt sein; prüfen mit `npx supabase secrets list --project-ref jczyyupxxqrdgbeifcwe` | Schritt 14 |
