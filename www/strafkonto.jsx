@@ -366,7 +366,7 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
     return () => { alive = false; };
   }, [api, weekStart]);
 
-  async function confirm() {
+  async function closeWeek() {
     setBusy(true);
     try { await api.closeWeek(weekStart); onDone(); }
     catch (e) { alert(e.message); onClose(); } finally { setBusy(false); }
@@ -395,7 +395,7 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
       )}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:18}}>
         <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>{tr('Abbrechen')}</button>
-        <button className="btn-ghost-sm primary" onClick={confirm} disabled={busy || !preview}>
+        <button className="btn-ghost-sm primary" onClick={closeWeek} disabled={busy || !preview}>
           {pens.length ? tr('Verbuchen') : trc('Woche', 'Abschließen')}
         </button>
       </div>

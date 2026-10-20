@@ -187,15 +187,22 @@ function formatDuration(minutes) {
   return `${h}h ${m}m`;
 }
 
+// 'YYYY-MM-DD' als lokaler Kalendertag. new Date('2026-10-19') liest UTC und
+// ist westlich davon schon Sonntag (falsche KW, falsche Wochenlinien).
+function localDay(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(value + 'T00:00:00') : new Date(value);
+}
+
 function formatWeek(weekStart) {
-  const d = new Date(weekStart);
+  const d = localDay(weekStart);
   const end = new Date(d); end.setDate(d.getDate() + 6);
   const fmt = (x) => PTi18n.date(x, { day: '2-digit', month: 'short' });
   return `${fmt(d)} – ${fmt(end)}`;
 }
 
 function weekNumber(weekStart) {
-  const d = new Date(weekStart);
+  const d = localDay(weekStart);
   const target = new Date(d.valueOf());
   const dayNr = (d.getDay() + 6) % 7;
   target.setDate(target.getDate() - dayNr + 3);
@@ -215,5 +222,5 @@ function todayGreeting() {
 
 Object.assign(window, {
   Icon, MiniRing, CountUp, Ring, Toast, Sheet, Stepper,
-  formatRelative, formatDuration, formatWeek, weekNumber, todayGreeting,
+  formatRelative, formatDuration, formatWeek, weekNumber, localDay, todayGreeting,
 });

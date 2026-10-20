@@ -99,6 +99,21 @@ test('englische Einladung lässt sich wieder einlesen, auch ohne Link', () => {
   assert.equal(E.normalizeCode(O.inviteText({ name: 'Büro-Battle', invite_code: '3A9UQM' })), '3A9UQM');
 });
 
+test('„Code“ im Challenge-Namen verdrängt nicht den echten Code', () => {
+  const { O: E } = loadEnglish();
+  const cut = (text) => text.split('\n').slice(0, 2).join('\n'); // ohne Link-Zeile
+  for (const M of [O, E]) {
+    for (const name of ['Code Sprint', 'Promo Code: SOMMER', 'code=HALLO1']) {
+      const text = M.inviteText({ name, invite_code: 'BJ4K7X' });
+      assert.equal(M.normalizeCode(text), 'BJ4K7X', `${name} mit Link`);
+      assert.equal(M.normalizeCode(cut(text)), 'BJ4K7X', `${name} ohne Link`);
+    }
+  }
+  // Etikett mitten im Satz und ohne Doppelpunkt geht weiterhin
+  assert.equal(O.normalizeCode('Hier der Code: bj4k7x, bis gleich'), 'BJ4K7X');
+  assert.equal(O.normalizeCode('Code bj4k7x'), 'BJ4K7X');
+});
+
 // ── Einstieg ────────────────────────────────────────────────────────────────
 
 const NOW = new Date(2026, 9, 21, 12, 0).getTime(); // Mi 21.10.2026

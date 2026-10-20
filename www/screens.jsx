@@ -1,4 +1,4 @@
-/* global React, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
+/* global React, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo } = React;
 
 // Per-athlete-per-category quick-log values, stored locally.
@@ -159,27 +159,6 @@ function dailyBreakdownFor(weekStart, sets, groups) {
     .sort((a, b) => (a.dow === 0 ? 7 : a.dow) - (b.dow === 0 ? 7 : b.dow));
 }
 
-function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDelta }) {
-  const isDone = done >= fairShare;
-  const footerClass = variant === 'tug' ? 'tug-foot' : 'owe';
-
-  if (isDone) {
-    return <div className={`${footerClass} mono done`}>{tr('✓ erledigt')}</div>;
-  }
-
-  const statusClass = trackDelta >= 0 ? 'ok' : 'behind';
-  const statusText = trackDelta >= 0 ? tr('✓ Auf Kurs') : tr('{n} hinten', { n: Math.abs(trackDelta) });
-
-  return (
-    <>
-      <div className="daily-line mono">
-        <span>{tr('heute {done} / {target}', { done: todayReps, target: dailyTarget })}</span>
-      </div>
-      <div className={`track-status ${statusClass}`}>{statusText}</div>
-    </>
-  );
-}
-
 function WeekCloseBanner({ weekStart, onClose }) {
   function weekKW(ws) {
     const d = new Date(ws + 'T00:00:00'); d.setHours(0,0,0,0);
@@ -192,34 +171,6 @@ function WeekCloseBanner({ weekStart, onClose }) {
       <div className="weekclose-banner-title">{tr('KW {week} ist um.', { week: weekKW(weekStart) })}</div>
       <div className="weekclose-banner-sub">{tr('Strafkonto-Abschluss noch offen.')}</div>
       <button className="weekclose-banner-btn" onClick={() => onClose(weekStart)}>{tr('Woche abschließen')}</button>
-    </div>
-  );
-}
-
-// Rangliste für „Jeder gegen jeden“ (statt Tauziehen).
-function RankList({ sides, stats, target, sideShares, fmtVal, total, remaining }) {
-  const order = sides.map((s, i) => i).sort((a, b) => stats[b].done - stats[a].done);
-  const max = Math.max(1, ...stats.map(s => s.done));
-  return (
-    <div className="mu-rank">
-      <div className="mu-rank-head mono">
-        <span>{tr('Gesamt {done} / {target}', { done: fmtVal(total), target: fmtVal(target) })}</span>
-        <span className={remaining === 0 ? 'done' : ''}>{remaining === 0 ? tr('🎉 erreicht') : tr('noch {amount}', { amount: fmtVal(remaining) })}</span>
-      </div>
-      {order.map((i, rank) => {
-        const side = sides[i];
-        const s = stats[i];
-        const doneShare = s.done >= sideShares[i];
-        return (
-          <div key={side.key} className={`mu-rank-row ${side.cls} ${side.isMine ? 'mine' : ''}`} style={sideStyle(side)}>
-            <span className="mu-rank-pos mono">{rank + 1}</span>
-            <SideAvatar side={side} size={26} />
-            <span className="mu-rank-name">{side.isMine ? tr('Du') : side.label}</span>
-            <span className="mu-rank-bar"><span className="mu-rank-fill" style={{ width: `${(s.done / max) * 100}%`, background: side.color }} /></span>
-            <span className="mu-rank-val mono">{fmtVal(s.done)}{doneShare ? ' ✓' : ''}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -1017,82 +968,6 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
   );
 }
 
-// ─── WEEK FIX CARD ───────────────────────────────────────────────────────────
-// Shown at the top of the home screen when no challenges exist yet this week.
-// Renders all template slots with individually editable targets,
-// then creates all challenges in one tap.
-function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
-  const catById = Object.fromEntries(categories.map(c => [c.id, c]));
-  const [targets, setTargets] = React.useState(() =>
-    Object.fromEntries(template.map(t => [t.category_id, t.base_reps]))
-  );
-
-  // Keep targets in sync if template changes (e.g. after load)
-  React.useEffect(() => {
-    setTargets(Object.fromEntries(template.map(t => [t.category_id, t.base_reps])));
-  }, [template.map(t => t.category_id + t.base_reps).join(',')]);
-
-  const OBLIGATORY_TYPES = new Set(['tom_holland', 'bring_sally_up']);
-
-  function handleFix() {
-    const picks = template.map(t => ({
-      category_id: t.category_id,
-      target_reps: Math.max(1, targets[t.category_id] || t.base_reps),
-    }));
-    onFix(picks);
-  }
-
-  return (
-    <div className="weekfix-card">
-      <div className="weekfix-header">
-        <div className="weekfix-title">{tr('Woche starten')}</div>
-        <div className="weekfix-sub">{tr('Targets anpassen & alle Challenges anlegen')}</div>
-      </div>
-
-      <div className="weekfix-slots">
-        {template.map(t => {
-          const cat = catById[t.category_id];
-          if (!cat) return null;
-          const isObligatory = OBLIGATORY_TYPES.has(cat.challenge_type);
-          const val = targets[t.category_id] ?? t.base_reps;
-          return (
-            <div key={t.category_id} className="weekfix-row">
-              <span className="weekfix-emoji">{cat.emoji}</span>
-              <span className="weekfix-name">{cat.name}</span>
-              {isObligatory ? (
-                <span className="weekfix-pflicht">{tr('PFLICHT')}</span>
-              ) : (
-                <div className="weekfix-stepper">
-                  <button className="weekfix-step-btn"
-                    onClick={() => setTargets(p => ({ ...p, [t.category_id]: Math.max(1, (p[t.category_id] || t.base_reps) - 5) }))}>−</button>
-                  <input
-                    className="weekfix-input mono"
-                    type="number"
-                    inputMode="numeric"
-                    value={val}
-                    onChange={e => {
-                      const n = parseInt(e.target.value);
-                      if (Number.isFinite(n) && n > 0)
-                        setTargets(p => ({ ...p, [t.category_id]: n }));
-                    }}
-                    onFocus={e => e.target.select()} />
-                  <button className="weekfix-step-btn"
-                    onClick={() => setTargets(p => ({ ...p, [t.category_id]: (p[t.category_id] || t.base_reps) + 5 }))}>＋</button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="btn-row" style={{ marginTop: 16 }}>
-        <button className="btn btn-secondary" onClick={onDismiss}>{tr('Später')}</button>
-        <button className="btn" onClick={handleFix}>{tr('🏁 Woche starten')}</button>
-      </div>
-    </div>
-  );
-}
-
 // ─── TOM HOLLAND WORKOUT ─────────────────────────────────────────────────────
 // 20-min AMRAP timer + round counter. Logs reps=rounds, note=elapsed time.
 const TH_TIMER_KEY   = 'pt_th_timer_start';
@@ -1600,7 +1475,7 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
   // Week boundaries — Mondays within the range
   const allWeekMarks = [];
   for (let i = 0; i < axis.length; i++) {
-    const d = new Date(axis[i].date);
+    const d = localDay(axis[i].date);
     if (d.getDay() === 1) allWeekMarks.push({ idx: i, kw: weekNumber(axis[i].date) });
   }
   // Bei langen Zeiträumen nur jede n-te Woche beschriften
@@ -1934,4 +1809,4 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
   );
 }
 
-Object.assign(window, { HomeScreen, SetupSheet, LogSheet, WeekRecap, bsuFmt, BSU_MAX_SEC, BackfillSheet, FullscreenChart, ChartFullscreen, EmojiPickerSheet, WeekFixCard, TomHollandSheet, BringSallySheet });
+Object.assign(window, { HomeScreen, SetupSheet, LogSheet, WeekRecap, bsuFmt, BSU_MAX_SEC, BackfillSheet, FullscreenChart, ChartFullscreen, EmojiPickerSheet, TomHollandSheet, BringSallySheet });
