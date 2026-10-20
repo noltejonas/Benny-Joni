@@ -27,60 +27,28 @@
   <div id="root"></div>
 
   <script>
-    // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
-    // @capacitor/preferences, im Browser localStorage (Wert null).
-    window.PTPreferencesReady = new Promise(function (resolve) { window.__ptResolvePreferences = resolve; });
-    // App-Plugin für Einladungslinks (projektterminator://join/<CODE>), nur nativ.
-    window.PTAppReady = new Promise(function (resolve) { window.__ptResolveApp = resolve; });
-  </script>
-  <script type="module">
-    try {
-      if (window.Capacitor?.isNativePlatform?.()) {
-        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/app@8/+esm');
-        window.__ptResolveApp(mod);
-      } else {
-        window.__ptResolveApp(null);
-      }
-    } catch (e) {
-      window.__ptResolveApp(null);
-    }
-  </script>
-  <script type="module">
-    try {
-      if (window.Capacitor?.isNativePlatform?.()) {
-        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/preferences@8/+esm');
-        window.__ptResolvePreferences(mod);
-      } else {
-        window.__ptResolvePreferences(null);
-      }
-    } catch (e) {
-      window.__ptResolvePreferences(null);
-    }
-  </script>
-
-  <script type="module">
-    // Expose Capacitor Haptics globally for our non-module JSX files.
-    try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/haptics@6/+esm');
-      window.PTCelebrationHaptics = mod;
-    } catch (e) {
-      window.PTCelebrationHaptics = null;
-    }
-  </script>
-
-  <script type="module">
-    // Expose Capacitor PushNotifications only when running natively — the web
-    // build has no implementation and would throw UNIMPLEMENTED on every call.
-    try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/push-notifications@8/+esm');
-      if (window.Capacitor?.isNativePlatform?.()) {
-        window.PTPushNotifications = mod;
-      } else {
-        window.PTPushNotifications = null;
-      }
-    } catch (e) {
-      window.PTPushNotifications = null;
-    }
+    // Capacitor-Plugins direkt über die native Bridge: iOS legt window.Capacitor
+    // samt Capacitor.Plugins.<Name> schon beim Dokumentstart an (WKUserScript),
+    // die JS-Seite passt damit immer zur nativen Version. Im Browser und in der
+    // Demo ist alles null. Form der Globals wie bisher (data.js, app.jsx,
+    // feed.jsx, celebration.jsx, onboarding*.jsx, settings.jsx).
+    (function () {
+      var C = window.Capacitor;
+      var native = false;
+      try { native = !!(C && C.isNativePlatform && C.isNativePlatform()); } catch (e) {}
+      var P = (native && C.Plugins) || {};
+      // Login-Session: data.js nutzt in der App Preferences, im Browser localStorage (null).
+      window.PTPreferencesReady = Promise.resolve(P.Preferences ? { Preferences: P.Preferences } : null);
+      // Einladungslinks (projektterminator://join/<CODE>), nur nativ.
+      window.PTAppReady = Promise.resolve(P.App ? { App: P.App } : null);
+      window.PTPushNotifications = P.PushNotifications ? { PushNotifications: P.PushNotifications } : null;
+      // Haptik: die native Seite erwartet genau diese Strings (HapticsPlugin.swift).
+      window.PTCelebrationHaptics = P.Haptics ? {
+        Haptics: P.Haptics,
+        ImpactStyle: { Heavy: 'HEAVY', Medium: 'MEDIUM', Light: 'LIGHT' },
+        NotificationType: { Success: 'SUCCESS', Warning: 'WARNING', Error: 'ERROR' },
+      } : null;
+    })();
   </script>
 
   <!-- Bibliotheken liegen in der App; Herkunft und sha384 stehen in tools/build-web.cjs (VENDOR). -->
