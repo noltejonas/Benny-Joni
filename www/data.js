@@ -1,4 +1,4 @@
-// Projekt Terminator — Data Layer
+// Benny & Joni — Data Layer
 // Supabase-Client mit Auth, Profilen, Challenges (Tabelle `competitions`) und
 // einem pro Challenge gescopten API (`api.forCompetition(id)`), das dieselben
 // Methoden wie früher anbietet (listChallenges, addSet, …).

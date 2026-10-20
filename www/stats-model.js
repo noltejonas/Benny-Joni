@@ -1,4 +1,4 @@
-// Projekt Terminator — Rechenmodell für den Stats-Tab (rein, ohne React).
+// Benny & Joni — Rechenmodell für den Stats-Tab (rein, ohne React).
 //
 // Stats zeigen nur Sport: Work-Kategorien fließen nicht ein. Pflicht-Workouts
 // (s.workout / ch.workout, siehe PTData.annotateWorkouts) zählen nie als Reps;

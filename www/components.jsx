@@ -1,5 +1,5 @@
 /* global React */
-// Shared UI components for Projekt Terminator
+// Shared UI components for Benny & Joni
 const { useState, useEffect, useRef, useMemo } = React;
 
 // ─── Icons (SF-style) ────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// Projekt Terminator — lokaler Demo-Modus
+// Benny & Joni — lokaler Demo-Modus
 //
 // Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt) oder
 // über „Demo ansehen“ auf dem Willkommen-Bildschirm.

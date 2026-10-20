@@ -1240,7 +1240,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onOpenSettings={() => openSettings('penalties')} />
         }
 
-        {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}
+        {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories} competition={competition}
           challenges={currentChallenges} weekSets={currentWeekSets} participantCount={peopleForShare}
           loading={loading}
           projectTags={projectTags} toolTags={toolTags}
@@ -1445,7 +1445,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onDone={() => advance({ sets: 1 })} />
       )}
       {layer?.kind === 'week1' && (
-        <ObWeekOne summary={layer.summary} onDone={() => {
+        <ObWeekOne summary={layer.summary} competition={competition} onDone={() => {
           onObPatch?.({ weekOne: { [competition.id]: layer.first } });
           if (!sportsGoalsNow.length) openLayer(['goal'], { data: { title: 'Ziel für Woche 2' } });
           else setLayer(null);

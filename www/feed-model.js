@@ -1,4 +1,4 @@
-// Projekt Terminator — Rechenmodell für den Live-Feed (rein, ohne React).
+// Benny & Joni — Rechenmodell für den Live-Feed (rein, ohne React).
 //
 // Aus den Sätzen der laufenden Woche entstehen Einträge:
 // - Serien: aufeinanderfolgende Sätze einer Person auf dieselbe Challenge,

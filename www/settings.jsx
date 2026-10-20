@@ -927,7 +927,7 @@ function TagList({ title, tags, addLabel, defaultEmoji, onAdd, onUpdate, onDelet
 
 // Card on Home: the first person of the week picks the reps for every exercise.
 // Default = base_reps, range = [base_reps, base_reps + bonus_max].
-function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
+function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub }) {
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const [values, setValues] = useState(() => {
     const initial = {};
@@ -960,8 +960,8 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
       <div className="weekfix-head">
         <div>
           <div className="weekfix-label">Neue Woche</div>
-          <div className="weekfix-title">Reps für diese Woche fixieren</div>
-          <div className="weekfix-sub">Wer zuerst da ist, setzt das Ziel für alle.</div>
+          <div className="weekfix-title">{title || 'Reps für diese Woche fixieren'}</div>
+          <div className="weekfix-sub">{sub || 'Wer zuerst da ist, setzt das Ziel für alle.'}</div>
         </div>
         {onDismiss && (
           <button className="weekfix-dismiss" aria-label="Später" onClick={onDismiss}>×</button>
