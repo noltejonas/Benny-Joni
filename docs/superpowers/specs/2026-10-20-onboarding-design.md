@@ -95,7 +95,7 @@ Stand 2026-10-20. Neu gebaut wird der Weg vom ersten App-Start bis zu dem Moment
     - „Demo ansehen“ öffnet wie bisher Bennys volle Challenge.
     - „Los geht's“ im Demo-Modus legt eine neue Person an und läuft durch das ganze Onboarding. Nach „Einladung senden“ tritt nach ein paar Sekunden eine Demo-Person bei.
     - Die Einstellungen haben im Demo-Modus „Eine Woche vorspulen“ (für den Wochenrückblick) und „Demo zurücksetzen“.
-    - `?demo=new` startet die Demo abgemeldet. `localStorage.pt_demo_confirm = '1'` spielt die Mail-Bestätigung durch.
+    - `?demo=new` startet die Demo abgemeldet. `localStorage.pt_demo_confirm = '1'` spielt die Mail-Bestätigung durch, `localStorage.pt_demo_offline = '1'` lässt alle Aufrufe wie ohne Netz scheitern.
 
 ## Aufbau
 Alle Bildschirme haben oben einen Zurück-Knopf, wo es zurück geht, und unten die Aktion in Daumenreichweite. Abstände kommen aus den Safe Areas. Klassen tragen das Präfix `ob-`.
@@ -155,8 +155,8 @@ Abbruch an jeder Stelle: Beim nächsten Start führt die Ableitung aus Entscheid
   - Push (`pushPrimerDue`, `nextPrimerState`)
   - Wochenrückblick (`weekOneDue`, `weekOneSummary`)
   - Beitritt mitten in der Woche (`weekProgress`) und Zusammenführen des Stands (`mergeState`)
-- `www/onboarding.jsx` (neu): Bausteine (`ObScreen`, `ObCodeField`, `useOnline`), Willkommen, Auth inklusive Mail-Bestätigung, Profil, Start, `CreatePanel` und `JoinPanel`. Dazu die Sheets `CreateCompetitionSheet` und `JoinCompetitionSheet` für die zweite Challenge.
-- `www/onboarding-intro.jsx` (neu): die Ebenen in der Challenge (Einladen, Wochenziel, Erster Satz, Feier, Push-Vorab, Woche 1), `ObStarterCard`, `ObInviteCard`, dazu `PTPush` und `PTHaptics`.
+- `www/onboarding.jsx` (neu): Bausteine (`ObScreen`, `ObCodeField`, `useObOnline`, `PTHaptics`, `PTSound`), Willkommen, Auth inklusive Mail-Bestätigung, Profil, Start, `CreatePanel` und `JoinPanel`. Dazu die Sheets `CreateCompetitionSheet` und `JoinCompetitionSheet` für die zweite Challenge.
+- `www/onboarding-intro.jsx` (neu): die Ebenen in der Challenge (Einladen, Wochenziel, Erster Satz, Feier, Push-Vorab, Woche 1), `ObStarterCard`, `ObInviteCard`, dazu `PTPush`.
 - `www/onboarding.css` (neu): alle `.ob-*`-Klassen. Sie nutzen nur die Tokens aus `redesign.css` und liegen hinter `redesign.css`.
 - `www/competitions.jsx`: `AuthScreen`, `OnboardingScreen` und die alten Erstellen-/Beitreten-Sheets fallen weg. `shareInvite` nutzt `PTOnboarding.inviteText`.
 - `www/app.jsx`: Einstieg über `entryRoute`, offene Einladungen (URL, `appUrlOpen`, Kaltstart) und die Ebenen-Reihenfolge. Außerdem Push ohne automatische Abfrage, Mitglieder-Toast, erwartete Teilnehmer für den Anteil, Offline-Neustart und Haptik beim Schnellsatz.
@@ -191,4 +191,5 @@ Abbruch an jeder Stelle: Beim nächsten Start führt die Ableitung aus Entscheid
 - **Sätze offline zwischenspeichern** (Warteschlange mit Abgleich).
 - **Meilenstein-Push** („Wochenziel geknackt“). `notify-set` schickt heute nur den Rivalen-Push, deshalb verspricht der Vorab-Bildschirm nur den.
 - **Anteil bei Beitritt mitten in der Woche:** Wer am Donnerstag beitritt, schuldet nach `participantsFor` den ganzen Wochenanteil. Strafen in einer 1 vs 1, in der der Gegner nie beitritt, rechnen mit einer Person. Beides wäre eine Regeländerung für alle.
+- **Kaltstart ganz ohne Netz:** React und Babel kommen per CDN; ohne Verbindung beim allerersten Laden bleibt die App leer. Das betrifft die ganze App und bräuchte gebündelte Skripte.
 - **Sign in with Apple**, Bildzuschnitt fürs Profilbild.
