@@ -1,4 +1,4 @@
-/* global React, PTData, Icon, Avatar, Sheet, modeLabel, shareInvite, formatEuro, COMP_EMOJIS */
+/* global React, PTData, PTOnboarding, Icon, Avatar, Sheet, modeLabel, shareInvite, formatEuro, COMP_EMOJIS */
 // Einstellungen im iOS-Stil: Startseite mit Gruppen, je Thema eine Unterseite.
 // Welche Seite offen ist, steuert CompetitionApp (`page`/`onNavigate`), damit
 // z. B. das Zahnrad im Strafkonto direkt die Strafregeln öffnet.
@@ -235,6 +235,15 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
       <SettingsDeviceGroup themePref={themePref} onSetThemePref={onSetThemePref}
         notificationsEnabled={notificationsEnabled} onSetNotifications={onSetNotifications} />
 
+      {api?.mode === 'demo' && window.PTDemo && (
+        <SettingsGroup title="Demo">
+          <SettingsRow icon="calendar" title="Eine Woche vorspulen" onClick={() => window.PTDemo.shiftWeek()} />
+          <SettingsRow icon="refresh" title="Demo zurücksetzen"
+            onClick={() => { if (confirm('Alle Demo-Daten neu erzeugen?')) window.PTDemo.reset(); }} />
+          <SettingsRow icon="close" title="Demo beenden" onClick={() => window.PTDemo.exit()} />
+        </SettingsGroup>
+      )}
+
       {onSignOut && (
         <SettingsGroup>
           <SettingsRow title="Abmelden" tone="danger" onClick={onSignOut} />
@@ -248,20 +257,33 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
 const ST_THEMES = [['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']];
 
 function SettingsDeviceGroup({ themePref, onSetThemePref, notificationsEnabled, onSetNotifications }) {
-  const [pushBlocked, setPushBlocked] = useState(false);
+  // Erlaubnis über PTPush (onboarding-intro.jsx); beim Zurückkehren aus den
+  // iOS-Einstellungen neu prüfen.
+  const [perm, setPerm] = useState('unsupported');
   useEffect(() => {
-    const Push = window.PTPushNotifications?.PushNotifications;
-    if (!Push || !notificationsEnabled) { setPushBlocked(false); return; }
     let alive = true;
-    Push.checkPermissions()
-      .then(p => { if (alive) setPushBlocked(p.receive === 'denied'); })
-      .catch(() => {});
-    return () => { alive = false; };
+    const check = () => window.PTPush?.permission().then(p => { if (alive) setPerm(p); });
+    check();
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVisible); };
   }, [notificationsEnabled]);
+  const native = !!window.PTPushNotifications?.PushNotifications;
+  const pushBlocked = notificationsEnabled && perm === 'denied';
+
+  // Einschalten ist der richtige Moment zum Fragen, wenn iOS noch fragen darf.
+  async function setPush(on) {
+    onSetNotifications(on);
+    if (!on || perm !== 'prompt' || !window.PTPush) return;
+    const result = await window.PTPush.request();
+    setPerm(result);
+    window.PTPush.writePrimer(PTOnboarding.nextPrimerState(window.PTPush.readPrimer(), result));
+    window.dispatchEvent(new CustomEvent('pt:push-permission', { detail: result }));
+  }
 
   return (
     <SettingsGroup title="App"
-      footer={pushBlocked ? 'In den iOS-Einstellungen ausgeschaltet.' : null}>
+      footer={pushBlocked ? (native ? 'In den iOS-Einstellungen ausgeschaltet.' : 'Im Browser blockiert.') : null}>
       <div className="st-row is-stacked">
         <span className="st-row-line">
           <SettingsTile icon="contrast" />
@@ -277,7 +299,10 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, notificationsEnabled, 
         </div>
       </div>
       <SettingsSwitchRow icon="bell" title="Push-Mitteilungen"
-        checked={notificationsEnabled} onChange={onSetNotifications} />
+        checked={notificationsEnabled} onChange={setPush} />
+      {pushBlocked && native && (
+        <SettingsRow icon="settings" title="iOS-Einstellungen öffnen" tone="accent" onClick={() => window.PTPush.openSettings()} />
+      )}
     </SettingsGroup>
   );
 }
@@ -396,7 +421,7 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
     finally { setBusy(false); }
   }
 
-  const share = () => { if (shareInvite(competition) === 'copied') onToast?.('Einladung kopiert'); };
+  const share = async () => { if (await shareInvite(competition) === 'copied') onToast?.('Einladung kopiert'); };
   const regenerate = () => {
     if (!confirm('Neuen Code erzeugen? Der alte Code funktioniert dann nicht mehr.')) return;
     run(() => baseApi.regenerateInviteCode(competition.id), 'Neuer Code erzeugt');

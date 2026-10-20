@@ -232,7 +232,7 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
   }, []);
 
   useEffect(() => {
-    const audio = new Audio('sounds/goal-reached.mp3');
+    const audio = new Audio('sounds/goal-reached.wav');
     audio.volume = 0.85;
     audio.play().catch(() => {
       // Audio asset missing or autoplay blocked — synthesize a fallback beep

@@ -1,24 +1,47 @@
 // Projekt Terminator — lokaler Demo-Modus
 //
-// Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt).
-// `?demo=reset` erzeugt die Beispieldaten neu, `?demo=off` schaltet zurück auf Supabase.
+// Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt) oder
+// über „Demo ansehen“ auf dem Willkommen-Bildschirm.
+//   ?demo=reset  Beispieldaten neu erzeugen
+//   ?demo=new    Demo abgemeldet starten (Onboarding als neue Person durchspielen)
+//   ?demo=off    zurück auf Supabase
 // Ersetzt PTData.init durch eine In-Memory-API mit denselben Methoden wie data.js.
 // Es gibt keinen Netzwerkzugriff; alles liegt in localStorage (`pt_demo_db_v1`).
+// Ohne Netz (navigator.onLine === false) scheitern Aufrufe wie bei Supabase.
+//
+// Zum Testen: localStorage.pt_demo_confirm = '1' → Registrieren verlangt die
+// Mail-Bestätigung; localStorage.pt_demo_offline = '1' → alle Aufrufe scheitern
+// wie ohne Netz; PTDemo.shiftWeek() spult eine Woche vor.
 
 (function () {
+  // Onboarding-Stände (pt:onboarding:<id>) gehören zu Demo-Personen, die es nach
+  // einem Zurücksetzen nicht mehr gibt.
+  function clearDemoState() {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('pt:onboarding:u-')) localStorage.removeItem(k);
+  }
   const params = new URLSearchParams(location.search);
   const flag = params.get('demo');
   try {
-    if (flag === 'off') localStorage.removeItem('pt_demo');
+    if (flag === 'off') { localStorage.removeItem('pt_demo'); localStorage.removeItem('pt_demo_user'); }
     else if (flag !== null) localStorage.setItem('pt_demo', '1');
-    if (flag === 'reset') localStorage.removeItem('pt_demo_db_v1');
+    if (flag === 'reset') { localStorage.removeItem('pt_demo_db_v1'); localStorage.removeItem('pt_demo_user'); clearDemoState(); }
+    if (flag === 'new') { sessionStorage.setItem('pt_demo_signed_out', '1'); localStorage.removeItem('pt_demo_user'); }
+    if (flag !== null) {
+      // Einmalige Schalter nicht beim Neuladen wiederholen; ?join= & Co. bleiben.
+      params.delete('demo');
+      const q = params.toString();
+      history.replaceState(null, '', location.pathname + (q ? `?${q}` : '') + location.hash);
+    }
     if (localStorage.getItem('pt_demo') !== '1') return;
   } catch (e) { return; }
 
-  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts } = window.PTData;
+  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts, friendlyError } = window.PTData;
   const DB_KEY = 'pt_demo_db_v1';
+  const USER_KEY = 'pt_demo_user';
   const ME = 'u-benny';
+  const SEED_IDS = ['u-benny', 'u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim'];
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
+  const DB_VERSION = 2;
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -43,7 +66,8 @@
       ['u-tim', 'Tim', null, COLORS[5]],
     ].map(([pid, name, avatar, color]) => ({
       id: pid, display_name: name, avatar_url: avatar, color,
-      main_competition_id: pid === ME ? 'c-bj' : null, created_at: now.toISOString(),
+      main_competition_id: pid === ME ? 'c-bj' : null, created_at: addDays(monday, -60) + 'T08:00:00Z',
+      onboarding: {},
     }));
 
     const cat = (cid, name, emoji, kind = 'sports', type = 'standard') =>
@@ -187,52 +211,124 @@
       penalty_config, penalties, week_closures, payouts, rotation_config, plan_slots,
       project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: 'Terminator', emoji: '📁', created_at: monday }],
       tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }],
+      accounts: [{ email: 'benny@demo.local', user_id: ME }],
+      v: DB_VERSION,
       seq: n,
     };
+  }
+
+  // Ältere Demo-Daten ergänzen statt verwerfen (v1 → v2: Konten, Onboarding-Spalte,
+  // Seed-Profile älter als 14 Tage, damit Benny nicht als „neu“ gilt).
+  function upgrade(d) {
+    if ((d.v || 1) >= DB_VERSION) return d;
+    d.accounts = d.accounts || [{ email: 'benny@demo.local', user_id: ME }];
+    const old = addDays(isoDate(mondayOf(new Date())), -60) + 'T08:00:00Z';
+    for (const p of d.profiles) {
+      if (!p.onboarding) p.onboarding = {};
+      if (SEED_IDS.includes(p.id)) p.created_at = old;
+    }
+    d.v = DB_VERSION;
+    return d;
   }
 
   // ── Store ──────────────────────────────────────────────────────────
   let db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch (e) { db = null; }
-  if (!db) db = seed();
+  db = db ? upgrade(db) : seed();
   const save = () => { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} };
   save();
   const newId = (p) => `${p}-${++db.seq}`;
-  const clone = (x) => JSON.parse(JSON.stringify(x));
-  const later = (v) => new Promise(res => setTimeout(() => res(clone(v)), 60));
+  const clone = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
+  const offline = () => (typeof navigator !== 'undefined' && navigator.onLine === false)
+    || (() => { try { return localStorage.getItem('pt_demo_offline') === '1'; } catch (e) { return false; } })();
+  // Wie ein Netzaufruf: kurz warten, ohne Netz mit demselben Fehler wie Supabase scheitern.
+  const later = (v) => new Promise((res, rej) => setTimeout(() => (
+    offline() ? rej(friendlyError(new TypeError('Failed to fetch'))) : res(clone(v))
+  ), 60));
+  const local = (v) => Promise.resolve(clone(v));
+  const fail = (message, code) => friendlyError(Object.assign(new Error(message), code ? { code } : {}));
   const profileOf = (uid) => { const p = db.profiles.find(x => x.id === uid); return p && { id: p.id, display_name: p.display_name, avatar_url: p.avatar_url, color: p.color }; };
   const withAthlete = (row) => (row && 'user_id' in row ? { ...row, athlete: row.user_id } : row);
   const normCh = (row) => ({ ...row, chosen_by: row.chosen_by_user });
   const capacity = (mode) => (mode === '1v1' ? 2 : mode === '2v2' ? 4 : 12);
   const code6 = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+  const activeMembers = (cid) => db.members.filter(m => m.competition_id === cid && !m.left_at);
 
+  // Session: wer angemeldet ist, merkt sich pt_demo_user; Abmelden gilt pro Tab.
+  const sessionFor = (userId) => {
+    const acc = db.accounts.find(a => a.user_id === userId);
+    return { user: { id: userId, email: acc?.email || null }, demo: true };
+  };
   let session = null;
-  try { if (sessionStorage.getItem('pt_demo_signed_out') !== '1') session = { user: { id: ME }, demo: true }; } catch (e) { session = { user: { id: ME }, demo: true }; }
+  try {
+    const stored = localStorage.getItem(USER_KEY);
+    const userId = stored && db.profiles.some(p => p.id === stored) ? stored : ME;
+    if (sessionStorage.getItem('pt_demo_signed_out') !== '1') session = sessionFor(userId);
+  } catch (e) { session = sessionFor(ME); }
   const authListeners = new Set();
   const setSession = (s, evt) => {
     session = s;
-    try { s ? sessionStorage.removeItem('pt_demo_signed_out') : sessionStorage.setItem('pt_demo_signed_out', '1'); } catch (e) {}
+    try {
+      if (s) { sessionStorage.removeItem('pt_demo_signed_out'); localStorage.setItem(USER_KEY, s.user.id); }
+      else sessionStorage.setItem('pt_demo_signed_out', '1');
+    } catch (e) {}
     authListeners.forEach(fn => fn(s, evt));
   };
+  const me = () => session?.user?.id || ME;
+
+  const blobToDataUrl = (blob) => new Promise((res, rej) => {
+    const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob);
+  });
 
   function createDemoAPI() {
     const uid = () => { if (!session) throw new Error('Bitte zuerst anmelden.'); return session.user.id; };
     const base = {
       mode: 'demo', client: null, mondayOf, isoDate,
 
-      async getSession() { return later(session); },
+      async getSession() { return local(session); },
       onAuthChange(fn) { authListeners.add(fn); return () => authListeners.delete(fn); },
-      async signUp() { setSession({ user: { id: ME }, demo: true }, 'SIGNED_IN'); return later(session); },
-      async signIn() { setSession({ user: { id: ME }, demo: true }, 'SIGNED_IN'); return later(session); },
+      // Neue Adresse = neue Person mit leerem Profil; bekannte Adresse = Fehler wie bei Supabase.
+      async signUp({ email, password, displayName } = {}) {
+        await later(null);
+        const mail = String(email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw fail('Unable to validate email address: invalid format', 'validation_failed');
+        if (String(password || '').length < 6) throw fail('Password should be at least 6 characters.', 'weak_password');
+        if (db.accounts.some(a => a.email === mail)) throw fail('User already registered', 'user_already_exists');
+        // Eindeutig über Zurücksetzen hinweg (seq beginnt dann neu).
+        const userId = `u-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+        db.profiles.push({
+          id: userId, display_name: (String(displayName || '').trim() || mail.split('@')[0]).slice(0, 30),
+          avatar_url: null, color: COLORS[db.profiles.length % COLORS.length], main_competition_id: null,
+          created_at: new Date().toISOString(), onboarding: {},
+        });
+        let needsConfirm = false;
+        try { needsConfirm = localStorage.getItem('pt_demo_confirm') === '1'; } catch (e) {}
+        db.accounts.push({ email: mail, user_id: userId });
+        save();
+        if (needsConfirm) return { session: null, user: { id: userId, email: mail }, needsConfirm: true };
+        setSession(sessionFor(userId), 'SIGNED_IN');
+        return { session: clone(session), user: clone(session.user), needsConfirm: false };
+      },
+      // Bekannte Adresse → diese Person (gilt auch als bestätigt); sonst Bennys Showcase.
+      async signIn({ email } = {}) {
+        await later(null);
+        const acc = db.accounts.find(a => a.email === String(email || '').trim().toLowerCase());
+        setSession(sessionFor(acc ? acc.user_id : ME), 'SIGNED_IN');
+        return clone(session);
+      },
       async signOut() { setSession(null, 'SIGNED_OUT'); },
-      async requestPasswordReset() {},
-      async resetPasswordWithCode() {},
+      async resendSignup() { return later(null); },
+      async requestPasswordReset() { return later(null); },
+      async resetPasswordWithCode() { return later(null); },
 
       async getMyProfile() { return later(db.profiles.find(p => p.id === uid())); },
       async updateProfile(patch) {
-        const p = db.profiles.find(x => x.id === uid()); Object.assign(p, patch); save(); emitAll(); return later(p);
+        await later(null);
+        const p = db.profiles.find(x => x.id === uid()); Object.assign(p, patch); save(); emitAll(); return clone(p);
       },
-      async uploadAvatar(blob) { return base.updateProfile({ avatar_url: URL.createObjectURL(blob) }); },
+      async saveOnboarding(state) { return base.updateProfile({ onboarding: state }); },
+      // Data-URL statt blob:, damit das Bild ein Neuladen übersteht.
+      async uploadAvatar(blob) { return base.updateProfile({ avatar_url: await blobToDataUrl(blob) }); },
 
       async listMyCompetitions() {
         const mine = db.members.filter(m => m.user_id === uid() && !m.left_at);
@@ -241,34 +337,50 @@
       },
       async getMembers(cid) { return later(membersOf(cid)); },
       async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+        await later(null);
+        const start = startDate || isoDate(new Date());
         const c = { id: newId('c'), name, emoji, mode, invite_code: code6(), rotation_enabled: !!rotation, penalties_enabled: !!penalties,
-          work_enabled: !!work, start_date: startDate || isoDate(new Date()), end_date: endDate || null, archived_at: null,
+          work_enabled: !!work, start_date: start, end_date: endDate || null, archived_at: null,
           created_by: uid(), created_at: new Date().toISOString() };
         db.competitions.push(c);
         db.members.push({ competition_id: c.id, user_id: uid(), role: 'owner', team: mode === '2v2' ? 'A' : null, joined_at: c.created_at, left_at: null });
         db.penalty_config.push({ competition_id: c.id, enabled: !!penalties, amount_cents: 500, rule_mode: 'per_week_aggregate' });
-        db.rotation_config.push({ competition_id: c.id, enabled: !!rotation, start_date: isoDate(mondayOf(new Date())) });
-        save(); return later(c);
+        db.rotation_config.push({ competition_id: c.id, enabled: !!rotation, start_date: isoDate(mondayOf(new Date(start + 'T00:00:00'))) });
+        const p = db.profiles.find(x => x.id === uid());
+        if (p && !p.main_competition_id) p.main_competition_id = c.id;
+        save(); return clone(c);
       },
       async previewCompetition(code) {
         const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && !x.archived_at);
         if (!c) return later(null);
-        const ms = db.members.filter(m => m.competition_id === c.id && !m.left_at);
+        const ms = activeMembers(c.id);
         return later({ id: c.id, name: c.name, emoji: c.emoji, mode: c.mode, capacity: capacity(c.mode),
           already_member: ms.some(m => m.user_id === uid()),
           members: ms.map(m => { const p = profileOf(m.user_id); return { display_name: p.display_name, team: m.team, avatar_url: p.avatar_url, color: p.color }; }) });
       },
+      // Wie join_competition: voll/Team voll/ungültiges Team, 2 vs 2 ohne Wahl
+      // ins kleinere Team, Wiedereintritt reaktiviert die alte Zeile.
       async joinCompetition(code, team = null) {
-        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase());
-        if (!c) throw new Error('Code nicht gefunden.');
-        const ms = db.members.filter(m => m.competition_id === c.id && !m.left_at);
-        if (!ms.some(m => m.user_id === uid())) {
-          if (ms.length >= capacity(c.mode)) throw new Error('Diese Challenge ist schon voll.');
-          db.members.push({ competition_id: c.id, user_id: uid(), role: 'member', team: c.mode === '2v2' ? (team || 'A') : null,
-            joined_at: new Date().toISOString(), left_at: null });
-          save(); emitAll();
+        await later(null);
+        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && !x.archived_at);
+        if (!c) throw fail('invalid_code');
+        const ms = activeMembers(c.id);
+        if (ms.some(m => m.user_id === uid())) return c.id;
+        if (ms.length >= capacity(c.mode)) throw fail('competition_full');
+        let t = null;
+        if (c.mode === '2v2') {
+          if (team && !['A', 'B'].includes(team)) throw fail('invalid_team');
+          const count = (x) => ms.filter(m => m.team === x).length;
+          t = team || (count('A') <= count('B') ? 'A' : 'B');
+          if (count(t) >= 2) throw fail('team_full');
         }
-        return later(c.id);
+        const row = { competition_id: c.id, user_id: uid(), role: 'member', team: t, joined_at: new Date().toISOString(), left_at: null };
+        const old = db.members.find(m => m.competition_id === c.id && m.user_id === uid());
+        if (old) Object.assign(old, row); else db.members.push(row);
+        const p = db.profiles.find(x => x.id === uid());
+        if (p && !p.main_competition_id) p.main_competition_id = c.id;
+        save(); emitAll();
+        return c.id;
       },
       async updateCompetition(cid, patch) {
         const c = db.competitions.find(x => x.id === cid); Object.assign(c, patch);
@@ -486,12 +598,12 @@
     if (!open.length) return;
     const cid = pick(open);
     const monday = isoDate(mondayOf(new Date()));
-    const others = db.members.filter(m => m.competition_id === cid && !m.left_at && m.user_id !== ME);
+    const others = db.members.filter(m => m.competition_id === cid && !m.left_at && m.user_id !== me());
     const challs = db.weekly_challenges.filter(c => c.competition_id === cid && c.week_start === monday && db.categories
       .some(cat => cat.id === c.category_id && (cat.challenge_type || 'standard') === 'standard'));
     if (!others.length || !challs.length) return;
     const who = pick(others).user_id;
-    const myLatest = db.sets.filter(s => s.competition_id === cid && s.user_id === ME)
+    const myLatest = db.sets.filter(s => s.competition_id === cid && s.user_id === me())
       .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     if (myLatest && Math.random() < 0.25) {
       const emoji = pick(['🔥', '💪', '👏', '😤']);
@@ -512,10 +624,58 @@
     setTimeout(() => { simulateTick(); schedule(); }, 18000 + Math.random() * 17000);
   })();
 
+  // ── Beitritt simulieren ───────────────────────────────────────────
+  // Nach „Einladung senden“ tritt nach ein paar Sekunden eine freie Seed-Person
+  // bei (in 2 vs 2 ins kleinere Team, bei Gleichstand ins gegnerische).
+  const joinTimers = new Map();
+  function simulateJoin(cid, delay = 6000) {
+    if (joinTimers.has(cid)) return;
+    joinTimers.set(cid, setTimeout(() => {
+      joinTimers.delete(cid);
+      const c = db.competitions.find(x => x.id === cid);
+      if (!c || c.archived_at) return;
+      const ms = activeMembers(cid);
+      if (ms.length >= capacity(c.mode)) return;
+      const order = ['u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim', 'u-benny'];
+      const who = order.find(id => id !== me() && !ms.some(m => m.user_id === id));
+      if (!who) return;
+      const count = (t) => ms.filter(m => m.team === t).length;
+      const team = c.mode === '2v2' ? (count('B') <= count('A') ? 'B' : 'A') : null;
+      const old = db.members.find(m => m.competition_id === cid && m.user_id === who);
+      const row = { competition_id: cid, user_id: who, role: 'member', team, joined_at: new Date().toISOString(), left_at: null };
+      if (old) Object.assign(old, row); else db.members.push(row);
+      save(); emitAll();
+    }, delay));
+  }
+
+  // ── Eine Woche vorspulen ─────────────────────────────────────────
+  // Schiebt alle Datumswerte 7 Tage zurück: die laufende Woche wird zur Vorwoche
+  // (z. B. für den Rückblick nach Woche 1).
+  const DATE_KEYS = ['created_at', 'start_date', 'end_date', 'archived_at', 'joined_at', 'left_at', 'week_start', 'paid_at'];
+  function shiftValue(v, days) {
+    if (typeof v !== 'string' || !v) return v;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return addDays(v, days);
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? new Date(t + days * 86400000).toISOString() : v;
+  }
+  function shiftWeek(weeks = 1) {
+    for (const [table, rows] of Object.entries(db)) {
+      if (!Array.isArray(rows) || table === 'categories') continue;
+      for (const row of rows) for (const k of DATE_KEYS) if (k in row) row[k] = shiftValue(row[k], -7 * weeks);
+    }
+    save();
+  }
+
   window.PTData.init = () => createDemoAPI();
   window.PTDemo = {
-    reset() { localStorage.removeItem(DB_KEY); location.reload(); },
+    reset() { localStorage.removeItem(DB_KEY); localStorage.removeItem(USER_KEY); clearDemoState(); location.reload(); },
     live(on = true) { try { localStorage.setItem(LIVE_KEY, on ? '1' : '0'); } catch (e) {} },
+    simulateJoin,
+    shiftWeek(weeks = 1) { shiftWeek(weeks); location.reload(); },
+    exit() {
+      try { localStorage.removeItem('pt_demo'); localStorage.removeItem(USER_KEY); sessionStorage.removeItem('pt_demo_signed_out'); } catch (e) {}
+      location.reload();
+    },
   };
 
   // Kleiner Hinweis, damit niemand Demo und echte Daten verwechselt.

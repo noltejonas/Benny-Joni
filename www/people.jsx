@@ -57,7 +57,11 @@ function SideAvatar({ side, size = 32, className = '' }) {
   return (
     <span className="pt-avatar-stack" style={{ height: size }}>
       {side.userIds.slice(0, 2).map(id => <Avatar key={id} userId={id} size={size} />)}
-      {side.userIds.length === 0 && <span className="pt-avatar pt-avatar-initial" style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}>{side.short}</span>}
+      {side.userIds.length === 0 && (
+        // Leeres Team (noch niemand beigetreten): neutrale Fläche statt weißer Schrift auf nichts
+        <span className="pt-avatar pt-avatar-initial"
+          style={{ width: size, height: size, fontSize: Math.round(size * 0.45), background: 'var(--surface-3)', color: 'var(--text-3)' }}>{side.short}</span>
+      )}
     </span>
   );
 }

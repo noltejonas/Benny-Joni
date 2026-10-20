@@ -14,10 +14,21 @@ function setQuickSets(athlete, catId, arr) {
   localStorage.setItem('quickSets', JSON.stringify(all));
 }
 
-function QuickLogRow({ me, catId, onQuick, onLog }) {
+// `coach`: Tipp für den allerersten Satz (Onboarding), bis er geloggt ist.
+function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
   const [values, setValues] = useState(() => getQuickSets(me, catId));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(values);
+  // Pfeil des Tipps zeigt auf die Mitte des ersten Zahl-Chips.
+  const rowRef = React.useRef(null);
+  const [arrowX, setArrowX] = useState(null);
+  React.useLayoutEffect(() => {
+    if (!coach || editing) return;
+    const row = rowRef.current, chip = row?.querySelector('.quick-chip');
+    if (!row || !chip) return;
+    const a = row.getBoundingClientRect(), b = chip.getBoundingClientRect();
+    setArrowX(Math.round(b.left - a.left + b.width / 2));
+  }, [coach, editing, values]);
 
   useEffect(() => { setValues(getQuickSets(me, catId)); setEditing(false); }, [me, catId]);
 
@@ -60,7 +71,7 @@ function QuickLogRow({ me, catId, onQuick, onLog }) {
   }
 
   return (
-    <div className="quick-row">
+    <div className="quick-row" ref={rowRef}>
       <div className="quick-row-head">
         <span className="quick-row-label">Schnellsatz</span>
         {values.length > 0 && (
@@ -69,6 +80,11 @@ function QuickLogRow({ me, catId, onQuick, onLog }) {
           </button>
         )}
       </div>
+      {coach && values.length > 0 && (
+        <div className="ob-coach" role="note" style={arrowX != null ? { '--ob-arrow-x': `${arrowX}px` } : undefined}>
+          Satz gemacht? Tipp hier.
+        </div>
+      )}
       <div className="quick-chips">
         {onLog && (
           <button className="quick-chip-open" onClick={onLog}>+ Satz</button>
@@ -78,7 +94,7 @@ function QuickLogRow({ me, catId, onQuick, onLog }) {
             Schnellsatz festlegen
           </button>
         ) : values.map((v, i) => (
-          <button key={i} className="quick-chip mono" onClick={() => onQuick(v)}>+{v}</button>
+          <button key={i} className={`quick-chip mono${coach && i === 0 ? ' ob-pulse' : ''}`} onClick={() => onQuick(v)}>+{v}</button>
         ))}
       </div>
     </div>
@@ -279,7 +295,7 @@ function DuelCard({ entries, title, meta }) {
 function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = [], categories = [], allSets = [], layout,
   weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   openClosures = [], onCloseWeek,
-  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog }) {
+  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false }) {
   const [timerRunning, setTimerRunning] = React.useState(() => {
     const v = localStorage.getItem('pt_work_timer_start');
     const parsed = v ? parseInt(v) : null;
@@ -439,7 +455,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
               {focus.catType === 'tom_holland' ? 'Workout starten' : 'Bring Sally Up starten'}
             </button>
           ) : (
-            <QuickLogRow me={me} catId={focus.ch.category_id}
+            <QuickLogRow me={me} catId={focus.ch.category_id} coach={coach}
               onQuick={(v) => onQuickLog?.(focus.ch, v)} onLog={() => onLogChallenge(focus.ch)} />
           )}
         </section>

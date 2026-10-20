@@ -191,8 +191,25 @@
     return row;
   }
 
+  const TEXT = {
+    exists: 'Für diese E-Mail gibt es schon einen Account.',
+    badEmail: 'Diese E-Mail-Adresse sieht nicht richtig aus.',
+    shortPassword: 'Passwort muss mindestens 6 Zeichen haben.',
+    weakPassword: 'Passwort zu schwach. Nimm ein anderes.',
+    rateLimit: 'Zu viele Versuche. Warte kurz und probier es dann nochmal.',
+    signupOff: 'Neue Konten sind gerade gesperrt.',
+    unconfirmed: 'E-Mail ist noch nicht bestätigt.',
+    credentials: 'E-Mail oder Passwort falsch.',
+    otp: 'Code ungültig oder abgelaufen.',
+    offline: 'Keine Verbindung. Prüf dein Internet.',
+  };
+
+  // Supabase-Fehler (Text oder `code`) → deutscher Text, `code` bleibt erhalten.
+  // Netzfehler bekommen `code = 'offline'`.
   function friendlyError(error) {
     const msg = error?.message || String(error);
+    const code = error?.code || '';
+    const wrap = (text, c = code) => { const e = new Error(text); e.code = c; return e; };
     const map = {
       invalid_code: 'Code nicht gefunden.',
       competition_full: 'Diese Challenge ist schon voll.',
@@ -200,19 +217,38 @@
       invalid_team: 'Ungültiges Team.',
       forbidden: 'Das darf nur der Ersteller der Challenge.',
       not_authenticated: 'Bitte zuerst anmelden.',
-      'Invalid login credentials': 'E-Mail oder Passwort falsch.',
-      'User already registered': 'Für diese E-Mail gibt es schon einen Account.',
-      'Email not confirmed': 'E-Mail ist noch nicht bestätigt.',
+      'Invalid login credentials': TEXT.credentials,
+      'User already registered': TEXT.exists,
+      'Email not confirmed': TEXT.unconfirmed,
     };
-    const wrap = (text) => { const e = new Error(text); e.code = error?.code; return e; };
     for (const [k, v] of Object.entries(map)) if (msg.includes(k)) return wrap(v);
-    if (/Password should be at least/i.test(msg)) return wrap('Passwort muss mindestens 6 Zeichen haben.');
-    if (/Token has expired or is invalid/i.test(msg)) return wrap('Code ungültig oder abgelaufen.');
+    if (/Failed to fetch|Load failed|NetworkError|Network request failed|fetch failed/i.test(msg)
+      || error?.name === 'AuthRetryableFetchError') return wrap(TEXT.offline, 'offline');
+    if (/Password should be at least/i.test(msg)) return wrap(TEXT.shortPassword);
+    const byCode = {
+      user_already_exists: TEXT.exists, email_exists: TEXT.exists,
+      email_address_invalid: TEXT.badEmail, weak_password: TEXT.weakPassword,
+      over_email_send_rate_limit: TEXT.rateLimit, over_request_rate_limit: TEXT.rateLimit,
+      signup_disabled: TEXT.signupOff, email_not_confirmed: TEXT.unconfirmed,
+      invalid_credentials: TEXT.credentials, otp_expired: TEXT.otp,
+    };
+    if (byCode[code]) return wrap(byCode[code]);
+    if (/already been registered/i.test(msg)) return wrap(TEXT.exists);
+    if (/validate email address|email address .* is invalid/i.test(msg)) return wrap(TEXT.badEmail);
+    if (/rate limit|For security purposes/i.test(msg)) return wrap(TEXT.rateLimit);
+    if (/Signups not allowed/i.test(msg)) return wrap(TEXT.signupOff);
+    if (/Token has expired or is invalid/i.test(msg)) return wrap(TEXT.otp);
     return error instanceof Error ? error : wrap(msg);
   }
   function check({ data, error }) {
     if (error) throw friendlyError(error);
     return data;
+  }
+  // Wie check, fängt aber auch geworfene Netzfehler (fetch) ab.
+  async function guard(run) {
+    let res;
+    try { res = await run(); } catch (e) { throw friendlyError(e); }
+    return check(res);
   }
 
   // Paged select — PostgREST liefert max. 1000 Zeilen pro Request.
@@ -273,18 +309,25 @@
         });
         return () => data.subscription.unsubscribe();
       },
+      // Ohne Session (E-Mail-Bestätigung im Dashboard an) zeigt die App
+      // „Check deine Mails“. Bei aktiver Bestätigung meldet Supabase eine schon
+      // registrierte Adresse nicht als Fehler, sondern mit leeren identities.
       async signUp({ email, password, displayName }) {
-        const data = check(await client.auth.signUp({
+        const name = (displayName || '').trim();
+        const data = await guard(() => client.auth.signUp({
           email: email.trim(), password,
-          options: { data: { display_name: displayName.trim() } },
+          options: { data: name ? { display_name: name } : {} },
         }));
-        if (!data.session) {
-          throw new Error('Account angelegt, aber E-Mail-Bestätigung ist aktiv. Bitte im Supabase-Dashboard unter Auth → Providers → Email „Confirm email“ ausschalten oder den Link in der Mail bestätigen.');
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          throw friendlyError({ message: 'User already registered', code: 'user_already_exists' });
         }
-        return data.session;
+        return { session: data.session, user: data.user, needsConfirm: !data.session };
       },
       async signIn({ email, password }) {
-        return check(await client.auth.signInWithPassword({ email: email.trim(), password })).session;
+        return (await guard(() => client.auth.signInWithPassword({ email: email.trim(), password }))).session;
+      },
+      async resendSignup(email) {
+        await guard(() => client.auth.resend({ type: 'signup', email: email.trim() }));
       },
       async signOut() {
         await client.auth.signOut();
@@ -293,11 +336,11 @@
       // Passwort vergessen: Mail enthält einen 6-stelligen Code ({{ .Token }}),
       // der in der App eingegeben wird — kein Deep Link nötig.
       async requestPasswordReset(email) {
-        check(await client.auth.resetPasswordForEmail(email.trim()));
+        await guard(() => client.auth.resetPasswordForEmail(email.trim()));
       },
       async resetPasswordWithCode({ email, code, password }) {
-        check(await client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' }));
-        check(await client.auth.updateUser({ password }));
+        await guard(() => client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' }));
+        await guard(() => client.auth.updateUser({ password }));
       },
 
       // ── Profile ──────────────────────────────────────────────────────
@@ -314,6 +357,11 @@
       },
       async updateProfile(patch) {
         return check(await client.from('profiles').update(patch).eq('id', uid()).select().single());
+      },
+      // Onboarding-Stand fürs Konto (Spalte profiles.onboarding, Migration
+      // 20261020000000). Aufrufen nur, wenn das geladene Profil die Spalte hat.
+      async saveOnboarding(state) {
+        return base.updateProfile({ onboarding: state });
       },
       async uploadAvatar(blob) {
         const path = `${uid()}/avatar-${Date.now()}.jpg`;
@@ -837,5 +885,6 @@
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
     isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, workoutSummary, workoutPeopleDone,
+    friendlyError,
   };
 })();
