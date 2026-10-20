@@ -103,6 +103,39 @@ function App() {
   const [intro, setIntro] = useState(null); // { kind: 'created' | 'joined', id } → Ebenen in der Challenge
   const [joinCode, setJoinCode] = useState(''); // Code fürs Beitreten-Sheet (Einladungslink in der App)
 
+  // Einladungslinks: im Browser ?join=CODE, in der App projektterminator://join/CODE
+  // (Kaltstart über getLaunchUrl, sonst appUrlOpen). Der Code wird als offene
+  // Einladung gemerkt; entryRoute bzw. der Effekt unten führen in die Vorschau.
+  useEffect(() => {
+    const take = (url) => {
+      const code = PTOnboarding.parseInviteUrl(url);
+      if (code) setInvite(code);
+      return code;
+    };
+    if (take(location.href)) {
+      const u = new URL(location.href);
+      u.searchParams.delete('join');
+      if (/^#join=/i.test(u.hash)) u.hash = '';
+      history.replaceState(null, '', u.toString());
+    }
+    let alive = true, handle = null;
+    (window.PTAppReady || Promise.resolve(null)).then(async (mod) => {
+      const AppPlugin = mod?.App;
+      if (!AppPlugin || !alive) return;
+      try {
+        // Der Startlink bleibt die ganze Laufzeit gleich; nach einem Neuladen nicht erneut öffnen.
+        const launch = await AppPlugin.getLaunchUrl();
+        if (launch?.url && sessionStorage.getItem('pt:launch-url') !== launch.url) {
+          sessionStorage.setItem('pt:launch-url', launch.url);
+          take(launch.url);
+        }
+        handle = await AppPlugin.addListener('appUrlOpen', (e) => take(e?.url));
+        if (!alive) handle.remove();
+      } catch (e) { console.warn('App-Plugin nicht verfügbar', e); }
+    });
+    return () => { alive = false; handle?.remove(); };
+  }, [setInvite]);
+
   useEffect(() => {
     if (!api) return;
     api.getSession().then(setSession).catch(() => setSession(null));
@@ -171,6 +204,16 @@ function App() {
   useEffect(() => {
     if (activeId) { try { localStorage.setItem(ACTIVE_KEY, activeId); } catch (e) {} }
   }, [activeId]);
+
+  // Einladung, während man schon in der App ist: eigene Challenge → öffnen,
+  // sonst das Beitreten-Sheet mit Vorschau.
+  useEffect(() => {
+    if (!invite || !competitions?.some(c => !c.archived_at)) return;
+    const mine = competitions.find(c => c.invite_code === invite && !c.archived_at);
+    setInvite(null);
+    if (mine) { setActiveId(mine.id); setSheet(null); setToast('Du bist schon dabei.'); }
+    else { setJoinCode(invite); setSheet('join'); }
+  }, [invite, competitions, setInvite]);
 
   // Welcher Bildschirm vor der App (onboarding-model.js). Wer im Onboarding
   // landet, gilt ab jetzt als neu (Startkarte, Tipps, Feiern).

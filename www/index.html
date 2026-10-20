@@ -34,6 +34,20 @@
     // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
     // @capacitor/preferences, im Browser localStorage (Wert null).
     window.PTPreferencesReady = new Promise(function (resolve) { window.__ptResolvePreferences = resolve; });
+    // App-Plugin für Einladungslinks (projektterminator://join/<CODE>), nur nativ.
+    window.PTAppReady = new Promise(function (resolve) { window.__ptResolveApp = resolve; });
+  </script>
+  <script type="module">
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/app@8/+esm');
+        window.__ptResolveApp(mod);
+      } else {
+        window.__ptResolveApp(null);
+      }
+    } catch (e) {
+      window.__ptResolveApp(null);
+    }
   </script>
   <script type="module">
     try {

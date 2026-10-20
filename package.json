@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
     "@capacitor/cli": "^8.3.3",
     "@capacitor/core": "^8.3.3",
     "@capacitor/haptics": "^8.0.2",
