@@ -557,6 +557,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   });
   useEffect(() => {
     try { sessionStorage.setItem(TAB_KEY, tab); } catch {}
+    // Neuer Tab beginnt oben, nicht auf der Scrollhöhe des vorigen.
+    try { window.scrollTo(0, 0); } catch {}
   }, [tab]);
   // reload() ist memoisiert; notify() braucht trotzdem den aktuellen Tab.
   const tabRef = React.useRef(tab);
