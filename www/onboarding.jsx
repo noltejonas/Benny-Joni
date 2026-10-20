@@ -200,14 +200,17 @@ function ObCodeField({ value, onChange, onComplete, onSubmit, autoFocus, onPaste
 // öffnen in Safari (openExternal).
 function ObLegalConsent() {
   const L = PTOnboarding.LEGAL;
+  // Link und Satzzeichen bleiben zusammen, sonst bricht der Punkt allein um.
   const link = (url, text) => (
-    <button type="button" className="btn-link" onClick={() => PTOnboarding.openExternal(url)}
-      style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit', verticalAlign: 'baseline' }}>{text}</button>
+    <span style={{ whiteSpace: 'nowrap' }}>
+      <button type="button" className="btn-link" onClick={() => PTOnboarding.openExternal(url)}
+        style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit', verticalAlign: 'baseline' }}>{text}</button>.
+    </span>
   );
   return (
     <p className="ob-hint" style={{ margin: 0, textAlign: 'center' }}>
-      Mit ‚Weiter‘ akzeptierst du die {link(L.terms, 'Nutzungsbedingungen')}.
-      {' '}Infos zum Datenschutz findest du in der {link(L.privacy, 'Datenschutzerklärung')}.
+      Mit ‚Weiter‘ akzeptierst du die {link(L.terms, 'Nutzungsbedingungen')}
+      {' '}Infos zum Datenschutz findest du in der {link(L.privacy, 'Datenschutzerklärung')}
     </p>
   );
 }
