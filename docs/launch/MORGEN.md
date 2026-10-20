@@ -196,6 +196,17 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    `supabase/migrations/20261021000000_delete_account.sql` einfügen → Run.
    Muss ohne Fehler durchlaufen (die Datei ist idempotent, ein zweiter Lauf
    schadet nicht).
+
+   2b. **SQL Editor** → New query → Inhalt von
+   `supabase/migrations/20261021000050_launch_vor_review.sql` → Run (sperrt das
+   öffentliche Avatar-Listing, benennt „Tom Holland“ in „20-Min-AMRAP“ um).
+   Kontrolle:
+   ```sql
+   select name from categories where competition_id is null and challenge_type = 'tom_holland';
+   -- → '20-Min-AMRAP'
+   select roles from pg_policies where schemaname='storage' and policyname='mu_avatars_read';
+   -- → {authenticated}
+   ```
 3. **Authentication → Sign In / Providers → Email**: „Confirm email“ muss
    **AUS** sein. Sonst kann sich niemand ohne Mail registrieren, auch nicht der
    Prüfer.
@@ -204,8 +215,8 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    `delete-account` deployen (siehe „Supabase-Funktionen“ unten). Die App nutzt
    sie dann automatisch.
 
-**Jetzt NICHT einspielen:** `20261021000100_launch_optional.sql` (nach dem
-Launch), `20261021001000_daily_nudge_cron.sql` (ab 22.10.),
+**Jetzt NICHT einspielen:** `20261021000100_launch_optional.sql` (nur noch
+Abschnitt 4 `client_errors`, nach dem Launch), `20261021001000_daily_nudge_cron.sql` (ab 22.10.),
 `20261021002000_social_push.sql` (später).
 
 ## 9. Build bauen und hochladen (07:05, A, 40 min) – P0
@@ -406,8 +417,8 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
   (Migration `20261021001000_daily_nudge_cron.sql`, Secret `NUDGE_SECRET`,
   `DRY_RUN=false`). Reihenfolge steht im Kopf der Migration.
 - **Nach dem Livegang:** optionale Migration `20261021000100_launch_optional.sql`
-  (Avatar-Bucket härten, Kategorie „Tom Holland“ umbenennen, Tabelle
-  `client_errors`). Ab dann im App-Datenschutz „Sonstige Diagnosedaten“ auf Ja.
+  (Tabelle `client_errors`; Bucket und Kategorie sind seit Schritt 8.2b
+  erledigt). Ab dann im App-Datenschutz „Sonstige Diagnosedaten“ auf Ja.
 - **25.10. (Zeitumstellung):** im `push_log` prüfen, ob Pushes zur richtigen
   Berliner Uhrzeit kamen.
 - **Tag 2–5:** AdMob-Konto, App verknüpfen, `app-ads.txt` auf eigener Domain,
@@ -464,6 +475,7 @@ kein Entwurfs-Kasten mehr da ist.
 |---|---|---|
 | Prüfskript (nur lesend) | `docs/launch/supabase-checks.sql` | Schritt 8, **P0** |
 | Migration „Konto löschen“ | `supabase/migrations/20261021000000_delete_account.sql` | Schritt 8, **P0** |
+| Migration vor dem Review (Avatar-Listing, Kategorie) | `supabase/migrations/20261021000050_launch_vor_review.sql` | Schritt 8, **P0** |
 | „Confirm email“ AUS | Authentication → Providers → Email | Schritt 8, **P0** |
 | AV-Vertrag (DPA) | Organization → Legal Documents | Schritt 5 |
 | Function `delete-account` | `supabase/functions/delete-account/` | nur falls die Löschung mit Rechtefehler scheitert |
@@ -473,7 +485,7 @@ kein Entwurfs-Kasten mehr da ist.
 | `WEBHOOK_SECRET` | in Prod nicht gesetzt; **nicht** heute setzen, sonst stoppen alle Pushes | nach dem Launch |
 | SMTP, Vorlage „Reset Password“ mit `{{ .Token }}`, Rate Limits, Site URL | Authentication → Emails / Rate Limits / URL Configuration | Schritt 14, P1 |
 | Function `daily-nudge` + Secret `NUDGE_SECRET` + `DRY_RUN` | `supabase/functions/daily-nudge/`, Migration `20261021001000_daily_nudge_cron.sql`. Deploy nur mit `--no-verify-jwt` | ab 22.10. |
-| Optionale Migration | `20261021000100_launch_optional.sql` | nach dem Launch |
+| Optionale Migration (nur Abschnitt 4 `client_errors`) | `20261021000100_launch_optional.sql` | nach dem Launch |
 | Social-Push | `20261021002000_social_push.sql` | später |
 | Tarif Pro, MFA, zwei Owner | Organization → Billing / Members | Schritt 14, P1 |
 

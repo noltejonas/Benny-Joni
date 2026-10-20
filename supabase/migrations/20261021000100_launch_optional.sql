@@ -11,8 +11,9 @@
 --      → '20-Min-AMRAP'.
 --   4. Test Fehlerprotokoll: select count(*) from client_errors; → Zahl, kein Fehler.
 --      Lesen nur im Dashboard (keine SELECT-Policy für die App).
--- Abschnitt 3 (Kategorie umbenennen) kann auch einzeln und schon vor dem Review
--- laufen, falls der Name „Tom Holland“ beim Prüfen stören sollte.
+-- Abschnitte 1–3 sind identisch mit 20261021000050_launch_vor_review.sql und laufen
+-- schon vor dem Review; ein erneuter Lauf schadet nicht. Nach dem Launch zählt nur
+-- Abschnitt 4.
 --
 -- Inhalt:
 --   1. Avatar-Bucket: höchstens 2 MB, nur JPEG/PNG/WebP (die App lädt image/jpeg).
