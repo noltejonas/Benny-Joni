@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -359,7 +359,9 @@ function App() {
         onSetMain={setMain}
         onSignOut={signOut}
         onCompetitionChanged={() => loadAccount()}
-        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }} />
+        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }}
+        intro={intro?.id === active.id ? intro.kind : null} onIntroDone={() => setIntro(null)}
+        newcomer={newcomer} obState={obState} onObPatch={patchOb} />
       {sheets}
     </>
   );
@@ -442,9 +444,21 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
 }
 
 // ─── App pro Challenge ──────────────────────────────────────────────────────
+// Schon gesehene Ziel-Feiern (celebration.jsx, pt_celebrated_v1) — beim
+// Beitritt für bereits geknackte Gruppenziele setzen.
+function markCelebrated(me, challengeIds) {
+  try {
+    const flags = JSON.parse(localStorage.getItem('pt_celebrated_v1') || '{}');
+    flags[me] = flags[me] || {};
+    for (const id of challengeIds) flags[me][id] = true;
+    localStorage.setItem('pt_celebrated_v1', JSON.stringify(flags));
+  } catch (e) {}
+}
+
 function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
   themePref, onSetThemePref, notificationsOn, onSetNotifications,
-  onOpenSwitcher, onOpenProfile, onSetMain, onSignOut, onCompetitionChanged, onLeft }) {
+  onOpenSwitcher, onOpenProfile, onSetMain, onSignOut, onCompetitionChanged, onLeft,
+  intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
 
   const [competition, setCompetition] = useState(initialCompetition);
@@ -492,6 +506,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [toast, setToast] = useState('');
   const lastFeedRef = React.useRef(null);
+  // Onboarding-Ebenen über Home (onboarding-intro.jsx): { kind, … } oder null.
+  const [layer, setLayer] = useState(null);
+  const layerQueue = React.useRef([]);
+  const introStarted = React.useRef(false);
 
   const sides = useMemo(() => buildSides(competition, members, me), [competition, members, me]);
   const allowWork = !!competition.work_enabled;
@@ -506,6 +524,66 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return allSets.filter((s) => ids.has(s.challenge_id));
   }, [allSets, currentChallenges]);
   const participantsNow = useMemo(() => PTData.participantsFor(members, weekStart), [members, weekStart]);
+
+  // ── Onboarding in der Challenge ──────────────────────────────────────────
+  const activeMembers = useMemo(() => members.filter(m => !m.left_at), [members]);
+  const catTypeOf = useCallback((ch) => {
+    const c = categories.find(x => x.id === ch.category_id);
+    return (c?.kind || 'sports') === 'sports' && (c?.challenge_type || 'standard') === 'standard';
+  }, [categories]);
+  const sportsGoalsNow = useMemo(() => currentChallenges.filter(catTypeOf), [currentChallenges, catTypeOf]);
+  const mySetCount = useMemo(() => allSets.filter(s => s.athlete === me).length, [allSets, me]);
+  // Solange Plätze frei sind, rechnet der Anteil mit der vollen Besetzung (Spec, Entscheidung 10).
+  const peopleForShare = PTOnboarding.expectedPeople(competition.mode, participantsNow.length);
+  const live = React.useRef({});
+  live.current = { goals: sportsGoalsNow.length, sets: mySetCount };
+
+  // Nächste Ebene aus der Warteschlange; überspringt, was die Daten schon erledigen.
+  const advance = useCallback((ctx = {}) => {
+    const goals = ctx.goals ?? live.current.goals;
+    const sets = ctx.sets ?? live.current.sets;
+    while (layerQueue.current.length) {
+      const kind = layerQueue.current.shift();
+      if (kind === 'goal' && goals > 0) continue;
+      if (kind === 'log' && (sets > 0 || goals === 0)) continue;
+      setLayer({ kind, ...(ctx.data || {}) });
+      return;
+    }
+    setLayer(null);
+    onIntroDone?.();
+  }, [onIntroDone]);
+
+  const openLayer = useCallback((kinds) => {
+    layerQueue.current = [...kinds];
+    advance();
+  }, [advance]);
+
+  // Nach Erstellen bzw. Beitreten: Ebenen einmal starten, sobald die Daten da sind.
+  useEffect(() => {
+    if (loading || !intro || introStarted.current) return;
+    introStarted.current = true;
+    if (intro === 'joined') {
+      // Gruppenziele, die vor dem Beitritt geknackt wurden, nicht als Vollbild feiern.
+      const reached = currentChallenges.filter(ch => {
+        const total = allSets.filter(x => x.challenge_id === ch.id).reduce((a, x) => a + (x.reps || 0), 0);
+        return ch.target_reps > 0 && total >= ch.target_reps;
+      });
+      markCelebrated(me, reached.map(ch => ch.id));
+    }
+    const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', 'log'] : ['invite'])
+      : newcomer ? ['goal', 'log'] : [];
+    openLayer(kinds);
+  }, [loading, intro, newcomer, openLayer, currentChallenges, allSets, me]);
+
+  // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
+  const celebrateFirst = useCallback((value, ch, cat) => {
+    const share = PTData.fairShareOf(ch.target_reps, peopleForShare);
+    const before = allSets.filter(x => x.challenge_id === ch.id && x.athlete === me).reduce((a, x) => a + (x.reps || 0), 0);
+    onObPatch?.({ firstLog: new Date().toISOString() });
+    layerQueue.current = [];
+    setLayer({ kind: 'cele', value, cat, share, myDone: before + value });
+  }, [peopleForShare, allSets, me, onObPatch]);
+  const isFirstLog = newcomer && !obState.firstLog && mySetCount === 0;
 
   const weekTemplate = useMemo(() => {
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
@@ -749,7 +827,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           api={capi}
           me={me}
           sides={sides}
-          participantCount={participantsNow.length}
+          participantCount={peopleForShare}
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
@@ -760,21 +838,27 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           nextWeekProposals={nextWeekProposals}
           openClosures={usePenalties ? openClosures : []}
           onCloseWeek={(w) => setClosingWeek(w)}
-          onAddGoal={() => setSetupForChallenge({})}
+          onAddGoal={() => (newcomer && !sportsGoalsNow.length ? openLayer(['goal', 'log']) : setSetupForChallenge({}))}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
           onLogChallenge={(ch) => setLogForChallenge(ch)}
           onQuickLog={async (ch, val) => {
             try {
               const cat = categories.find(c => c.id === ch.category_id);
               const isWork = cat?.kind === 'work';
+              const first = isFirstLog && !isWork;
               const payload = isWork
                 ? { challenge_id: ch.id, reps: null, duration_minutes: parseInt(val), note: null }
                 : { challenge_id: ch.id, reps: parseInt(val), note: null };
               await capi.addSet(payload);
+              PTHaptics.tap();
               const what = cat?.name ? ` ${cat.name}` : '';
-              setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt`);
+              if (first) celebrateFirst(parseInt(val), ch, cat);
+              else setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt`);
               reload();
-            } catch (e) { alert(e.message); }
+            } catch (e) {
+              if (e?.code === 'offline') setToast('Keine Verbindung. Satz nicht gespeichert.');
+              else alert(e.message);
+            }
           }} />
         }
 
@@ -790,7 +874,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}
-          challenges={currentChallenges} weekSets={currentWeekSets} participantCount={participantsNow.length}
+          challenges={currentChallenges} weekSets={currentWeekSets} participantCount={peopleForShare}
           loading={loading}
           projectTags={projectTags} toolTags={toolTags}
           onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
@@ -927,9 +1011,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               toolTags={toolTags}
               onClose={() => setLogForChallenge(null)}
               onLogged={(r, isWork) => {
+                const ch = logForChallenge;
                 setLogForChallenge(null);
+                PTHaptics.tap();
                 const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
-                setToast(`${valStr}${what} geloggt`);
+                if (isFirstLog && !isWork) celebrateFirst(r, ch, logCat);
+                else setToast(`${valStr}${what} geloggt`);
                 reload();
               }} />
           );
@@ -960,6 +1047,27 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             } catch (e) { alert(e.message); }
           }} />
       </Sheet>
+
+      {layer?.kind === 'invite' && (
+        <ObInviteLayer competition={competition} members={members} me={me} fresh={intro === 'created'}
+          onDone={() => advance()} />
+      )}
+      {layer?.kind === 'goal' && (
+        <ObGoalLayer api={capi} competition={competition} categories={categories} me={me}
+          activeCount={participantsNow.length} weekStart={weekStart}
+          onDone={(ch) => { reload(); advance({ goals: 1, data: { extra: [ch] } }); }}
+          onSkip={() => advance({ goals: live.current.goals })} />
+      )}
+      {layer?.kind === 'log' && (
+        <ObFirstLogLayer api={capi} categories={categories} people={peopleForShare}
+          challenges={[...currentChallenges, ...(layer.extra || []).filter(x => !currentChallenges.some(c => c.id === x.id))]}
+          onLogged={(reps, ch, cat) => { PTHaptics.tap(); celebrateFirst(reps, ch, cat); reload(); }}
+          onSkip={() => advance()} />
+      )}
+      {layer?.kind === 'cele' && (
+        <ObCelebrate value={layer.value} category={layer.cat} myDone={layer.myDone} share={layer.share}
+          onDone={() => advance({ sets: 1 })} />
+      )}
 
       <Toast message={toast} onDone={() => setToast('')} />
 

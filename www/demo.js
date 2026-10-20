@@ -628,7 +628,8 @@
       if (!c || c.archived_at) return;
       const ms = activeMembers(cid);
       if (ms.length >= capacity(c.mode)) return;
-      const who = SEED_IDS.find(id => id !== me() && !ms.some(m => m.user_id === id));
+      const order = ['u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim', 'u-benny'];
+      const who = order.find(id => id !== me() && !ms.some(m => m.user_id === id));
       if (!who) return;
       const count = (t) => ms.filter(m => m.team === t).length;
       const team = c.mode === '2v2' ? (count('B') <= count('A') ? 'B' : 'A') : null;

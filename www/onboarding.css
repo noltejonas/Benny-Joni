@@ -342,7 +342,10 @@
 .ob-cele-ring { position: relative; animation: ob-pop .6s .4s var(--ease) both; }
 .ob-cele-ring .mini-ring-label { color: #fff; font-size: 18px; font-weight: 800; }
 .ob-cele-sub { font-size: 16px; line-height: 22px; opacity: .92; max-width: 300px; }
-.ob-cele .rd-btn-white { width: 100%; max-width: 360px; margin-top: 8px; animation: ob-in .4s .9s var(--ease) both; }
+.ob-cele .rd-btn-white {
+  position: absolute; left: 24px; right: 24px; bottom: calc(var(--safe-bot) + 24px);
+  max-width: 432px; margin: 0 auto; animation: ob-in .4s .9s var(--ease) both;
+}
 .ob-confetti { position: absolute; inset: 0; pointer-events: none; }
 .ob-confetti i {
   position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px;
