@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -201,6 +201,20 @@ function App() {
     else { setProfile(null); setCompetitions(null); setActiveId(null); }
   }, [userId, loadAccount]);
 
+  // Ladefehler (meist offline): automatisch neu versuchen, sobald das Netz zurück ist.
+  useEffect(() => {
+    if (!accountError) return;
+    const retry = () => loadAccount();
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [accountError, loadAccount]);
+  useEffect(() => {
+    if (api) return;
+    const reload = () => location.reload();
+    window.addEventListener('online', reload);
+    return () => window.removeEventListener('online', reload);
+  }, [api]);
+
   useEffect(() => {
     if (activeId) { try { localStorage.setItem(ACTIVE_KEY, activeId); } catch (e) {} }
   }, [activeId]);
@@ -269,12 +283,11 @@ function App() {
 
   if (!api) {
     return (
-      <div className="name-picker">
-        <div className="brand">Projekt Terminator</div>
-        <h1>Keine Verbindung</h1>
-        <p className="sub">Die App braucht Internet, um deine Challenges zu laden.</p>
-        <button className="btn" onClick={() => location.reload()}>Erneut versuchen</button>
-      </div>
+      <ObScreen center foot={<button className="btn" onClick={() => location.reload()}>Erneut versuchen</button>}>
+        <div className="ob-trophy" aria-hidden="true">📡</div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>Keine Verbindung</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>Die App braucht Internet, um deine Challenges zu laden. Sobald du online bist, geht’s weiter.</p>
+      </ObScreen>
     );
   }
   if (session === undefined) return <Loader text="Starte…" />;
@@ -283,14 +296,16 @@ function App() {
       returning={readPref(RETURNING_KEY, '') === '1'} />;
   }
   if (accountError && !profile) {
+    const offline = navigator.onLine === false || /Keine Verbindung/.test(accountError);
     return (
-      <div className="name-picker">
-        <div className="brand">Projekt Terminator</div>
-        <h1>Laden fehlgeschlagen</h1>
-        <p className="sub">{accountError}</p>
+      <ObScreen center foot={<>
         <button className="btn" onClick={() => loadAccount()}>Erneut versuchen</button>
-        <button className="btn-link" style={{ marginTop: 16 }} onClick={() => api.signOut()}>Abmelden</button>
-      </div>
+        <button className="btn-link" onClick={() => api.signOut()}>Abmelden</button>
+      </>}>
+        <div className="ob-trophy" aria-hidden="true">{offline ? '📡' : '😵'}</div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{offline ? 'Keine Verbindung' : 'Laden fehlgeschlagen'}</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>{offline ? 'Sobald du wieder online bist, geht’s weiter.' : accountError}</p>
+      </ObScreen>
     );
   }
   if (!profile || !competitions) return <Loader text="Lade Profil…" />;

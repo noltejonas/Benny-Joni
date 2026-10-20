@@ -10,7 +10,8 @@
 // Ohne Netz (navigator.onLine === false) scheitern Aufrufe wie bei Supabase.
 //
 // Zum Testen: localStorage.pt_demo_confirm = '1' → Registrieren verlangt die
-// Mail-Bestätigung; PTDemo.shiftWeek() spult eine Woche vor.
+// Mail-Bestätigung; localStorage.pt_demo_offline = '1' → alle Aufrufe scheitern
+// wie ohne Netz; PTDemo.shiftWeek() spult eine Woche vor.
 
 (function () {
   const params = new URLSearchParams(location.search);
@@ -233,7 +234,8 @@
   save();
   const newId = (p) => `${p}-${++db.seq}`;
   const clone = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
-  const offline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+  const offline = () => (typeof navigator !== 'undefined' && navigator.onLine === false)
+    || (() => { try { return localStorage.getItem('pt_demo_offline') === '1'; } catch (e) { return false; } })();
   // Wie ein Netzaufruf: kurz warten, ohne Netz mit demselben Fehler wie Supabase scheitern.
   const later = (v) => new Promise((res, rej) => setTimeout(() => (
     offline() ? rej(friendlyError(new TypeError('Failed to fetch'))) : res(clone(v))
