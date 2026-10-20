@@ -1,4 +1,4 @@
-/* global React, PTData, PTOnboarding, Icon, Avatar */
+/* global React, PTData, PTOnboarding, Icon, Avatar, Sheet, modeLabel */
 // Onboarding vor der Challenge: Willkommen, Konto, Profil, Start, Erstellen,
 // Beitreten. Welcher Bildschirm dran ist, entscheidet PTOnboarding.entryRoute
 // (onboarding-model.js); die Ebenen in der Challenge liegen in onboarding-intro.jsx.
@@ -460,7 +460,314 @@ function ObProfile({ api, profile, email, onSaved, onDone, onSignOut }) {
   );
 }
 
+// ─── Start (Konto ohne Challenge) ───────────────────────────────────────────
+function ObStart({ profile, onCreate, onJoin, onProfile, onDemo }) {
+  const first = (profile.display_name || '').split(/\s+/)[0];
+  return (
+    <ObScreen steps={3} step={3} stepKey="start"
+      left={<button type="button" className="ob-corner-avatar" onClick={onProfile} aria-label="Profil"><Avatar profile={profile} size={40} /></button>}
+      foot={<button type="button" className="btn-link" onClick={onDemo}>Erst mal die Demo ansehen</button>}>
+      <h1 className="ob-title">Hi {first} 👋</h1>
+      <p className="ob-sub">Wie startest du?</p>
+      <div className="ob-choices">
+        <button type="button" className="ob-choice is-primary" onClick={onCreate}>
+          <span className="ob-choice-icon" aria-hidden="true">🏁</span>
+          <span className="ob-choice-text">
+            <span className="ob-choice-title">Challenge starten</span>
+            <span className="ob-choice-desc">Du lädst deine Leute ein.</span>
+          </span>
+          <span className="ob-choice-chev"><Icon name="chevron" size={20} /></span>
+        </button>
+        <button type="button" className="ob-choice" onClick={onJoin}>
+          <span className="ob-choice-icon" aria-hidden="true">🎟️</span>
+          <span className="ob-choice-text">
+            <span className="ob-choice-title">Ich habe einen Code</span>
+            <span className="ob-choice-desc">Jemand hat dich eingeladen.</span>
+          </span>
+          <span className="ob-choice-chev"><Icon name="chevron" size={20} /></span>
+        </button>
+      </div>
+    </ObScreen>
+  );
+}
+
+// ─── Plätze: Mitglieder als Avatare, freie Plätze gestrichelt ───────────────
+function ObSlots({ members = [], capacity = 2, newIds = [] }) {
+  const free = Math.max(0, capacity - members.length);
+  const shown = Math.min(free, Math.max(1, 4 - members.length)); // höchstens vier Kreise in einer Reihe
+  return (
+    <div className="ob-slots">
+      {members.map((m, i) => (
+        <div key={m.user_id || m.id || i} className={`ob-slot${newIds.includes(m.user_id || m.id) ? ' is-new' : ''}`}>
+          <Avatar profile={m.profile || m} size={52} />
+          <span className="ob-slot-name">{((m.profile || m).display_name || '').split(/\s+/)[0]}</span>
+        </div>
+      ))}
+      {Array.from({ length: shown }, (_, i) => (
+        <div key={`free-${i}`} className="ob-slot"><span className="ob-slot-empty" aria-hidden="true">?</span><span className="ob-slot-name">frei</span></div>
+      ))}
+      {free > shown && <span className="ob-slots-more">bis {capacity}</span>}
+    </div>
+  );
+}
+
+// ─── Challenge erstellen ────────────────────────────────────────────────────
+const OB_MODES = [
+  { id: '1v1', title: '1 vs 1', desc: 'Du gegen eine Person', name: 'Duell', emoji: '⚔️', pic: <><i /><em>vs</em><i className="b" /></> },
+  { id: '2v2', title: '2 vs 2', desc: 'Zwei Teams à zwei Personen', name: 'Team-Duell', emoji: '💪', pic: <><i /><i /><em>vs</em><i className="b" /><i className="b" /></> },
+  { id: 'ffa', title: 'Jeder gegen jeden', desc: 'Bis zu 12 Personen, Rangliste', name: 'Freundeskreis', emoji: '🔥', pic: <><i /><i className="b" /><i className="c" /><i className="d" /></> },
+];
+const OB_EMOJIS = ['⚔️', '💪', '🔥', '🏆', '🦾', '🏋️', '🤸', '🚀', '🐺', '🦁', '🏃', '🧗'];
+
+// `variant`: 'screen' (Onboarding) oder 'sheet' (zweite Challenge über den Switcher).
+function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
+  const online = useObOnline();
+  const [mode, setMode] = React.useState('1v1');
+  const [name, setName] = React.useState('');
+  const [emoji, setEmoji] = React.useState('⚔️');
+  const [emojiTouched, setEmojiTouched] = React.useState(false);
+  const [extrasOpen, setExtrasOpen] = React.useState(false);
+  const [penalties, setPenalties] = React.useState(false);
+  const [rotation, setRotation] = React.useState(false);
+  const [work, setWork] = React.useState(false);
+  const [startDate, setStartDate] = React.useState(() => PTData.isoDate(new Date()));
+  const [endDate, setEndDate] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const current = OB_MODES.find(m => m.id === mode);
+  const pickMode = (m) => { setMode(m.id); if (!emojiTouched) setEmoji(m.emoji); };
+  const on = [penalties && 'Strafkasse', rotation && 'Wochenplan', work && 'Arbeitszeit'].filter(Boolean);
+
+  async function create() {
+    if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    setError(''); setBusy(true);
+    try {
+      const c = await api.createCompetition({
+        name: (name.trim() || current.name).slice(0, 40), emoji, mode, rotation, penalties, work,
+        startDate, endDate: endDate || null,
+      });
+      onCreated(c);
+    } catch (e) { setError(e.message || String(e)); setBusy(false); }
+  }
+
+  const toggle = (title, desc, value, set) => (
+    <label className="ob-toggle">
+      <span className="ob-toggle-text">
+        <span className="ob-toggle-title">{title}</span>
+        <span className="ob-toggle-desc">{desc}</span>
+      </span>
+      <span className="toggle-switch">
+        <input type="checkbox" role="switch" checked={value} onChange={e => set(e.target.checked)} />
+        <span className="toggle-slider" />
+      </span>
+    </label>
+  );
+
+  const body = <>
+    <div className="ob-label">Gegen wen?</div>
+    <div className="ob-modes" role="radiogroup" aria-label="Modus">
+      {OB_MODES.map(m => (
+        <button key={m.id} type="button" role="radio" aria-checked={mode === m.id}
+          className={`ob-mode${mode === m.id ? ' is-on' : ''}`} onClick={() => pickMode(m)}>
+          <span className="ob-mode-pic" aria-hidden="true">{m.pic}</span>
+          <span className="ob-mode-text">
+            <span className="ob-mode-title">{m.title}</span>
+            <span className="ob-mode-desc">{m.desc}</span>
+          </span>
+          <span className="ob-radio">{mode === m.id && <Icon name="check" size={14} strokeWidth={3} />}</span>
+        </button>
+      ))}
+    </div>
+
+    <div className="ob-label">Name</div>
+    <div className="ob-name-row">
+      <span className="ob-emoji-btn" aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{emoji}</span>
+      <input className="input" value={name} maxLength={40} placeholder={current.name} aria-label="Name der Challenge"
+        onChange={e => setName(e.target.value)} />
+    </div>
+    <div className="ob-emoji-row" role="radiogroup" aria-label="Emoji">
+      {OB_EMOJIS.map(e => (
+        <button key={e} type="button" role="radio" aria-checked={emoji === e} className={`ob-emoji${emoji === e ? ' is-on' : ''}`}
+          onClick={() => { setEmoji(e); setEmojiTouched(true); }}>{e}</button>
+      ))}
+    </div>
+
+    <div className={`ob-extras${extrasOpen ? ' is-open' : ''}`}>
+      <button type="button" className="ob-extras-head" aria-expanded={extrasOpen} onClick={() => setExtrasOpen(v => !v)}>
+        <span className="ob-extras-title">Extras</span>
+        <span className="ob-extras-sub">{on.length ? on.join(' · ') : 'alles aus, geht auch später'}</span>
+        <Icon name="chevron" size={18} />
+      </button>
+      {extrasOpen && (
+        <div className="ob-extras-body">
+          {toggle('Strafkasse', 'Wer seinen Wochenteil nicht schafft, zahlt 5 € in die Kasse.', penalties, setPenalties)}
+          {toggle('Wochenplan', 'Ihr legt Übungen fest, die jede Woche wiederkommen.', rotation, setRotation)}
+          {toggle('Arbeitszeit', 'Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.', work, setWork)}
+          <div className="ob-dates">
+            <label>Start<input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value || PTData.isoDate(new Date()))} /></label>
+            <label>Ende (optional)<input className="input" type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} /></label>
+          </div>
+        </div>
+      )}
+    </div>
+    <ObMessage error={error} />
+  </>;
+
+  const cta = <button type="button" className="btn" disabled={busy} onClick={create}>{busy ? '…' : 'Challenge erstellen'}</button>;
+
+  if (variant === 'sheet') {
+    return <>
+      <h2 className="title" style={{ marginBottom: 4 }}>Neue Challenge</h2>
+      <div className="ob-fields" style={{ gap: 12 }}>{body}</div>
+      <div className="btn-row" style={{ marginTop: 20 }}>
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>Abbrechen</button>
+        {cta}
+      </div>
+    </>;
+  }
+  return (
+    <ObScreen onBack={onCancel} stepKey="create" foot={cta}>
+      <h1 className="ob-title">Neue Challenge</h1>
+      {body}
+    </ObScreen>
+  );
+}
+
+function CreateCompetitionSheet({ open, api, onClose, onCreated }) {
+  return (
+    <Sheet open={open} onClose={onClose}>
+      {open && <CreatePanel api={api} variant="sheet" onCancel={onClose} onCreated={onCreated} />}
+    </Sheet>
+  );
+}
+
+// ─── Beitreten ──────────────────────────────────────────────────────────────
+// Mit gültigem `initialCode` lädt die Vorschau sofort (Einladungslink).
+function JoinPanel({ api, initialCode = '', variant = 'screen', onJoined, onCancel, onSkip }) {
+  const online = useObOnline();
+  const [code, setCode] = React.useState(initialCode || '');
+  const [preview, setPreview] = React.useState(null);
+  const [team, setTeam] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [info, setInfo] = React.useState('');
+
+  async function lookup(c = code) {
+    const clean = PTOnboarding.normalizeCode(c);
+    if (!clean) return;
+    if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    setError(''); setInfo(''); setBusy(true);
+    try {
+      const p = await api.previewCompetition(clean);
+      if (!p) throw new Error('Code nicht gefunden. Prüf ihn nochmal oder frag nach einem neuen.');
+      setPreview(p);
+      if (p.mode === '2v2') {
+        const n = (t) => p.members.filter(m => m.team === t).length;
+        setTeam(n('A') <= n('B') ? 'A' : 'B');
+      }
+    } catch (e) { setError(e.message || String(e)); }
+    finally { setBusy(false); }
+  }
+
+  React.useEffect(() => {
+    if (PTOnboarding.normalizeCode(initialCode)) lookup(initialCode);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function join() {
+    if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    setError(''); setBusy(true);
+    try {
+      const id = await api.joinCompetition(PTOnboarding.normalizeCode(code), preview.mode === '2v2' ? team : null);
+      onJoined(id);
+    } catch (e) { setError(e.message || String(e)); setBusy(false); }
+  }
+
+  const full = preview && preview.members.length >= preview.capacity;
+  const week = PTOnboarding.weekProgress();
+  const back = preview ? () => { setPreview(null); setError(''); } : onCancel;
+
+  const codeBody = <>
+    <ObCodeField value={code} onChange={setCode} autoFocus={!initialCode} onComplete={(c) => lookup(c)}
+      onPasteFail={(m) => setInfo(m)} />
+    <ObMessage error={error} info={info} />
+  </>;
+
+  const previewBody = preview && <>
+    <div className="ob-preview">
+      <div className="ob-preview-emoji" aria-hidden="true">{preview.emoji}</div>
+      <div className="ob-preview-name">{preview.name}</div>
+      <div className="ob-preview-meta">{modeLabel(preview.mode)} · {preview.members.length}/{preview.capacity} dabei</div>
+      {preview.mode !== '2v2' && <ObSlots members={preview.members} capacity={preview.capacity} />}
+    </div>
+    {preview.mode === '2v2' && (
+      <div className="ob-teams" role="radiogroup" aria-label="Team wählen">
+        {['A', 'B'].map(t => {
+          const ms = preview.members.filter(m => m.team === t);
+          const teamFull = ms.length >= 2;
+          return (
+            <button key={t} type="button" role="radio" aria-checked={team === t} disabled={teamFull && !preview.already_member}
+              className={`ob-team${team === t ? ' is-on' : ''}`} onClick={() => setTeam(t)}>
+              <span className="ob-team-title">Team {t}</span>
+              {ms.map((m, i) => <span key={i} className="ob-team-member"><Avatar profile={m} size={24} /> {m.display_name}</span>)}
+              {!ms.length && <span className="ob-team-member is-muted">noch leer</span>}
+              {teamFull && <span className="ob-team-member is-muted">voll</span>}
+            </button>
+          );
+        })}
+      </div>
+    )}
+    {!preview.already_member && !full && week.dayIndex > 1 && (
+      <div className="ob-note"><span className="ob-note-emoji" aria-hidden="true">📅</span>
+        Die Woche läuft seit Montag · noch {week.daysLeft} {week.daysLeft === 1 ? 'Tag' : 'Tage'}.</div>
+    )}
+    {preview.already_member && <ObMessage info="Du bist schon dabei." />}
+    {full && !preview.already_member && <ObMessage error="Diese Challenge ist voll." />}
+    <ObMessage error={error} />
+  </>;
+
+  const cta = preview
+    ? <button type="button" className="btn" disabled={busy || (full && !preview.already_member)}
+        onClick={preview.already_member ? () => onJoined(preview.id) : join}>
+        {busy ? '…' : preview.already_member ? 'Öffnen' : 'Beitreten'}
+      </button>
+    : <button type="button" className="btn" disabled={busy || !PTOnboarding.normalizeCode(code)} onClick={() => lookup()}>
+        {busy ? '…' : 'Weiter'}
+      </button>;
+
+  if (variant === 'sheet') {
+    return <>
+      <h2 className="title" style={{ marginBottom: 4 }}>Challenge beitreten</h2>
+      {!preview && <div className="subtitle" style={{ marginBottom: 16 }}>Gib den Code aus der Einladung ein.</div>}
+      <div className="ob-fields" style={{ gap: 12, marginTop: preview ? 12 : 0 }}>{preview ? previewBody : codeBody}</div>
+      <div className="btn-row" style={{ marginTop: 20 }}>
+        <button type="button" className="btn btn-secondary" onClick={back}>{preview ? 'Zurück' : 'Abbrechen'}</button>
+        {cta}
+      </div>
+    </>;
+  }
+  return (
+    <ObScreen onBack={back} stepKey={preview ? 'preview' : 'code'} foot={<>
+      {cta}
+      {onSkip && <button type="button" className="btn-link" onClick={onSkip}>Ohne Code weiter</button>}
+    </>}>
+      <h1 className="ob-title">{preview ? 'Bist du dabei?' : 'Challenge beitreten'}</h1>
+      {!preview && <p className="ob-sub">Gib den Code aus der Einladung ein. Ganze Nachricht einfügen geht auch.</p>}
+      {preview ? previewBody : codeBody}
+    </ObScreen>
+  );
+}
+
+function JoinCompetitionSheet({ open, api, onClose, onJoined, initialCode = '' }) {
+  return (
+    <Sheet open={open} onClose={onClose}>
+      {open && <JoinPanel api={api} variant="sheet" initialCode={initialCode} onCancel={onClose} onJoined={onJoined} />}
+    </Sheet>
+  );
+}
+
 Object.assign(window, {
   PTHaptics, PTSound, useObOnline, ObScreen, ObMessage, obSetDemo, ObWelcome, ObHeroDuel,
-  ObCodeField, ObAuthFlow, obMarkStarted, ObProfile,
+  ObCodeField, ObAuthFlow, obMarkStarted, ObProfile, ObStart, ObSlots,
+  CreatePanel, CreateCompetitionSheet, JoinPanel, JoinCompetitionSheet,
 });

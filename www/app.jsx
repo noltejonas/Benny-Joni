@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, ObAuthFlow, ObProfile, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -99,6 +99,9 @@ function App() {
   const [toast, setToast] = useState('');
   const [invite, setInviteState] = useState(readInvite);
   const setInvite = useCallback((code) => { writeInvite(code); setInviteState(code || null); }, []);
+  const [startView, setStartView] = useState(null); // Start-Bildschirm: null | 'create' | 'join'
+  const [intro, setIntro] = useState(null); // { kind: 'created' | 'joined', id } → Ebenen in der Challenge
+  const [joinCode, setJoinCode] = useState(''); // Code fürs Beitreten-Sheet (Einladungslink in der App)
 
   useEffect(() => {
     if (!api) return;
@@ -196,6 +199,23 @@ function App() {
     await api.signOut();
   }
 
+  const newcomer = PTOnboarding.isNewcomer({ state: obState, profile });
+
+  async function handleCreated(c) {
+    setSheet(null); setStartView(null);
+    setIntro({ kind: 'created', id: c.id });
+    await loadAccount(c.id);
+    setActiveId(c.id);
+  }
+
+  async function handleJoined(id) {
+    setSheet(null); setStartView(null); setInvite(null); setJoinCode('');
+    setIntro({ kind: 'joined', id });
+    await loadAccount(id);
+    setActiveId(id);
+    if (!newcomer) setToast('Willkommen in der Challenge 💪');
+  }
+
   async function setMain(id) {
     try {
       const p = await api.updateProfile({ main_competition_id: id });
@@ -254,9 +274,9 @@ function App() {
         onProfile={() => setSheet('profile')}
         onSignOut={signOut} />
       <CreateCompetitionSheet open={sheet === 'create'} api={api} onClose={() => setSheet(null)}
-        onCreated={async (c) => { setSheet(null); await loadAccount(c.id); setActiveId(c.id); }} />
-      <JoinCompetitionSheet open={sheet === 'join'} api={api} onClose={() => setSheet(null)}
-        onJoined={async (id) => { setSheet(null); await loadAccount(id); setActiveId(id); setToast('Willkommen in der Challenge 💪'); }} />
+        onCreated={handleCreated} />
+      <JoinCompetitionSheet open={sheet === 'join'} api={api} initialCode={joinCode}
+        onClose={() => { setSheet(null); setJoinCode(''); }} onJoined={handleJoined} />
       <ProfileSheet open={sheet === 'profile'} api={api} profile={profile} onClose={() => setSheet(null)}
         onSignOut={signOut}
         onSaved={(p, opts) => { PTPeople.set([p]); setProfile(p); if (!opts?.keepOpen) { setSheet(null); setToast('Profil gespeichert'); } }} />
@@ -264,16 +284,23 @@ function App() {
     </>
   );
 
-  if (!active) {
-    return (
-      <>
-        <OnboardingScreen profile={profile}
-          onCreate={() => setSheet('create')} onJoin={() => setSheet('join')}
-          onProfile={() => setSheet('profile')} onSignOut={signOut} />
-        {sheets}
-      </>
-    );
+  // Konto ohne aktive Challenge: offene Einladung → Vorschau, sonst Start.
+  if (route === 'join' || route === 'start') {
+    let screen;
+    if (route === 'join') {
+      screen = <JoinPanel key={invite} api={api} initialCode={invite} onJoined={handleJoined}
+        onCancel={() => setInvite(null)} onSkip={() => setInvite(null)} />;
+    } else if (startView === 'create') {
+      screen = <CreatePanel api={api} onCancel={() => setStartView(null)} onCreated={handleCreated} />;
+    } else if (startView === 'join') {
+      screen = <JoinPanel api={api} onCancel={() => setStartView(null)} onJoined={handleJoined} />;
+    } else {
+      screen = <ObStart profile={profile} onCreate={() => setStartView('create')} onJoin={() => setStartView('join')}
+        onProfile={() => setSheet('profile')} onDemo={() => obSetDemo(true)} />;
+    }
+    return <>{screen}{sheets}</>;
   }
+  if (!active) return <Loader text="Lade Challenge…" />;
 
   return (
     <>

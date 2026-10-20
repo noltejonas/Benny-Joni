@@ -396,7 +396,7 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
     finally { setBusy(false); }
   }
 
-  const share = () => { if (shareInvite(competition) === 'copied') onToast?.('Einladung kopiert'); };
+  const share = async () => { if (await shareInvite(competition) === 'copied') onToast?.('Einladung kopiert'); };
   const regenerate = () => {
     if (!confirm('Neuen Code erzeugen? Der alte Code funktioniert dann nicht mehr.')) return;
     run(() => baseApi.regenerateInviteCode(competition.id), 'Neuer Code erzeugt');

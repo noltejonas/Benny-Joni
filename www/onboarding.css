@@ -173,7 +173,7 @@
 .ob-choice.is-primary .ob-choice-desc { color: rgba(255, 255, 255, .85); }
 .ob-choice-chev { color: var(--text-4); }
 .ob-choice.is-primary .ob-choice-chev { color: rgba(255, 255, 255, .8); }
-.ob-corner-avatar { margin-left: auto; border: none; background: none; padding: 0; cursor: pointer; border-radius: 999px; }
+.ob-corner-avatar { border: none; background: none; padding: 0; cursor: pointer; border-radius: 999px; }
 
 /* ─── Challenge erstellen ───────────────────────────────────────────────── */
 .ob-modes { display: flex; flex-direction: column; gap: 8px; }
@@ -184,8 +184,8 @@
 }
 .sheet .ob-mode { background: var(--surface-2); box-shadow: none; }
 .ob-mode.is-on { border-color: var(--primary); background: var(--primary-tint); }
-.ob-mode-pic { width: 48px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 3px; }
-.ob-mode-pic i { width: 12px; height: 12px; border-radius: 999px; background: var(--player-1); }
+.ob-mode-pic { width: 64px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.ob-mode-pic i { width: 11px; height: 11px; flex-shrink: 0; border-radius: 999px; background: var(--player-1); }
 .ob-mode-pic i.b { background: var(--player-2); }
 .ob-mode-pic i.c { background: var(--player-3); }
 .ob-mode-pic i.d { background: var(--player-4); }
@@ -233,8 +233,8 @@
 .ob-toggle-title { font-size: 15px; font-weight: 700; }
 .ob-toggle-desc { font-size: 13px; line-height: 18px; color: var(--text-3); }
 .ob-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
-.ob-dates label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-3); }
-.ob-dates .input { padding: 10px 12px; font-size: 15px; }
+.ob-dates label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--text-3); }
+.ob-dates .input { width: 100%; min-width: 0; padding: 10px 10px; font-size: 15px; -webkit-appearance: none; appearance: none; }
 
 /* ─── Beitreten ─────────────────────────────────────────────────────────── */
 .ob-preview {
