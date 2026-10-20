@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -525,6 +525,22 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }, [allSets, currentChallenges]);
   const participantsNow = useMemo(() => PTData.participantsFor(members, weekStart), [members, weekStart]);
 
+  // ── Push-Erlaubnis und Vorab-Bildschirm ─────────────────────────────────
+  const [pushPerm, setPushPerm] = useState('unsupported');
+  const [primer, setPrimer] = useState(() => PTPush.readPrimer());
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const check = () => PTPush.permission().then(p => { if (alive) setPushPerm(p); });
+    check();
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    const onChange = (e) => setPushPerm(e.detail);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pt:push-permission', onChange);
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('pt:push-permission', onChange); };
+  }, []);
+  const pushDue = PTOnboarding.pushPrimerDue({ permission: pushPerm, enabled: notificationsOn, primer });
+
   // ── Onboarding in der Challenge ──────────────────────────────────────────
   const activeMembers = useMemo(() => members.filter(m => !m.left_at), [members]);
   const catTypeOf = useCallback((ch) => {
@@ -536,7 +552,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // Solange Plätze frei sind, rechnet der Anteil mit der vollen Besetzung (Spec, Entscheidung 10).
   const peopleForShare = PTOnboarding.expectedPeople(competition.mode, participantsNow.length);
   const live = React.useRef({});
-  live.current = { goals: sportsGoalsNow.length, sets: mySetCount };
+  live.current = { goals: sportsGoalsNow.length, sets: mySetCount, pushDue, pushPerm };
 
   // Nächste Ebene aus der Warteschlange; überspringt, was die Daten schon erledigen.
   const advance = useCallback((ctx = {}) => {
@@ -546,6 +562,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       const kind = layerQueue.current.shift();
       if (kind === 'goal' && goals > 0) continue;
       if (kind === 'log' && (sets > 0 || goals === 0)) continue;
+      if (kind === 'push' && !(ctx.manual ? live.current.pushPerm === 'prompt' : live.current.pushDue)) continue;
       setLayer({ kind, ...(ctx.data || {}) });
       return;
     }
@@ -553,10 +570,28 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     onIntroDone?.();
   }, [onIntroDone]);
 
-  const openLayer = useCallback((kinds) => {
+  const openLayer = useCallback((kinds, ctx) => {
     layerQueue.current = [...kinds];
-    advance();
+    advance(ctx);
   }, [advance]);
+
+  async function allowPush() {
+    setPushBusy(true);
+    const result = await PTPush.request();
+    setPushBusy(false);
+    const next = PTOnboarding.nextPrimerState(primer, result);
+    PTPush.writePrimer(next); setPrimer(next); setPushPerm(result);
+    if (result === 'granted') { onSetNotifications(true); setToast('Mitteilungen sind an 🔔'); }
+    else if (result === 'denied') setToast('Alles klar. Geht auch später in den Einstellungen.');
+    advance();
+  }
+  function laterPush() {
+    const next = PTOnboarding.nextPrimerState(primer, 'later');
+    PTPush.writePrimer(next); setPrimer(next);
+    advance();
+  }
+  // Nach einem Satz: Vorab-Bildschirm, wenn er dran ist (pushPrimerDue).
+  const maybePushPrimer = () => { if (live.current.pushDue) openLayer(['push']); };
 
   // Nach Erstellen bzw. Beitreten: Ebenen einmal starten, sobald die Daten da sind.
   useEffect(() => {
@@ -580,7 +615,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     const share = PTData.fairShareOf(ch.target_reps, peopleForShare);
     const before = allSets.filter(x => x.challenge_id === ch.id && x.athlete === me).reduce((a, x) => a + (x.reps || 0), 0);
     onObPatch?.({ firstLog: new Date().toISOString() });
-    layerQueue.current = [];
+    layerQueue.current = ['push']; // nach der Feier ist der richtige Moment für den Push-Vorab-Bildschirm
     setLayer({ kind: 'cele', value, cat, share, myDone: before + value });
   }, [peopleForShare, allSets, me, onObPatch]);
   const isFirstLog = newcomer && !obState.firstLog && mySetCount === 0;
@@ -709,16 +744,6 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return off;
   }, [capi, reload]);
 
-  // Ask for notification permission on first interaction
-  useEffect(() => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default' && notificationsOn) {
-      // Defer to first user gesture to avoid blocking
-      const ask = () => {Notification.requestPermission();document.removeEventListener('click', ask);};
-      document.addEventListener('click', ask, { once: true });
-    }
-  }, [notificationsOn]);
-
   // Native APNs registration (Capacitor only — web uses the Notification API above)
   useEffect(() => {
     const Push = window.PTPushNotifications?.PushNotifications;
@@ -740,16 +765,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
     (async () => {
       try {
+        // Nie automatisch fragen: die Erlaubnis holt der Vorab-Bildschirm
+        // (ObPushPrimer) bzw. der Schalter in den Einstellungen.
         const perm = await Push.checkPermissions();
-        if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-          const req = await Push.requestPermissions();
-          if (req.receive !== 'granted') return;
-        } else if (perm.receive !== 'granted') {
-          return;
-        }
-        if (cancelled) return;
-        await Push.register();
+        if (perm.receive !== 'granted' || cancelled) return;
 
+        // Listener vor register(), sonst kann das Token-Ereignis verloren gehen.
         const onReg = await Push.addListener('registration', async (info) => {
           try {
             await api.upsertDeviceToken({ token: info.value, platform: 'ios' });
@@ -769,11 +790,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         // the banner automatically while the app is in the foreground.
 
         cleanup = () => { onReg.remove(); onErr.remove(); onTap.remove(); };
+        if (cancelled) { cleanup(); return; }
+        await Push.register();
       } catch (e) { console.warn('Push setup failed', e); }
     })();
 
     return () => { cancelled = true; cleanup(); };
-  }, [me, notificationsOn, api]);
+  }, [me, notificationsOn, api, pushPerm]);
 
   // Tap on push → switch to Feed tab
   useEffect(() => {
@@ -853,7 +876,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               PTHaptics.tap();
               const what = cat?.name ? ` ${cat.name}` : '';
               if (first) celebrateFirst(parseInt(val), ch, cat);
-              else setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt`);
+              else { setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt`); maybePushPrimer(); }
               reload();
             } catch (e) {
               if (e?.code === 'offline') setToast('Keine Verbindung. Satz nicht gespeichert.');
@@ -1016,7 +1039,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 PTHaptics.tap();
                 const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
                 if (isFirstLog && !isWork) celebrateFirst(r, ch, logCat);
-                else setToast(`${valStr}${what} geloggt`);
+                else { setToast(`${valStr}${what} geloggt`); maybePushPrimer(); }
                 reload();
               }} />
           );
@@ -1067,6 +1090,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {layer?.kind === 'cele' && (
         <ObCelebrate value={layer.value} category={layer.cat} myDone={layer.myDone} share={layer.share}
           onDone={() => advance({ sets: 1 })} />
+      )}
+      {layer?.kind === 'push' && (
+        <ObPushPrimer competition={competition} busy={pushBusy}
+          rival={activeMembers.filter(m => m.user_id !== me).map(m => m.profile?.display_name?.split(/\s+/)[0]).find(Boolean)}
+          onAllow={allowPush} onLater={laterPush} />
       )}
 
       <Toast message={toast} onDone={() => setToast('')} />

@@ -285,6 +285,67 @@ function ObCelebrate({ value, category, myDone, share, onDone }) {
   );
 }
 
+// ─── Push ───────────────────────────────────────────────────────────────────
+// Erlaubnis lesen und anfragen — nativ über @capacitor/push-notifications,
+// im Browser über die Notification-API. Ergebnis: 'prompt' | 'granted' |
+// 'denied' | 'unsupported'. iOS fragt nur einmal; danach hilft nur der Weg in
+// die iOS-Einstellungen. Der Stand des Vorab-Bildschirms liegt pro Gerät in
+// pt:push-primer ({ asks, lastAt, result }, s. PTOnboarding.pushPrimerDue).
+const PT_PRIMER_KEY = 'pt:push-primer';
+const PTPush = {
+  native() { return window.PTPushNotifications?.PushNotifications || null; },
+  map(v) { return v === 'granted' ? 'granted' : v === 'denied' ? 'denied' : 'prompt'; },
+  async permission() {
+    const P = this.native();
+    if (P) { try { return this.map((await P.checkPermissions()).receive); } catch (e) { return 'unsupported'; } }
+    if (typeof Notification !== 'undefined') return this.map(Notification.permission);
+    return 'unsupported';
+  },
+  async request() {
+    const P = this.native();
+    try {
+      if (P) return this.map((await P.requestPermissions()).receive);
+      if (typeof Notification !== 'undefined') return this.map(await Notification.requestPermission());
+    } catch (e) { console.warn('Push-Erlaubnis', e); }
+    return 'unsupported';
+  },
+  readPrimer() { try { return JSON.parse(localStorage.getItem(PT_PRIMER_KEY) || '{}'); } catch (e) { return {}; } },
+  writePrimer(state) { try { localStorage.setItem(PT_PRIMER_KEY, JSON.stringify(state)); } catch (e) {} },
+  // iOS-Einstellungen der App öffnen (Capacitor gibt app-settings: an iOS weiter).
+  openSettings() { if (this.native()) location.href = 'app-settings:'; },
+};
+
+// Zeigt genau die Mitteilung, die notify-set verschickt (Rivalen-Push).
+function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
+  return (
+    <ObLayer label="Mitteilungen">
+      <ObScreen stepKey="push" foot={<>
+        <button type="button" className="btn" disabled={busy} onClick={onAllow}>{busy ? '…' : 'Mitteilungen erlauben'}</button>
+        <button type="button" className="btn-link" disabled={busy} onClick={onLater}>Jetzt nicht</button>
+      </>}>
+        <div className="ob-bell" aria-hidden="true"><Icon name="bell" size={44} strokeWidth={2} /></div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>Bleib im Rennen</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>Wir melden uns nur, wenn es zählt.</p>
+        <div className="ob-preview-push" aria-label="Beispiel einer Mitteilung">
+          <img src="icons/icon-192.png" alt="" />
+          <span>
+            <strong>🔥 {rival || 'Dein Rivale'} ist los</strong>
+            {competition.emoji} {competition.name}<br />
+            Schon 120 Reps heute — du noch bei 0.
+          </span>
+        </div>
+        <ul className="ob-points">
+          <li className="ob-point"><span className="ob-point-emoji" aria-hidden="true">🔥</span>
+            <span>Dein Rivale legt los und du bist heute noch bei 0? Wir sagen Bescheid.</span></li>
+          <li className="ob-point"><span className="ob-point-emoji" aria-hidden="true">🤫</span>
+            <span>Höchstens eine Mitteilung pro Tag und Challenge.</span></li>
+        </ul>
+      </ObScreen>
+    </ObLayer>
+  );
+}
+
 Object.assign(window, {
   ObLayer, ObInviteLayer, ObAmount, ObGoalLayer, ObFirstLogLayer, ObConfetti, ObCelebrate, obGoalCategories,
+  PTPush, ObPushPrimer,
 });

@@ -472,3 +472,6 @@
   .ob-bell svg, .ob-coach, .ob-pulse, .ob-hero-live::before { animation: none; }
   .ob-confetti { display: none; }
 }
+
+/* Toasts über Ebenen oben zeigen, damit sie keine Aktion verdecken */
+.ob-layer ~ .toast, .ob-cele ~ .toast { top: calc(var(--safe-top) + 12px); bottom: auto; }
