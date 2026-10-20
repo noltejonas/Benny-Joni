@@ -218,6 +218,11 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    AN bleiben: Die App ruft mit dem Nutzer-Token auf, die Function prüft es
    selbst per `auth.getUser`. Danach „Konto löschen“ erneut testen; die App
    weicht bei 42501 automatisch auf die Function aus.
+5. **Authentication → Emails → Templates → „Reset Password“**: Betreff
+   „Dein Code für Benny & Joni“, Text auf Deutsch mit `{{ .Token }}` als
+   6-stelligem Code, **kein Link** (die App erwartet einen Code; 5 min). Mit
+   einer Team-Adresse testen: „Passwort vergessen?“ → Mail mit Code → neues
+   Passwort.
 
 **Jetzt NICHT einspielen:** `20261021000100_launch_optional.sql` (nur noch
 Abschnitt 4 `client_errors`, nach dem Launch), `20261021001000_daily_nudge_cron.sql` (ab 22.10.),
@@ -386,11 +391,13 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
    `npx supabase secrets unset WEBHOOK_SECRET --project-ref jczyyupxxqrdgbeifcwe`);
    503 = APNs-Secrets fehlen. Nur **einen** Auslöser behalten (Trigger ODER
    Dashboard-Webhook).
-2. **E-Mail-Versand (P1, 30 min).** Authentication → Emails → **SMTP
+2. **E-Mail-Versand (P1, 30 min).** Möglichst noch vor 08:30 (B nach dem
+   Gerätetest): Ohne eigenen SMTP-Anbieter stellt Supabase nur an
+   Team-Adressen zu, Prüfer und neue Nutzer bekommen dann keine Reset-Mail.
+   Authentication → Emails → **SMTP
    Settings**: eigenen Anbieter eintragen (Resend, Brevo oder Postmark) mit
    SPF/DKIM für die Absender-Domain, Absendername „Benny & Joni“.
-   Vorlage **„Reset Password“** auf Deutsch, mit `{{ .Token }}` als 6-stelligem
-   Code (die App erwartet einen Code, keinen Link). Authentication → Rate
+   Die Vorlage „Reset Password“ ist seit Schritt 8.5 fertig. Authentication → Rate
    Limits: Mails pro Stunde erhöhen (z. B. 100). URL Configuration: Site URL auf
    `https://noltejonas.github.io/Benny-Joni/`. Mit einer Adresse außerhalb des
    Teams testen. Danach in `datenschutz.html` Abschnitt 2.10 den Anbieter
@@ -487,7 +494,8 @@ kein Entwurfs-Kasten mehr da ist.
 | Secret `RIVAL_THRESHOLD` | optional, Standard 10 | Schritt 14 |
 | Secrets `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_ENV`, `APNS_PRIVATE_KEY` | sollten schon gesetzt sein; prüfen mit `npx supabase secrets list --project-ref jczyyupxxqrdgbeifcwe` | Schritt 14 |
 | `WEBHOOK_SECRET` | in Prod nicht gesetzt; **nicht** heute setzen, sonst stoppen alle Pushes | nach dem Launch |
-| SMTP, Vorlage „Reset Password“ mit `{{ .Token }}`, Rate Limits, Site URL | Authentication → Emails / Rate Limits / URL Configuration | Schritt 14, P1 |
+| Vorlage „Reset Password“ mit `{{ .Token }}` (Code, kein Link) | Authentication → Emails → Templates | Schritt 8, **P0** |
+| SMTP, Rate Limits, Site URL | Authentication → Emails / Rate Limits / URL Configuration | Schritt 14, P1 (möglichst vor 08:30) |
 | Function `daily-nudge` + Secret `NUDGE_SECRET` + `DRY_RUN` | `supabase/functions/daily-nudge/`, Migration `20261021001000_daily_nudge_cron.sql`. Deploy nur mit `--no-verify-jwt` | ab 22.10. |
 | Optionale Migration (nur Abschnitt 4 `client_errors`) | `20261021000100_launch_optional.sql` | nach dem Launch |
 | Social-Push | `20261021002000_social_push.sql` | später |
