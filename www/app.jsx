@@ -641,6 +641,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
           profile={profile}
           competition={competition}
           sides={sides}
+          members={members}
           challenges={allChallenges}
           categories={categories}
           allSets={allSets} />

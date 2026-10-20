@@ -573,18 +573,148 @@ button, input, select, textarea { font-family: inherit; }
 .open-closure-label { font-size: 15px; font-weight: 700; color: var(--text); flex: 1; }
 
 /* ─── Stats ────────────────────────────────────────────────────────────── */
-.stat { background: var(--surface-2); border-radius: 16px; }
-.stat .v { font-weight: 800; }
-.stat .k { color: var(--text-3); letter-spacing: 0.06em; }
-.vs-side { background: var(--surface-2); border-radius: 16px; }
-.vs-side.side-0 .vs-reps { color: var(--side0-ink); }
-.vs-side.side-1 .vs-reps { color: var(--side1-ink); }
-.vs-cat-leader { box-shadow: none !important; border: none !important; }
-.vs-cat-row.lead .vs-cat-fill.side-0, .vs-cat-row.lead .vs-cat-fill.side-1 { box-shadow: none; }
-.vs-cat.leader-side-0, .vs-cat.leader-side-1 { background: transparent; }
-.stats-table thead th.side-0, .stats-table .st-val.side-0 { color: var(--side0-ink); }
-.stats-table thead th.side-1, .stats-table .st-val.side-1 { color: var(--side1-ink); }
-.week-done-badge { background: var(--primary-tint); color: var(--primary-ink); border: none; }
+/* Karten-Kopf: Label links, Kennzahl oder Legende rechts */
+.st-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 20px; margin-bottom: 16px;
+}
+.st-head .label { margin: 0; }
+.st-head-right { display: inline-flex; align-items: center; gap: 8px; }
+.st-meta { font-size: 13px; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.st-meta b { color: var(--text); font-weight: 800; }
+.st-lead { font-size: 15px; font-weight: 800; }
+.st-muted { color: var(--text-3); font-weight: 600; }
+.st-legend { display: inline-flex; gap: 12px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.st-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.st-legend i { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+
+/* Bilanz */
+.st-score .st-head { margin-bottom: -4px; }
+.st-score .rd-duel-player { flex: 1; }
+.st-split-legend {
+  display: flex; justify-content: space-between; margin-top: 8px;
+  font-size: 13px; font-weight: 700; color: var(--text-2);
+}
+
+/* Diagramme */
+.st-trend { cursor: pointer; transition: transform .15s var(--ease); }
+.st-trend:active { transform: scale(0.99); }
+.st-chart, .st-heat { width: 100%; }
+.st-chart svg, .st-heat svg { display: block; overflow: visible; }
+.st-chart text, .st-heat text { font-family: var(--font); font-variant-numeric: tabular-nums; }
+
+/* Anteilsbalken (Wochen, Kategorien) */
+.st-bar {
+  display: flex; gap: 2px; height: 8px; min-width: 0;
+  border-radius: 999px; overflow: hidden; background: var(--track);
+}
+.st-bar i { display: block; min-width: 3px; }
+
+/* Wochen */
+.st-week-list { list-style: none; margin: 0 -12px; padding: 0; }
+.st-week-list > li + li { border-top: 1px solid var(--line); }
+.st-week {
+  width: 100%; display: grid; grid-template-columns: 64px minmax(0, 1fr) 46px 16px; align-items: center; gap: 10px;
+  padding: 12px; background: none; border: none; border-radius: 14px;
+  text-align: left; color: inherit; font: inherit; cursor: pointer;
+}
+.st-week:active { background: var(--surface-2); }
+.st-week-kw { display: flex; flex-direction: column; gap: 2px; }
+.st-week-kw b { font-size: 14px; line-height: 18px; font-weight: 800; }
+.st-week-kw small { font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-3); white-space: nowrap; }
+.st-week-bar {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-3);
+}
+.st-week-bar > span:first-child { text-align: right; }
+.st-week-bar.is-multi { display: block; }
+.st-week-bar .is-win, .st-cat-val.is-win { color: var(--text); font-weight: 800; }
+.st-week-res { display: flex; justify-content: center; }
+.st-live {
+  padding: 2px 6px; border-radius: 999px; background: var(--primary-tint); color: var(--primary-ink);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.st-tie { font-size: 15px; font-weight: 800; color: var(--text-3); }
+.st-chev { display: flex; color: var(--text-4); transition: transform .2s var(--ease); }
+.st-week[aria-expanded="true"] .st-chev { transform: rotate(90deg); }
+.st-more {
+  display: block; width: 100%; margin-top: 8px; padding: 10px;
+  background: var(--surface-2); border: none; border-radius: 12px;
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--primary-ink); cursor: pointer;
+}
+
+/* Woche aufgeklappt: jede Übung gegen den fairen Anteil */
+.st-wd { display: flex; flex-direction: column; gap: 14px; padding: 2px 12px 16px; }
+.st-wd-goals { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; font-weight: 600; color: var(--text-3); }
+.st-wd-row { display: flex; flex-direction: column; gap: 6px; }
+.st-wd-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 700; }
+.st-wd-name small { font-size: 12px; font-weight: 600; color: var(--text-3); white-space: nowrap; }
+.st-wd-side { display: grid; grid-template-columns: 14px minmax(0, 1fr) 76px 18px; align-items: center; gap: 8px; font-size: 13px; }
+.st-wd-who { font-size: 12px; font-weight: 800; text-align: center; }
+.st-wd-track { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.st-wd-track i { display: block; height: 100%; border-radius: 999px; }
+.st-wd-val { text-align: right; color: var(--text-2); white-space: nowrap; }
+.st-wd-val.is-wide { grid-column: span 2; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.st-wd-hit { width: 18px; height: 18px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
+.st-wd-hit.is-hit { background: var(--primary-tint); color: var(--primary-ink); }
+
+/* Kategorien */
+.st-cats { display: flex; flex-direction: column; gap: 14px; }
+.st-cat {
+  display: grid; grid-template-columns: minmax(0, 1fr) 38px minmax(64px, 1.1fr) 38px; align-items: center; gap: 8px;
+  font-size: 13px;
+}
+.st-cat.is-multi { grid-template-columns: minmax(0, 1fr) minmax(64px, 1.1fr) 60px; }
+.st-cat-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-cat-val { color: var(--text-3); text-align: right; }
+.st-cat-val:last-child { text-align: left; }
+.st-cat-lead { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-weight: 700; }
+
+/* Tabellen: Kennzahlen, Tabelle, Übungen */
+.st-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.st-table th { padding: 0 0 8px; text-align: right; font-size: 12px; font-weight: 700; color: var(--text-3); white-space: nowrap; }
+.st-table td { padding: 10px 0; border-top: 1px solid var(--line); text-align: right; font-weight: 700; }
+.st-table th:first-child, .st-table td:first-child { text-align: left; }
+.st-table td:first-child { color: var(--text-2); font-weight: 600; }
+.st-table th + th, .st-table td + td { padding-left: 12px; }
+.st-records th { width: 76px; }
+.st-records td.is-win { font-weight: 800; }
+.st-records td.is-lose { color: var(--text-3); font-weight: 600; }
+.st-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); font-weight: 700; }
+.st-who-stack { display: inline-flex; align-items: center; }
+.st-who-stack .pt-avatar + .pt-avatar { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface); }
+.st-standings .st-pos { width: 24px; color: var(--text-3); }
+.st-standings td:nth-child(2), .st-holders td:nth-child(2) { text-align: left; }
+.st-standings tr.is-me td { color: var(--text); font-weight: 800; }
+.st-standings tr.is-me .st-pos { color: var(--primary-ink); }
+.st-ex td:first-child { width: 100%; max-width: 0; }
+.st-ex-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 700; }
+.st-ex td + td, .st-ex th + th { white-space: nowrap; }
+
+/* Ich */
+.st-me-head { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.st-me-name { font-size: 18px; line-height: 24px; font-weight: 800; }
+.st-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.st-kpis > div {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px 6px; border-radius: 16px; background: var(--surface-2);
+}
+.st-kpis b { font-size: 20px; line-height: 26px; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+.st-kpis span { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); text-align: center; }
+.st-heat-foot {
+  display: flex; justify-content: flex-end; min-height: 16px; margin-top: 10px;
+  font-size: 12px; font-weight: 600; color: var(--text-3);
+}
+.st-heat-scale { display: inline-flex; align-items: center; gap: 4px; }
+.st-heat-scale i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.st-comps { list-style: none; margin: 0; padding: 0; }
+.st-comps li { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.st-comps li + li { border-top: 1px solid var(--line); }
+.st-comp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.st-comp-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-comp-rank { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; flex-shrink: 0; }
+.st-comp-rank b { font-size: 20px; font-weight: 800; }
+.st-comp-rank small { font-size: 11px; font-weight: 600; color: var(--text-3); }
 
 /* ─── Einstellungen ────────────────────────────────────────────────────── */
 .rd-profile { display: flex; align-items: center; gap: 16px; }
@@ -601,16 +731,6 @@ button, input, select, textarea { font-family: inherit; }
   .rd-bar, .rd-check, .rd-check path { animation: none !important; stroke-dashoffset: 0; }
   .rd-split-a, .mini-ring-fg { transition: none; }
 }
-
-/* Stats: Führungs-Banner ruhig statt gold */
-.winner-banner {
-  background: var(--surface-2); border: none; border-radius: 16px; padding: 16px;
-}
-.winner-avatar { border-color: var(--surface) !important; box-shadow: none !important; }
-.winner-name, .winner-name.side-0, .winner-name.side-1 { color: var(--text) !important; text-shadow: none !important; }
-.winner-lead { color: var(--text-2); }
-.winner-momentum.side-0 { color: var(--side0-ink); }
-.winner-momentum.side-1 { color: var(--side1-ink); }
 
 .card .segmented:last-child { margin-bottom: 0; }
 
