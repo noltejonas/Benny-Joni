@@ -43,7 +43,7 @@
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   font-feature-settings: "ss01", "cv11";
@@ -65,7 +65,7 @@ body {
 
 /* Typography */
 .display {
-  font-family: "SF Pro Display", -apple-system, system-ui, sans-serif;
+  font-family: "SF Pro Display", -apple-system, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
   font-weight: 700;
   letter-spacing: -0.04em;
   font-feature-settings: "tnum" 1;
@@ -2140,7 +2140,7 @@ a { color: var(--accent); text-decoration: none; }
   margin-bottom: 14px;
 }
 .strafkonto-pot-amount {
-  font-family: "SF Pro Display", -apple-system, system-ui, sans-serif;
+  font-family: "SF Pro Display", -apple-system, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
   font-size: 44px; font-weight: 700; letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   color: var(--text);

@@ -57,7 +57,7 @@
   --radius-sm: 12px;
   --radius: 20px;
   --radius-lg: 24px;
-  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   --ease: cubic-bezier(.2, .8, .2, 1);
   color-scheme: light;
 }

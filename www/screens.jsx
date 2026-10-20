@@ -719,7 +719,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
         value={editingCat.name} autoFocus
         onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
         onKeyDown={(e) => e.key === 'Enter' && saveEdit()} />
-          <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label="Löschen">🗑</button>
+          <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label="Löschen">🗑️</button>
           <button className="new-cat-add" onClick={saveEdit} aria-label="Speichern">✓</button>
         </div>
       }
@@ -771,7 +771,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
       </div>
       {existing?.id &&
         <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={deleteChallenge} disabled={deleting}>
-          {deleting ? '…' : '🗑 Challenge aus dieser Woche entfernen'}
+          {deleting ? '…' : '🗑️ Challenge aus dieser Woche entfernen'}
         </button>
       }
     </>);
