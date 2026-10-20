@@ -216,10 +216,13 @@ Genau nach `docs/launch/RELEASE.md`, **Weg A (Xcode)**. Kurzfassung:
 cd <Repo>
 git switch main && git pull
 npm ci
+grep -nE "APP_STORE_ID = ''|SUPPORT_EMAIL = ''" www/onboarding-model.js && echo "STOPP: Schritt 6 fehlt" || echo "ok: Konstanten gesetzt"
 npx cap sync ios
 git status --short          # nichts Unerwartetes
 open ios/App/App.xcodeproj
 ```
+
+Steht da STOPP: nicht bauen, erst Schritt 6.
 
 In Xcode: Team `HHJ498GCL6`, Version 1.4, Build 20 → Ziel „Any iOS Device“ →
 Product → Archive → Distribute App → App Store Connect → Upload. Apple
@@ -328,6 +331,10 @@ Fehler sofort Claude melden, mit Screenshot.
 
 ## 13. Einreichen und beschleunigte Prüfung beantragen (08:30, A, 15 min) – P0
 
+0. Vorher die curl-Schleife aus Schritt 7.3 noch einmal ausführen. Alle 5
+   Zeilen müssen 200 zeigen, sonst **NICHT** einreichen: Datenschutz-,
+   Nutzungsbedingungen- und Melden-Links landen sonst auf einer 404
+   (Ablehnung nach 5.1.1 bzw. 1.2).
 1. Version 1.4 → **Build** → den neuen Build wählen (Build 20 oder höher).
 2. **„Zur Prüfung hinzufügen“ / „Zur Prüfung einreichen“**. Ziel: spätestens
    09:00.
