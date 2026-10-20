@@ -202,7 +202,10 @@ function App() {
   }, [api]);
 
   const userId = session?.user?.id || null;
-  useEffect(() => { if (userId) writePref(RETURNING_KEY, '1'); }, [userId]);
+  // „Willkommen zurück“ beim nächsten Start – nicht nach der Demo, sonst landen
+  // Neugierige nach „Demo ansehen“ beim Login statt bei der Registrierung.
+  const isDemo = api?.mode === 'demo' || !!session?.demo;
+  useEffect(() => { if (userId && !isDemo) writePref(RETURNING_KEY, '1'); }, [userId, isDemo]);
 
   // Onboarding-Stand: Gerät (localStorage) + Konto (profiles.onboarding, nur
   // wenn die Spalte existiert — Migration 20261020000000).
@@ -365,7 +368,7 @@ function App() {
     return (
       <ObScreen center foot={<>
         <button className="btn" onClick={() => loadAccount()}>Erneut versuchen</button>
-        <button className="btn-link" onClick={() => api.signOut()}>Abmelden</button>
+        <button className="btn-link" onClick={signOut}>Abmelden</button>
       </>}>
         <div className="ob-trophy" aria-hidden="true">{offline ? '📡' : '😵'}</div>
         <h1 className="ob-title" style={{ textAlign: 'center' }}>{offline ? 'Keine Verbindung' : 'Laden fehlgeschlagen'}</h1>
@@ -591,6 +594,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const [pickerForSet, setPickerForSet] = useState(null); // null=closed, set object = emoji picker open
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [toast, setToast] = useState('');
+  const quickBusy = React.useRef({}); // Schnellsatz läuft: { [challengeId]: true }
   const lastFeedRef = React.useRef(null);
   // Onboarding-Ebenen über Home (onboarding-intro.jsx): { kind, … } oder null.
   const [layer, setLayer] = useState(null);
@@ -1068,7 +1072,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         });
         const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
           const competitionId = action?.notification?.data?.competition_id;
-          if (competitionId) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId } }));
+          if (competitionId) {
+            // Wechselt die Challenge, liest die neue Instanz den Tab beim Start
+            // aus sessionStorage – pt:nav-feed erreicht nur noch die alte.
+            try { sessionStorage.setItem(TAB_KEY, 'feed'); } catch (e) {}
+            window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId } }));
+          }
           window.dispatchEvent(new CustomEvent('pt:nav-feed'));
         });
         // Foreground deliveries: do nothing here. Supabase Realtime + the
@@ -1093,7 +1102,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }, [reload]);
 
   const setupCategories = allowWork ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
-  const openPenaltyCount = usePenalties ? penalties.filter(p => !p.paid).length : 0;
+  // Badge = Personen mit offenem Saldo (Strafen minus Einzahlungen), wie im Strafkonto.
+  const openPenaltyCount = usePenalties ? (window.penaltySummary?.(penalties, payouts).openPeople ?? 0) : 0;
 
   return (
     <div className="app">
@@ -1167,6 +1177,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onLogChallenge={(ch) => setLogForChallenge(ch)}
           coach={newcomer && mySetCount === 0 && !layer}
           onQuickLog={async (ch, val) => {
+            // Doppeltipp: pro Ziel gesperrt, bis addSet fertig ist, mindestens 700 ms.
+            if (quickBusy.current[ch.id]) return;
+            quickBusy.current[ch.id] = true;
+            const started = Date.now();
+            const unlock = () => setTimeout(() => { delete quickBusy.current[ch.id]; },
+              Math.max(0, QUICK_LOG_LOCK_MS - (Date.now() - started)));
             try {
               const cat = categories.find(c => c.id === ch.category_id);
               const isWork = cat?.kind === 'work';
@@ -1183,6 +1199,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             } catch (e) {
               if (e?.code === 'offline') setToast('Keine Verbindung. Satz nicht gespeichert.');
               else alert(e.message);
+            } finally {
+              unlock();
             }
           }} />
         }
@@ -1262,7 +1280,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               onClick={() => setTab(t.id)}>
               <span className="tab-icon">
                 <Icon name={t.icon} size={22} />
-                {t.badge > 0 && <span className="tab-badge" aria-label={`${t.badge} offene Strafen`}>{t.badge}</span>}
+                {t.badge > 0 && <span className="tab-badge" aria-label={t.badge === 1 ? '1 Person mit offener Strafe' : `${t.badge} Personen mit offener Strafe`}>{t.badge}</span>}
               </span>
               {t.label}
             </button>
