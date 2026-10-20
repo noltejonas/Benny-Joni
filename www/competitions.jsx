@@ -53,7 +53,8 @@ function AuthScreen({ api }) {
       if (mode === 'login') await api.signIn({ email, password });
       else if (mode === 'signup') {
         if (!name.trim()) throw new Error('Bitte gib deinen Namen ein.');
-        await api.signUp({ email, password, displayName: name });
+        const r = await api.signUp({ email, password, displayName: name });
+        if (r?.needsConfirm) { setMode('login'); setInfo('Bestätige den Link in der Mail und melde dich dann an.'); }
       } else if (mode === 'reset') {
         await api.requestPasswordReset(email);
         setMode('reset-code');

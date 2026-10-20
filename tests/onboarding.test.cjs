@@ -267,3 +267,43 @@ test('weekOneSummary: Reps, aktive Tage, erfüllte Teile und Ergebnis', () => {
   const solo = O.weekOneSummary({ weekStart: ws, me: 'me', sides: [sides[0]], sets, challenges, categories, participantCount: 1 });
   assert.equal(solo.result, 'solo');
 });
+
+// ── Fehlertexte (www/data.js) ───────────────────────────────────────────────
+
+const { D } = load();
+const err = (message, code) => Object.assign(new Error(message), code ? { code } : {});
+
+test('friendlyError übersetzt Auth-Fehler nach Code und Text', () => {
+  const cases = [
+    [err('User already registered', 'user_already_exists'), 'Für diese E-Mail gibt es schon einen Account.'],
+    [err('A user with this email address has already been registered', 'email_exists'), 'Für diese E-Mail gibt es schon einen Account.'],
+    [err('Unable to validate email address: invalid format', 'validation_failed'), 'Diese E-Mail-Adresse sieht nicht richtig aus.'],
+    [err('Email address "x@y" is invalid', 'email_address_invalid'), 'Diese E-Mail-Adresse sieht nicht richtig aus.'],
+    [err('Password should be at least 6 characters.', 'weak_password'), 'Passwort muss mindestens 6 Zeichen haben.'],
+    [err('Password is known to be weak and easy to guess', 'weak_password'), 'Passwort zu schwach. Nimm ein anderes.'],
+    [err('email rate limit exceeded', 'over_email_send_rate_limit'), 'Zu viele Versuche. Warte kurz und probier es dann nochmal.'],
+    [err('For security purposes, you can only request this after 42 seconds.', 'over_email_send_rate_limit'), 'Zu viele Versuche. Warte kurz und probier es dann nochmal.'],
+    [err('Signups not allowed for this instance', 'signup_disabled'), 'Neue Konten sind gerade gesperrt.'],
+    [err('Email not confirmed', 'email_not_confirmed'), 'E-Mail ist noch nicht bestätigt.'],
+    [err('Invalid login credentials', 'invalid_credentials'), 'E-Mail oder Passwort falsch.'],
+  ];
+  for (const [input, text] of cases) assert.equal(D.friendlyError(input).message, text, input.message);
+});
+
+test('friendlyError erkennt Netzfehler', () => {
+  for (const m of ['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.', 'Network request failed']) {
+    const e = D.friendlyError(new TypeError(m));
+    assert.equal(e.message, 'Keine Verbindung. Prüf dein Internet.');
+    assert.equal(e.code, 'offline');
+  }
+  const retry = Object.assign(new Error('{}'), { name: 'AuthRetryableFetchError' });
+  assert.equal(D.friendlyError(retry).message, 'Keine Verbindung. Prüf dein Internet.');
+});
+
+test('friendlyError behält RPC-Fehler und den Code', () => {
+  const e = D.friendlyError(err('competition_full', 'P0001'));
+  assert.equal(e.message, 'Diese Challenge ist schon voll.');
+  assert.equal(e.code, 'P0001');
+  const own = new Error('Bitte gib deinen Namen ein.');
+  assert.equal(D.friendlyError(own).message, own.message, 'eigene Texte bleiben unverändert');
+});
