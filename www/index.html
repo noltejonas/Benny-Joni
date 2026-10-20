@@ -9,7 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <title>Projekt Terminator</title>
+  <title>Benny &amp; Joni</title>
   <script>
     try {
       var t = localStorage.getItem('pt:theme2') || 'system';
@@ -22,9 +22,81 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="redesign.css" />
   <link rel="stylesheet" href="onboarding.css" />
+  <style>
+    /* Startplatzhalter und Notfallansicht. Eigene Farben, damit beides auch ohne
+       die übrigen CSS-Dateien steht; Werte wie --bg/--text/--primary in redesign.css. */
+    .pt-boot {
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 24px; text-align: center;
+      background: #F4F3F8; color: #1C1B2E;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .pt-boot-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .pt-boot-spinner {
+      width: 36px; height: 36px; border-radius: 999px;
+      border: 3px solid #ECEAF3; border-top-color: #4F46E5;
+      animation: pt-boot-spin 0.9s linear infinite;
+    }
+    .pt-boot-text {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #5F5C74;
+    }
+    .pt-boot-msg { font-size: 16px; font-weight: 600; line-height: 1.45; max-width: 280px; color: #5F5C74; }
+    .pt-boot-btn {
+      margin-top: 8px; height: 52px; padding: 0 28px; border: 0; border-radius: 16px;
+      background: #4F46E5; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 700;
+    }
+    [data-theme="dark"] .pt-boot { background: #16151F; color: #F1F0F7; }
+    [data-theme="dark"] .pt-boot-spinner { border-color: #353345; border-top-color: #8B7CFF; }
+    [data-theme="dark"] .pt-boot-text,
+    [data-theme="dark"] .pt-boot-msg { color: #B9B6CC; }
+    [data-theme="dark"] .pt-boot-btn { background: #8B7CFF; color: #16151F; }
+    @keyframes pt-boot-spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
+  <!-- Platzhalter bis zum ersten React-Render; React leert #root dabei selbst. -->
+  <div id="root"><div id="pt-boot" class="pt-boot" role="status" aria-live="polite">
+    <div class="pt-boot-name">Benny &amp; Joni</div>
+    <div class="pt-boot-spinner" aria-hidden="true"></div>
+    <div class="pt-boot-text">Starte…</div>
+  </div></div>
+
+  <script>
+    // Start-Wächter: Lädt ein Skript nicht oder steht nach 15 s noch der
+    // Platzhalter (React hat nie gerendert), zeigt schlichtes HTML mit
+    // „Neu laden“. Kommt das Netz zurück, lädt die Seite von selbst neu.
+    (function () {
+      var LIMIT_MS = 15000;
+      var shown = false;
+      function stuck() {
+        var root = document.getElementById('root');
+        return !!document.getElementById('pt-boot') || (root && root.childElementCount === 0);
+      }
+      function fail(reason) {
+        if (shown || !stuck()) return;
+        shown = true;
+        try { if (window.PTReportError) window.PTReportError(new Error('Start fehlgeschlagen: ' + reason), { where: 'boot' }); } catch (e) {}
+        var root = document.getElementById('root');
+        root.innerHTML =
+          '<div id="pt-boot-fail" class="pt-boot" role="alert">' +
+            '<div class="pt-boot-name">Benny &amp; Joni</div>' +
+            '<p class="pt-boot-msg">App konnte nicht starten. Prüfe deine Verbindung.</p>' +
+            '<button type="button" class="pt-boot-btn">Neu laden</button>' +
+          '</div>';
+        root.querySelector('button').addEventListener('click', function () { location.reload(); });
+        window.addEventListener('online', function () {
+          if (document.getElementById('pt-boot-fail')) location.reload();
+        });
+      }
+      // Ladefehler von <script src> steigen nicht auf, darum die Capture-Phase.
+      window.addEventListener('error', function (e) {
+        var el = e && e.target;
+        if (el && el.tagName === 'SCRIPT') fail('Skript ' + (el.getAttribute('src') || '?') + ' nicht geladen');
+      }, true);
+      setTimeout(function () { fail('nach ' + LIMIT_MS / 1000 + ' s kein Render'); }, LIMIT_MS);
+    })();
+  </script>
 
   <script>
     // Capacitor-Plugins direkt über die native Bridge: iOS legt window.Capacitor
