@@ -17,6 +17,16 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Werbung (AdMob, ab 1.4.1): Hier steht nur, was der eigene Code der App
+	     erhebt. Er gibt dem Werbe-SDK keine Nutzerdaten (nur Anzeigenblock-ID,
+	     npa=1 und den Testmodus, siehe www/ads.js) und ruft keine weiteren
+	     Required-Reason-APIs auf. Was Google erhebt (Geräte-ID, ungefährer
+	     Standort, Produktinteraktion, Werbedaten, Diagnose) und welche APIs das SDK
+	     nutzt, steht in den Manifesten von GoogleMobileAds.framework und
+	     UserMessagingPlatform.framework. Xcode bettet beide unter
+	     App.app/Frameworks/ ein; der Datenschutzbericht (Archive → Generate
+	     Privacy Report) führt alles zusammen. Doppelt eintragen ist nicht nötig.
+	     App-Store-Angaben: docs/launch/ADMOB.md. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>
