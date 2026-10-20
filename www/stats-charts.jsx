@@ -68,7 +68,7 @@ function GapChart({ dates, gap, sides }) {
   const halo = { paintOrder: 'stroke', stroke: 'var(--surface)', strokeWidth: 4, strokeLinejoin: 'round' };
 
   return (
-    <div ref={ref} className="st-chart">
+    <div ref={ref} className="stats-chart">
       {W > 0 && n > 0 && (
         <svg width={W} height={H} role="img"
           aria-label={`Vorsprung über ${n} Tage, aktuell ${Math.abs(last)} Reps für ${sideName(sides[last >= 0 ? 0 : 1])}`}>
@@ -123,7 +123,7 @@ function RaceChart({ dates, cum, sides }) {
   if (overflow > 0) labels.forEach(l => { l.y -= overflow; });
 
   return (
-    <div ref={ref} className="st-chart">
+    <div ref={ref} className="stats-chart">
       {W > 0 && n > 0 && (
         <svg width={W} height={H} role="img" aria-label="Kumulierte Reps pro Seite">
           {[0.5, 1].map(f => (
@@ -173,7 +173,7 @@ function ActivityHeatmap({ repsByDay, today }) {
   const H = MONTH_H + 7 * cell + 6 * GAP;
 
   return (
-    <div ref={ref} className="st-heat">
+    <div ref={ref} className="stats-heat">
       {W > 0 && (
         <svg width={W} height={H} role="img" aria-label={`Trainingstage der letzten ${weeks} Wochen`}>
           {cols.map(({ c, monday }) => {
@@ -198,11 +198,11 @@ function ActivityHeatmap({ repsByDay, today }) {
           }))}
         </svg>
       )}
-      <div className="st-heat-foot">
+      <div className="stats-heat-foot">
         {picked ? (
           <span className="mono">{fmtDay(picked)} · {repsByDay[picked] != null ? `${repsByDay[picked].toLocaleString('de-DE')} Reps` : 'kein Training'}</span>
         ) : (
-          <span className="st-heat-scale">
+          <span className="stats-heat-scale">
             weniger
             {opacity.map((o, i) => <i key={i} style={{ background: i ? 'var(--primary)' : 'var(--track)', opacity: i ? o : 1 }} />)}
             mehr

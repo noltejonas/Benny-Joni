@@ -105,25 +105,25 @@ function ChallengeStats({ sides, members = [], challenges, categories, sets, tit
 }
 
 function CardHead({ label, children }) {
-  return <div className="st-head"><span className="label">{label}</span>{children}</div>;
+  return <div className="stats-head"><span className="label">{label}</span>{children}</div>;
 }
 
 function SideLegend({ sides }) {
   return (
-    <span className="st-legend">
+    <span className="stats-legend">
       {sides.map(s => <span key={s.key}><i style={{ background: sideFill(s) }} />{sideName(s)}</span>)}
     </span>
   );
 }
 
 function ScoreCard({ st, sides }) {
-  const meta = st.decided > 0 && <span className="st-meta">{plural(st.decided, 'Woche', 'Wochen')}</span>;
+  const meta = st.decided > 0 && <span className="stats-meta">{plural(st.decided, 'Woche', 'Wochen')}</span>;
 
   if (sides.length === 2) {
     const [a, b] = st.totals;
     const share = a + b ? (a / (a + b)) * 100 : 50;
     return (
-      <section className="card rd-duel st-score" aria-label="Bilanz">
+      <section className="card rd-duel stats-score" aria-label="Bilanz">
         <CardHead label="Bilanz">{meta}</CardHead>
         <div className="rd-duel-main">
           {[0, null, 1].map(i => i == null ? (
@@ -145,7 +145,7 @@ function ScoreCard({ st, sides }) {
             <div className="rd-split-a" style={{ width: `${share}%`, '--sc': sideFill(sides[0]) }} />
             <div className="rd-split-b" style={{ '--sc': sideFill(sides[1]) }} />
           </div>
-          <div className="st-split-legend mono">
+          <div className="stats-split-legend mono">
             <span>{fmtNum(a)} Reps</span><span>{fmtNum(b)} Reps</span>
           </div>
         </div>
@@ -158,13 +158,13 @@ function ScoreCard({ st, sides }) {
   return (
     <section className="card" aria-label="Tabelle">
       <CardHead label="Tabelle">{meta}</CardHead>
-      <table className="st-table st-standings">
-        <thead><tr><th className="st-pos">#</th><th /><th>Siege</th><th>Reps</th></tr></thead>
+      <table className="stats-table stats-standings">
+        <thead><tr><th className="stats-pos">#</th><th /><th>Siege</th><th>Reps</th></tr></thead>
         <tbody>
           {order.map((i, pos) => (
             <tr key={sides[i].key} className={sides[i].isMine ? 'is-me' : ''}>
-              <td className="st-pos mono">{pos + 1}</td>
-              <td><span className="st-who"><SideAvatar side={sides[i]} size={26} /><span>{sideName(sides[i])}</span></span></td>
+              <td className="stats-pos mono">{pos + 1}</td>
+              <td><span className="stats-who"><SideAvatar side={sides[i]} size={26} /><span>{sideName(sides[i])}</span></span></td>
               <td className="mono">{st.wins[i]}</td>
               <td className="mono">{fmtNum(st.totals[i])}</td>
             </tr>
@@ -197,15 +197,15 @@ function TrendCard({ st, sides, title }) {
 
   return (
     <>
-      <section className="card st-trend" role="button" tabIndex={0} aria-label="Verlauf im Vollbild öffnen"
+      <section className="card stats-trend" role="button" tabIndex={0} aria-label="Verlauf im Vollbild öffnen"
         onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
         <CardHead label={duel ? 'Vorsprung' : 'Verlauf'}>
-          <span className="st-head-right">
+          <span className="stats-head-right">
             {duel
               ? (leadSide
-                ? <span className="st-lead mono" style={{ color: sideInk(leadSide) }}>{sideName(leadSide)} +{fmtNum(Math.abs(last))}</span>
-                : <span className="st-meta">Gleichstand</span>)
-              : <span className="st-meta">Reps kumuliert</span>}
+                ? <span className="stats-lead mono" style={{ color: sideInk(leadSide) }}>{sideName(leadSide)} +{fmtNum(Math.abs(last))}</span>
+                : <span className="stats-meta">Gleichstand</span>)
+              : <span className="stats-meta">Reps kumuliert</span>}
             <Icon name="expand" size={14} color="var(--text-3)" />
           </span>
         </CardHead>
@@ -238,22 +238,22 @@ function WeeksCard({ st, sides, comps }) {
   const weeks = showAll ? st.weeks : st.weeks.slice(0, WEEKS_SHOWN);
 
   return (
-    <section className="card st-weeks" aria-label="Wochen">
+    <section className="card stats-weeks" aria-label="Wochen">
       <CardHead label="Wochen">{sides.length === 2 && <SideLegend sides={sides} />}</CardHead>
-      <ul className="st-week-list">
+      <ul className="stats-week-list">
         {weeks.map(w => {
           const isOpen = openWeek === w.weekStart;
           return (
             <li key={w.weekStart} className={isOpen ? 'is-open' : ''}>
-              <button className="st-week" aria-expanded={isOpen} onClick={() => setOpenWeek(isOpen ? null : w.weekStart)}>
-                <span className="st-week-kw"><b>KW {weekNumber(w.weekStart)}</b><small>{fmtWeekRange(w.weekStart)}</small></span>
+              <button className="stats-week" aria-expanded={isOpen} onClick={() => setOpenWeek(isOpen ? null : w.weekStart)}>
+                <span className="stats-week-kw"><b>KW {weekNumber(w.weekStart)}</b><small>{fmtWeekRange(w.weekStart)}</small></span>
                 <WeekBar w={w} sides={sides} />
-                <span className="st-week-res">
-                  {w.current ? <span className="st-live">läuft</span>
+                <span className="stats-week-res">
+                  {w.current ? <span className="stats-live">läuft</span>
                     : w.winner != null ? <SideAvatar side={sides[w.winner]} size={24} />
-                    : <span className="st-tie">{w.active ? '=' : '–'}</span>}
+                    : <span className="stats-tie">{w.active ? '=' : '–'}</span>}
                 </span>
-                <span className="st-chev"><Icon name="chevron" size={16} /></span>
+                <span className="stats-chev"><Icon name="chevron" size={16} /></span>
               </button>
               {isOpen && <WeekDetail w={w} sides={sides} comps={comps} />}
             </li>
@@ -261,7 +261,7 @@ function WeeksCard({ st, sides, comps }) {
         })}
       </ul>
       {st.weeks.length > WEEKS_SHOWN && (
-        <button className="st-more" onClick={() => setShowAll(v => !v)}>
+        <button className="stats-more" onClick={() => setShowAll(v => !v)}>
           {showAll ? 'Weniger anzeigen' : `Alle ${st.weeks.length} Wochen`}
         </button>
       )}
@@ -272,13 +272,13 @@ function WeeksCard({ st, sides, comps }) {
 function WeekBar({ w, sides }) {
   const segs = sides.map((s, i) => ({ s, v: w.totals[i] })).filter(x => x.v > 0);
   const bar = (
-    <span className="st-bar">
+    <span className="stats-bar">
       {segs.map(({ s, v }) => <i key={s.key} style={{ flex: v, background: sideFill(s) }} />)}
     </span>
   );
-  if (sides.length !== 2) return <span className="st-week-bar is-multi">{bar}</span>;
+  if (sides.length !== 2) return <span className="stats-week-bar is-multi">{bar}</span>;
   return (
-    <span className="st-week-bar">
+    <span className="stats-week-bar">
       <span className={`mono ${w.winner === 0 ? 'is-win' : ''}`}>{fmtNum(w.totals[0])}</span>
       {bar}
       <span className={`mono ${w.winner === 1 ? 'is-win' : ''}`}>{fmtNum(w.totals[1])}</span>
@@ -290,32 +290,32 @@ function WeekDetail({ w, sides, comps }) {
   const multiComp = new Set(w.rows.map(r => r.ch.competition_id)).size > 1;
   const compName = (ch) => comps.find(c => c.id === ch.competition_id)?.name;
   return (
-    <div className="st-wd">
-      <div className="st-wd-goals">
+    <div className="stats-wd">
+      <div className="stats-wd-goals">
         {sides.map((s, i) => (
           <span key={s.key}><b style={{ color: sideInk(s) }}>{sideName(s)}</b> <span className="mono">{w.goalsHit[i]}/{w.goals[i]}</span> Ziele</span>
         ))}
       </div>
       {w.rows.map(({ ch, cat, share, perSide }) => (
-        <div className="st-wd-row" key={ch.id}>
-          <div className="st-wd-name">
-            <span>{cat?.name}{multiComp && <span className="st-muted"> · {compName(ch)}</span>}</span>
+        <div className="stats-wd-row" key={ch.id}>
+          <div className="stats-wd-name">
+            <span>{cat?.name}{multiComp && <span className="stats-muted"> · {compName(ch)}</span>}</span>
             <small className="mono">{ch.workout ? '1× p. P.' : `${fmtNum(share)} p. P.`}</small>
           </div>
           {perSide.map((p, i) => (
-            <div className="st-wd-side" key={sides[i].key}>
-              <span className="st-wd-who" style={{ color: sideInk(sides[i]) }}>{sides[i].short}</span>
+            <div className="stats-wd-side" key={sides[i].key}>
+              <span className="stats-wd-who" style={{ color: sideInk(sides[i]) }}>{sides[i].short}</span>
               {ch.workout ? (
-                <span className="st-wd-val is-wide mono">{fmtWorkoutRuns(ch.workout, p.sets)}</span>
+                <span className="stats-wd-val is-wide mono">{fmtWorkoutRuns(ch.workout, p.sets)}</span>
               ) : (
                 <>
-                  <span className="st-wd-track">
+                  <span className="stats-wd-track">
                     <i style={{ width: `${p.goal ? Math.min(100, (100 * p.value) / p.goal) : 0}%`, background: sideFill(sides[i]) }} />
                   </span>
-                  <span className="st-wd-val mono">{fmtNum(p.value)}/{fmtNum(p.goal)}</span>
+                  <span className="stats-wd-val mono">{fmtNum(p.value)}/{fmtNum(p.goal)}</span>
                 </>
               )}
-              <span className={`st-wd-hit ${p.hit ? 'is-hit' : ''}`} aria-label={p.hit ? 'Ziel erfüllt' : 'Ziel offen'}>
+              <span className={`stats-wd-hit ${p.hit ? 'is-hit' : ''}`} aria-label={p.hit ? 'Ziel erfüllt' : 'Ziel offen'}>
                 {p.hit ? <Icon name="check" size={14} strokeWidth={3} /> : null}
               </span>
             </div>
@@ -331,17 +331,17 @@ function CategoryCard({ st, sides }) {
   return (
     <section className="card" aria-label="Kategorien">
       <CardHead label="Kategorien">{duel && <SideLegend sides={sides} />}</CardHead>
-      <div className="st-cats">
+      <div className="stats-cats">
         {st.categories.map(({ cat, vals, leader }) => (
-          <div className={`st-cat ${duel ? '' : 'is-multi'}`} key={cat?.id}>
-            <span className="st-cat-name">{cat?.name}</span>
-            {duel && <span className={`st-cat-val mono ${leader === 0 ? 'is-win' : ''}`}>{fmtNum(vals[0])}</span>}
-            <span className="st-bar">
+          <div className={`stats-cat ${duel ? '' : 'is-multi'}`} key={cat?.id}>
+            <span className="stats-cat-name">{cat?.name}</span>
+            {duel && <span className={`stats-cat-val mono ${leader === 0 ? 'is-win' : ''}`}>{fmtNum(vals[0])}</span>}
+            <span className="stats-bar">
               {sides.map((s, i) => vals[i] > 0 && <i key={s.key} style={{ flex: vals[i], background: sideFill(s) }} />)}
             </span>
             {duel
-              ? <span className={`st-cat-val mono ${leader === 1 ? 'is-win' : ''}`}>{fmtNum(vals[1])}</span>
-              : <span className="st-cat-lead">
+              ? <span className={`stats-cat-val mono ${leader === 1 ? 'is-win' : ''}`}>{fmtNum(vals[1])}</span>
+              : <span className="stats-cat-lead">
                   {leader != null && <SideAvatar side={sides[leader]} size={20} />}
                   <span className="mono">{leader != null ? fmtNum(vals[leader]) : '='}</span>
                 </span>}
@@ -372,7 +372,7 @@ function RecordsCard({ st, sides }) {
     return (
       <section className="card" aria-label="Kennzahlen">
         <CardHead label="Kennzahlen" />
-        <table className="st-table st-records">
+        <table className="stats-table stats-records">
           <thead>
             <tr><th />{sides.map(s => <th key={s.key} style={{ color: sideInk(s) }}>{sideName(s)}</th>)}</tr>
           </thead>
@@ -399,7 +399,7 @@ function RecordsCard({ st, sides }) {
   return (
     <section className="card" aria-label="Bestwerte">
       <CardHead label="Bestwerte" />
-      <table className="st-table st-holders">
+      <table className="stats-table stats-holders">
         <tbody>
           {rows.map(row => {
             const best = Math.max(...row.vals.map(v => v ?? 0));
@@ -408,9 +408,9 @@ function RecordsCard({ st, sides }) {
               <tr key={row.label}>
                 <td>{row.label}</td>
                 <td>
-                  {holders.length === 1 && <span className="st-who"><SideAvatar side={holders[0]} size={22} /><span>{sideName(holders[0])}</span></span>}
+                  {holders.length === 1 && <span className="stats-who"><SideAvatar side={holders[0]} size={22} /><span>{sideName(holders[0])}</span></span>}
                   {holders.length > 1 && (
-                    <span className="st-who-stack" aria-label={holders.map(sideName).join(', ')}>
+                    <span className="stats-who-stack" aria-label={holders.map(sideName).join(', ')}>
                       {holders.slice(0, 4).map(s => <SideAvatar key={s.key} side={s} size={22} />)}
                     </span>
                   )}
@@ -440,15 +440,15 @@ function AllTimeStats({ me, profile, bundle, comps }) {
 
   return (
     <>
-      <section className="card st-me" aria-label="Überblick">
-        <div className="st-me-head">
+      <section className="card stats-me" aria-label="Überblick">
+        <div className="stats-me-head">
           <Avatar profile={profile} size={48} />
           <div>
-            <div className="st-me-name">{profile.display_name}</div>
-            <div className="st-meta">{plural(comps.length, 'Challenge', 'Challenges')}</div>
+            <div className="stats-me-name">{profile.display_name}</div>
+            <div className="stats-meta">{plural(comps.length, 'Challenge', 'Challenges')}</div>
           </div>
         </div>
-        <div className="st-kpis">
+        <div className="stats-kpis">
           <div><b className="mono">{fmtNum(stats.totalReps)}</b><span>Reps</span></div>
           <div><b className="mono">{fmtNum(stats.activeDays)}</b><span>Aktive Tage</span></div>
           <div><b className="mono">{fmtPct(stats.goalRate)}</b><span>Ziele erfüllt</span></div>
@@ -457,14 +457,14 @@ function AllTimeStats({ me, profile, bundle, comps }) {
 
       <section className="card" aria-label="Aktivität">
         <CardHead label="Aktivität">
-          <span className="st-meta">Serie <b className="mono">{stats.streak}</b> · Rekord <b className="mono">{stats.longestStreak}</b></span>
+          <span className="stats-meta">Serie <b className="mono">{stats.streak}</b> · Rekord <b className="mono">{stats.longestStreak}</b></span>
         </CardHead>
         <ActivityHeatmap repsByDay={stats.repsByDay} today={today} />
       </section>
 
       <section className="card" aria-label="Übungen">
         <CardHead label="Übungen" />
-        <table className="st-table st-ex">
+        <table className="stats-table stats-ex">
           <thead><tr><th /><th>Gesamt</th><th>Max. Satz</th><th>Max. Tag</th></tr></thead>
           <tbody>
             {stats.categories.map(e => {
@@ -476,7 +476,7 @@ function AllTimeStats({ me, profile, bundle, comps }) {
                   : [fmtNum(e.total), fmtNum(e.maxSet), fmtNum(e.bestDay)];
               return (
                 <tr key={e.cat?.id}>
-                  <td><span className="st-ex-name">{e.cat?.name || '—'}</span></td>
+                  <td><span className="stats-ex-name">{e.cat?.name || '—'}</span></td>
                   {cells.map((v, k) => <td key={k} className="mono">{v}</td>)}
                 </tr>
               );
@@ -487,15 +487,15 @@ function AllTimeStats({ me, profile, bundle, comps }) {
 
       {stats.perComp.length > 0 && (
         <section className="card" aria-label="Challenges">
-          <CardHead label="Challenges"><span className="st-meta">{plural(stats.weeksWon, 'Wochensieg', 'Wochensiege')}</span></CardHead>
-          <ul className="st-comps">
+          <CardHead label="Challenges"><span className="stats-meta">{plural(stats.weeksWon, 'Wochensieg', 'Wochensiege')}</span></CardHead>
+          <ul className="stats-comps">
             {stats.perComp.map(({ c, played, wins, total, rank, of }) => (
               <li key={c.id}>
-                <span className="st-comp-text">
-                  <span className="st-comp-name">{c.name}</span>
-                  <span className="st-meta">{wins}/{played} Siege · {fmtNum(total)} Reps</span>
+                <span className="stats-comp-text">
+                  <span className="stats-comp-name">{c.name}</span>
+                  <span className="stats-meta">{wins}/{played} Siege · {fmtNum(total)} Reps</span>
                 </span>
-                <span className="st-comp-rank"><b className="mono">{rank}.</b><small>von {of}</small></span>
+                <span className="stats-comp-rank"><b className="mono">{rank}.</b><small>von {of}</small></span>
               </li>
             ))}
           </ul>
