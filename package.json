@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "capacitor:copy:after": "node tools/build-web.cjs",
     "test": "node --test tests/"
   },
   "keywords": [],
