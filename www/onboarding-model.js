@@ -1,10 +1,83 @@
-// Projekt Terminator — Onboarding-Modell (ohne React)
+// Benny & Joni — Onboarding-Modell (ohne React)
 //
 // Entscheidet aus echten Daten (Profil, Mitgliedschaften, Wochenziele, Sätze),
 // was eine neue Person als Nächstes sieht. Die Screens in onboarding.jsx und
 // onboarding-intro.jsx lesen nur hieraus; Tests: tests/onboarding.test.cjs.
+// Oben steht außerdem die Launch-Konfiguration (Name, Store, Support,
+// Rechtstexte), die alle Screens über window.PTOnboarding lesen.
 
 (function () {
+  // ── Launch-Konfiguration ────────────────────────────────────────────
+  // Einzige Stelle für Name, Store-Link, Support und Rechtstexte.
+  const APP_NAME = 'Benny & Joni';
+  // Numerische Apple-ID der App: morgens aus App Store Connect eintragen
+  // (App-Informationen → Apple-ID). Leer = Einladung ohne Store-Link.
+  const APP_STORE_ID = '';
+  const STORE_DIGITS = APP_STORE_ID.replace(/\D/g, ''); // verzeiht „id…“ und Leerzeichen
+  const APP_STORE_URL = STORE_DIGITS ? `https://apps.apple.com/de/app/id${STORE_DIGITS}` : '';
+  // Support-Adresse: morgens eintragen. Leer = Support und Meldungen öffnen
+  // stattdessen die Support-Seite (LEGAL.support).
+  const SUPPORT_EMAIL = '';
+  // Rechtstexte auf GitHub Pages (docs/launch/site).
+  const LEGAL_BASE = 'https://noltejonas.github.io/Benny-Joni/';
+  const LEGAL = Object.freeze({
+    privacy: `${LEGAL_BASE}datenschutz.html`,
+    imprint: `${LEGAL_BASE}impressum.html`,
+    terms: `${LEGAL_BASE}nutzungsbedingungen.html`,
+    support: `${LEGAL_BASE}support.html`,
+  });
+
+  // Öffnet Webseiten in Safari und mailto: in der Mail-App. Nativ reicht
+  // Capacitor window.open an iOS weiter und liefert null; im Browser fängt
+  // location.href ein blockiertes Pop-up ab.
+  function openExternal(url) {
+    const s = String(url || '');
+    if (!s) return;
+    if (!/^https?:/i.test(s)) { window.location.href = s; return; }
+    const native = !!window.Capacitor?.isNativePlatform?.();
+    try {
+      if (window.open(s, '_blank') || native) return;
+    } catch (e) {}
+    window.location.href = s;
+  }
+
+  // mailto:-Link an den Support, leer ohne SUPPORT_EMAIL.
+  function supportMailto(subject = '', body = '') {
+    const to = SUPPORT_EMAIL.trim();
+    if (!to) return '';
+    const query = [
+      subject && `subject=${encodeURIComponent(subject)}`,
+      body && `body=${encodeURIComponent(body)}`,
+    ].filter(Boolean).join('&');
+    return `mailto:${to}${query ? `?${query}` : ''}`;
+  }
+
+  // Inhalt melden (Apple 1.2): Mail an den Support mit allen IDs, ohne
+  // Adresse die Support-Seite. Liefert die geöffnete Adresse.
+  const REPORT_KINDS = {
+    set: 'Satz', note: 'Notiz', member: 'Person', user: 'Person', profile: 'Person',
+    photo: 'Profilfoto', avatar: 'Profilfoto', challenge: 'Challenge',
+  };
+  function reportText({ kind, setId, userId, challengeId, note } = {}) {
+    const label = REPORT_KINDS[kind] || 'Inhalt';
+    const facts = [
+      `Art: ${label}`,
+      setId && `Satz-ID: ${setId}`,
+      userId && `Nutzer-ID: ${userId}`,
+      challengeId && `Challenge-ID: ${challengeId}`,
+      note && `Notiz: „${String(note).slice(0, 300)}“`,
+      `App: ${APP_NAME}`,
+    ].filter(Boolean);
+    const body = ['Was ist passiert? Beschreib es kurz:', '', '', '––––––––', ...facts].join('\n');
+    return { subject: `Meldung: ${label}`, body };
+  }
+  function reportContent(info = {}) {
+    const { subject, body } = reportText(info);
+    const url = supportMailto(subject, body) || LEGAL.support;
+    openExternal(url);
+    return url;
+  }
+
   // Alphabet von gen_invite_code (ohne 0/O/1/I). Getippte Codes prüft der
   // Server; hier zählt nur die Form, damit kein gültiger Code abgelehnt wird.
   const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -46,11 +119,14 @@
     return `${SCHEME}://join/${String(code || '').toUpperCase()}`;
   }
 
+  // Teilen-Text: Wer die App noch nicht hat, braucht Store-Link bzw. Namen;
+  // „Code:“ muss bleiben, daran erkennt normalizeCode den Code.
   function inviteText(competition) {
     const code = String(competition.invite_code || '').toUpperCase();
-    return `Komm in meine Challenge „${competition.name}“ bei Projekt Terminator 💪\n`
+    return `Komm in meine Challenge „${competition.name}“ bei ${APP_NAME} 💪\n`
+      + (APP_STORE_URL ? `App laden: ${APP_STORE_URL}\n` : `Im App Store: ${APP_NAME}\n`)
       + `Code: ${code}\n`
-      + `Direkt öffnen: ${inviteLink(code)}`;
+      + `Schon installiert? ${inviteLink(code)}`;
   }
 
   // ── Einstieg ────────────────────────────────────────────────────────
@@ -257,6 +333,8 @@
   }
 
   window.PTOnboarding = {
+    APP_NAME, APP_STORE_ID, APP_STORE_URL, SUPPORT_EMAIL, LEGAL,
+    openExternal, supportMailto, reportText, reportContent,
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
     entryRoute, isNewcomer, youngProfile, suggestName, mergeState, stateKey,

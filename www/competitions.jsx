@@ -17,6 +17,37 @@ async function shareInvite(competition) {
   try { await navigator.clipboard.writeText(text); return 'copied'; } catch (e) { return 'failed'; }
 }
 
+// ─── Rechtliches ────────────────────────────────────────────────────────────
+// Kleine Linkzeile am Ende der Sheets, damit Datenschutz und Impressum auch
+// ohne Challenge erreichbar sind (Apple 5.1.1). Adressen: PTOnboarding.LEGAL.
+const MU_LEGAL_LABELS = {
+  privacy: 'Datenschutz', imprint: 'Impressum', terms: 'Nutzungsbedingungen', support: 'Support',
+};
+
+function MuLegalFooter({ items, userId }) {
+  const O = window.PTOnboarding;
+  if (!O?.LEGAL) return null;
+  const open = (key) => {
+    // Support: Mail mit Nutzer-ID, solange eine Adresse eingetragen ist.
+    const mail = key === 'support'
+      ? O.supportMailto?.(`Support: ${O.APP_NAME}`, userId ? `\n\n––––––––\nNutzer-ID: ${userId}` : '')
+      : '';
+    const url = mail || O.LEGAL[key];
+    if (O.openExternal) O.openExternal(url); else window.open(url, '_blank');
+  };
+  return (
+    <nav aria-label="Rechtliches"
+      style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0 14px', marginTop: 14 }}>
+      {items.map(key => (
+        <button key={key} type="button" className="btn-link" onClick={() => open(key)}
+          style={{ color: 'var(--text-3)', fontSize: 13, fontWeight: 600, padding: '8px 2px' }}>
+          {MU_LEGAL_LABELS[key]}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 // ─── Challenge-Switcher ─────────────────────────────────────────────────────
 function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId, onSelect, onSetMain,
   onCreate, onJoin, onProfile, onSignOut }) {
@@ -77,6 +108,7 @@ function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId
       )}
 
       <button className="btn btn-danger-ghost" style={{ marginTop: 20 }} onClick={onSignOut}>Abmelden</button>
+      <MuLegalFooter items={['privacy', 'imprint']} />
     </Sheet>
   );
 }
@@ -102,9 +134,39 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
   const [name, setName] = React.useState(profile.display_name);
   const [color, setColor] = React.useState(profile.color);
   const [busy, setBusy] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const fileRef = React.useRef(null);
 
   React.useEffect(() => { if (open) { setName(profile.display_name); setColor(profile.color); } }, [open, profile]);
+
+  // Konto löschen (Apple 5.1.1(v)). api.deleteAccount löscht Konto und Daten
+  // und meldet lokal ab; danach startet die App neu. Fehlt die Funktion,
+  // geht die Bitte per Mail bzw. Support-Seite an uns.
+  async function deleteAccount() {
+    const O = window.PTOnboarding;
+    if (typeof api?.deleteAccount !== 'function') {
+      if (!confirm('Konto löschen geht gerade nur über unseren Support. Jetzt Anfrage öffnen?')) return;
+      const mail = O?.supportMailto?.('Konto löschen', `Bitte löscht mein Konto und alle meine Daten.\n\nNutzer-ID: ${profile.id}`);
+      const url = mail || O?.LEGAL?.support;
+      if (url) O?.openExternal ? O.openExternal(url) : window.open(url, '_blank');
+      return;
+    }
+    if (!confirm('Konto löschen?\n\nDein Profil, alle Sätze, Reaktionen, Strafkonto-Einträge und dein Foto werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.')) return;
+    if (!confirm('Wirklich endgültig löschen?')) return;
+    setDeleting(true);
+    try {
+      await api.deleteAccount();
+    } catch (e) {
+      alert(e?.message || 'Konto konnte nicht gelöscht werden. Versuch es nochmal.');
+      setDeleting(false);
+      return;
+    }
+    try { localStorage.removeItem('pt_apns_token'); } catch (e) {}
+    // Neustart ohne ?join/?demo; hat die API schon umgeleitet, führt das zum selben Ziel.
+    const url = new URL(location.href);
+    url.search = ''; url.hash = '';
+    location.replace(url.toString());
+  }
 
   async function save() {
     if (!name.trim()) return;
@@ -147,11 +209,15 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
         <button className="btn btn-secondary" onClick={onClose}>Schließen</button>
         <button className="btn" disabled={busy || !name.trim()} onClick={save}>{busy ? '…' : 'Speichern'}</button>
       </div>
-      {onSignOut && <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={onSignOut}>Abmelden</button>}
+      {onSignOut && <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={onSignOut} disabled={deleting}>Abmelden</button>}
+      <button className="btn btn-danger-ghost" style={{ marginTop: 4 }} onClick={deleteAccount} disabled={busy || deleting}>
+        {deleting ? 'Wird gelöscht …' : 'Konto löschen'}
+      </button>
+      <MuLegalFooter items={['privacy', 'imprint', 'terms', 'support']} userId={profile.id} />
     </Sheet>
   );
 }
 
 Object.assign(window, {
-  ChallengeSwitcherSheet, ProfileSheet, shareInvite, COMP_EMOJIS, resizeImage,
+  ChallengeSwitcherSheet, ProfileSheet, MuLegalFooter, shareInvite, COMP_EMOJIS, resizeImage,
 });
