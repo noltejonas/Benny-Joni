@@ -64,3 +64,58 @@ test('inviteLink und inviteText enthalten Code, Name und Link', () => {
   assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
   assert.equal(O.normalizeCode(text), 'BJ4K7X', 'die eigene Einladung lässt sich wieder einlesen');
 });
+
+// ── Einstieg ────────────────────────────────────────────────────────────────
+
+const NOW = new Date(2026, 9, 21, 12, 0).getTime(); // Mi 21.10.2026
+const daysAgo = (n) => new Date(NOW - n * 86400000).toISOString();
+const comp = (extra = {}) => ({ id: 'c1', name: 'Duell', mode: '1v1', archived_at: null, ...extra });
+
+test('entryRoute: Laden und ohne Konto', () => {
+  assert.equal(O.entryRoute({ session: undefined }), 'loading');
+  assert.equal(O.entryRoute({ session: null }), 'welcome');
+  assert.equal(O.entryRoute({ session: {}, profile: null, competitions: null }), 'loading');
+});
+
+test('entryRoute: wer eine aktive Challenge hat, geht direkt in die App', () => {
+  const r = O.entryRoute({ session: {}, profile: {}, competitions: [comp()], state: {}, invite: 'BJ4K7X' });
+  assert.equal(r, 'app');
+});
+
+test('entryRoute: neue Person erst Profil, dann Einladung oder Start', () => {
+  const base = { session: {}, profile: {}, competitions: [] };
+  assert.equal(O.entryRoute({ ...base, state: {} }), 'profile');
+  assert.equal(O.entryRoute({ ...base, state: { profileDone: daysAgo(0) } }), 'start');
+  assert.equal(O.entryRoute({ ...base, state: { profileDone: daysAgo(0) }, invite: 'BJ4K7X' }), 'join');
+});
+
+test('entryRoute: nur archivierte Challenges = bestehendes Konto, kein Profilschritt', () => {
+  const base = { session: {}, profile: {}, competitions: [comp({ archived_at: daysAgo(3) })], state: {} };
+  assert.equal(O.entryRoute(base), 'start');
+  assert.equal(O.entryRoute({ ...base, invite: 'BJ4K7X' }), 'join');
+});
+
+test('isNewcomer: begonnenes Onboarding oder junges Profil', () => {
+  assert.equal(O.isNewcomer({ state: { started: daysAgo(30) }, profile: { created_at: daysAgo(30) }, now: NOW }), true);
+  assert.equal(O.isNewcomer({ state: {}, profile: { created_at: daysAgo(3) }, now: NOW }), true);
+  assert.equal(O.isNewcomer({ state: {}, profile: { created_at: daysAgo(15) }, now: NOW }), false);
+  assert.equal(O.isNewcomer({ state: {}, profile: {}, now: NOW }), false);
+});
+
+test('suggestName macht aus der E-Mail einen Vornamen', () => {
+  assert.equal(O.suggestName('lenn.hoffmann@bauerlieferant.de'), 'Lenn');
+  assert.equal(O.suggestName('max_99@example.com'), 'Max');
+  assert.equal(O.suggestName('JONAS@example.com'), 'Jonas');
+  assert.equal(O.suggestName('a.b@example.com'), '');
+  assert.equal(O.suggestName(''), '');
+  assert.equal(O.suggestName(undefined), '');
+});
+
+test('mergeState vereint Gerät und Profil', () => {
+  const local = { started: 't1', dismissed: { c1: 't2' } };
+  const remote = { profileDone: 't3', dismissed: { c2: 't4' }, weekOne: { c1: '2026-10-12' } };
+  assert.deepEqual(JSON.parse(JSON.stringify(O.mergeState(local, remote))), {
+    started: 't1', profileDone: 't3', dismissed: { c1: 't2', c2: 't4' }, weekOne: { c1: '2026-10-12' },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(O.mergeState(null, undefined))), {});
+});

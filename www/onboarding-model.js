@@ -53,8 +53,58 @@
       + `Direkt öffnen: ${inviteLink(code)}`;
   }
 
+  // ── Einstieg ────────────────────────────────────────────────────────
+  const DAY = 86400000;
+  const NEWCOMER_DAYS = 14;
+
+  // Welcher Bildschirm vor der App? Aus Session, Profil, Challenges, offener
+  // Einladung und dem Onboarding-Stand (state, s. mergeState).
+  function entryRoute({ session, profile, competitions, invite, state } = {}) {
+    if (session === undefined) return 'loading';
+    if (!session) return 'welcome';
+    if (!profile || !competitions) return 'loading';
+    if (competitions.some(c => !c.archived_at)) return 'app';
+    // Nur archivierte Challenges: bestehendes Konto, der Profilschritt entfällt.
+    if (!competitions.length && !state?.profileDone) return 'profile';
+    return invite ? 'join' : 'start';
+  }
+
+  // Neue Begleitung (Startkarte, Tipps, Feiern) nur für Konten, die das neue
+  // Onboarding begonnen haben oder deren Profil jünger als 14 Tage ist.
+  function isNewcomer({ state, profile, now = Date.now() } = {}) {
+    if (state?.started) return true;
+    const created = Date.parse(profile?.created_at);
+    return Number.isFinite(created) && now - created < NEWCOMER_DAYS * DAY;
+  }
+
+  // „lenn.hoffmann@…“ → „Lenn“. Leer, wenn nichts Sinnvolles herauskommt.
+  function suggestName(email) {
+    const local = String(email || '').split('@')[0];
+    const first = local.split(/[._\-+\d]+/).find(Boolean) || '';
+    if (first.length < 2) return '';
+    return (first[0].toUpperCase() + first.slice(1).toLowerCase()).slice(0, 30);
+  }
+
+  // Stand auf dem Gerät (localStorage) und im Profil (profiles.onboarding)
+  // zusammenführen: Zeitstempel bleiben, Maps werden vereint.
+  function mergeState(local, remote) {
+    const a = local || {}, b = remote || {};
+    const out = {};
+    for (const key of new Set([...Object.keys(b), ...Object.keys(a)])) {
+      const x = a[key], y = b[key];
+      const isMap = (v) => v && typeof v === 'object' && !Array.isArray(v);
+      out[key] = isMap(x) || isMap(y) ? { ...(isMap(y) ? y : {}), ...(isMap(x) ? x : {}) } : (x || y);
+    }
+    return out;
+  }
+
+  function stateKey(userId) {
+    return `pt:onboarding:${userId}`;
+  }
+
   window.PTOnboarding = {
-    ALPHABET, SCHEME,
+    ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
+    entryRoute, isNewcomer, suggestName, mergeState, stateKey,
   };
 })();
