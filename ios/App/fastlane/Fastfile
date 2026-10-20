@@ -1,9 +1,12 @@
-# fastlane für Benny & Joni (com.bennyjoni.terminator) → TestFlight.
-# Einrichtung und Ablauf: docs/FASTLANE_TESTFLIGHT.md
+# fastlane für Benny & Joni (com.bennyjoni.terminator) → TestFlight und App Store.
+# Einrichtung und Ablauf: docs/launch/RELEASE.md (App Store) und
+# docs/FASTLANE_TESTFLIGHT.md (TestFlight)
 #
 #   cd ios/App
-#   bundle exec fastlane verify_auth   # nur den App-Store-Connect-Zugang prüfen
-#   bundle exec fastlane beta          # Web-Assets syncen, bauen, hochladen
+#   bundle exec fastlane verify_auth          # nur den App-Store-Connect-Zugang prüfen
+#   bundle exec fastlane beta                 # Web-Assets syncen, bauen, zu TestFlight hochladen
+#   bundle exec fastlane release              # bauen, Build + Store-Texte hochladen, NICHT einreichen
+#   bundle exec fastlane release submit:true  # dasselbe und direkt zur Prüfung einreichen
 #
 # Zugangsdaten stehen in ios/App/fastlane/.env (gitignored), siehe .env.example.
 
@@ -36,6 +39,34 @@ IOS_APP_DIR = File.join(REPO_ROOT, "ios", "App").freeze
 XCODEPROJ   = File.join(IOS_APP_DIR, "App.xcodeproj").freeze
 OUTPUT_DIR  = File.join(IOS_APP_DIR, "build", "fastlane").freeze
 
+# Store-Texte im deliver-Format (de-DE/*.txt, copyright.txt, primary_category.txt)
+# und die Hinweise für die App-Prüfung. Erklärt in docs/launch/STORE_LISTING.md.
+METADATA_DIR    = File.join(IOS_APP_DIR, "fastlane", "metadata").freeze
+REVIEW_NOTES_MD = File.join(REPO_ROOT, "docs", "launch", "REVIEW_NOTES.md").freeze
+
+# Alles, was morgens noch von Hand ausgefüllt werden muss, ist so markiert.
+PLACEHOLDER = "[BITTE AUSFÜLLEN".freeze
+# Der Einladungscode der Review-Challenge steht nicht im öffentlichen Repo,
+# sondern als REVIEW_CODE in der .env.
+REVIEW_CODE_PLACEHOLDER = "[BITTE AUSFÜLLEN: Einladungscode]".freeze
+
+# Zeichenlimits von App Store Connect. Keywords zusätzlich in Byte, weil
+# Umlaute sonst knapp über die Grenze rutschen können.
+METADATA_LIMITS = {
+  "name" => 30,
+  "subtitle" => 30,
+  "promotional_text" => 170,
+  "keywords" => 100,
+  "description" => 4000,
+  "release_notes" => 4000
+}.freeze
+REVIEW_NOTES_LIMIT = 4000
+
+# Kontakt und Login für die App-Prüfung. Nur wenn ALLE gesetzt sind, lädt
+# release Review-Daten hoch. Sonst bliebe „Anmeldung erforderlich“ in App
+# Store Connect ohne Login zurück.
+REVIEW_ENV = %w[REVIEW_FIRST_NAME REVIEW_LAST_NAME REVIEW_EMAIL REVIEW_PHONE REVIEW_USER REVIEW_PASSWORD].freeze
+
 # Leere Werte zählen als fehlend — `||` würde einen Leerstring durchlassen.
 def require_env(name)
   value = ENV[name].to_s.strip
@@ -64,6 +95,61 @@ def pbxproj_setting(name)
   File.read(File.join(XCODEPROJ, "project.pbxproj"))[/#{name} = ([^;]+);/, 1]
 end
 
+# Immer als UTF-8 lesen, egal mit welcher Locale Ruby gestartet wurde.
+def read_utf8(path)
+  File.read(path, encoding: "UTF-8")
+end
+
+# Vor jedem Upload: keine Platzhalter mehr in den Store-Texten, alle Limits
+# eingehalten. Bricht mit einer Liste aller Probleme ab.
+def check_metadata!
+  problems = []
+  Dir.glob(File.join(METADATA_DIR, "**", "*.txt")).sort.each do |path|
+    rel = path.sub("#{METADATA_DIR}/", "")
+    next if rel.start_with?("review_information/") # privat, gitignored
+    text = read_utf8(path).strip
+    problems << "#{rel}: enthält noch #{PLACEHOLDER} …]" if text.include?(PLACEHOLDER)
+    limit = METADATA_LIMITS[File.basename(path, ".txt")]
+    next unless limit
+    too_long = text.length > limit || (File.basename(path) == "keywords.txt" && text.bytesize > limit)
+    problems << "#{rel}: #{text.length} Zeichen (#{text.bytesize} Byte), erlaubt #{limit}" if too_long
+  end
+  UI.user_error!("Store-Texte noch nicht bereit:\n- #{problems.join("\n- ")}") unless problems.empty?
+  UI.success("Store-Texte geprüft: keine Platzhalter, alle Limits eingehalten")
+end
+
+# Englischer Notizen-Block aus docs/launch/REVIEW_NOTES.md, mit dem
+# Einladungscode aus der .env.
+def review_notes
+  notes = read_utf8(REVIEW_NOTES_MD)[/<!-- review-notes:start -->(.*?)<!-- review-notes:end -->/m, 1].to_s.strip
+  UI.user_error!("Notizen-Block in #{REVIEW_NOTES_MD} nicht gefunden") if notes.empty?
+  code = ENV["REVIEW_CODE"].to_s.strip
+  notes = notes.gsub(REVIEW_CODE_PLACEHOLDER, code) unless code.empty?
+  if notes.include?(PLACEHOLDER)
+    UI.user_error!("REVIEW_NOTES.md enthält noch #{PLACEHOLDER} …]. Support-Adresse dort eintragen, den Einladungscode als REVIEW_CODE in die .env.")
+  end
+  UI.user_error!("Review-Notizen zu lang: #{notes.length}/#{REVIEW_NOTES_LIMIT} Zeichen") if notes.length > REVIEW_NOTES_LIMIT
+  notes
+end
+
+def app_review_information
+  missing = REVIEW_ENV.select { |name| ENV[name].to_s.strip.empty? }
+  unless missing.empty?
+    UI.important("Review-Daten werden NICHT hochgeladen, es fehlt: #{missing.join(', ')}. " \
+                 "Login, Kontakt und Notizen in App Store Connect von Hand eintragen.")
+    return {}
+  end
+  {
+    first_name: ENV["REVIEW_FIRST_NAME"].strip,
+    last_name: ENV["REVIEW_LAST_NAME"].strip,
+    email_address: ENV["REVIEW_EMAIL"].strip,
+    phone_number: ENV["REVIEW_PHONE"].strip,
+    demo_user: ENV["REVIEW_USER"].strip,
+    demo_password: ENV["REVIEW_PASSWORD"],
+    notes: review_notes
+  }
+end
+
 platform :ios do
   private_lane :asc_api_key do
     app_store_connect_api_key(
@@ -74,20 +160,11 @@ platform :ios do
     )
   end
 
-  desc "Nur den App-Store-Connect-Zugang prüfen (ohne Build)"
-  lane :verify_auth do
-    latest = latest_testflight_build_number(
-      api_key: asc_api_key,
-      app_identifier: APP_IDENTIFIER,
-      initial_build_number: 0
-    )
-    UI.success("App-Store-Connect-Zugang OK — letzter TestFlight-Build: #{latest}")
-  end
-
-  desc "Web-Assets syncen, Release-IPA bauen und zu TestFlight hochladen"
-  desc "Optionen: build_number:<n> statt automatischer Nummer, upload:false baut nur die IPA"
-  lane :beta do |options|
-    api_key = asc_api_key
+  # Gemeinsamer Build für beta und release: Build-Nummer bestimmen, www/ und
+  # Plugins syncen, Release-IPA archivieren und exportieren.
+  # Gibt { ipa:, version:, build_number: } zurück.
+  private_lane :build_ipa do |options|
+    api_key = options[:api_key]
     version = pbxproj_setting("MARKETING_VERSION")
 
     # Build-Nummer: eins über dem letzten Upload (egal welche Version), nie
@@ -128,10 +205,32 @@ platform :ios do
       export_method: "app-store",
       export_team_id: TEAM_ID
     )
-    ipa = lane_context[SharedValues::IPA_OUTPUT_PATH]
+
+    {
+      ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
+      version: version,
+      build_number: build_number
+    }
+  end
+
+  desc "Nur den App-Store-Connect-Zugang prüfen (ohne Build)"
+  lane :verify_auth do
+    latest = latest_testflight_build_number(
+      api_key: asc_api_key,
+      app_identifier: APP_IDENTIFIER,
+      initial_build_number: 0
+    )
+    UI.success("App-Store-Connect-Zugang OK — letzter TestFlight-Build: #{latest}")
+  end
+
+  desc "Web-Assets syncen, Release-IPA bauen und zu TestFlight hochladen"
+  desc "Optionen: build_number:<n> statt automatischer Nummer, upload:false baut nur die IPA"
+  lane :beta do |options|
+    api_key = asc_api_key
+    build = build_ipa(api_key: api_key, build_number: options[:build_number])
 
     if options[:upload] == false
-      UI.success("IPA gebaut, nicht hochgeladen: #{ipa}")
+      UI.success("IPA gebaut, nicht hochgeladen: #{build[:ipa]}")
       next
     end
 
@@ -140,10 +239,69 @@ platform :ios do
     # Info.plist beantwortet, sonst bliebe der Build hängen.
     upload_to_testflight(
       api_key: api_key,
-      ipa: ipa,
+      ipa: build[:ipa],
       skip_waiting_for_build_processing: true,
       distribute_external: false
     )
-    UI.success("TestFlight-Upload abgeschlossen: #{version} (#{build_number})")
+    UI.success("TestFlight-Upload abgeschlossen: #{build[:version]} (#{build[:build_number]})")
+  end
+
+  desc "Wie beta bauen, dann Build und Store-Texte (fastlane/metadata) zu App Store Connect hochladen"
+  desc "Standard: nur hochladen, nicht einreichen. Veröffentlichung nach Freigabe immer manuell."
+  desc "Optionen: submit:true reicht danach zur Prüfung ein, metadata_only:true lädt ohne Build nur Texte"
+  desc "und Review-Daten hoch, build_number:<n> wie bei beta"
+  desc "Altersfreigabe, App-Datenschutz und Screenshots bleiben Handarbeit (docs/launch/STORE_LISTING.md)"
+  lane :release do |options|
+    submit = options[:submit] == true
+    metadata_only = options[:metadata_only] == true
+
+    # Erst prüfen, dann bauen: ein Platzhalter soll nicht erst nach 15 Minuten
+    # Archivieren auffallen.
+    check_metadata!
+    review_info = app_review_information
+    api_key = asc_api_key
+
+    version = pbxproj_setting("MARKETING_VERSION")
+    ipa = nil
+    build_number = options[:build_number]
+    unless metadata_only
+      build = build_ipa(api_key: api_key, build_number: options[:build_number])
+      ipa = build[:ipa]
+      version = build[:version]
+      build_number = build[:build_number]
+    end
+
+    upload_to_app_store(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      # Legt die Version an oder benennt die vorbereitete um (z. B. 1.0 → 1.4).
+      app_version: version,
+      ipa: ipa,
+      skip_binary_upload: metadata_only,
+      build_number: build_number&.to_s,
+      metadata_path: METADATA_DIR,
+      skip_screenshots: true,
+      app_review_information: review_info,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+        # Nutzer laden eigene Fotos und Texte hoch; die Rechte daran regeln
+        # die Nutzungsbedingungen.
+        content_rights_contains_third_party_content: true
+      },
+      submit_for_review: submit,
+      # Nie automatisch live gehen: Den Zeitpunkt bestimmt ihr nach der Freigabe.
+      automatic_release: false,
+      phased_release: false,
+      # Nur beim Einreichen eine noch wartende Einreichung zurückziehen.
+      reject_if_possible: submit,
+      precheck_include_in_app_purchases: false,
+      force: true
+    )
+
+    if submit
+      UI.success("Version #{version} eingereicht. Veröffentlichung nach der Freigabe von Hand in App Store Connect.")
+    else
+      UI.success("Version #{version} hochgeladen, NICHT eingereicht. Rest in App Store Connect, dann „Zur Prüfung einreichen“.")
+    end
   end
 end
