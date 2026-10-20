@@ -10,6 +10,9 @@
 // - Wochenrückblicke vergangener Wochen kommen fertig aus buildWeekRecaps.
 //
 // Werte zählen über PTData.setValue: Workouts tragen nie zu Summen bei.
+//
+// Dazu kleine Helfer ohne React: Plausibilität pro Satz, Blockliste,
+// Melde-Mail und die Texte für „Ergebnis teilen“.
 
 (function () {
   const P = window.PTData;
@@ -140,5 +143,125 @@
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || rank(a) - rank(b));
   }
 
-  window.PTFeed = { BURST_GAP_MIN, bursts, leaderIndex, weekTimeline, buildFeed };
+  // ── Plausibilität ────────────────────────────────────────────────────
+  // Wiederholungen pro Satz: ab REPS_ASK nachfragen, über REPS_MAX ablehnen,
+  // damit ein Tippfehler (1000 statt 100) kein Duell entscheidet. Gilt nicht
+  // für Workouts (Sekunden, Runden) und Work-Minuten.
+  const REPS_MAX = 500;
+  const REPS_ASK = 200;
+
+  // 'ok' | 'ask' | 'too_many' | 'invalid'
+  function repsCheck(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v) || v <= 0) return 'invalid';
+    if (v > REPS_MAX) return 'too_many';
+    if (v >= REPS_ASK) return 'ask';
+    return 'ok';
+  }
+
+  // ── Blockieren ───────────────────────────────────────────────────────
+  // Blockierte Personen (User-IDs) liegen auf dem Gerät in localStorage
+  // 'pt:blocked'. Ihre Notizen und Fotos blendet der Feed aus. Ohne Speicher
+  // (privater Modus, Tests) gilt niemand als blockiert; Fehler schlucken wir.
+  const BLOCK_KEY = 'pt:blocked';
+
+  function storage() {
+    try { return window.localStorage || null; } catch (e) { return null; }
+  }
+
+  function blockedIds() {
+    try {
+      const raw = storage()?.getItem(BLOCK_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list.filter((id) => typeof id === 'string' && id) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function isBlocked(userId) {
+    return !!userId && blockedIds().includes(userId);
+  }
+
+  // Liefert die neue Liste, auch wenn das Speichern scheitert (gilt dann bis zum Neuladen).
+  function setBlocked(userId, on) {
+    const list = blockedIds().filter((id) => id !== userId);
+    if (on && userId) list.push(String(userId));
+    try { storage()?.setItem(BLOCK_KEY, JSON.stringify(list)); } catch (e) {}
+    return list;
+  }
+
+  // ── Melden ───────────────────────────────────────────────────────────
+  // mailto an den Support mit den IDs, die wir zum Prüfen brauchen. Leer,
+  // solange keine Support-Adresse feststeht. Normalerweise übernimmt das
+  // PTOnboarding.reportContent; das hier ist der Ersatz, falls es fehlt.
+  function reportMailto({ kind = 'set', setId, userId, challengeId, note } = {}, email = '') {
+    if (!email) return '';
+    const facts = [
+      `Art: ${kind === 'set' ? 'Eintrag im Feed' : kind}`,
+      setId && `Satz-ID: ${setId}`,
+      userId && `User-ID: ${userId}`,
+      challengeId && `Challenge-ID: ${challengeId}`,
+      note && `Notiz: „${note}“`,
+    ].filter(Boolean);
+    const body = ['Was stimmt mit dem Eintrag nicht?', '', '', '— Angaben für uns (bitte drinlassen) —', ...facts].join('\n');
+    return `mailto:${email}?subject=${encodeURIComponent('Meldung: Eintrag im Feed')}&body=${encodeURIComponent(body)}`;
+  }
+
+  // ── Teilen ───────────────────────────────────────────────────────────
+  // Texte für „Ergebnis teilen“ (WhatsApp & Co.). Link und Code nur, wenn
+  // vorhanden: appUrl kommt aus PTOnboarding.APP_STORE_URL, code ist der
+  // Einladungscode der Challenge.
+  function shareFooter({ appName = 'Benny & Joni', appUrl = '', code = '' } = {}) {
+    const out = [`Mach mit bei ${appName}${appUrl ? `: ${appUrl}` : ''}`];
+    if (code) out.push(`Code: ${String(code).toUpperCase()}`);
+    return out.join('\n');
+  }
+
+  // recap aus buildWeekRecaps (app.jsx), sides wie dort: Seite 0 ist die eigene.
+  // kw: Kalenderwoche, name: Name der Challenge. fmt formatiert Werte
+  // (Work-Wochen: Dauer, dann unit leer lassen).
+  function recapShareText({ recap, sides = [], kw = null, name = '', unit = 'Reps', fmt = String, appName, appUrl, code }) {
+    const totals = recap?.totals || [];
+    const mine = totals[0] || 0;
+    const tail = unit ? ` ${unit}` : '';
+    const one = (a) => `${fmt(a)}${tail}`;
+    const pair = (a, b) => `${fmt(a)} zu ${fmt(b)}${tail}`;
+    const many = (side) => (side?.userIds?.length || 0) > 1;
+    let line;
+    if (sides.length === 2) {
+      const other = totals[1] || 0;
+      if (recap?.winnerIdx === 0) line = `${many(sides[0]) ? 'Wir haben' : 'Ich hab'} die Woche geholt: ${pair(mine, other)} 💪`;
+      else if (recap?.winnerIdx === 1) line = `${sides[1].label} ${many(sides[1]) ? 'haben' : 'hat'} die Woche geholt: ${pair(other, mine)}. Revanche läuft.`;
+      else line = `Unentschieden: ${pair(mine, other)}.`;
+    } else if (sides.length > 2) {
+      const rank = 1 + totals.filter((v) => v > mine).length;
+      line = `Platz ${rank} von ${sides.length} mit ${one(mine)}${rank === 1 ? ' 🏆' : '.'}`;
+    } else {
+      line = `${one(mine)} diese Woche.`;
+    }
+    const head = `🏁 ${kw != null ? `KW ${kw}` : 'Wochenergebnis'}${name ? ` in „${name}“` : ''}`;
+    return [head, line, '', shareFooter({ appName, appUrl, code })].join('\n');
+  }
+
+  // summary aus PTOnboarding.weekOneSummary. fmtMinutes für reine Work-Wochen.
+  function weekOneShareText({ summary, fmtMinutes = (m) => `${m} min`, appName = 'Benny & Joni', appUrl, code }) {
+    const s = summary || {};
+    const main = s.myMinutes && !s.myReps ? `${fmtMinutes(s.myMinutes)} Fokuszeit` : `${s.myReps || 0} Reps`;
+    const days = s.activeDays > 0 ? ` an ${s.activeDays} ${s.activeDays === 1 ? 'Tag' : 'Tagen'}` : '';
+    const result = s.result === 'won' ? (s.diff > 0 ? `Ich hab die Woche geholt, ${s.diff} vorne.` : 'Ich hab die Woche geholt.')
+      : s.result === 'lost' ? `${s.leader || 'Die anderen'} lag ${s.diff} vorne. Revanche läuft.`
+      : s.result === 'tie' ? 'Gleichstand. Woche 2 entscheidet.'
+      : '';
+    return [`🏁 Woche 1 bei ${appName} geschafft`, `${main}${days}.${result ? ` ${result}` : ''}`, '',
+      shareFooter({ appName, appUrl, code })].join('\n');
+  }
+
+  window.PTFeed = {
+    BURST_GAP_MIN, bursts, leaderIndex, weekTimeline, buildFeed,
+    REPS_MAX, REPS_ASK, repsCheck,
+    BLOCK_KEY, blockedIds, isBlocked, setBlocked,
+    reportMailto,
+    shareFooter, recapShareText, weekOneShareText,
+  };
 })();
