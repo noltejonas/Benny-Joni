@@ -150,6 +150,20 @@ test('Konfiguration in www/ads.js und Info.plist passt zusammen (Release-Sperre)
   assert.deepEqual(configProblems({ config, plistAppId }), []);
 });
 
+// fastlane release (App Store) setzt ADS_REQUIRE_LIVE=1: Ist Werbung an, darf
+// der Build keine Google-Testanzeigen ausliefern. TestFlight (beta) darf das.
+test('Release-Sperre: mit ADS_REQUIRE_LIVE=1 keine Testanzeigen im App-Store-Build',
+  { skip: process.env.ADS_REQUIRE_LIVE !== '1' && 'nur mit ADS_REQUIRE_LIVE=1 (fastlane release)' }, () => {
+    const { config } = makeEnv({ native: false }).PTAds;
+    assert.ok(!config.enabled || !config.testing,
+      'ADS_ENABLED ist an, aber PROD.banner ist leer: Der Build zeigt nur Testanzeigen. '
+      + 'Echte IDs eintragen (docs/launch/ADMOB.md) oder ADS_ENABLED = false.');
+    if (config.enabled) {
+      assert.notEqual(APP_ID_RE.exec(plistValue('GADApplicationIdentifier') || '')?.[1], TEST_PUB,
+        'Info.plist hat noch die Google-Test-App-ID');
+    }
+  });
+
 test('Prüfregeln schlagen bei typischen Release-Fehlern an', () => {
   const real = { appId: 'ca-app-pub-1234567890123456~1111111111', banner: 'ca-app-pub-1234567890123456/2222222222', rewarded: '' };
   const testIds = { appId: `ca-app-pub-${TEST_PUB}~1458002511`, banner: `ca-app-pub-${TEST_PUB}/2435281174`, rewarded: `ca-app-pub-${TEST_PUB}/1712485313` };
