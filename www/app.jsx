@@ -1,10 +1,11 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, AuthScreen, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, ObAuthFlow, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjenl5dXB4eHFyZGdiZWlmY3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDYyMjgsImV4cCI6MjA5NDA4MjIyOH0.2Bz6R3N3p3evHXB7j5cKamq2egHrE1zYfgLcV2R8awg";
 
 const ACTIVE_KEY = 'pt_active_competition';
+const RETURNING_KEY = 'pt:returning';
 const THEME_KEY = 'pt:theme2';
 const PUSH_KEY = 'pt:notifications';
 
@@ -89,6 +90,7 @@ function App() {
   }, [api]);
 
   const userId = session?.user?.id || null;
+  useEffect(() => { if (userId) writePref(RETURNING_KEY, '1'); }, [userId]);
 
   // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
   const pickActive = useCallback((p, list, current) => {
@@ -165,7 +167,7 @@ function App() {
     );
   }
   if (session === undefined) return <Loader text="Starte…" />;
-  if (!session) return <AuthScreen api={api} />;
+  if (!session) return <ObAuthFlow api={api} returning={readPref(RETURNING_KEY, '') === '1'} />;
   if (accountError && !profile) {
     return (
       <div className="name-picker">

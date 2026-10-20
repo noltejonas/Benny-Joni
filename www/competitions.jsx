@@ -34,9 +34,9 @@ function setDemoMode(on) {
 }
 
 // ─── Login / Registrierung ──────────────────────────────────────────────────
-function AuthScreen({ api }) {
+function AuthScreen({ api, initialMode = 'login', onBack }) {
   const isDemo = api.mode === 'demo';
-  const [mode, setMode] = React.useState('login'); // login | signup | reset | reset-code
+  const [mode, setMode] = React.useState(initialMode); // login | signup | reset | reset-code
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -119,6 +119,7 @@ function AuthScreen({ api }) {
         {mode !== 'login' && (
           <button className="btn-link" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>Zurück zum Login</button>
         )}
+        {onBack && <button className="btn-link" onClick={onBack}>Zurück</button>}
       </div>
     </div>
   );
