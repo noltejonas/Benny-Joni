@@ -1102,3 +1102,33 @@ button.st-row:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .mu-profile-row { border-radius: 16px; }
 .mu-recap-podium-row.win { box-shadow: 0 0 0 2px var(--sc); }
 .penalty-row.payout { background: transparent; }
+
+/* ─── Launch: Serie, Übung hinzufügen, Melden/Blockieren, Teilen ──────── */
+/* Serie auf „Heute“ (Fokus-Karte): Tage in Folge, offen = heute noch kein Satz */
+.rd-chip-streak { white-space: nowrap; }
+.rd-chip-streak.is-open { white-space: normal; background: rgba(255, 255, 255, 0.24); }
+.rd-chip-streak-note { font-weight: 500; }
+
+/* „+ Übung hinzufügen“ am Ende von „Deine Übungen“ */
+.rd-row-add { min-height: 56px; }
+.rd-row-add .rd-tile { background: transparent; border: 1.5px dashed var(--text-4); color: var(--primary-ink); }
+.rd-row-add .rd-row-name { color: var(--primary-ink); }
+
+/* Timer-Banner ohne Work-Challenge: nur Anzeige */
+.timer-banner.is-static { cursor: default; }
+
+/* Wochenziel-Sheet: Übung hat diese Woche schon ein Ziel */
+.cat-card-note { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--text-3); }
+
+/* „Ergebnis teilen“ im Wochenabschluss und in Woche 1 */
+.recap-share { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
+.recap-share .share-result-btn { width: 100%; }
+.share-result-btn svg { flex-shrink: 0; }
+.share-result-info { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); text-align: center; }
+
+/* Feed: Melden und Blockieren im aufgeklappten Eintrag */
+.lf-mod { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--line); }
+.lf-mod-hint { font-size: 13px; line-height: 18px; color: var(--text-3); }
+.lf-mod-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.lf-mod-btn { min-height: 36px; padding: 6px 10px; color: var(--text-2); font-size: 13px; }
+.lf-row.is-blocked .lf-avatar { opacity: 0.6; }
