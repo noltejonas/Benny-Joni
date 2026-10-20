@@ -1,4 +1,4 @@
-/* global React */
+/* global React, PTi18n, tr */
 // Shared UI components for Projekt Terminator
 const { useState, useEffect, useRef, useMemo } = React;
 
@@ -168,13 +168,13 @@ function formatRelative(ts) {
   const d = new Date(ts);
   const diffMs = Date.now() - d.getTime();
   const m = Math.floor(diffMs / 60000);
-  if (m < 1) return 'gerade eben';
-  if (m < 60) return `vor ${m} min`;
+  if (m < 1) return tr('gerade eben');
+  if (m < 60) return tr('vor {n} min', { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `vor ${h} h`;
+  if (h < 24) return tr('vor {n} h', { n: h });
   const days = Math.floor(h / 24);
-  if (days < 7) return `vor ${days} d`;
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+  if (days < 7) return tr('vor {n} d', { n: days });
+  return PTi18n.date(d, { day: '2-digit', month: 'short' });
 }
 
 function formatDuration(minutes) {
@@ -189,7 +189,7 @@ function formatDuration(minutes) {
 function formatWeek(weekStart) {
   const d = new Date(weekStart);
   const end = new Date(d); end.setDate(d.getDate() + 6);
-  const fmt = (x) => x.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+  const fmt = (x) => PTi18n.date(x, { day: '2-digit', month: 'short' });
   return `${fmt(d)} – ${fmt(end)}`;
 }
 
@@ -206,10 +206,10 @@ function weekNumber(weekStart) {
 
 function todayGreeting() {
   const h = new Date().getHours();
-  if (h < 5) return 'Gute Nacht';
-  if (h < 11) return 'Guten Morgen';
-  if (h < 18) return 'Guten Tag';
-  return 'Guten Abend';
+  if (h < 5) return tr('Gute Nacht');
+  if (h < 11) return tr('Guten Morgen');
+  if (h < 18) return tr('Guten Tag');
+  return tr('Guten Abend');
 }
 
 Object.assign(window, {
