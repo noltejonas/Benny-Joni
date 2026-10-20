@@ -24,6 +24,7 @@
 .ob-step.is-on { width: 18px; background: var(--primary); }
 .ob-step.is-done { background: var(--primary); opacity: .45; }
 .ob-top-action { margin-left: auto; }
+.ob-top-link { padding: 8px 0; }
 
 .ob-body {
   flex: 1; display: flex; flex-direction: column; gap: 16px;

@@ -44,14 +44,14 @@ function useObOnline() {
 
 // Vollbild-Schritt: oben Zurück und Fortschritt, unten die Aktion (sticky,
 // Safe Area). `stepKey` startet die Einblend-Animation bei Schrittwechsel neu.
-function ObScreen({ onBack, steps = 0, step = 0, aside, foot, children, className = '', center, stepKey }) {
+function ObScreen({ onBack, left, steps = 0, step = 0, aside, foot, children, className = '', center, stepKey }) {
   const online = useObOnline();
   return (
     <div className={`ob-screen ${className}`}>
       <div className="ob-top">
         {onBack
           ? <button type="button" className="ob-back" onClick={onBack} aria-label="Zurück"><Icon name="chevron" size={22} strokeWidth={2.5} /></button>
-          : <span />}
+          : (left || <span />)}
         {aside}
         {steps > 1 && (
           <div className="ob-steps" role="img" aria-label={`Schritt ${step} von ${steps}`}>
@@ -398,7 +398,69 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   );
 }
 
+// ─── Profil ─────────────────────────────────────────────────────────────────
+// Name Pflicht (vorbelegt), Foto optional. Ohne eigenen Namen setzt der
+// Supabase-Trigger den Teil vor dem @ ein — dann lieber den Vorschlag zeigen.
+function obInitialName(profile, email) {
+  const current = (profile?.display_name || '').trim();
+  const local = String(email || '').split('@')[0];
+  if (!current || current === local) return PTOnboarding.suggestName(email) || current;
+  return current;
+}
+
+function ObProfile({ api, profile, email, onSaved, onDone, onSignOut }) {
+  const online = useObOnline();
+  const [name, setName] = React.useState(() => obInitialName(profile, email));
+  const [busy, setBusy] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const fileRef = React.useRef(null);
+
+  async function pickPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError(''); setUploading(true);
+    try { onSaved(await api.uploadAvatar(await window.resizeImage(file))); }
+    catch (err) { setError(err?.code === 'offline' ? err.message : 'Foto ging nicht hoch. Versuch es nochmal.'); }
+    finally { setUploading(false); }
+  }
+
+  async function next() {
+    const clean = name.trim();
+    if (!clean) return;
+    if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    setError(''); setBusy(true);
+    try {
+      if (clean !== profile.display_name) onSaved(await api.updateProfile({ display_name: clean.slice(0, 30) }));
+      onDone();
+    } catch (err) { setError(err.message || String(err)); }
+    finally { setBusy(false); }
+  }
+
+  const preview = { ...profile, display_name: name.trim() || profile.display_name };
+  return (
+    <ObScreen steps={3} step={2} stepKey="profile"
+      left={onSignOut && <button type="button" className="btn-link ob-top-link" onClick={onSignOut}>Abmelden</button>}
+      foot={<button type="button" className="btn" disabled={busy || uploading || !name.trim()} onClick={next}>{busy ? '…' : 'Weiter'}</button>}>
+      <h1 className="ob-title">Wie sollen dich die anderen sehen?</h1>
+      <p className="ob-sub">So erscheinst du in Feed und Rangliste.</p>
+      <button type="button" className={`ob-avatar-pick${uploading ? ' is-busy' : ''}`} disabled={uploading}
+        onClick={() => fileRef.current?.click()} aria-label={profile.avatar_url ? 'Foto ändern' : 'Foto wählen'}>
+        <Avatar profile={preview} size={120} />
+        <span className="ob-avatar-badge"><Icon name="camera" size={20} strokeWidth={2.2} /></span>
+      </button>
+      <div className="ob-avatar-caption">{uploading ? 'Lädt hoch …' : profile.avatar_url ? 'Foto ändern' : 'Foto wählen (optional)'}</div>
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickPhoto} />
+      <div className="ob-label">Dein Name</div>
+      <input className="input" value={name} maxLength={30} placeholder="Vorname" autoComplete="given-name"
+        onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') next(); }} />
+      <ObMessage error={error} />
+    </ObScreen>
+  );
+}
+
 Object.assign(window, {
   PTHaptics, PTSound, useObOnline, ObScreen, ObMessage, obSetDemo, ObWelcome, ObHeroDuel,
-  ObCodeField, ObAuthFlow, obMarkStarted,
+  ObCodeField, ObAuthFlow, obMarkStarted, ObProfile,
 });

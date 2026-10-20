@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, ObAuthFlow, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, ObAuthFlow, ObProfile, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -109,6 +109,30 @@ function App() {
   const userId = session?.user?.id || null;
   useEffect(() => { if (userId) writePref(RETURNING_KEY, '1'); }, [userId]);
 
+  // Onboarding-Stand: Gerät (localStorage) + Konto (profiles.onboarding, nur
+  // wenn die Spalte existiert — Migration 20261020000000).
+  const [obLocal, setObLocal] = useState({});
+  useEffect(() => {
+    if (!userId) { setObLocal({}); return; }
+    try { setObLocal(JSON.parse(localStorage.getItem(PTOnboarding.stateKey(userId)) || '{}')); }
+    catch (e) { setObLocal({}); }
+  }, [userId]);
+  const obState = useMemo(() => PTOnboarding.mergeState(obLocal, profile?.onboarding), [obLocal, profile]);
+  const obStateRef = React.useRef(obState);
+  obStateRef.current = obState;
+  const patchOb = useCallback((patch) => {
+    if (!userId) return;
+    const next = PTOnboarding.mergeState(obStateRef.current, patch);
+    obStateRef.current = next;
+    try { localStorage.setItem(PTOnboarding.stateKey(userId), JSON.stringify(next)); } catch (e) {}
+    setObLocal(next);
+    if (profile && 'onboarding' in profile) {
+      api.saveOnboarding(next)
+        .then(p => { PTPeople.set([p]); setProfile(p); })
+        .catch(e => console.warn('saveOnboarding failed', e));
+    }
+  }, [userId, profile, api]);
+
   // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
   const pickActive = useCallback((p, list, current) => {
     const usable = list.filter(c => !c.archived_at);
@@ -144,6 +168,13 @@ function App() {
   useEffect(() => {
     if (activeId) { try { localStorage.setItem(ACTIVE_KEY, activeId); } catch (e) {} }
   }, [activeId]);
+
+  // Welcher Bildschirm vor der App (onboarding-model.js). Wer im Onboarding
+  // landet, gilt ab jetzt als neu (Startkarte, Tipps, Feiern).
+  const route = PTOnboarding.entryRoute({ session, profile: userId ? profile : null, competitions, invite, state: obState });
+  useEffect(() => {
+    if (['profile', 'start', 'join'].includes(route) && !obState.started) patchOb({ started: new Date().toISOString() });
+  }, [route, obState.started, patchOb]);
 
   // Push-Tap mit competition_id → passende Challenge öffnen
   useEffect(() => {
@@ -200,6 +231,15 @@ function App() {
     );
   }
   if (!profile || !competitions) return <Loader text="Lade Profil…" />;
+
+  if (route === 'profile') {
+    return (
+      <ObProfile api={api} profile={profile} email={session.user?.email}
+        onSaved={(p) => { PTPeople.set([p]); setProfile(p); }}
+        onDone={() => patchOb({ profileDone: new Date().toISOString() })}
+        onSignOut={signOut} />
+    );
+  }
 
   const active = competitions.find(c => c.id === activeId) || null;
 

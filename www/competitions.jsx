@@ -383,5 +383,5 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
 
 Object.assign(window, {
   OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet,
-  JoinCompetitionSheet, ProfileSheet, shareInvite, COMP_EMOJIS,
+  JoinCompetitionSheet, ProfileSheet, shareInvite, COMP_EMOJIS, resizeImage,
 });
