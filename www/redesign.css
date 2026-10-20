@@ -57,7 +57,7 @@
   --radius-sm: 12px;
   --radius: 20px;
   --radius-lg: 24px;
-  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   --ease: cubic-bezier(.2, .8, .2, 1);
   color-scheme: light;
 }
@@ -149,6 +149,11 @@ button, input, select, textarea { font-family: inherit; }
 .app-main {
   padding: 24px 16px calc(120px + var(--safe-bot));
   display: flex; flex-direction: column; gap: 24px;
+}
+/* `clip` schneidet wie `hidden` ab, macht .app-main aber nicht zum
+   Scroll-Container. Sonst kleben die Tagesüberschriften im Feed nicht. */
+@supports (overflow-x: clip) {
+  .app-main { overflow-x: clip; }
 }
 .app-main > .card { margin-bottom: 0; }
 
@@ -558,6 +563,136 @@ button, input, select, textarea { font-family: inherit; }
 .reaction-add {
   width: 32px; height: 32px; border-radius: 999px; border: none;
   background: var(--surface-2); color: var(--text-2);
+}
+
+/* ─── Live-Feed (feed.jsx) ─────────────────────────────────────────────── */
+/* overflow-anchor: none, weil feed.jsx die Leseposition selbst hält. */
+.rd-feed.lf { gap: 8px; overflow-anchor: none; }
+.lf-head { display: flex; align-items: center; gap: 10px; }
+.lf-spacer { flex: 1; }
+.lf-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 10px; border-radius: 999px;
+  background: var(--surface); box-shadow: var(--shadow); color: var(--text-2);
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+}
+.lf-live-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--live);
+  animation: lfPulse 2s ease-out infinite;
+}
+.lf-live.off .lf-live-dot { background: var(--text-4); animation: none; }
+@keyframes lfPulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 168, 106, 0.45); }
+  70%, 100% { box-shadow: 0 0 0 6px rgba(52, 168, 106, 0); }
+}
+
+/* Tagesüberschrift bleibt beim Scrollen oben stehen */
+.rd-day-label.lf-day {
+  position: sticky; top: calc(var(--safe-top) + 8px); z-index: 6;
+  align-self: flex-start; margin: 10px 0 2px 4px; padding: 5px 10px;
+  border-radius: 999px; background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+
+.lf-row { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.lf-main {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 14px; border: none; background: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background .2s var(--ease);
+}
+.lf-main:active { background: var(--surface-2); }
+.lf-avatar { position: relative; flex-shrink: 0; width: 36px; height: 36px; }
+.lf-dot {
+  position: absolute; top: -1px; right: -1px; width: 11px; height: 11px;
+  border-radius: 50%; background: var(--primary); border: 2px solid var(--surface);
+}
+.lf-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lf-title, .lf-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lf-title { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--text); }
+.lf-title strong { font-weight: 800; }
+.lf-meta { font-size: 13px; line-height: 18px; color: var(--text-3); }
+.lf-note { font-size: 13px; line-height: 18px; color: var(--text-2); font-style: italic; }
+.lf-value { flex-shrink: 0; font-size: 19px; font-weight: 800; color: var(--text); }
+
+.lf-under { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; padding: 0 14px 12px 62px; }
+.lf-tag {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 10px;
+  border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 600;
+}
+.lf-react {
+  display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 9px;
+  border: none; border-radius: 999px; background: var(--surface-2); font: inherit; font-size: 14px; cursor: pointer;
+}
+.lf-react.mine { background: var(--primary-tint); }
+.lf-react-count { font-size: 12px; font-weight: 700; color: var(--text-2); }
+.lf-react.mine .lf-react-count { color: var(--primary-ink); }
+
+.lf-tray {
+  display: flex; flex-direction: column; gap: 6px; padding: 0 14px 12px;
+  animation: lfTray .2s var(--ease);
+}
+@keyframes lfTray { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.lf-quick { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.lf-quick button {
+  flex: 1; height: 40px; border: none; border-radius: 12px; background: var(--surface-2);
+  font-size: 20px; cursor: pointer; transition: transform .15s var(--ease);
+}
+.lf-quick button:active { transform: scale(0.92); }
+.lf-quick button.on { background: var(--primary-tint); box-shadow: inset 0 0 0 1.5px var(--primary); }
+.lf-quick .lf-more { display: inline-flex; align-items: center; justify-content: center; color: var(--text-2); }
+.lf-sets { display: flex; flex-direction: column; }
+.lf-set { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.lf-set + .lf-set { border-top: 1px solid var(--line); }
+.lf-set-time { width: 46px; font-size: 13px; color: var(--text-3); }
+.lf-set-val { flex: 1; font-size: 15px; font-weight: 700; }
+.lf-set-input { flex: 1; height: 36px; max-width: 120px; }
+
+/* Meilensteine: Anteil erledigt, Wochenziel, Führungswechsel */
+.lf-event {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border-radius: 16px; background: var(--primary-tint); color: var(--text);
+}
+.lf-event-icon {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--primary-ink);
+}
+.lf-event-goal .lf-event-icon { background: var(--grad); color: #fff; }
+.lf-event-body { display: flex; flex-direction: column; min-width: 0; }
+.lf-event-text { font-size: 14px; line-height: 19px; font-weight: 600; }
+.lf-event-text strong { font-weight: 800; }
+.lf-event-sub { font-size: 12px; line-height: 16px; color: var(--text-3); }
+
+/* Neue Einträge: oben hineinrutschen, kurz hervorgehoben */
+.lf-row.is-arriving, .lf-event.is-arriving { animation: lfArrive .45s var(--ease) both; }
+.lf-row.is-arriving .lf-main { animation: lfGlow 2.4s ease-out; }
+@keyframes lfArrive { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes lfGlow { 0%, 30% { background: var(--primary-tint); } 100% { background: transparent; } }
+
+.lf-pill {
+  position: fixed; top: calc(var(--safe-top) + 44px); left: 50%; z-index: 150;
+  height: 36px; padding: 0 16px; border: none; border-radius: 999px;
+  background: var(--grad); color: #fff; box-shadow: var(--grad-shadow);
+  font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  transform: translateX(-50%); animation: lfPillIn .3s var(--ease);
+}
+@keyframes lfPillIn { from { transform: translate(-50%, -12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+.lf-skel { display: flex; align-items: center; gap: 12px; padding: 14px; }
+.lf-skel-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--surface-2); }
+.lf-skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.lf-skel-lines span { height: 10px; width: 60%; border-radius: 6px; background: var(--surface-2); }
+.lf-skel-lines span + span { width: 35%; }
+.lf-skel span { animation: lfShimmer 1.1s ease-in-out infinite alternate; }
+@keyframes lfShimmer { from { opacity: 0.5; } to { opacity: 1; } }
+
+.lf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-live-dot, .lf-tray, .lf-pill, .lf-skel span,
+  .lf-row.is-arriving, .lf-event.is-arriving, .lf-row.is-arriving .lf-main { animation: none; }
 }
 
 /* Wochen-Rückblick im Feed: ruhig, ohne Glow */

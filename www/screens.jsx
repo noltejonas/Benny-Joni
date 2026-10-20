@@ -719,7 +719,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
         value={editingCat.name} autoFocus
         onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
         onKeyDown={(e) => e.key === 'Enter' && saveEdit()} />
-          <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label="Löschen">🗑</button>
+          <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label="Löschen">🗑️</button>
           <button className="new-cat-add" onClick={saveEdit} aria-label="Speichern">✓</button>
         </div>
       }
@@ -771,7 +771,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
       </div>
       {existing?.id &&
         <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={deleteChallenge} disabled={deleting}>
-          {deleting ? '…' : '🗑 Challenge aus dieser Woche entfernen'}
+          {deleting ? '…' : '🗑️ Challenge aus dieser Woche entfernen'}
         </button>
       }
     </>);
@@ -1500,35 +1500,6 @@ function WeekRecap({ recap, me, sides = [] }) {
   );
 }
 
-function ReactionBar({ set, me, onToggle, onPick }) {
-  const reactions = set.reactions || [];
-  // Gruppieren nach emoji: { emoji, count, byMe }
-  const grouped = {};
-  for (const r of reactions) {
-    const g = grouped[r.emoji] ||= { emoji: r.emoji, count: 0, byMe: false };
-    g.count++;
-    if (r.athlete === me) g.byMe = true;
-  }
-  const pills = Object.values(grouped);
-  return (
-    <div className="feed-reactions">
-      {pills.map(p => (
-        <button
-          key={p.emoji}
-          className={`reaction-pill ${p.byMe ? 'mine' : ''}`}
-          onClick={() => onToggle?.(set, p.emoji)}
-          aria-label={`${p.emoji} ${p.count}`}>
-          <span className="reaction-emoji">{p.emoji}</span>
-          <span className="reaction-count mono">{p.count}</span>
-        </button>
-      ))}
-      <button className="reaction-add" aria-label="Reaktion hinzufügen" onClick={() => onPick?.(set)}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><line x1="18" y1="6" x2="18" y2="10"/><line x1="16" y1="8" x2="20" y2="8"/></svg>
-      </button>
-    </div>
-  );
-}
-
 function EmojiPickerSheet({ onPick, onClose }) {
   const [val, setVal] = useState('');
   const submit = () => {
@@ -1557,151 +1528,6 @@ function EmojiPickerSheet({ onPick, onClose }) {
       </div>
     </>
   );
-}
-
-function FeedScreen({ feed, me, sides = [], categories = [], projectTags = [], toolTags = [], onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
-  const [editId, setEditId] = React.useState(null);
-  const [editVal, setEditVal] = React.useState('');
-  // Snapshot last-seen timestamp; on tab-unmount, persist "now" so next visit
-  // only highlights items created after this view.
-  const [lastSeen, setLastSeen] = React.useState(() => me ? (localStorage.getItem(`pt_feed_lastseen_${me}`) || '') : '');
-  React.useEffect(() => {
-    if (!me) return;
-    const key = `pt_feed_lastseen_${me}`;
-    setLastSeen(localStorage.getItem(key) || '');
-    return () => { localStorage.setItem(key, new Date().toISOString()); };
-  }, [me]);
-  const sideIdx = React.useMemo(() => sideIndexByUser(sides), [sides]);
-  const trackingNumById = React.useMemo(() => {
-    const counters = {};
-    const out = {};
-    const sets = feed.filter(s => s.kind !== 'recap' && s.challenge_id);
-    const chronological = [...sets].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-    for (const s of chronological) {
-      const key = `${s.athlete}|${s.challenge_id}|${localDateOf(s.created_at)}`;
-      counters[key] = (counters[key] || 0) + 1;
-      out[s.id] = counters[key];
-    }
-    return out;
-  }, [feed]);
-  if (feed.length === 0) {
-    return <div className="rd-empty">
-      <div className="rd-empty-title">Noch keine Aktivität</div>
-      <div className="rd-empty-text">Logge den ersten Satz, dann geht es hier los.</div>
-    </div>;
-  }
-  const isWorkSet = (s) => s.duration_minutes != null;
-  const startEdit = (s) => { setEditId(s.id); setEditVal(String(isWorkSet(s) ? s.duration_minutes : s.reps)); };
-  const commitEdit = (s) => {
-    const v = parseInt(editVal) || 0;
-    if (isWorkSet(s)) {
-      if (v > 0 && v !== s.duration_minutes) onEditSet?.(s, { duration_minutes: v });
-    } else {
-      if (v > 0 && v !== s.reps) onEditSet?.(s, { reps: v });
-    }
-    setEditId(null);
-  };
-  const todayIso = localDateOf(new Date());
-  const yesterdayIso = localDateOf(new Date(Date.now() - 86400000));
-  const dayLabel = (iso) => iso === todayIso ? 'Heute' : iso === yesterdayIso ? 'Gestern'
-    : new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
-  let lastDay = null;
-  return (
-    <div className="rd-feed">
-      <div className="rd-section-head">
-        <h2>Aktivität</h2>
-        {onBackfill && me && (
-          <button className="btn-link" onClick={onBackfill}>Nachtrag</button>
-        )}
-      </div>
-      {feed.map((s) => {
-        const day = s.created_at ? localDateOf(s.created_at) : null;
-        const heading = day && day !== lastDay ? <h3 className="rd-day-label">{dayLabel(day)}</h3> : null;
-        if (day) lastDay = day;
-        if (s.kind === 'recap') return <React.Fragment key={s.id}>{heading}<WeekRecap recap={s} me={me} sides={sides} /></React.Fragment>;
-        const mine = !me || s.athlete === me;
-        const editing = editId === s.id;
-        const trackingNum = trackingNumById[s.id];
-        const isToday = s.created_at && localDateOf(s.created_at) === localDateOf(new Date());
-        const fireTier = trackingNum >= 15 ? 3 : trackingNum >= 10 ? 2 : trackingNum >= 5 ? 1 : 0;
-        const isNew = !!me && s.athlete !== me && lastSeen && String(s.created_at) > lastSeen;
-        const side = sides[sideIdx[s.athlete]];
-        const sideCls = side ? side.cls : 'side-n';
-        return (
-        <React.Fragment key={s.id}>{heading}
-        <div className={`feed-item fire-${fireTier} ${editing?'editing':''} ${isNew ? 'is-new' : ''}`}>
-          <div className={`feed-avatar ${sideCls}`} style={sideStyle(side)}><Avatar userId={s.athlete} size={36} className="avatar-img"/></div>
-          <div className="feed-content">
-            <div className="feed-title">
-              <strong>{s.athlete === me ? 'Du' : PTPeople.nameOf(s.athlete)}</strong> · {s.category?.name || '—'}
-            </div>
-            <div className="feed-meta">
-              {formatRelative(s.created_at)}
-              {s.note ? ` · „${s.note}"` : ''}
-              {trackingNum != null && (
-                <>
-                  {' · '}
-                  <span className="feed-meta-tracking">
-                    {trackingNum}. Tracking{isToday ? ' heute' : ''}
-                    {fireTier > 0 && <span className="reps-fire" aria-label={`Serie Stufe ${fireTier}`}> <Icon name="flame" size={12} />{fireTier > 1 ? `×${fireTier}` : ''}</span>}
-                  </span>
-                </>
-              )}
-            </div>
-            <ReactionBar set={s} me={me} onToggle={onToggleReaction} onPick={onPickEmoji} />
-          </div>
-          {editing ? (
-            <div className="feed-edit">
-              <div className="feed-edit-unit">{isWorkSet(s) ? 'min'
-                : s.category?.challenge_type === 'bring_sally_up' ? 'Sek.'
-                : s.category?.challenge_type === 'tom_holland' ? 'Runden' : 'reps'}</div>
-              <input className="input mono" type="number" inputMode="numeric"
-                value={editVal} autoFocus
-                onChange={e => setEditVal(e.target.value)}
-                onFocus={e => e.target.select()}
-                onKeyDown={e => { if (e.key==='Enter') commitEdit(s); if (e.key==='Escape') setEditId(null); }}
-                onBlur={() => commitEdit(s)} />
-            </div>
-          ) : (
-            <div className={`feed-reps ${sideCls} mono`} style={sideStyle(side)}>
-              <div className="feed-reps-val">
-                {s.duration_minutes != null
-                  ? formatDuration(s.duration_minutes)
-                  : s.category?.challenge_type === 'tom_holland'
-                    ? `${s.reps} Rd.`
-                    : s.category?.challenge_type === 'bring_sally_up'
-                      ? (s.reps >= BSU_MAX_SEC ? '3:24' : bsuFmt(s.reps))
-                      : `+${s.reps}`}
-              </div>
-              {(s.project_tag_id || s.tool_tag_id) && (
-                <div className="feed-tags-row">
-                  {s.project_tag_id && (() => {
-                    const pt = projectTags.find(t => t.id === s.project_tag_id);
-                    return pt ? <span className="feed-tag">{pt.emoji} {pt.name}</span> : null;
-                  })()}
-                  {s.tool_tag_id && (() => {
-                    const tt = toolTags.find(t => t.id === s.tool_tag_id);
-                    return tt ? <span className="feed-tag">{tt.emoji} {tt.name}</span> : null;
-                  })()}
-                </div>
-              )}
-            </div>
-          )}
-          {mine && !editing && (
-            <div className="feed-actions">
-              <button className="icon-btn feed-action-btn" aria-label="Bearbeiten" onClick={() => startEdit(s)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              </button>
-              <button className="icon-btn icon-btn-danger feed-action-btn" aria-label="Löschen" onClick={() => { if (confirm(`${isWorkSet(s) ? formatDuration(s.duration_minutes) : `+${s.reps}`} löschen?`)) onDeleteSet?.(s); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-              </button>
-            </div>
-          )}
-        </div>
-        </React.Fragment>);
-      })}
-    </div>);
-
 }
 
 // ─── Verlauf im Vollbild (Stats-Tab) ─────────────────────────────────────────
@@ -2077,4 +1903,4 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
   );
 }
 
-Object.assign(window, { HomeScreen, SetupSheet, LogSheet, FeedScreen, BackfillSheet, FullscreenChart, ChartFullscreen, EmojiPickerSheet, WeekFixCard, TomHollandSheet, BringSallySheet });
+Object.assign(window, { HomeScreen, SetupSheet, LogSheet, WeekRecap, bsuFmt, BSU_MAX_SEC, BackfillSheet, FullscreenChart, ChartFullscreen, EmojiPickerSheet, WeekFixCard, TomHollandSheet, BringSallySheet });

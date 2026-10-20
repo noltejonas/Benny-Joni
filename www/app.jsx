@@ -325,6 +325,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     try { sessionStorage.setItem('pt:tab', tab); } catch {}
   }, [tab]);
+  // reload() ist memoisiert; notify() braucht trotzdem den aktuellen Tab.
+  const tabRef = React.useRef(tab);
+  tabRef.current = tab;
   useEffect(() => {
     if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
   }, [tab, competition.penalties_enabled]);
@@ -365,7 +368,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // This week
   const weekStart = PTData.isoDate(PTData.mondayOf(new Date()));
-  const currentChallenges = allChallenges.filter((c) => c.week_start === weekStart);
+  const currentChallenges = useMemo(() => allChallenges.filter((c) => c.week_start === weekStart), [allChallenges, weekStart]);
+  const currentWeekSets = useMemo(() => {
+    const ids = new Set(currentChallenges.map((c) => c.id));
+    return allSets.filter((s) => ids.has(s.challenge_id));
+  }, [allSets, currentChallenges]);
   const participantsNow = useMemo(() => PTData.participantsFor(members, weekStart), [members, weekStart]);
 
   const weekTemplate = useMemo(() => {
@@ -476,7 +483,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     const isWork = set.category?.kind === 'work';
     const who = PTPeople.firstNameOf(set.athlete);
     const valStr = isWork ? window.formatDuration?.(set.duration_minutes) ?? `${set.duration_minutes}m` : `+${set.reps}`;
-    setToast(`${who}: ${valStr} ${set.category?.name || ''}`);
+    // Im offenen Feed erscheint der Satz ohnehin live; dort keinen Toast doppelt.
+    if (tabRef.current !== 'feed') setToast(`${who}: ${valStr} ${set.category?.name || ''}`);
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(`${isWork ? '💻' : '💪'} ${who} hat geliefert`, {
         body: `${valStr} ${set.category?.name || (isWork ? 'min' : 'Reps')} · ${competition.name}`,
@@ -650,6 +658,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}
+          challenges={currentChallenges} weekSets={currentWeekSets} participantCount={participantsNow.length}
+          loading={loading}
           projectTags={projectTags} toolTags={toolTags}
           onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
           onDeleteSet={async (s) => { try { await capi.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
