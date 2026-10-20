@@ -621,10 +621,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       });
       markCelebrated(me, reached.map(ch => ch.id));
     }
-    const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', 'log'] : ['invite'])
-      : newcomer ? ['goal', 'log'] : [];
+    // Erster Satz mit Feier gibt es einmal pro Konto (obState.firstLog).
+    const firstLog = obState.firstLog ? [] : ['log'];
+    const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', ...firstLog] : ['invite'])
+      : newcomer ? ['goal', ...firstLog] : [];
     openLayer(kinds);
-  }, [loading, intro, newcomer, openLayer, currentChallenges, allSets, me]);
+  }, [loading, intro, newcomer, openLayer, currentChallenges, allSets, me, obState.firstLog]);
 
   // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
   const celebrateFirst = useCallback((value, ch, cat) => {
@@ -1154,7 +1156,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {layer?.kind === 'log' && (
         <ObFirstLogLayer api={capi} categories={categories} people={peopleForShare}
           challenges={[...currentChallenges, ...(layer.extra || []).filter(x => !currentChallenges.some(c => c.id === x.id))]}
-          onLogged={(reps, ch, cat) => { PTHaptics.tap(); celebrateFirst(reps, ch, cat); reload(); }}
+          onLogged={(reps, ch, cat) => {
+            PTHaptics.tap();
+            if (!obState.firstLog) celebrateFirst(reps, ch, cat);
+            else { setToast(`+${reps}${cat?.name ? ` ${cat.name}` : ''} geloggt`); advance({ sets: 1 }); maybePushPrimer(); }
+            reload();
+          }}
           onSkip={() => advance()} />
       )}
       {layer?.kind === 'cele' && (

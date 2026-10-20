@@ -9,6 +9,10 @@ const PTHaptics = {
   run(fn) {
     const H = window.PTCelebrationHaptics;
     if (!H?.Haptics) return;
+    // Im Browser nutzt das Plugin navigator.vibrate, das vor dem ersten Tippen
+    // blockiert (Konsolenfehler). Nativ gibt es diese Einschränkung nicht.
+    const native = window.Capacitor?.isNativePlatform?.();
+    if (!native && navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     try { fn(H)?.catch?.(() => {}); } catch (e) {}
   },
   tap() { this.run(H => H.Haptics.impact({ style: H.ImpactStyle.Light })); },
@@ -102,7 +106,9 @@ function useObCount(target, duration = 1100, delay = 250) {
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    // Läuft rAF nicht (Hintergrund, Energiesparen), steht der Endwert trotzdem da.
+    const done = setTimeout(() => setV(target), delay + duration + 80);
+    return () => { cancelAnimationFrame(raf); clearTimeout(done); };
   }, [target, duration, delay]);
   return v;
 }

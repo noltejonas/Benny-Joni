@@ -267,7 +267,8 @@ function ObCelebrate({ value, category, myDone, share, onDone }) {
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const done = setTimeout(() => setShown(value), 1050);
+    return () => { cancelAnimationFrame(raf); clearTimeout(done); };
   }, [value]);
   const pct = share > 0 ? Math.min(1, myDone / share) : 0;
   return (

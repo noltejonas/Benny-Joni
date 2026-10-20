@@ -274,7 +274,7 @@
   display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 20px;
   border-radius: 20px; background: var(--surface); box-shadow: var(--shadow);
 }
-.ob-codebox-code { flex: 1; font-size: 32px; line-height: 40px; font-weight: 800; letter-spacing: .18em; font-variant-numeric: tabular-nums; }
+.ob-codebox-code { flex: 1; min-width: 0; font-size: 30px; line-height: 40px; font-weight: 800; letter-spacing: .14em; font-variant-numeric: tabular-nums; }
 .ob-codebox-copy {
   border: none; border-radius: 12px; padding: 10px 14px; cursor: pointer; font: inherit;
   background: var(--primary-tint); color: var(--primary-ink); font-size: 14px; font-weight: 700;
@@ -326,6 +326,8 @@
   font-variant-numeric: tabular-nums;
 }
 .ob-chip.is-on { background: var(--primary); color: #fff; }
+/* Chips direkt auf dem Seitenhintergrund (nicht in einer Karte) als kleine Karten */
+.ob-body > .ob-chips .ob-chip:not(.is-on) { background: var(--surface); box-shadow: var(--shadow); }
 .ob-amount-note { font-size: 13px; line-height: 18px; color: var(--text-3); text-align: center; font-weight: 600; }
 
 /* Feier zum ersten Satz */
