@@ -10,6 +10,9 @@ const INVITE_KEY = 'pt:invite'; // offene Einladung { code, at }, 7 Tage gültig
 const INVITE_TTL = 7 * 86400000;
 const THEME_KEY = 'pt:theme2';
 const PUSH_KEY = 'pt:notifications';
+const TAB_KEY = 'pt:tab'; // zuletzt offener Tab (sessionStorage)
+const RESUME_RELOAD_MS = 20000; // Rückkehr aus dem Hintergrund: ab 20 s neu laden
+const QUICK_LOG_LOCK_MS = 700; // Schnellsatz: Sperre gegen Doppeltipp
 
 function readPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
@@ -59,6 +62,62 @@ function Loader({ text = 'Lade Daten…' }) {
       <div className="app-loader-text">{text}</div>
     </div>
   );
+}
+
+// ─── Fehlergrenze ───────────────────────────────────────────────────────────
+// Ein Renderfehler soll nicht die ganze App abräumen (weißer Bildschirm).
+// variant 'screen' (um <App/>) ersetzt den Bildschirm, 'card' (um den Tab-
+// Inhalt) nur den Inhalt; Kopf und Tab-Leiste bleiben bedienbar. Der Fallback
+// nutzt nur einfache Elemente, damit er selbst nicht scheitert.
+class PTErrorBoundary extends React.Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Renderfehler', error, info?.componentStack);
+    try { window.PTReportError?.(error, { where: this.props.where || 'app', componentStack: info?.componentStack }); }
+    catch (e) {}
+  }
+
+  reset = () => {
+    try { sessionStorage.setItem(TAB_KEY, 'home'); } catch (e) {}
+    this.setState({ error: null });
+    this.props.onReset?.();
+  };
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    const title = 'Da ist etwas schiefgelaufen';
+    const actions = (
+      <>
+        <button className="btn" onClick={() => location.reload()}>Neu laden</button>
+        <button className="btn-link" onClick={this.reset}>Zur Übersicht</button>
+      </>
+    );
+    if (this.props.variant === 'card') {
+      return (
+        <div className="rd-empty" role="alert">
+          <div className="rd-empty-title">{title}</div>
+          <div className="rd-empty-text">Dieser Bereich lässt sich gerade nicht anzeigen. Deine Sätze sind gespeichert.</div>
+          {actions}
+        </div>
+      );
+    }
+    return (
+      <div className="ob-screen" role="alert">
+        <div className="ob-top"><span /></div>
+        <main className="ob-body is-center">
+          <div className="ob-trophy" aria-hidden="true">😵</div>
+          <h1 className="ob-title" style={{ textAlign: 'center' }}>{title}</h1>
+          <p className="ob-sub" style={{ textAlign: 'center' }}>Lade die App neu, dann geht’s weiter. Deine Sätze sind gespeichert.</p>
+        </main>
+        <div className="ob-foot">{actions}</div>
+      </div>
+    );
+  }
 }
 
 // ─── Hülle: Session, Profil, Challenge-Auswahl ──────────────────────────────
@@ -489,10 +548,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // Tabs
   const [tab, setTab] = useState(() => {
     if (intro) return 'home'; // frisch erstellt oder beigetreten: immer „Heute“
-    try { return sessionStorage.getItem('pt:tab') || 'home'; } catch { return 'home'; }
+    try { return sessionStorage.getItem(TAB_KEY) || 'home'; } catch { return 'home'; }
   });
   useEffect(() => {
-    try { sessionStorage.setItem('pt:tab', tab); } catch {}
+    try { sessionStorage.setItem(TAB_KEY, tab); } catch {}
   }, [tab]);
   // reload() ist memoisiert; notify() braucht trotzdem den aktuellen Tab.
   const tabRef = React.useRef(tab);
@@ -521,6 +580,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const [closingWeek, setClosingWeek] = useState(null);
   const [proposalDismissed, setProposalDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Erstes Laden gescheitert (meist offline): Karte „Konnte nicht laden“ statt
+  // einer scheinbar leeren Challenge. Nach einem Erfolg bleibt der letzte Stand.
+  const [loadError, setLoadError] = useState(null);
+  const dataReady = !loading && !loadError;
 
   // UI state
   const [setupForChallenge, setSetupForChallenge] = useState(null); // null=closed, {} = new, {id, ...} = edit
@@ -542,8 +605,21 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const usePenalties = !!competition.penalties_enabled;
   const useRotation = !!competition.rotation_enabled;
 
+  // Heute als State: um Mitternacht und nach der Rückkehr aus dem Hintergrund
+  // springt der Tag (und montags die Woche) um, auch ohne neues Rendern von außen.
+  const [today, setToday] = useState(() => PTData.isoDate(new Date()));
+  const todayRef = React.useRef(today);
+  // Prüft den Kalendertag; true, wenn er sich seit dem letzten Prüfen geändert hat.
+  const checkDay = useCallback(() => {
+    const d = PTData.isoDate(new Date());
+    if (d === todayRef.current) return false;
+    todayRef.current = d;
+    setToday(d);
+    return true;
+  }, []);
+
   // This week
-  const weekStart = PTData.isoDate(PTData.mondayOf(new Date()));
+  const weekStart = useMemo(() => PTData.isoDate(PTData.mondayOf(new Date(today + 'T00:00:00'))), [today]);
   const currentChallenges = useMemo(() => allChallenges.filter((c) => c.week_start === weekStart), [allChallenges, weekStart]);
   const currentWeekSets = useMemo(() => {
     const ids = new Set(currentChallenges.map((c) => c.id));
@@ -621,14 +697,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Nach Erstellen bzw. Beitreten: Ebenen einmal starten, sobald die Daten da sind.
   useEffect(() => {
-    if (loading || !intro || introStarted.current) return;
+    if (!dataReady || !intro || introStarted.current) return;
     introStarted.current = true;
     // Erster Satz mit Feier gibt es einmal pro Konto (obState.firstLog).
     const firstLog = obState.firstLog ? [] : ['log'];
     const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', ...firstLog] : ['invite'])
       : newcomer ? ['goal', ...firstLog] : [];
     openLayer(kinds);
-  }, [loading, intro, newcomer, openLayer, obState.firstLog]);
+  }, [dataReady, intro, newcomer, openLayer, obState.firstLog]);
 
   // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
   const celebrateFirst = useCallback((value, ch, cat) => {
@@ -647,7 +723,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const starterItems = PTOnboarding.starterItems({
     activeMembers: activeMembers.length, weekGoals: sportsGoalsNow.length, mySets: mySetCount, push: pushPerm,
   });
-  const starterVisible = !loading && PTOnboarding.showStarter({
+  const starterVisible = dataReady && PTOnboarding.showStarter({
     newcomer, items: starterItems, dismissedAt: obState.dismissed?.[competition.id], joinedAt: myMembership?.joined_at,
   });
   function openStarter(id) {
@@ -731,7 +807,31 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     } catch (e) { alert(e.message); }
   }
 
-  const reload = useCallback(async () => {
+  // ── Laden ───────────────────────────────────────────────────────────────
+  // Ein Durchgang lädt alles neu. Realtime, eigene Aktionen und die Rückkehr in
+  // die App fallen oft zusammen: Läuft schon ein Durchgang, folgt höchstens genau
+  // einer danach. reloadSeq verwirft Antworten, die nicht mehr die neueste sind
+  // (z. B. nach dem Wechsel in eine andere Challenge).
+  const reloadSeq = React.useRef(0);
+  const reloadRun = React.useRef(null);
+  const reloadAgain = React.useRef(false);
+  const loadedOnce = React.useRef(false);
+  const leftRef = React.useRef(false);
+  const unmounted = React.useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => { unmounted.current = true; reloadSeq.current++; };
+  }, []);
+
+  // Mitgliedschaft beendet: nur einmal melden, auch wenn weitere Antworten kommen.
+  const leave = () => {
+    if (leftRef.current || unmounted.current) return;
+    leftRef.current = true;
+    onLeft?.();
+  };
+
+  const loadOnce = async () => {
+    const seq = ++reloadSeq.current;
     try {
       const [comp, mems, cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, pys, projTags, toolTagsData] = await Promise.all([
         capi.getCompetition(),
@@ -749,6 +849,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         capi.getProjectTags(),
         capi.getToolTags(),
       ]);
+      if (seq !== reloadSeq.current) return; // veraltet
       // Pflicht-Workouts markieren, damit Summen sie erkennen (PTData.setValue).
       PTData.annotateWorkouts(allSetsData, challs, cats);
       PTData.annotateWorkouts(feedData, challs, cats);
@@ -792,17 +893,42 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         notify(feedData[0]);
       }
       lastFeedRef.current = feedData[0]?.id || null;
+      loadedOnce.current = true;
+      setLoadError(null);
 
       // Mitgliedschaft beendet (entfernt oder Challenge gelöscht)
-      if (!mems.some(m => m.user_id === me && !m.left_at)) onLeft?.();
+      if (!mems.some(m => m.user_id === me && !m.left_at)) leave();
     } catch (e) {
+      if (seq !== reloadSeq.current) return;
       console.error('reload failed', e);
-      // Challenge nicht mehr sichtbar (entfernt worden) → zurück zur Auswahl
-      if (e?.code === 'PGRST116') onLeft?.();
+      // Challenge nicht mehr sichtbar (PGRST116) oder keine Berechtigung mehr
+      // (42501, z. B. aus der Challenge entfernt) → zurück zur Auswahl
+      if (e?.code === 'PGRST116' || e?.code === '42501') { leave(); return; }
+      if (!loadedOnce.current) setLoadError(e || new Error('reload failed'));
+      else setToast(e?.code === 'offline' ? 'Keine Verbindung – zeige letzten Stand' : 'Aktualisieren hat nicht geklappt – zeige letzten Stand');
     } finally {
-      setLoading(false);
+      if (seq === reloadSeq.current) setLoading(false);
     }
-  }, [capi, me, notificationsOn]);
+  };
+  const loadRef = React.useRef(loadOnce);
+  loadRef.current = loadOnce; // immer der aktuelle Stand (me, notificationsOn, onLeft …)
+
+  // Stabil über die ganze Lebensdauer: Realtime-Abo und Listener hängen nur einmal.
+  const reload = useCallback(() => {
+    if (reloadRun.current) { reloadAgain.current = true; return reloadRun.current; }
+    const run = (async () => {
+      try {
+        do {
+          reloadAgain.current = false;
+          await loadRef.current();
+        } while (reloadAgain.current && !unmounted.current);
+      } finally {
+        reloadRun.current = null;
+      }
+    })();
+    reloadRun.current = run;
+    return run;
+  }, []);
 
   function notify(set) {
     const isWork = set.category?.kind === 'work';
@@ -823,6 +949,86 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     const off = capi.onChange(reload);
     return off;
   }, [capi, reload]);
+
+  // Erstes Laden gescheitert: alle 15 s still neu versuchen, solange die Karte steht.
+  useEffect(() => {
+    if (!loadError) return;
+    const id = setTimeout(() => reload(), 15000);
+    return () => clearTimeout(id);
+  }, [loadError, reload]);
+  function retryLoad() {
+    setLoading(true);
+    reload();
+  }
+
+  // Rückkehr aus dem Hintergrund: iOS friert die WebView ein, und Realtime liefert
+  // verpasste Änderungen nicht nach. Nach mehr als 20 s im Hintergrund (oder an
+  // einem neuen Tag) neu laden; ebenso, wenn das Netz zurück ist. visibilitychange
+  // und das App-Ereignis resume kommen oft beide – hiddenAt sorgt für einen Reload.
+  useEffect(() => {
+    let hiddenAt = document.visibilityState === 'hidden' ? Date.now() : null;
+    const hide = () => { if (hiddenAt == null) hiddenAt = Date.now(); };
+    const back = () => {
+      const away = hiddenAt == null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      const newDay = checkDay();
+      if (away > RESUME_RELOAD_MS || newDay) reload();
+    };
+    const onVisibility = () => (document.visibilityState === 'hidden' ? hide() : back());
+    const onOnline = () => reload();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+
+    let alive = true;
+    const handles = [];
+    (window.PTAppReady || Promise.resolve(null)).then(async (mod) => {
+      const AppPlugin = mod?.App;
+      if (!AppPlugin || !alive) return;
+      try {
+        for (const [evt, fn] of [['pause', hide], ['resume', back]]) {
+          const h = await AppPlugin.addListener(evt, fn);
+          if (alive) handles.push(h); else h?.remove?.();
+        }
+      } catch (e) { console.warn('App-Plugin: pause/resume nicht verfügbar', e); }
+    });
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+      handles.forEach(h => h?.remove?.());
+    };
+  }, [reload, checkDay]);
+
+  // Tageswechsel bei offener App: kurz nach Mitternacht Tag (und Woche) neu
+  // setzen und laden. Feuert der Timer zu früh, wird er neu gestellt.
+  useEffect(() => {
+    let id;
+    const arm = () => {
+      const next = new Date();
+      next.setHours(24, 0, 1, 0);
+      id = setTimeout(() => { if (checkDay()) reload(); else arm(); }, Math.max(1000, next - Date.now()));
+    };
+    arm();
+    return () => clearTimeout(id);
+  }, [today, checkDay, reload]);
+  // Sicherheitsnetz: Rendert die App nach Mitternacht aus anderem Grund neu
+  // (Timer im Hintergrund pausiert), springt der Tag ebenfalls um.
+  useEffect(() => { if (checkDay()) reload(); });
+
+  // Neue Woche: offene Sheets gehören zur alten Woche und schließen sich, sonst
+  // landet ein Satz in der Vorwoche. Laufende Pflicht-Workouts bleiben offen.
+  const shownWeek = React.useRef(weekStart);
+  useEffect(() => {
+    if (shownWeek.current === weekStart) return;
+    shownWeek.current = weekStart;
+    setSetupForChallenge(null);
+    setBackfillOpen(false);
+    setProposalDismissed(false);
+    setLogForChallenge(cur => {
+      const type = cur && categories.find(c => c.id === cur.category_id)?.challenge_type;
+      return cur && PTData.isWorkoutType(type) ? cur : null;
+    });
+  }, [weekStart]);
 
   // Native APNs registration (Capacitor only — web uses the Notification API above)
   useEffect(() => {
@@ -878,12 +1084,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return () => { cancelled = true; cleanup(); };
   }, [me, notificationsOn, api, pushPerm]);
 
-  // Tap on push → switch to Feed tab
+  // Tap on push → switch to Feed tab und neu laden (der Satz aus der Mitteilung
+  // kam evtl. an, während Realtime im Hintergrund schlief)
   useEffect(() => {
-    const onNavFeed = () => setTab('feed');
+    const onNavFeed = () => { setTab('feed'); reload(); };
     window.addEventListener('pt:nav-feed', onNavFeed);
     return () => window.removeEventListener('pt:nav-feed', onNavFeed);
-  }, []);
+  }, [reload]);
 
   const setupCategories = allowWork ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
   const openPenaltyCount = usePenalties ? penalties.filter(p => !p.paid).length : 0;
@@ -908,7 +1115,20 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       </header>
 
       <main className="app-main">
-        {loading ? <Loader /> : (<>
+        {/* key: Tab-Wechsel setzt die Fehlergrenze zurück */}
+        <PTErrorBoundary key={tab} where={`tab:${tab}`} variant="card"
+          onReset={() => { setSettingsPage('root'); setTab('home'); }}>
+        {loading ? <Loader /> : loadError ? (
+          <div className="rd-empty" role="alert">
+            <div className="rd-empty-title">Konnte nicht laden</div>
+            <div className="rd-empty-text">
+              {loadError.code === 'offline' || navigator.onLine === false
+                ? 'Keine Verbindung. Sobald du online bist, geht’s weiter.'
+                : 'Gerade klappt es nicht. Versuch es gleich nochmal.'}
+            </div>
+            <button className="btn" onClick={retryLoad}>Erneut versuchen</button>
+          </div>
+        ) : (<>
         {tab === 'home' && starterVisible && (
           <ObStarterCard items={starterItems} daysLeft={PTOnboarding.weekProgress().daysLeft}
             midWeek={PTOnboarding.joinedMidWeek({ joinedAt: myMembership?.joined_at })}
@@ -1026,6 +1246,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onToast={setToast} />
         }
         </>)}
+        </PTErrorBoundary>
       </main>
 
       <nav className="tabbar" aria-label="Hauptnavigation">
@@ -1214,4 +1435,6 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <PTErrorBoundary where="app"><App /></PTErrorBoundary>
+);
