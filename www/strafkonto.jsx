@@ -25,12 +25,32 @@ function reasonText(p) {
   }
 }
 
+// Strafregel als ein Satz für Neue (Regelnamen wie in den Einstellungen).
+function obRuleLine(cfg) {
+  const amount = formatEuro(cfg.amount_cents ?? 500);
+  switch (cfg.rule_mode) {
+    case 'per_challenge': return `Für jede Übung unter deinem Teil zahlst du ${amount}.`;
+    case 'per_week_any': return `Wer sonntags bei einer Übung unter seinem Teil liegt, zahlt ${amount}.`;
+    case 'per_week_all': return `Wer sonntags bei allen Übungen unter seinem Teil liegt, zahlt ${amount}.`;
+    default: return `Wer sonntags unter seinem Teil liegt, zahlt ${amount} in die Kasse.`;
+  }
+}
+
 function StrafkontoScreen({ api, me, members = [], penalties, closures, openClosures, payouts = [], onChange, onOpenSettings }) {
   const [closing, setClosing] = useState(null);
   const [penaltyEdit, setPenaltyEdit] = useState(null);
   const [reopenWk, setReopenWk] = useState(null);
   const [addPayout, setAddPayout] = useState(false);
   const [payoutEdit, setPayoutEdit] = useState(null);
+  // Regel für den leeren Zustand (neue Challenge): in einer Zeile, ohne Fachbegriffe.
+  const [cfg, setCfg] = useState(null);
+  const isEmpty = !penalties.length && !openClosures.length && !closures.length && !payouts.length;
+  React.useEffect(() => {
+    if (!isEmpty || !api?.getPenaltyConfig) return;
+    let alive = true;
+    api.getPenaltyConfig().then(c => { if (alive) setCfg(c); }).catch(() => {});
+    return () => { alive = false; };
+  }, [api, isEmpty]);
 
   const totalPenalties = penalties.reduce((a, p) => a + p.amount_cents, 0);
   const totalPayouts   = payouts.reduce((a, p) => a + p.amount_cents, 0);
@@ -63,7 +83,7 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
         </div>
         <div className="rd-empty">
           <div className="rd-empty-title">Noch sauber.</div>
-          <div className="rd-empty-text">Lasst es so.</div>
+          <div className="rd-empty-text">Lasst es so.{cfg ? ` ${obRuleLine(cfg)}` : ''}</div>
         </div>
       </div>
     );

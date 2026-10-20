@@ -53,6 +53,9 @@ function StatsTab({ api, me, profile, competition, sides, members, challenges, c
     } catch (e) { setError(e.message); }
   }, [api]);
   React.useEffect(() => { if (view !== 'challenge' && !bundle) load(); }, [view, bundle, load]);
+  // Noch keine Woche vorbei: Hinweis statt rätselhafter Nullkarten.
+  const monday = PTData.isoDate(PTData.mondayOf(new Date()));
+  const firstWeek = challenges.length > 0 && !challenges.some(c => c.week_start < monday);
 
   return (
     <>
@@ -61,6 +64,10 @@ function StatsTab({ api, me, profile, competition, sides, members, challenges, c
         <button className={view === 'me' ? 'active' : ''} onClick={() => switchView('me')}>Ich</button>
         <button className={view === 'duel' ? 'active' : ''} onClick={() => switchView('duel')}>Duelle</button>
       </div>
+      {view === 'challenge' && firstWeek && (
+        <div className="ob-note"><span className="ob-note-emoji" aria-hidden="true">📊</span>
+          Woche 1 läuft. Ab Montag steht hier eure erste Bilanz.</div>
+      )}
       {view === 'challenge' && (
         <ChallengeStats sides={sides} members={members} challenges={challenges} categories={categories} sets={allSets} />
       )}
@@ -86,8 +93,8 @@ function ChallengeStats({ sides, members = [], challenges, categories, sets, tit
   );
 
   if (!challenges.length || !sides.length) {
-    return <div className="empty"><div className="title">Noch keine Historie</div>
-      <div>Starte deine erste Wochen-Challenge.</div></div>;
+    return <div className="rd-empty"><div className="rd-empty-title">Noch keine Historie</div>
+      <div className="rd-empty-text">Sobald ihr ein Wochenziel habt, geht es hier los.</div></div>;
   }
   if (!st.weeks.length) {
     return <div className="rd-empty"><div className="rd-empty-title">Noch keine Sport-Challenges</div>

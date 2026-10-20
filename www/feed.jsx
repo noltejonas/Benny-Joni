@@ -222,9 +222,10 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
   );
 }
 
+// `alone`, `onFirstLog`, `onInvite`: leerer Zustand und Hinweis für neue Challenges.
 function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], weekSets = [], participantCount = 2,
-  projectTags = [], toolTags = [], loading = false,
-  onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
+  projectTags = [], toolTags = [], loading = false, alone = false,
+  onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill, onFirstLog, onInvite }) {
   useTicker(30000);
   const online = useOnline();
 
@@ -345,7 +346,11 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
     return (
       <div className="rd-empty">
         <div className="rd-empty-title">Noch keine Aktivität</div>
-        <div className="rd-empty-text">Logge den ersten Satz, dann geht es hier los.</div>
+        <div className="rd-empty-text">Hier siehst du live jeden Satz{alone ? ', sobald jemand dabei ist' : ''}.</div>
+        <div className="ob-empty-actions">
+          {onFirstLog && <button className="btn" onClick={onFirstLog}>Ersten Satz loggen</button>}
+          {alone && onInvite && <button className="btn btn-secondary" onClick={onInvite}>Einladen</button>}
+        </div>
       </div>
     );
   }
@@ -418,6 +423,12 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
           </React.Fragment>
         );
       })}
+      {alone && onInvite && (
+        <div className="ob-note" style={{ marginTop: 8 }}>
+          <span className="ob-note-emoji" aria-hidden="true">👋</span>
+          <span>Sobald jemand dabei ist, siehst du hier jeden Satz live. <button className="btn-link" onClick={onInvite}>Einladen</button></span>
+        </div>
+      )}
     </div>
   );
 }

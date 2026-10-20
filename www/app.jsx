@@ -635,6 +635,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     else if (id === 'log') openLayer(sportsGoalsNow.length ? ['log'] : ['goal', 'log']);
     else if (id === 'push') openLayer(['push'], { manual: true });
   }
+  // „Ersten Satz loggen“ aus leeren Zuständen: Ziel fehlt → Ziel, sonst Satz.
+  function startFirstLog() {
+    setTab('home');
+    if (!sportsGoalsNow.length) { if (newcomer) openLayer(['goal', 'log']); else setSetupForChallenge({}); return; }
+    if (newcomer && mySetCount === 0) openLayer(['log']);
+    else setLogForChallenge(sportsGoalsNow[0]);
+  }
   const layerRef = React.useRef(null);
   layerRef.current = layer;
   const memberIdsRef = React.useRef(null);
@@ -941,7 +948,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             } catch (e) { alert(e.message); }
           }}
           onPickEmoji={(s) => setPickerForSet(s)}
-          onBackfill={() => setBackfillOpen(true)} />}
+          onBackfill={() => setBackfillOpen(true)}
+          alone={activeMembers.length < 2}
+          onFirstLog={startFirstLog}
+          onInvite={() => openLayer(['invite'])} />}
 
         {tab === 'history' &&
         <StatsTab

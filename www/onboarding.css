@@ -55,7 +55,7 @@
 }
 .ob-foot .btn-link { align-self: center; padding: 8px 10px; }
 /* Auf dem Seitenhintergrund ist --surface-2 = --bg: Zweitknöpfe als Karte */
-.ob-screen .btn-secondary { background: var(--surface); box-shadow: var(--shadow); }
+.ob-screen .btn-secondary, .ob-empty-actions .btn-secondary { background: var(--surface); box-shadow: var(--shadow); }
 .ob-row2 { display: flex; gap: 10px; }
 .ob-row2 > .btn { flex: 1; min-width: 0; }
 .ob-foot .btn[aria-busy="true"] { opacity: .7; }
