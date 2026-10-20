@@ -767,6 +767,18 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   layerRef.current = layer;
   const memberIdsRef = React.useRef(null);
 
+  // ── Werbung (www/ads.js, nur in der iOS-App) ─────────────────────────────
+  // Erst nach dem Onboarding: nicht in der Demo (dort verlässt nichts das Gerät),
+  // nicht während Einstiegs-Ebenen und bei neuen Leuten erst nach dem ersten Satz.
+  // checkConsent() fragt dann nur still den Stand ab. Das Einwilligungsformular
+  // kommt frühestens, wenn Feed oder Stats das Banner wollen.
+  const adsOk = api?.mode !== 'demo' && !intro && !layer && (!newcomer || !!obState.firstLog);
+  useEffect(() => { if (adsOk) window.PTAds?.checkConsent(); }, [adsOk]);
+  useEffect(() => {
+    window.PTAds?.setBannerWanted(adsOk && (tab === 'feed' || tab === 'history'));
+  }, [adsOk, tab]);
+  useEffect(() => () => window.PTAds?.setBannerWanted(false), []);
+
   const weekTemplate = useMemo(() => {
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
     return PTData.weekTemplateFor({ weekStart, slots: planSlots, config: rotationConfig });

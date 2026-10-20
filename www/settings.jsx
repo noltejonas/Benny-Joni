@@ -376,6 +376,16 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, notificationsEnabled, 
     window.dispatchEvent(new CustomEvent('pt:push-permission', { detail: result }));
   }
 
+  // Google verlangt in EU/EWR, UK und der Schweiz einen Weg zurück zur
+  // Werbe-Einwilligung (www/ads.js meldet das über pt:ads-change).
+  const [adsPrivacy, setAdsPrivacy] = useState(() => !!window.PTAds?.privacyOptionsRequired());
+  useEffect(() => {
+    const onChange = () => setAdsPrivacy(!!window.PTAds?.privacyOptionsRequired());
+    onChange();
+    window.addEventListener('pt:ads-change', onChange);
+    return () => window.removeEventListener('pt:ads-change', onChange);
+  }, []);
+
   return (
     <SettingsGroup title="App"
       footer={pushBlocked ? (native ? 'In den iOS-Einstellungen ausgeschaltet.' : 'Im Browser blockiert.') : null}>
@@ -397,6 +407,10 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, notificationsEnabled, 
         checked={notificationsEnabled} onChange={setPush} />
       {pushBlocked && native && (
         <SettingsRow icon="settings" title="iOS-Einstellungen öffnen" tone="accent" onClick={() => window.PTPush.openSettings()} />
+      )}
+      {adsPrivacy && (
+        <SettingsRow icon="shield" title="Werbe-Einwilligung" subtitle="Auswahl ändern oder widerrufen"
+          onClick={() => window.PTAds?.showPrivacyOptions()} />
       )}
     </SettingsGroup>
   );

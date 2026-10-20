@@ -146,8 +146,9 @@ button, input, select, textarea { font-family: inherit; }
 .avatar-btn:active { transform: scale(0.94); }
 .avatar-btn.is-active .rd-avatar { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--primary); }
 
+/* --pt-ad-h: Höhe des AdMob-Banners über der Tab-Leiste, sonst 0 (www/ads.js). */
 .app-main {
-  padding: 24px 16px calc(120px + var(--safe-bot));
+  padding: 24px 16px calc(120px + var(--safe-bot) + var(--pt-ad-h, 0px));
   display: flex; flex-direction: column; gap: 24px;
 }
 /* `clip` schneidet wie `hidden` ab, macht .app-main aber nicht zum
@@ -266,7 +267,7 @@ button, input, select, textarea { font-family: inherit; }
    Toast über den ganzen Bildschirm. Nach dem Einfahren zieht einmal ein
    heller Glanzstreifen darüber. */
 .toast {
-  top: auto; bottom: calc(104px + var(--safe-bot));
+  top: auto; bottom: calc(104px + var(--safe-bot) + var(--pt-ad-h, 0px));
   width: max-content; max-width: calc(100vw - 48px);
   padding: 14px 22px; text-align: center;
   background: var(--grad);

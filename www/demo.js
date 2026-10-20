@@ -731,7 +731,8 @@
     el.addEventListener('click', () => leaveDemo());
     el.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);z-index:60;' +
       // Tab-Leiste endet 84 px über dem Rand, .app-main hat 120 px Luft: dazwischen passt der Knopf.
-      'bottom:calc(env(safe-area-inset-bottom,0px) + 88px);height:28px;padding:0 14px;border:none;border-radius:999px;' +
+      // --pt-ad-h: Höhe eines AdMob-Banners über der Tab-Leiste (www/ads.js), sonst 0.
+      'bottom:calc(env(safe-area-inset-bottom,0px) + 88px + var(--pt-ad-h,0px));height:28px;padding:0 14px;border:none;border-radius:999px;' +
       'background:var(--grad,#1C1B2E);color:#fff;font:700 13px/28px system-ui,sans-serif;white-space:nowrap;' +
       'box-shadow:0 8px 24px rgba(28,27,46,.28);cursor:pointer;-webkit-tap-highlight-color:transparent');
     document.body.appendChild(el);
