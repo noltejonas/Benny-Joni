@@ -24,7 +24,7 @@ App freigegeben ist (realistisch 21.10. nachmittags bis 22.10.).
 | 06:10–06:30 | DSA-Händlerstatus | Nacht-PR mergen, Pages-Quelle umstellen, Rechtstexte ausfüllen | 2, 3, 5 |
 | 06:30–06:40 | App-Infos: Apple-ID, Sprache, Name, Version | Rechtstexte weiter | 4, 5 |
 | 06:40–06:50 | Apple-ID an B geben | Konstanten im Code eintragen | 6 |
-| 06:50–07:05 | Rechtsseiten veröffentlichen, URLs prüfen | Supabase: Prüfskript, Migration | 7, 8 |
+| 06:50–07:10 | Rechtsseiten veröffentlichen, URLs prüfen | Supabase: Prüfskript, zwei Migrationen, Reset-Vorlage | 7, 8 |
 | 07:05–07:45 | Build bauen und hochladen | Review-Konten mit Daten anlegen | 9, 10 |
 | 07:45–08:30 | Version 1.4 in App Store Connect ausfüllen | Gerätetest auf echtem iPhone + Screenshots | 11, 11a, 12 |
 | 08:30–08:45 | Build wählen, einreichen, Expedited Review beantragen | | 13 |
@@ -51,7 +51,7 @@ jede Abweichung ist eine Konstante (Spalte „Wo ändern“):
 | Anteil-Regel | Echte Teilnehmerzahl ab 2 Aktiven, sonst erwartete Personen | `SHARE_BASIS` in `www/stats-model.js` und dieselbe Regel im Abschnitt „Anteil (SHARE_BASIS)“ in `supabase/functions/_shared/push-rules.ts` (danach notify-set/daily-nudge neu deployen) |
 | Push | Rivalen-Push ab 10 Wdh./Tag, Ruhezeit 22–7 Uhr, max. 1 pro Tag und Challenge; Tageserinnerung erst ab 22.10. | Secret `RIVAL_THRESHOLD`; Ruhezeit in `supabase/functions/_shared/push-rules.ts`; `DRY_RUN` bei daily-nudge |
 | Sprache, Geräte, Länder | Nur Deutsch, nur iPhone, DE/AT/CH | App Store Connect (Schritt 11) |
-| JSX vorkompiliert in V1 | [INTEGRATOR: ja/nein und Ergebnis des Simulator-Checks] | Zeile `"capacitor:copy:after"` in `package.json` |
+| JSX vorkompiliert in V1 | Ja. Hook aktiv (`capacitor:copy:after` → `node tools/build-web.cjs`). Simulator-Check ca. 00:48 grün (Kaltstart → Willkommen, Preferences, Haptik, Push-Abfrage, Einladungslink bei offener App; kein Babel und keine .jsx im Bundle). Achtung: Ein Hook-Fehler bricht `cap sync` NICHT ab, deshalb danach `node tools/build-web.cjs --verify` (Schritt 9). | Zeile `"capacitor:copy:after"` in `package.json` |
 
 Abweichungen sofort Claude melden.
 
@@ -86,9 +86,9 @@ Die Rechtsseiten werden nur von `main` veröffentlicht, deshalb zuerst mergen.
    ```bash
    cd <Repo>
    git switch main && git pull
-   for f in tests/*.test.cjs; do node "$f" || echo "FEHLER $f"; done
+   npm test
    ```
-   Alles muss ohne „FEHLER“ durchlaufen.
+   Erwartet: `fail 0` in der Zusammenfassung am Ende (heute Nacht 133 Tests).
 
 Ab hier arbeitet ihr direkt auf `main`.
 
@@ -158,9 +158,9 @@ Dazu:
 2. In `docs/launch/REVIEW_NOTES.md` im englischen Block die Support-Adresse
    eintragen. Den Einladungscode **nicht** (kommt nur in App Store Connect).
 3. `ios/App/fastlane/metadata/copyright.txt`: `2026 <Name bzw. GbR>`.
-4. Testen und committen:
+4. Testen und committen. Erwartet: `fail 0`, sonst nicht committen.
    ```bash
-   for f in tests/*.test.cjs; do node "$f" || echo "FEHLER $f"; done
+   npm test
    git add www/onboarding-model.js docs/launch/REVIEW_NOTES.md ios/App/fastlane/metadata/copyright.txt
    git commit -m "chore(launch): App-Store-ID und Support-Adresse eintragen"
    git push
@@ -186,7 +186,7 @@ Dazu:
 Achtung: Wird das Repo auf privat gestellt, schaltet GitHub Pages im
 Free-Plan ab, und die App-Links laufen ins Leere.
 
-## 8. Supabase: prüfen und „Konto löschen“ einspielen (06:50, B, 15 min) – P0
+## 8. Supabase: prüfen, Migrationen einspielen, Reset-Vorlage (06:50, B, 20 min) – P0
 
 Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
 
@@ -246,7 +246,9 @@ git status --short          # nichts Unerwartetes
 open ios/App/App.xcodeproj
 ```
 
-Steht da STOPP: nicht bauen, erst Schritt 6.
+Steht da STOPP: nicht bauen, erst Schritt 6. Meldet `--verify` Probleme:
+ebenfalls nicht bauen, Meldung an Claude (Notlösung in `RELEASE.md`, Weg A
+Schritt 3).
 
 In Xcode: Team `HHJ498GCL6`, Version 1.4, Build 20 → Ziel „Any iOS Device“ →
 Product → Archive → Distribute App → App Store Connect → Upload. Apple
@@ -260,7 +262,8 @@ eingerichtet: `cd ios/App && bundle exec fastlane release`.
 
 Nach `docs/launch/REVIEW_NOTES.md`, Abschnitt „Review-Konto vorbereiten“:
 zwei Konten in der Produktions-App, eine Challenge mit Strafkonto, Profilfoto,
-Sätzen an zwei Tagen, Reaktionen. Login und Einladungscode **nur** in App
+Sätzen an zwei Tagen, Reaktionen, dazu ein Reserve-Konto 3 (Punkt 7, falls
+der Prüfer Konto 1 löscht). Login und Einladungscode **nur** in App
 Store Connect eintragen, nie ins Repo, nie in Chats.
 
 ## 11. Version 1.4 in App Store Connect ausfüllen (07:45, A, 45 min) – P0
@@ -297,7 +300,9 @@ sind 1206×2622 oder 1179×2556, JPG oder PNG ohne Alphakanal, höchstens 10.
    1206×2622. **Nicht** den iOS-27.1-Simulator nehmen, der zeigt Emojis als
    Kästchen.
 2. Auf dem Willkommen-Bildschirm „Demo ansehen“ wählen.
-3. Am Mac: Safari → Entwickler → `<iPhone>` → `localhost` → Konsole:
+3. Am Mac (am iPhone muss unter Einstellungen → Apps → Safari → Erweitert der
+   „Web-Inspektor“ an sein): Safari → Entwickler → `<iPhone>` → `localhost`
+   → Konsole:
    ```js
    localStorage.setItem('pt:shots','1'); location.reload()
    ```
@@ -400,11 +405,11 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 2. **E-Mail-Versand (P1, 30 min).** Möglichst noch vor 08:30 (B nach dem
    Gerätetest): Ohne eigenen SMTP-Anbieter stellt Supabase nur an
    Team-Adressen zu, Prüfer und neue Nutzer bekommen dann keine Reset-Mail.
-   Authentication → Emails → **SMTP
-   Settings**: eigenen Anbieter eintragen (Resend, Brevo oder Postmark) mit
-   SPF/DKIM für die Absender-Domain, Absendername „Benny & Joni“.
-   Die Vorlage „Reset Password“ ist seit Schritt 8.5 fertig. Authentication → Rate
-   Limits: Mails pro Stunde erhöhen (z. B. 100). URL Configuration: Site URL auf
+   Authentication → Emails → **SMTP Settings**: eigenen Anbieter eintragen
+   (Resend, Brevo oder Postmark) mit SPF/DKIM für die Absender-Domain,
+   Absendername „Benny & Joni“. Die Vorlage „Reset Password“ ist seit Schritt
+   8.5 fertig. Authentication → Rate Limits: Mails pro Stunde erhöhen
+   (z. B. 100). URL Configuration: Site URL auf
    `https://noltejonas.github.io/Benny-Joni/`. Mit einer Adresse außerhalb des
    Teams testen. Danach in `datenschutz.html` Abschnitt 2.10 den Anbieter
    eintragen und pushen.
@@ -456,7 +461,7 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `www/onboarding-model.js` | `SUPPORT_EMAIL` | `''` | Support-Adresse eintragen | Schritt 6, **P0** |
 | `www/onboarding-model.js` | `LEGAL_BASE` / `LEGAL` | GitHub Pages | nur bei anderem Hosting | – |
 | `www/stats-model.js` (+ `_shared/push-rules.ts`) | `SHARE_BASIS` | `'actual'`: echte Teilnehmer ab 2 | nur bei anderer Anteil-Regel | – |
-| `package.json` | `"capacitor:copy:after"` | [INTEGRATOR: drin/nicht drin] | Notlösung siehe `RELEASE.md` | nur bei Build-Problemen |
+| `package.json` | `"capacitor:copy:after"` | drin: `node tools/build-web.cjs` | Notlösung siehe `RELEASE.md` | nur bei Build-Problemen |
 | `capacitor.config.json` | `appName` | `Benny & Joni` | – | – |
 | `ios/App/App/Info.plist` | `CFBundleDisplayName` | `Benny & Joni` | – | – |
 | `ios/App/App.xcodeproj` | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | `1.4` / `20` | Build +1 bei jedem neuen Upload | Schritt 9 |
@@ -533,19 +538,36 @@ SMTP-Passwörter, `ios/App/fastlane/.env`. `ios/.gitignore` fängt `*.p8` und
 
 ## Was heute Nacht gebaut wurde
 
-Claude füllt diesen Abschnitt nach dem Merge. Pro Paket: was drin ist, was
-offen blieb, worauf ihr achten müsst.
+Pro Paket: was drin ist, was offen blieb, worauf ihr achten müsst.
 
 - **p0-konto-loeschen-daten** (Konto löschen, Rechtliches und Melden in den
   Einstellungen, Ziel-Löschen ohne Datenverlust, deutsche Fehlertexte):
-  [INTEGRATOR: Ergebnis, offene Punkte]
+  Gemergt. „Konto löschen“ in den Einstellungen (rote Gruppe unten) und im
+  Profil-Sheet, je 2 Rückfragen. Die App löscht `avatars/<uid>/`, dann das
+  Konto per RPC `delete_my_account` (bei 42501 automatisch über die Function
+  `delete-account`), dann Neustart auf Willkommen. Dazu „Info & Rechtliches“
+  und „Melden“ bei Teilnehmern. Wochenziele mit Sätzen sind nicht mehr
+  löschbar. Deutsche Fehlertexte. **Offen:** Migration in Schritt 8 einspielen
+  und in Schritt 12 mit einem Wegwerf-Konto testen.
 - **p0-rechtliches-marke-einladung** (Launch-Konstanten, Name, Zustimmungszeile
-  bei der Registrierung, Einladung mit App-Store-Link): [INTEGRATOR: Ergebnis,
-  offene Punkte]
+  bei der Registrierung, Einladung mit App-Store-Link): Gemergt. Launch-Werte
+  oben in `www/onboarding-model.js`. `APP_STORE_ID` und `SUPPORT_EMAIL` sind
+  leer und müssen in Schritt 6 gesetzt werden (Schritt 9 prüft das jetzt).
+  Zustimmungszeile bei der Registrierung, Rechtslinks im Profil-Sheet und im
+  Switcher, Einladung mit Store-Link, Code und `projektterminator://join/…`.
 - **p0-ios-projekt** (Privacy-Manifest, nur iPhone, Deutsch, Startbildschirm,
-  Build 20): [INTEGRATOR: Ergebnis, offene Punkte]
+  Build 20): Gemergt, braucht einen neuen nativen Build. Privacy-Manifest
+  (jetzt auch „Andere Finanzinformationen“), nur iPhone, Deutsch,
+  Startbildschirm ohne Splash-Bild, 1.4 (20), `appName` „Benny & Joni“.
+  **Offen:** Startbildschirm hell/dunkel im Gerätetest ansehen.
 - **p0-start-ohne-cdn** (lokale Bibliotheken und Schrift, Start-Fallback,
-  Vorkompilieren): [INTEGRATOR: Ergebnis, Vorkompilieren ja/nein]
+  Vorkompilieren): Gemergt. Vorkompilieren **JA**. React, ReactDOM,
+  supabase-js, Babel und Schrift liegen lokal in `www/vendor`, es gibt keine
+  CDN-Aufrufe mehr. Start-Wächter „App konnte nicht starten“ bei Skriptfehler
+  bzw. nach 15 s. `npx cap sync ios` übersetzt 14 JSX-Dateien. Hook-Fehler
+  zeigen nur eine `[error]`-Zeile, deshalb `--verify` (fastlane macht das
+  jetzt selbst). **Offen:** Einladungslink bei geschlossener App testen;
+  Emojis zeigt der Simulator als Kästchen, auf dem iPhone ansehen.
 - **p0-store-unterlagen-aufraeumen**:
   - Rechtstexte als Entwürfe unter `docs/launch/site/` (Datenschutz nach den
     echten Datenflüssen, Impressum, Nutzungsbedingungen mit Null-Toleranz,
@@ -563,17 +585,43 @@ offen blieb, worauf ihr achten müsst.
   - App-Bundle aufgeräumt: Bildschirmfotos, SETUP-Dateien und Icon-Quellen nach
     `docs/archive/`; `www/` von 24 auf 4,1 MB (vor den lokalen Bibliotheken).
 - **p1-app-robustheit** (Error-Boundary, Neuladen nach Rückkehr, Ladefehler,
-  „Wie letzte Woche starten“, Strafkonto-Badge, `SHARE_BASIS`):
-  [INTEGRATOR: Ergebnis, offene Punkte]
+  „Wie letzte Woche starten“, Strafkonto-Badge, `SHARE_BASIS`): Gemergt.
+  Fehlergrenze, Neuladen nach mehr als 20 s im Hintergrund, bei Rückkehr des
+  Netzes und beim Tippen auf eine Mitteilung, Tageswechsel um Mitternacht,
+  Karte „Konnte nicht laden“, Doppeltipp-Sperre 700 ms, „Wie letzte Woche
+  starten“, Strafkonto-Badge zählt Personen mit offenem Saldo,
+  `SHARE_BASIS = 'actual'` in `www/stats-model.js`.
 - **p1-screens-feed-retention** (Diagramm-Absturz, weitere Übungen, Serie,
-  Plausibilität, Melden und Blockieren im Feed): [INTEGRATOR: Ergebnis, offene
-  Punkte]
+  Plausibilität, Melden und Blockieren im Feed): Gemergt. Diagramm-Absturz
+  behoben, „+ Übung hinzufügen“, Serie auf Heute (ohne Workouts; der
+  Stats-Tab zählt sie mit, das ist eine Produktentscheidung), Plausibilität
+  (max. 500, Rückfrage ab 200), Melden/Blockieren im aufgeklappten
+  Feed-Eintrag (Blockieren blendet jetzt Notizen und das Foto überall in der
+  App aus), „Ergebnis teilen“. „Tom Holland“ wird über Schritt 8.2b
+  umbenannt.
 - **p1-push-server** (Schwelle 10, Ruhezeit, daily-nudge im DRY_RUN,
-  Prüfskript, Push-Doku): [INTEGRATOR: Ergebnis, offene Punkte]
-- **p1-store-screenshots** (6 Motive in 1206×2622 und 1320×2868):
-  [INTEGRATOR: Ergebnis]
+  Prüfskript, Push-Doku): Gemergt, **NICHT deployt**. Schwelle 10, Ruhezeit
+  22–7 Uhr, max. 1 pro Nutzer, Challenge und Tag. `daily-nudge` im DRY_RUN.
+  Deploy nur mit `--no-verify-jwt` (Schritt 14.1), `WEBHOOK_SECRET` nicht
+  setzen.
+- **p1-store-screenshots** (geplant: 6 Motive): **Nicht umgesetzt** →
+  Schritt 11a (Pflicht vor dem Einreichen).
 - **p2-admob-update-branch** (eigener Branch `claude/admob-1.4.1`, NICHT im
-  Launch-Build): [INTEGRATOR: Stand]
+  Launch-Build): Um 01:33 zeigte der Branch auf `ca20176` (enthält den
+  Nacht-Stand `d3dd7ef`, dazu `www/ads.js` und `docs/launch/ADMOB.md`). Nachts
+  wurde daran noch gearbeitet; morgens mit
+  `git log -1 --oneline claude/admob-1.4.1` nachsehen. Für den Launch ohne
+  Folgen.
 
 Ergebnis der Gesamtprüfung nach dem Merge (Tests, Browser, Simulator):
-[INTEGRATOR: Zusammenfassung]
+Stand 21.10., 01:35 (Nacht-Stand `d3dd7ef` plus Korrektur-Branches
+`launch/fix-web` und `launch/fix-backend-docs`): `npm test` 133/133 grün
+(fail 0). `www/index.html` ohne unpkg/jsdelivr/googleapis/gstatic.
+Store-Texte in den Limits. `npx cap sync ios` mit anschließendem
+`node tools/build-web.cjs --verify`: „alles in Ordnung“. Verify-Runde
+(Browser, Simulator, Backend, Doku): korrigiert wurden Blockieren-Foto,
+Demo-Knopf-Rückfrage, Build-Verify, notify-set-Flag, Altersfreigabe 16+,
+Screenshot-Schritt, Migration vor dem Review, Review-Notizen,
+Reset-Vorlage. Bewusst nach dem Launch: siehe Liste „deferred“ der
+Verify-Runde (liegt bei Claude, nicht im Repo; z. B. kein
+`supabase/config.toml`) und Abschnitt 16.
