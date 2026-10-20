@@ -94,7 +94,9 @@ class PTErrorBoundary extends React.Component {
     const actions = (
       <>
         <button className="btn" onClick={() => location.reload()}>Neu laden</button>
-        <button className="btn-link" onClick={this.reset}>Zur Übersicht</button>
+        {/* Nur die Karte: Um <App/> würde reset die App neu mounten und einen
+            zweiten Supabase-Client anlegen, während der alte weiterläuft. */}
+        {this.props.variant === 'card' && <button className="btn-link" onClick={this.reset}>Zur Übersicht</button>}
       </>
     );
     if (this.props.variant === 'card') {
