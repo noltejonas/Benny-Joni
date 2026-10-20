@@ -363,3 +363,16 @@ test('notify-set: Schwelle aus Env, Antwort ohne Empfänger und Tageswert', () =
   // Ruhezeit vor dem Anlegen des Clients, also vor jedem push_log-Insert
   assert.ok(src.indexOf('isQuietHour(') < src.indexOf('createClient(SUPABASE_URL'));
 });
+
+test('daily-nudge: im DRY_RUN kein Versand und kein push_log', () => {
+  const src = readFileSync(fn('daily-nudge/index.ts'), 'utf8');
+  const dry = src.indexOf('if (dryRun) {');
+  const ret = src.indexOf('return Response.json({ dry_run: true', dry);
+  const send = src.indexOf('await sendPlans(');
+  assert.ok(dry > 0 && ret > dry && send > ret, 'sendPlans darf erst nach dem DRY_RUN-Return kommen');
+  assert.doesNotMatch(src.slice(0, send), /sendToDevices\(|sendApns\(|\.insert\(/);
+  assert.doesNotMatch(src, /sendApns/);
+  assert.match(src, /flagFromEnv\(Deno\.env\.get\("DRY_RUN"\), true\)/);
+  // NUDGE_SECRET fail closed
+  assert.match(src, /if \(!NUDGE_SECRET\)/);
+});
