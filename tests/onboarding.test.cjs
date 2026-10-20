@@ -5,14 +5,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function load() {
+// `config` setzt Konstanten der Launch-Konfiguration (z. B. APP_STORE_ID), so
+// wie die Gründer sie morgens in onboarding-model.js eintragen.
+function load(config = {}) {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
   for (const f of ['data.js', 'onboarding-model.js']) {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+    let src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+    if (f === 'onboarding-model.js') {
+      for (const [key, value] of Object.entries(config)) {
+        const re = new RegExp(`const ${key} = '[^']*';`);
+        assert.match(src, re, `${key} steht als Konstante in onboarding-model.js`);
+        src = src.replace(re, `const ${key} = ${JSON.stringify(value)};`);
+      }
+    }
     vm.runInContext(src, ctx, { filename: f });
   }
-  return { O: ctx.window.PTOnboarding, D: ctx.window.PTData };
+  return { O: ctx.window.PTOnboarding, D: ctx.window.PTData, window: ctx.window };
 }
 const { O } = load();
 
@@ -34,7 +43,7 @@ test('normalizeCode lehnt falsche Länge und Sonderzeichen ab', () => {
 });
 
 test('normalizeCode holt den Code aus einer ganzen Einladung', () => {
-  const msg = 'Komm in meine Challenge „Büro-Battle“ bei Projekt Terminator 💪\nCode: 3a9uqm\n';
+  const msg = 'Komm in meine Challenge „Büro-Battle“ bei Benny & Joni 💪\nCode: 3a9uqm\n';
   assert.equal(O.normalizeCode(msg), '3A9UQM');
   // Wörter mit sechs Buchstaben („BATTLE“) sind kein Code
   assert.equal(O.normalizeCode('Büro-Battle ist super'), null);
@@ -63,6 +72,116 @@ test('inviteLink und inviteText enthalten Code, Name und Link', () => {
   assert.match(text, /Code: BJ4K7X/);
   assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
   assert.equal(O.normalizeCode(text), 'BJ4K7X', 'die eigene Einladung lässt sich wieder einlesen');
+});
+
+// ── Launch-Konfiguration ────────────────────────────────────────────────────
+
+// Die Tests setzen die Konstanten selbst, damit sie nach dem Eintragen von
+// Store-ID und Support-Adresse am Morgen grün bleiben.
+test('App-Name steht im Einladungstext, „Projekt Terminator“ nicht mehr', () => {
+  assert.ok(O.APP_NAME);
+  assert.doesNotMatch(O.APP_NAME, /Terminator/);
+  const text = O.inviteText({ name: 'Duell', invite_code: 'gtb34l' });
+  assert.ok(text.includes(O.APP_NAME), text);
+  assert.doesNotMatch(text, /Terminator/, 'nur das technische Schema darf „terminator“ enthalten');
+});
+
+test('inviteText ohne App-Store-ID: Name statt Link, keine leere Zeile', () => {
+  const { O: o } = load({ APP_STORE_ID: '' });
+  assert.equal(o.APP_STORE_URL, '');
+  const text = o.inviteText({ name: 'Duell', invite_code: 'GTB34L' });
+  assert.deepEqual(text.split('\n'), [
+    `Komm in meine Challenge „Duell“ bei ${o.APP_NAME} 💪`,
+    `Im App Store: ${o.APP_NAME}`,
+    'Code: GTB34L',
+    'Schon installiert? projektterminator://join/GTB34L',
+  ]);
+  assert.doesNotMatch(text, /App laden:|undefined|https?:/);
+  assert.equal(o.normalizeCode(text), 'GTB34L');
+});
+
+test('inviteText mit App-Store-ID: Link zum Laden', () => {
+  const { O: o } = load({ APP_STORE_ID: '6741234567' });
+  assert.equal(o.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
+  const text = o.inviteText({ name: 'Büro-Battle', invite_code: 'bj4k7x' });
+  const lines = text.split('\n');
+  assert.equal(lines[1], 'App laden: https://apps.apple.com/de/app/id6741234567');
+  assert.equal(lines[2], 'Code: BJ4K7X');
+  assert.equal(o.normalizeCode(text), 'BJ4K7X', 'Store-Link stört das Einlesen nicht');
+  // Ohne die letzte Zeile (z. B. abgeschnitten) findet „Code:“ den Code.
+  assert.equal(o.normalizeCode(lines.slice(0, 3).join('\n')), 'BJ4K7X');
+});
+
+test('LEGAL: alle Rechtstexte per https', () => {
+  const keys = Object.keys(O.LEGAL).sort();
+  assert.deepEqual(keys, ['imprint', 'privacy', 'support', 'terms']);
+  for (const k of keys) assert.match(O.LEGAL[k], /^https:\/\/\S+\.html$/, k);
+});
+
+test('supportMailto: leer ohne Adresse, sonst mailto mit Betreff und Text', () => {
+  const { O: none } = load({ SUPPORT_EMAIL: '' });
+  assert.equal(none.supportMailto('Hilfe', 'Text'), '');
+  const { O: o } = load({ SUPPORT_EMAIL: 'hallo@example.com' });
+  assert.equal(o.supportMailto(), 'mailto:hallo@example.com');
+  assert.equal(o.supportMailto('Frage & Idee', 'Zeile 1\nZeile 2'),
+    'mailto:hallo@example.com?subject=Frage%20%26%20Idee&body=Zeile%201%0AZeile%202');
+});
+
+// Fängt window.open und location.href ab.
+function spyWindow(w, { opened = {}, native = false } = {}) {
+  const calls = [];
+  w.open = (url, target) => { calls.push(['open', url, target]); return opened; };
+  w.location = {
+    get href() { return ''; },
+    set href(v) { calls.push(['href', v]); },
+  };
+  w.Capacitor = native ? { isNativePlatform: () => true } : undefined;
+  return calls;
+}
+
+test('openExternal: Webseiten per window.open, Mail per location, leer = nichts', () => {
+  const { O: o, window: w } = load();
+  let calls = spyWindow(w);
+  o.openExternal('');
+  o.openExternal(null);
+  assert.deepEqual(calls, []);
+  o.openExternal(o.LEGAL.privacy);
+  assert.deepEqual(calls, [['open', o.LEGAL.privacy, '_blank']]);
+
+  calls = spyWindow(w);
+  o.openExternal('mailto:hallo@example.com');
+  assert.deepEqual(calls, [['href', 'mailto:hallo@example.com']]);
+
+  calls = spyWindow(w, { opened: null });
+  o.openExternal(o.LEGAL.terms);
+  assert.deepEqual(calls, [['open', o.LEGAL.terms, '_blank'], ['href', o.LEGAL.terms]], 'Browser: Pop-up blockiert');
+
+  calls = spyWindow(w, { opened: null, native: true });
+  o.openExternal(o.LEGAL.terms);
+  assert.deepEqual(calls, [['open', o.LEGAL.terms, '_blank']], 'nativ öffnet Safari, kein zweites Öffnen');
+});
+
+test('reportContent: ohne Support-Adresse die Support-Seite, sonst Mail mit IDs', () => {
+  const { O: o, window: w } = load({ SUPPORT_EMAIL: '' });
+  let calls = spyWindow(w);
+  const url = o.reportContent({ kind: 'set', setId: 's-1', userId: 'u-2', challengeId: 'c-3' });
+  assert.equal(url, o.LEGAL.support);
+  assert.deepEqual(calls, [['open', o.LEGAL.support, '_blank']]);
+
+  const { O: m, window: mw } = load({ SUPPORT_EMAIL: 'hallo@example.com' });
+  calls = spyWindow(mw);
+  const mail = m.reportContent({ kind: 'set', setId: 's-1', userId: 'u-2', challengeId: 'c-3', note: 'Blöder Spruch' });
+  assert.match(mail, /^mailto:hallo@example\.com\?subject=Meldung%3A%20Satz&body=/);
+  const body = decodeURIComponent(mail.split('body=')[1]);
+  for (const part of ['Satz-ID: s-1', 'Nutzer-ID: u-2', 'Challenge-ID: c-3', 'Notiz: „Blöder Spruch“', `App: ${m.APP_NAME}`]) {
+    assert.ok(body.includes(part), part);
+  }
+  assert.deepEqual(calls, [['href', mail]]);
+
+  const { subject, body: plain } = m.reportText({ kind: 'member', userId: 'u-9' });
+  assert.equal(subject, 'Meldung: Person');
+  assert.doesNotMatch(plain, /Satz-ID|Challenge-ID|Notiz|undefined/);
+  assert.equal(m.reportText({}).subject, 'Meldung: Inhalt');
 });
 
 // ── Einstieg ────────────────────────────────────────────────────────────────
