@@ -1627,7 +1627,7 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
           {series.map(s => (
             <circle key={s.key}
               className="chart-scrubber-dot"
-              cx={xPos(activeIdx)} cy={yScale(s.data[activeIdx].reps)}
+              cx={xPos(activeIdx)} cy={yScale(s.data[activeIdx]?.reps ?? 0)}
               r="5" fill={s.color}
             />
           ))}
@@ -1668,10 +1668,15 @@ function ChartFullscreen({
 
   // Reset scrubber when range changes (series length changes -> activeIdx may be out of bounds).
   useEffect(() => { setActiveIdx(null); }, [totalDays]);
+  // Der Effect läuft erst nach dem Render. Darum den Index beim Wechsel sofort
+  // zurücksetzen und unten zusätzlich auf die aktuelle Länge begrenzen –
+  // sonst greift die Leiste auf einen Tag zu, den es im kürzeren Zeitraum nicht gibt.
+  const pickRange = (r) => { setActiveIdx(null); setRange(r); };
 
   // Resolve which series to render based on cumulative flag.
   const shown = cumulative ? cumSeries : series;
   const axis = shown[0]?.data || [];
+  const idx = activeIdx != null && activeIdx >= 0 && activeIdx < axis.length ? activeIdx : null;
 
   // Scrubber pointer handlers.
   const handlePointer = (e) => {
@@ -1699,9 +1704,9 @@ function ChartFullscreen({
         <div className="chart-fs-title">{title}</div>
         <div className="chart-fs-controls">
           <div className="segmented segmented-sm">
-            <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>7T</button>
-            <button className={range==='30'?'active':''} onClick={()=>setRange('30')}>30T</button>
-            <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>All</button>
+            <button className={range==='7'?'active':''} onClick={()=>pickRange('7')}>7T</button>
+            <button className={range==='30'?'active':''} onClick={()=>pickRange('30')}>30T</button>
+            <button className={range==='all'?'active':''} onClick={()=>pickRange('all')}>All</button>
           </div>
           <div className="segmented segmented-sm">
             <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
@@ -1722,20 +1727,20 @@ function ChartFullscreen({
         <FullscreenChart
           series={shown}
           days={totalDays}
-          activeIdx={activeIdx}
+          activeIdx={idx}
           vw={bodySize.w}
           vh={bodySize.h}
         />
       </div>
 
       <div className="chart-fs-bottom">
-        {activeIdx === null ? (
+        {idx === null ? (
           <div className="chart-fs-hint">Tippe in das Diagramm für Tageswerte</div>
         ) : (
           <div className="chart-fs-values">
-            <span className="chart-fs-date">{fmtDate(axis[activeIdx].date)}</span>
+            <span className="chart-fs-date">{fmtDate(axis[idx].date)}</span>
             {shown.map(s => (
-              <span key={s.key} className="chart-fs-val side-n" style={{ '--sc': s.color }}>{s.label}: <b>{s.data[activeIdx].reps}</b></span>
+              <span key={s.key} className="chart-fs-val side-n" style={{ '--sc': s.color }}>{s.label}: <b>{s.data[idx]?.reps ?? 0}</b></span>
             ))}
           </div>
         )}
