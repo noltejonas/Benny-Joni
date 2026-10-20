@@ -218,6 +218,7 @@ git switch main && git pull
 npm ci
 grep -nE "APP_STORE_ID = ''|SUPPORT_EMAIL = ''" www/onboarding-model.js && echo "STOPP: Schritt 6 fehlt" || echo "ok: Konstanten gesetzt"
 npx cap sync ios
+node tools/build-web.cjs --verify   # muss „alles in Ordnung“ melden, sonst STOPP
 git status --short          # nichts Unerwartetes
 open ios/App/App.xcodeproj
 ```
