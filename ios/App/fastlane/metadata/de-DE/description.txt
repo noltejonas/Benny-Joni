@@ -19,7 +19,7 @@ Wer seinen Anteil verpasst, zahlt in eure gemeinsame Kasse. Die App führt nur d
 
 MOTIVATION OHNE NERVEN
 • Höchstens eine Mitteilung pro Tag und Challenge, zum Beispiel wenn jemand vorlegt
-• Keine Werbung, kein Tracking
+• Kein Tracking: Werbung nur als kleines Banner im Feed und in den Stats, nicht personalisiert
 • Kein Chat und keine Telefonnummer nötig: Eure Sätze sieht nur eure Gruppe
 
 Erst mal reinschauen? Mit „Demo ansehen“ geht das ohne Konto.

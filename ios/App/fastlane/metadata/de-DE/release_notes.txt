@@ -1,1 +1,1 @@
-Die erste Version im App Store: Challenges mit Freunden, gemeinsame Wochenziele, Live-Feed mit Reaktionen, Statistiken und auf Wunsch ein Strafkonto.
+Neu: Ein kleines Werbebanner im Feed und in den Stats hilft, Benny & Joni kostenlos zu halten. Die Anzeigen sind nicht personalisiert, es gibt kein Tracking. Heute, das Eintragen von Sätzen und das Strafkonto bleiben werbefrei. Beim ersten Öffnen von Feed oder Stats fragt Google einmal nach deiner Einwilligung. Ändern kannst du sie jederzeit unter Einstellungen → „Werbe-Einwilligung“.

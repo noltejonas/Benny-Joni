@@ -372,7 +372,7 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `ios/App/App/Info.plist` | `CFBundleDisplayName` | `Benny & Joni` | – | – |
 | `ios/App/App.xcodeproj` | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | `1.4` / `20` | Build +1 bei jedem neuen Upload | Schritt 9 |
 | `www/index.html`, `www/manifest.webmanifest` | Titel, Name | `Benny & Joni` | – | – |
-| `www/ads.js` (nur Branch `claude/admob-1.4.1`) | `ADS_ENABLED`, `PROD` | aus / Test-IDs | echte AdMob-IDs | 1.4.1 |
+| `www/ads.js` (nur Branch `claude/admob-1.4.1`) | `ADS_ENABLED`, `PROD` | an / `PROD` leer = Testmodus mit Google-Test-IDs | echte AdMob-IDs (`docs/launch/ADMOB.md`) | 1.4.1 |
 | URL-Schema | `projektterminator://` | bleibt | technisch, nicht sichtbar | – |
 
 ### Rechtstexte (`docs/launch/site/`) – alle `[BITTE AUSFÜLLEN]`

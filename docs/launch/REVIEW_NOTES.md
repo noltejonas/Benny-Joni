@@ -1,6 +1,6 @@
 # Hinweise für die App-Prüfung (App Review)
 
-Wohin: App Store Connect → App → Version 1.4 → „App-Prüfung“ (App Review
+Wohin: App Store Connect → App → Version 1.4.1 → „App-Prüfung“ (App Review
 Information). Dort gehören hin:
 
 - **Anmeldung erforderlich:** Haken setzen. Benutzername und Passwort des
@@ -52,8 +52,11 @@ Users can report content and people ("Melden" on a feed entry, in Settings > "Te
 SIGN-IN
 Email and password only. There is no third-party or social login, so Sign in with Apple is not required (Guideline 4.8).
 
+ADS (new in 1.4.1)
+Google AdMob banner ads, only on the "Feed" and "Stats" tabs. Never during onboarding, never in the demo, no interstitials, no rewarded or app-open ads. Only non-personalized ads (npa=1), ad content limited to "General". In the EEA, UK and Switzerland, Google's consent form (User Messaging Platform, IAB TCF) appears the first time the Feed or Stats tab is opened; users can change or withdraw their choice under Settings > "Werbe-Einwilligung". The app does not request App Tracking Transparency and does not use the IDFA.
+
 OTHER
-No ads, no tracking, no analytics SDK. Push notifications are optional (at most one per day and challenge). The camera and photo library are only used to pick a profile photo. The app is in German and for iPhone only. Legal pages open in Safari: Settings > "Info & Rechtliches".
+No tracking, no analytics SDK. Push notifications are optional (at most one per day and challenge). The camera and photo library are only used to pick a profile photo. The app is in German and for iPhone only. Legal pages open in Safari: Settings > "Info & Rechtliches".
 
 Support: [BITTE AUSFÜLLEN: Support-E-Mail-Adresse] (we reply within 24 hours)
 <!-- review-notes:end -->
@@ -93,7 +96,14 @@ Nutzungsbedingungen enthalten eine Null-Toleranz-Regel.
 **Login:** nur E-Mail und Passwort, kein Drittanbieter-Login. Deshalb ist
 „Mit Apple anmelden“ nicht nötig (4.8).
 
-**Sonst:** keine Werbung, kein Tracking, kein Analyse-SDK. Push ist optional
+**Werbung (neu in 1.4.1):** AdMob-Banner nur in den Tabs Feed und Stats. Nie
+im Onboarding, nie in der Demo, keine Vollbild-, Prämien- oder App-Start-Anzeigen.
+Nur nicht-personalisierte Anzeigen, Inhalte höchstens „General“. In EWR, UK und
+Schweiz fragt Googles Einwilligungsdialog beim ersten Öffnen von Feed oder
+Stats; ändern unter Einstellungen → „Werbe-Einwilligung“. Kein ATT-Dialog, die
+IDFA wird nicht genutzt.
+
+**Sonst:** kein Tracking, kein Analyse-SDK. Push ist optional
 (höchstens eine Mitteilung pro Tag und Challenge). Kamera und Fotos nur fürs
 Profilbild. Nur Deutsch, nur iPhone. Rechtstexte öffnen in Safari:
 Einstellungen → „Info & Rechtliches“.
@@ -105,3 +115,8 @@ Einstellungen → „Info & Rechtliches“.
   den Nacht-Paketen; heißen sie anders, den englischen Block anpassen.
 - „Confirm email“ in Supabase ist AUS (sonst stimmt Schritt 2 nicht).
 - Die Support-Adresse beantwortet wirklich jemand, auch am Launch-Wochenende.
+- 1.4.1: Mit dem Review-Konto Feed öffnen. In der EU erscheint Googles
+  Einwilligungsdialog, danach das Banner über der Tab-Leiste. Erscheint kein
+  Banner, ist die App in AdMob noch nicht freigegeben bzw. nicht mit dem
+  Store-Eintrag verknüpft (docs/launch/ADMOB.md). Das ist kein Ablehnungsgrund,
+  aber vor dem Einreichen wissen.

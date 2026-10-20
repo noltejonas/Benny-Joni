@@ -15,10 +15,10 @@ ab, müssen die markierten Stellen mitgeändert werden.
 |---|---|---|---|
 | Name | `Benny & Joni: Fitness-Duell` | `de-DE/name.txt` | 27/30 |
 | Untertitel | `Trainier gegen deine Freunde` | `de-DE/subtitle.txt` | 28/30 |
-| Werbetext | Ein Wochenziel, jeder seinen Teil: Fordere deine Freunde heraus, trag jeden Satz ein und sieh live, wer liefert. Kostenlos und ohne Werbung. | `de-DE/promotional_text.txt` | 140/170 |
-| Beschreibung | Datei öffnen und komplett kopieren | `de-DE/description.txt` | 1445/4000 |
+| Werbetext | Ein Wochenziel, jeder seinen Teil: Fordere deine Freunde heraus, trag jeden Satz ein und sieh live, wer liefert. Kostenlos und ohne Tracking. | `de-DE/promotional_text.txt` | 141/170 |
+| Beschreibung | Datei öffnen und komplett kopieren | `de-DE/description.txt` | 1509/4000 |
 | Schlüsselwörter | `Liegestütze,Klimmzüge,Kniebeugen,Calisthenics,Challenge,Wochenziel,Workout,Wettkampf,Sport,Gruppe` | `de-DE/keywords.txt` | 97/100 |
-| Neuerungen | Bei der ersten Version zeigt App Store Connect das Feld nicht. Text liegt für 1.4.1 bereit. | `de-DE/release_notes.txt` | 149/4000 |
+| Neuerungen | Text für 1.4.1 (Werbebanner, Einwilligung) | `de-DE/release_notes.txt` | 387/4000 |
 | Datenschutz-URL | https://noltejonas.github.io/Benny-Joni/datenschutz.html | `de-DE/privacy_url.txt` | |
 | Support-URL | https://noltejonas.github.io/Benny-Joni/support.html | `de-DE/support_url.txt` | |
 | Marketing-URL | https://noltejonas.github.io/Benny-Joni/ | `de-DE/marketing_url.txt` | |
@@ -148,12 +148,13 @@ Tracking.**
 „Daten, die zum Tracking verwendet werden“: **keine**. Die App fragt nicht nach
 App-Tracking-Transparenz.
 
-**Ab 1.4.1 mit AdMob** kommen die Angaben aus `docs/launch/ADMOB.md` dazu
-(AdMob-Branch). Nicht jetzt eintragen.
+**Ab 1.4.1 mit AdMob** (dieser Branch) kommen die Angaben aus
+`docs/launch/ADMOB.md`, Abschnitt 11, dazu. Erst eintragen, wenn 1.4.1
+eingereicht wird; die Tabelle oben bleibt der Stand für 1.4.
 
 ## 5. Verfügbarkeit und Zielgruppe
 
 - Nur iPhone (iPad ist im Projekt abgeschaltet).
 - Nur Deutsch, Länder DE, AT, CH.
-- Kostenlos, keine In-App-Käufe, keine Werbung.
+- Kostenlos, keine In-App-Käufe. Ab 1.4.1 Werbebanner (AdMob) in Feed und Stats.
 - Android gibt es zum Start nicht. Im Marketing „fürs iPhone“ sagen.
