@@ -86,14 +86,22 @@ function ObInviteLayer({ competition, members, me, fresh, onDone }) {
 const obStepOf = (n) => (n < 30 ? 1 : n < 100 ? 5 : 10);
 
 function ObAmount({ value, onChange, choices, unit, note }) {
-  const set = (v) => onChange(Math.max(1, Math.min(9999, Math.round(v) || 1)));
+  // Beim Tippen darf das Feld kurz leer sein; der Wert bleibt der letzte gültige.
+  const [draft, setDraft] = React.useState(null);
+  const set = (v) => { setDraft(null); onChange(Math.max(1, Math.min(9999, Math.round(v) || 1))); };
+  const type = (raw) => {
+    const clean = String(raw).replace(/\D/g, '').slice(0, 4);
+    setDraft(clean);
+    const n = parseInt(clean, 10);
+    if (n > 0) onChange(n);
+  };
   return (
     <div className="ob-amount">
       <div className="ob-amount-row">
         <button type="button" className="ob-step-btn" aria-label="weniger" disabled={value <= 1}
           onClick={() => set(value - obStepOf(value - 1))}>−</button>
-        <input className="ob-amount-num" type="number" inputMode="numeric" value={value} aria-label={unit}
-          onFocus={e => e.target.select()} onChange={e => set(parseInt(e.target.value, 10))} />
+        <input className="ob-amount-num" type="text" inputMode="numeric" pattern="[0-9]*" value={draft ?? value} aria-label={unit}
+          onFocus={e => e.target.select()} onChange={e => type(e.target.value)} onBlur={() => setDraft(null)} />
         <button type="button" className="ob-step-btn" aria-label="mehr" onClick={() => set(value + obStepOf(value))}>+</button>
       </div>
       <div className="ob-amount-unit">{unit}</div>

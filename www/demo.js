@@ -14,12 +14,17 @@
 // wie ohne Netz; PTDemo.shiftWeek() spult eine Woche vor.
 
 (function () {
+  // Onboarding-Stände (pt:onboarding:<id>) gehören zu Demo-Personen, die es nach
+  // einem Zurücksetzen nicht mehr gibt.
+  function clearDemoState() {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('pt:onboarding:u-')) localStorage.removeItem(k);
+  }
   const params = new URLSearchParams(location.search);
   const flag = params.get('demo');
   try {
     if (flag === 'off') { localStorage.removeItem('pt_demo'); localStorage.removeItem('pt_demo_user'); }
     else if (flag !== null) localStorage.setItem('pt_demo', '1');
-    if (flag === 'reset') { localStorage.removeItem('pt_demo_db_v1'); localStorage.removeItem('pt_demo_user'); }
+    if (flag === 'reset') { localStorage.removeItem('pt_demo_db_v1'); localStorage.removeItem('pt_demo_user'); clearDemoState(); }
     if (flag === 'new') { sessionStorage.setItem('pt_demo_signed_out', '1'); localStorage.removeItem('pt_demo_user'); }
     if (flag !== null) {
       // Einmalige Schalter nicht beim Neuladen wiederholen; ?join= & Co. bleiben.
@@ -289,7 +294,8 @@
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw fail('Unable to validate email address: invalid format', 'validation_failed');
         if (String(password || '').length < 6) throw fail('Password should be at least 6 characters.', 'weak_password');
         if (db.accounts.some(a => a.email === mail)) throw fail('User already registered', 'user_already_exists');
-        const userId = newId('u');
+        // Eindeutig über Zurücksetzen hinweg (seq beginnt dann neu).
+        const userId = `u-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         db.profiles.push({
           id: userId, display_name: (String(displayName || '').trim() || mail.split('@')[0]).slice(0, 30),
           avatar_url: null, color: COLORS[db.profiles.length % COLORS.length], main_competition_id: null,
@@ -662,7 +668,7 @@
 
   window.PTData.init = () => createDemoAPI();
   window.PTDemo = {
-    reset() { localStorage.removeItem(DB_KEY); localStorage.removeItem(USER_KEY); location.reload(); },
+    reset() { localStorage.removeItem(DB_KEY); localStorage.removeItem(USER_KEY); clearDemoState(); location.reload(); },
     live(on = true) { try { localStorage.setItem(LIVE_KEY, on ? '1' : '0'); } catch (e) {} },
     simulateJoin,
     shiftWeek(weeks = 1) { shiftWeek(weeks); location.reload(); },

@@ -3,6 +3,7 @@
 
 /* ─── Bildschirm-Gerüst ─────────────────────────────────────────────────── */
 .ob-screen {
+  min-height: 100vh; /* iOS < 15.4 kennt dvh nicht */
   min-height: 100dvh;
   display: flex; flex-direction: column;
   padding: calc(var(--safe-top) + 8px) 24px 0;
@@ -283,7 +284,8 @@
 
 /* ─── Ebenen in der Challenge ───────────────────────────────────────────── */
 .ob-layer {
-  position: fixed; inset: 0; z-index: 160; overflow-y: auto;
+  /* unter Sheets (100/101), damit z. B. ein Einladungslink sein Sheet zeigen kann */
+  position: fixed; inset: 0; z-index: 99; overflow-y: auto;
   background: var(--bg);
   animation: ob-layer-in .38s var(--ease) both;
 }

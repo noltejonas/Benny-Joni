@@ -158,7 +158,7 @@ function App() {
   obStateRef.current = obState;
   const patchOb = useCallback((patch) => {
     if (!userId) return;
-    const next = PTOnboarding.mergeState(obStateRef.current, patch);
+    const next = PTOnboarding.mergeState(patch, obStateRef.current); // neue Werte gewinnen
     obStateRef.current = next;
     try { localStorage.setItem(PTOnboarding.stateKey(userId), JSON.stringify(next)); } catch (e) {}
     setObLocal(next);
@@ -233,8 +233,10 @@ function App() {
   // landet, gilt ab jetzt als neu (Startkarte, Tipps, Feiern).
   const route = PTOnboarding.entryRoute({ session, profile: userId ? profile : null, competitions, invite, state: obState });
   useEffect(() => {
-    if (['profile', 'start', 'join'].includes(route) && !obState.started) patchOb({ started: new Date().toISOString() });
-  }, [route, obState.started, patchOb]);
+    if (['profile', 'start', 'join'].includes(route) && !obState.started && PTOnboarding.youngProfile(profile)) {
+      patchOb({ started: new Date().toISOString() });
+    }
+  }, [route, obState.started, patchOb, profile]);
 
   // Push-Tap mit competition_id → passende Challenge öffnen
   useEffect(() => {
@@ -258,18 +260,22 @@ function App() {
 
   const newcomer = PTOnboarding.isNewcomer({ state: obState, profile });
 
+  // Start-Ansicht und Einladung erst nach dem Laden zurücksetzen, sonst blitzt
+  // „Wie startest du?“ auf und ließe sich ein zweites Mal antippen.
   async function handleCreated(c) {
-    setSheet(null); setStartView(null);
+    setSheet(null);
     setIntro({ kind: 'created', id: c.id });
     await loadAccount(c.id);
     setActiveId(c.id);
+    setStartView(null);
   }
 
   async function handleJoined(id) {
-    setSheet(null); setStartView(null); setInvite(null); setJoinCode('');
+    setSheet(null); setJoinCode('');
     setIntro({ kind: 'joined', id });
     await loadAccount(id);
     setActiveId(id);
+    setInvite(null); setStartView(null);
     if (!newcomer) setToast('Willkommen in der Challenge 💪');
   }
 
@@ -354,7 +360,8 @@ function App() {
       screen = <JoinPanel api={api} onCancel={() => setStartView(null)} onJoined={handleJoined} />;
     } else {
       screen = <ObStart profile={profile} onCreate={() => setStartView('create')} onJoin={() => setStartView('join')}
-        onProfile={() => setSheet('profile')} onDemo={() => obSetDemo(true)} />;
+        onProfile={() => setSheet('profile')} onDemo={() => obSetDemo(true)}
+        onArchived={competitions.length ? () => setSheet('switcher') : null} />;
     }
     return <>{screen}{sheets}</>;
   }
@@ -526,6 +533,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const [layer, setLayer] = useState(null);
   const layerQueue = React.useRef([]);
   const introStarted = React.useRef(false);
+  const introRef = React.useRef(intro);
+  const firstLoadRef = React.useRef(true);
+  const celebratedRef = React.useRef(false);
 
   const sides = useMemo(() => buildSides(competition, members, me), [competition, members, me]);
   const allowWork = !!competition.work_enabled;
@@ -613,30 +623,24 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     if (loading || !intro || introStarted.current) return;
     introStarted.current = true;
-    if (intro === 'joined') {
-      // Gruppenziele, die vor dem Beitritt geknackt wurden, nicht als Vollbild feiern.
-      const reached = currentChallenges.filter(ch => {
-        const total = allSets.filter(x => x.challenge_id === ch.id).reduce((a, x) => a + (x.reps || 0), 0);
-        return ch.target_reps > 0 && total >= ch.target_reps;
-      });
-      markCelebrated(me, reached.map(ch => ch.id));
-    }
     // Erster Satz mit Feier gibt es einmal pro Konto (obState.firstLog).
     const firstLog = obState.firstLog ? [] : ['log'];
     const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', ...firstLog] : ['invite'])
       : newcomer ? ['goal', ...firstLog] : [];
     openLayer(kinds);
-  }, [loading, intro, newcomer, openLayer, currentChallenges, allSets, me, obState.firstLog]);
+  }, [loading, intro, newcomer, openLayer, obState.firstLog]);
 
   // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
   const celebrateFirst = useCallback((value, ch, cat) => {
+    if (celebratedRef.current) return; // zwei schnelle Tipps feiern nur einmal
+    celebratedRef.current = true;
     const share = PTData.fairShareOf(ch.target_reps, peopleForShare);
     const before = allSets.filter(x => x.challenge_id === ch.id && x.athlete === me).reduce((a, x) => a + (x.reps || 0), 0);
     onObPatch?.({ firstLog: new Date().toISOString() });
     layerQueue.current = ['push']; // nach der Feier ist der richtige Moment für den Push-Vorab-Bildschirm
     setLayer({ kind: 'cele', value, cat, share, myDone: before + value });
   }, [peopleForShare, allSets, me, onObPatch]);
-  const isFirstLog = newcomer && !obState.firstLog && mySetCount === 0;
+  const isFirstLog = newcomer && !obState.firstLog && mySetCount === 0 && !celebratedRef.current;
 
   // Startkarte (nur neue Leute, erste 14 Tage, nicht weggetippt).
   const myMembership = members.find(m => m.user_id === me);
@@ -748,6 +752,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       // Pflicht-Workouts markieren, damit Summen sie erkennen (PTData.setValue).
       PTData.annotateWorkouts(allSetsData, challs, cats);
       PTData.annotateWorkouts(feedData, challs, cats);
+      // Frisch beigetreten: Gruppenziele, die vorher geknackt wurden, nicht als
+      // Vollbild feiern. Vor dem ersten Rendern von Home setzen (useCelebration).
+      if (firstLoadRef.current && introRef.current === 'joined') {
+        const reached = challs.filter(ch => ch.target_reps > 0 && !ch.workout
+          && allSetsData.filter(x => x.challenge_id === ch.id).reduce((a, x) => a + (x.reps || 0), 0) >= ch.target_reps);
+        markCelebrated(me, reached.map(ch => ch.id));
+      }
+      firstLoadRef.current = false;
       PTPeople.set(mems.map(m => m.profile).filter(Boolean));
       // Neue Mitglieder ankündigen (nicht beim ersten Laden; die Einladen-Ebene zeigt es selbst).
       const activeIds = mems.filter(m => !m.left_at).map(m => m.user_id);
@@ -903,7 +915,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             onOpen={openStarter}
             onDismiss={() => onObPatch?.({ dismissed: { [competition.id]: new Date().toISOString() } })} />
         )}
-        {tab === 'home' && !starterVisible && (sides.length < 2 || sides.some(x => !x.userIds.length)) && (
+        {tab === 'home' && !starterVisible
+          && (activeMembers.length < 2 || (competition.mode === '2v2' && sides.some(x => !x.userIds.length))) && (
           <ObInviteCard competition={competition} members={members} onInvite={() => openLayer(['invite'])} />
         )}
 
@@ -983,7 +996,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onBackfill={() => setBackfillOpen(true)}
           alone={activeMembers.length < 2}
           onFirstLog={startFirstLog}
-          onInvite={() => openLayer(['invite'])} />}
+          onInvite={() => { setTab('home'); openLayer(['invite']); }} />}
 
         {tab === 'history' &&
         <StatsTab

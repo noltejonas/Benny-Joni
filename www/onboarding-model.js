@@ -55,26 +55,34 @@
 
   // ── Einstieg ────────────────────────────────────────────────────────
   const DAY = 86400000;
-  const NEWCOMER_DAYS = 14;
+  const NEWCOMER_DAYS = 14;   // so lange gilt ein frisches Profil als neu
+  const STARTED_DAYS = 30;    // so lange nach Beginn des neuen Onboardings
+
+  function youngProfile(profile, now = Date.now()) {
+    const created = Date.parse(profile?.created_at);
+    return Number.isFinite(created) && now - created < NEWCOMER_DAYS * DAY;
+  }
 
   // Welcher Bildschirm vor der App? Aus Session, Profil, Challenges, offener
-  // Einladung und dem Onboarding-Stand (state, s. mergeState).
-  function entryRoute({ session, profile, competitions, invite, state } = {}) {
+  // Einladung und dem Onboarding-Stand (state, s. mergeState). Den
+  // Profilschritt sehen nur junge Konten; wer schon länger dabei ist (z. B.
+  // alle Challenges verlassen oder nur archivierte), landet direkt beim Start.
+  function entryRoute({ session, profile, competitions, invite, state, now = Date.now() } = {}) {
     if (session === undefined) return 'loading';
     if (!session) return 'welcome';
     if (!profile || !competitions) return 'loading';
     if (competitions.some(c => !c.archived_at)) return 'app';
-    // Nur archivierte Challenges: bestehendes Konto, der Profilschritt entfällt.
-    if (!competitions.length && !state?.profileDone) return 'profile';
+    if (!competitions.length && !state?.profileDone && youngProfile(profile, now)) return 'profile';
     return invite ? 'join' : 'start';
   }
 
-  // Neue Begleitung (Startkarte, Tipps, Feiern) nur für Konten, die das neue
-  // Onboarding begonnen haben oder deren Profil jünger als 14 Tage ist.
+  // Neue Begleitung (Startkarte, Tipps, Feiern) nur für Konten, deren Profil
+  // jünger als 14 Tage ist oder die das neue Onboarding vor höchstens 30 Tagen
+  // begonnen haben.
   function isNewcomer({ state, profile, now = Date.now() } = {}) {
-    if (state?.started) return true;
-    const created = Date.parse(profile?.created_at);
-    return Number.isFinite(created) && now - created < NEWCOMER_DAYS * DAY;
+    const started = Date.parse(state?.started);
+    if (Number.isFinite(started) && now - started < STARTED_DAYS * DAY) return true;
+    return youngProfile(profile, now);
   }
 
   // „lenn.hoffmann@…“ → „Lenn“. Leer, wenn nichts Sinnvolles herauskommt.
@@ -251,7 +259,7 @@
   window.PTOnboarding = {
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
-    entryRoute, isNewcomer, suggestName, mergeState, stateKey,
+    entryRoute, isNewcomer, youngProfile, suggestName, mergeState, stateKey,
     weekProgress, joinedMidWeek,
     expectedPeople, goalDefault, goalChoices, goalTarget,
     starterItems, showStarter,

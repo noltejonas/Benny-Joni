@@ -83,10 +83,16 @@ test('entryRoute: wer eine aktive Challenge hat, geht direkt in die App', () => 
 });
 
 test('entryRoute: neue Person erst Profil, dann Einladung oder Start', () => {
-  const base = { session: {}, profile: {}, competitions: [] };
+  const base = { session: {}, profile: { created_at: daysAgo(0) }, competitions: [], now: NOW };
   assert.equal(O.entryRoute({ ...base, state: {} }), 'profile');
   assert.equal(O.entryRoute({ ...base, state: { profileDone: daysAgo(0) } }), 'start');
   assert.equal(O.entryRoute({ ...base, state: { profileDone: daysAgo(0) }, invite: 'BJ4K7X' }), 'join');
+});
+
+test('entryRoute: altes Konto ohne Challenge bekommt keinen Profilschritt', () => {
+  const base = { session: {}, profile: { created_at: daysAgo(60) }, competitions: [], state: {}, now: NOW };
+  assert.equal(O.entryRoute(base), 'start');
+  assert.equal(O.entryRoute({ ...base, invite: 'BJ4K7X' }), 'join');
 });
 
 test('entryRoute: nur archivierte Challenges = bestehendes Konto, kein Profilschritt', () => {
@@ -95,8 +101,9 @@ test('entryRoute: nur archivierte Challenges = bestehendes Konto, kein Profilsch
   assert.equal(O.entryRoute({ ...base, invite: 'BJ4K7X' }), 'join');
 });
 
-test('isNewcomer: begonnenes Onboarding oder junges Profil', () => {
-  assert.equal(O.isNewcomer({ state: { started: daysAgo(30) }, profile: { created_at: daysAgo(30) }, now: NOW }), true);
+test('isNewcomer: begonnenes Onboarding (30 Tage) oder junges Profil (14 Tage)', () => {
+  assert.equal(O.isNewcomer({ state: { started: daysAgo(20) }, profile: { created_at: daysAgo(60) }, now: NOW }), true);
+  assert.equal(O.isNewcomer({ state: { started: daysAgo(40) }, profile: { created_at: daysAgo(60) }, now: NOW }), false);
   assert.equal(O.isNewcomer({ state: {}, profile: { created_at: daysAgo(3) }, now: NOW }), true);
   assert.equal(O.isNewcomer({ state: {}, profile: { created_at: daysAgo(15) }, now: NOW }), false);
   assert.equal(O.isNewcomer({ state: {}, profile: {}, now: NOW }), false);
@@ -306,4 +313,12 @@ test('friendlyError behält RPC-Fehler und den Code', () => {
   assert.equal(e.code, 'P0001');
   const own = new Error('Bitte gib deinen Namen ein.');
   assert.equal(D.friendlyError(own).message, own.message, 'eigene Texte bleiben unverändert');
+});
+
+test('mergeState: der erste Stand gewinnt (so überschreibt ein Patch alte Werte)', () => {
+  const patch = { weekOne: { c1: '2026-10-19' }, dismissed: { c1: 'neu' } };
+  const current = { weekOne: { c1: '2026-10-12' }, dismissed: { c1: 'alt', c2: 'x' }, started: 't0' };
+  assert.deepEqual(JSON.parse(JSON.stringify(O.mergeState(patch, current))), {
+    weekOne: { c1: '2026-10-19' }, dismissed: { c1: 'neu', c2: 'x' }, started: 't0',
+  });
 });

@@ -467,12 +467,16 @@ function ObProfile({ api, profile, email, onSaved, onDone, onSignOut }) {
 }
 
 // ─── Start (Konto ohne Challenge) ───────────────────────────────────────────
-function ObStart({ profile, onCreate, onJoin, onProfile, onDemo }) {
+// `onArchived`: nur archivierte Challenges vorhanden → über den Switcher erreichbar.
+function ObStart({ profile, onCreate, onJoin, onProfile, onDemo, onArchived }) {
   const first = (profile.display_name || '').split(/\s+/)[0];
   return (
     <ObScreen steps={3} step={3} stepKey="start"
       left={<button type="button" className="ob-corner-avatar" onClick={onProfile} aria-label="Profil"><Avatar profile={profile} size={40} /></button>}
-      foot={<button type="button" className="btn-link" onClick={onDemo}>Erst mal die Demo ansehen</button>}>
+      foot={<>
+        {onArchived && <button type="button" className="btn-link" onClick={onArchived}>Archivierte Challenges</button>}
+        <button type="button" className="btn-link" onClick={onDemo}>Erst mal die Demo ansehen</button>
+      </>}>
       <h1 className="ob-title">Hi {first} 👋</h1>
       <p className="ob-sub">Wie startest du?</p>
       <div className="ob-choices">
