@@ -1,6 +1,6 @@
 /* global React, Sheet, Avatar, PTPeople, SIDE_COLORS, modeLabel */
-// Login, Onboarding, Challenge-Switcher, Erstellen/Beitreten, Profil und
-// Challenge-Einstellungen.
+// Login, Onboarding, Challenge-Switcher, Erstellen/Beitreten und Profil.
+// Die Challenge-Einstellungen liegen in settings.jsx.
 
 const MODES = [
   { id: '1v1', title: '1 vs 1', desc: 'Du gegen eine Person' },
@@ -167,7 +167,6 @@ function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId
         {active.map(row)}
         {!active.length && <div className="subtitle">Noch keine aktive Challenge.</div>}
       </div>
-      <div className="mu-hint">★ = Haupt-Challenge, öffnet sich beim Start der App</div>
 
       <div className="btn-row" style={{ marginTop: 16 }}>
         <button className="btn" onClick={onCreate}>+ Neue Challenge</button>
@@ -467,140 +466,7 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
   );
 }
 
-// ─── Challenge-Einstellungen (Karte im Settings-Screen) ─────────────────────
-function CompetitionSettingsCard({ api, capi, competition, members, me, onChanged, onLeft }) {
-  const isOwner = members.some(m => m.user_id === me && m.role === 'owner' && !m.left_at);
-  const [name, setName] = React.useState(competition.name);
-  const [emoji, setEmoji] = React.useState(competition.emoji);
-  const [busy, setBusy] = React.useState(false);
-  const [shareState, setShareState] = React.useState('');
-  React.useEffect(() => { setName(competition.name); setEmoji(competition.emoji); }, [competition.name, competition.emoji]);
-
-  const run = async (fn) => {
-    setBusy(true);
-    try { await fn(); onChanged?.(); }
-    catch (e) { alert(e.message); }
-    finally { setBusy(false); }
-  };
-
-  const saveName = () => {
-    if (!name.trim() || (name === competition.name && emoji === competition.emoji)) return;
-    run(() => api.updateCompetition(competition.id, { name: name.trim(), emoji: emoji || '💪' }));
-  };
-
-  const setModule = (key, value) => run(async () => {
-    await api.updateCompetition(competition.id, { [key]: value });
-    if (key === 'penalties_enabled') await capi.setPenaltyConfig({ enabled: value });
-    if (key === 'rotation_enabled') await capi.setRotationConfig({ enabled: value });
-  });
-
-  const active = members.filter(m => !m.left_at);
-  const moduleRow = (key, label, desc) => (
-    <div className="mu-toggle-row">
-      <div>
-        <div className="mu-toggle-title">{label}</div>
-        <div className="mu-toggle-desc">{desc}</div>
-      </div>
-      <label className="toggle-switch">
-        <input type="checkbox" checked={!!competition[key]} disabled={!isOwner || busy}
-          onChange={e => setModule(key, e.target.checked)} />
-        <span className="toggle-slider" />
-      </label>
-    </div>
-  );
-
-  return (
-    <div className="card mu-settings">
-      <div className="label" style={{ margin: 0, marginBottom: 10 }}>Challenge</div>
-      {isOwner ? (
-        <div className="new-cat-row" style={{ marginTop: 0 }}>
-          <input className="input new-cat-emoji" value={emoji} maxLength={2}
-            onChange={e => setEmoji(e.target.value)} onBlur={saveName} />
-          <input className="input" value={name} maxLength={40}
-            onChange={e => setName(e.target.value)} onBlur={saveName}
-            onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
-        </div>
-      ) : (
-        <div className="mu-settings-name">{competition.emoji} {competition.name}</div>
-      )}
-      <div className="subtitle" style={{ fontSize: 13, marginTop: 6 }}>
-        {modeLabel(competition.mode)} · seit {new Date(competition.start_date + 'T00:00:00').toLocaleDateString('de-DE')}
-        {competition.end_date ? ` · bis ${new Date(competition.end_date + 'T00:00:00').toLocaleDateString('de-DE')}` : ''}
-      </div>
-
-      <div className="settings-section-label" style={{ marginTop: 18 }}>Einladungscode</div>
-      <div className="mu-code-row">
-        <span className="mu-code mono small">{competition.invite_code}</span>
-        <button className="btn-ghost-sm primary" onClick={() => setShareState(shareInvite(competition))}>Teilen</button>
-        {isOwner && (
-          <button className="btn-ghost-sm" disabled={busy}
-            onClick={() => confirm('Neuen Code erzeugen? Der alte funktioniert dann nicht mehr.') && run(() => api.regenerateInviteCode(competition.id))}>
-            Neu
-          </button>
-        )}
-      </div>
-      {shareState === 'copied' && <div className="mu-info">Einladung kopiert</div>}
-
-      <div className="settings-section-label" style={{ marginTop: 18 }}>Module</div>
-      {moduleRow('rotation_enabled', 'Rotationsplan', 'Wochenplan mit Vorschlägen')}
-      {moduleRow('penalties_enabled', 'Strafkonto', 'Strafen bei verfehltem Anteil')}
-      {moduleRow('work_enabled', 'Work-Tracking', 'Arbeitszeit-Kategorien und Tags')}
-      {!isOwner && <div className="mu-hint">Module kann nur der Ersteller ändern.</div>}
-
-      <div className="settings-section-label" style={{ marginTop: 18 }}>
-        Teilnehmer ({active.length})
-      </div>
-      <div className="mu-member-list">
-        {active.map(m => (
-          <div key={m.user_id} className="mu-member-row">
-            <Avatar profile={m.profile} size={32} />
-            <span className="mu-member-name">
-              {m.profile?.display_name}{m.user_id === me ? ' (du)' : ''}
-              {m.role === 'owner' && <span className="mu-badge">Ersteller</span>}
-            </span>
-            {competition.mode === '2v2' && (
-              <div className="segmented segmented-sm">
-                {['A', 'B'].map(t => (
-                  <button key={t} className={m.team === t ? 'active' : ''}
-                    disabled={busy || !(isOwner || m.user_id === me)}
-                    onClick={() => m.team !== t && run(() => api.setMemberTeam(competition.id, m.user_id, t))}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            )}
-            {isOwner && m.user_id !== me && (
-              <button className="icon-btn icon-btn-danger" aria-label="Entfernen" disabled={busy}
-                onClick={() => confirm(`${m.profile?.display_name} aus der Challenge entfernen? Die Sätze bleiben in der Historie.`)
-                  && run(() => api.removeMember(competition.id, m.user_id))}>
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mu-settings-danger">
-        {isOwner && (
-          <button className="btn btn-secondary" disabled={busy}
-            onClick={() => run(() => api.updateCompetition(competition.id,
-              { archived_at: competition.archived_at ? null : new Date().toISOString() }))}>
-            {competition.archived_at ? 'Wieder aktivieren' : 'Archivieren'}
-          </button>
-        )}
-        <button className="btn btn-danger-ghost" disabled={busy}
-          onClick={async () => {
-            if (!confirm(`„${competition.name}“ verlassen? Deine Sätze bleiben in der Historie.`)) return;
-            try { await api.leaveCompetition(competition.id); onLeft?.(); } catch (e) { alert(e.message); }
-          }}>
-          Challenge verlassen
-        </button>
-      </div>
-    </div>
-  );
-}
-
 Object.assign(window, {
   AuthScreen, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet,
-  JoinCompetitionSheet, ProfileSheet, CompetitionSettingsCard, shareInvite,
+  JoinCompetitionSheet, ProfileSheet, shareInvite, COMP_EMOJIS,
 });

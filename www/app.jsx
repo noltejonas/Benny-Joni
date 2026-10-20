@@ -5,6 +5,29 @@ const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjenl5dXB4eHFyZGdiZWlmY3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDYyMjgsImV4cCI6MjA5NDA4MjIyOH0.2Bz6R3N3p3evHXB7j5cKamq2egHrE1zYfgLcV2R8awg";
 
 const ACTIVE_KEY = 'pt_active_competition';
+const THEME_KEY = 'pt:theme2';
+const PUSH_KEY = 'pt:notifications';
+
+function readPref(key, fallback) {
+  try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
+}
+function writePref(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) {}
+}
+
+// Folgt dem Hell/Dunkel-Modus des Systems (iOS-Kontrollzentrum, macOS).
+function useSystemDark() {
+  const query = '(prefers-color-scheme: dark)';
+  const [dark, setDark] = useState(() => !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq?.addEventListener) return;
+    const onChange = (e) => setDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return dark;
+}
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "theme": "dark",
@@ -34,23 +57,20 @@ function App() {
     }
   }, []);
 
-  // Theme: end-user preference persists in localStorage (override of tweak default).
-  // Settings dispatches 'pt:theme-change' to update without reload.
-  const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem('pt:theme2') || 'light'; }
-    catch (e) { return 'light'; }
-  });
+  // Gerätebezogene Einstellungen liegen in localStorage (nicht im Profil):
+  // Erscheinungsbild 'system' | 'light' | 'dark' und Push an/aus.
+  const [themePref, setThemePref] = useState(() => readPref(THEME_KEY, 'system'));
+  const systemDark = useSystemDark();
+  const theme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
+  useEffect(() => { writePref(THEME_KEY, themePref); }, [themePref]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    try { localStorage.setItem('pt:theme2', theme); } catch (e) {}
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', theme === 'dark' ? '#16151F' : '#F4F3F8');
   }, [theme]);
-  useEffect(() => {
-    const onChange = (e) => { if (e?.detail?.theme) setTheme(e.detail.theme); };
-    window.addEventListener('pt:theme-change', onChange);
-    return () => window.removeEventListener('pt:theme-change', onChange);
-  }, []);
+
+  const [notificationsOn, setNotificationsOn] = useState(() => readPref(PUSH_KEY, 'on') !== 'off');
+  useEffect(() => { writePref(PUSH_KEY, notificationsOn ? 'on' : 'off'); }, [notificationsOn]);
 
   const api = useMemo(() => PTData.init({ url: SUPABASE_URL, key: SUPABASE_ANON_KEY }), []);
 
@@ -197,10 +217,15 @@ function App() {
     <>
       <CompetitionApp key={active.id}
         api={api} competition={active} profile={profile} me={profile.id}
+        email={session.user?.email}
         competitions={competitions}
         t={t} setTweak={setTweak}
+        themePref={themePref} onSetThemePref={setThemePref}
+        notificationsOn={notificationsOn} onSetNotifications={setNotificationsOn}
         onOpenSwitcher={() => setSheet('switcher')}
         onOpenProfile={() => setSheet('profile')}
+        onSetMain={setMain}
+        onSignOut={signOut}
         onCompetitionChanged={() => loadAccount()}
         onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }} />
       {sheets}
@@ -285,8 +310,9 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
 }
 
 // ─── App pro Challenge ──────────────────────────────────────────────────────
-function CompetitionApp({ api, competition: initialCompetition, profile, me, t, setTweak,
-  onOpenSwitcher, onOpenProfile, onCompetitionChanged, onLeft }) {
+function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
+  themePref, onSetThemePref, notificationsOn, onSetNotifications,
+  onOpenSwitcher, onOpenProfile, onSetMain, onSignOut, onCompetitionChanged, onLeft }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
 
   const [competition, setCompetition] = useState(initialCompetition);
@@ -302,6 +328,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
   useEffect(() => {
     if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
   }, [tab, competition.penalties_enabled]);
+  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'work')
+  const [settingsPage, setSettingsPage] = useState('root');
+  const openSettings = (page = 'root') => { setSettingsPage(page); setTab('settings'); };
 
   // Data
   const [members, setMembers] = useState([]);
@@ -427,7 +456,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
 
       // Notification trigger
       if (lastFeedRef.current !== null && feedData[0] && feedData[0].id !== lastFeedRef.current &&
-      feedData[0].athlete !== me && t.notifications) {
+      feedData[0].athlete !== me && notificationsOn) {
         notify(feedData[0]);
       }
       lastFeedRef.current = feedData[0]?.id || null;
@@ -441,7 +470,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
     } finally {
       setLoading(false);
     }
-  }, [capi, me, t.notifications]);
+  }, [capi, me, notificationsOn]);
 
   function notify(set) {
     const isWork = set.category?.kind === 'work';
@@ -465,19 +494,19 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
   // Ask for notification permission on first interaction
   useEffect(() => {
     if (!('Notification' in window)) return;
-    if (Notification.permission === 'default' && t.notifications) {
+    if (Notification.permission === 'default' && notificationsOn) {
       // Defer to first user gesture to avoid blocking
       const ask = () => {Notification.requestPermission();document.removeEventListener('click', ask);};
       document.addEventListener('click', ask, { once: true });
     }
-  }, [t.notifications]);
+  }, [notificationsOn]);
 
   // Native APNs registration (Capacitor only — web uses the Notification API above)
   useEffect(() => {
     const Push = window.PTPushNotifications?.PushNotifications;
     if (!Push) return; // not running natively, nothing to do
 
-    if (!t.notifications) {
+    if (!notificationsOn) {
       // Toggle is OFF → wipe this device's token from the server so we stop
       // receiving banners. Keep localStorage in sync.
       const saved = localStorage.getItem('pt_apns_token');
@@ -526,7 +555,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
     })();
 
     return () => { cancelled = true; cleanup(); };
-  }, [me, t.notifications, api]);
+  }, [me, notificationsOn, api]);
 
   // Tap on push → switch to Feed tab
   useEffect(() => {
@@ -551,7 +580,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
           </span>
         </button>
         <button className={`avatar-btn${tab === 'settings' ? ' is-active' : ''}`}
-          onClick={() => setTab(tab === 'settings' ? 'home' : 'settings')}
+          onClick={() => tab === 'settings' ? setTab('home') : openSettings()}
           aria-label="Profil und Einstellungen">
           <Avatar userId={me} profile={profile} size={44} />
         </button>
@@ -616,7 +645,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
           openClosures={openClosures}
           payouts={payouts}
           onChange={reload}
-          onOpenSettings={() => setTab('settings')} />
+          onOpenSettings={() => openSettings('penalties')} />
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}
@@ -647,19 +676,18 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
         }
 
         {tab === 'settings' &&
-        <SettingsScreen api={capi} baseApi={api} categories={categories} onAddCategory={reload}
-          me={me}
-          competition={competition}
-          members={members}
-          notificationsEnabled={t.notifications}
-          onSetNotifications={(v) => setTweak('notifications', v)}
-          projectTags={projectTags}
-          toolTags={toolTags}
+        <SettingsScreen api={capi} baseApi={api}
+          page={settingsPage} onNavigate={setSettingsPage}
+          me={me} profile={profile} email={email}
+          competition={competition} members={members} categories={categories}
+          planSlots={planSlots} rotationConfig={rotationConfig}
+          projectTags={projectTags} toolTags={toolTags}
+          themePref={themePref} onSetThemePref={onSetThemePref}
+          notificationsEnabled={notificationsOn} onSetNotifications={onSetNotifications}
+          onProfile={onOpenProfile} onSetMain={onSetMain} onSignOut={onSignOut}
           onCompetitionChanged={() => { reload(); onCompetitionChanged?.(); }}
           onLeft={onLeft}
-          profile={profile}
-          onProfile={onOpenProfile}
-          reload={reload} />
+          onToast={setToast} />
         }
         </>)}
       </main>
@@ -801,8 +829,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, t, 
         options={[{ label: 'Ring', value: 'rings' }, { label: 'Balken', value: 'bar' }, { label: 'Zahl', value: 'numeric' }]}
         onChange={(v) => setTweak('layout', v)} />
         <TweakSection label="Sonstiges" />
-        <TweakToggle label="Benachrichtigungen" value={t.notifications}
-        onChange={(v) => setTweak('notifications', v)} />
+        <TweakToggle label="Benachrichtigungen" value={notificationsOn}
+        onChange={onSetNotifications} />
       </TweaksPanel>
     </div>);
 
