@@ -49,7 +49,7 @@ const TEXT = {
   en: {
     someone: "Someone",
     title: (name: string) => `🔥 ${name} is on a roll`,
-    body: (reps: number) => `Already ${reps} reps today — you're still at 0.`,
+    body: (reps: number) => `Already ${reps} reps today — you’re still at 0.`,
   },
 };
 type Lang = keyof typeof TEXT;
