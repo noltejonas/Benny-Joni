@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTStats, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -655,8 +655,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }, [categories]);
   const sportsGoalsNow = useMemo(() => currentChallenges.filter(catTypeOf), [currentChallenges, catTypeOf]);
   const mySetCount = useMemo(() => allSets.filter(s => s.athlete === me).length, [allSets, me]);
-  // Solange Plätze frei sind, rechnet der Anteil mit der vollen Besetzung (Spec, Entscheidung 10).
-  const peopleForShare = PTOnboarding.expectedPeople(competition.mode, participantsNow.length);
+  // Anteil-Regel (PTStats.SHARE_BASIS): ab 2 Aktiven die tatsächlichen Teilnehmer
+  // wie Stats und Strafe, allein die volle Besetzung (Spec, Entscheidung 10).
+  const sharePeopleFor = useCallback((mode, active) => {
+    const expected = PTOnboarding.expectedPeople(mode, active);
+    return window.PTStats?.sharePeople ? PTStats.sharePeople({ active, expected }) : expected;
+  }, []);
+  const peopleForShare = sharePeopleFor(competition.mode, participantsNow.length);
   const live = React.useRef({});
   live.current = { goals: sportsGoalsNow.length, sets: mySetCount, pushDue, pushPerm };
 
@@ -739,17 +744,17 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // Rückblick beim ersten Öffnen in Woche 2 einer Mitgliedschaft (nur neue Leute, einmal).
   const weekOneChecked = React.useRef(false);
   useEffect(() => {
-    if (loading || intro || !newcomer || weekOneChecked.current || !myMembership) return;
+    if (!dataReady || intro || !newcomer || weekOneChecked.current || !myMembership) return;
     weekOneChecked.current = true;
     const first = PTOnboarding.weekOneDue({ joinedAt: myMembership.joined_at, startDate: competition.start_date,
       seen: obState.weekOne?.[competition.id] });
     if (!first) return;
-    const people = PTOnboarding.expectedPeople(competition.mode, PTData.participantsFor(members, first).length);
+    const people = sharePeopleFor(competition.mode, PTData.participantsFor(members, first).length);
     const summary = PTOnboarding.weekOneSummary({ weekStart: first, me, sides, sets: allSets,
       challenges: allChallenges, categories, participantCount: people });
     setTab('home');
     setLayer({ kind: 'week1', summary, first });
-  }, [loading, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories]);
+  }, [dataReady, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories, sharePeopleFor]);
 
   // „Ersten Satz loggen“ aus leeren Zuständen: Ziel fehlt → Ziel, sonst Satz.
   function startFirstLog() {
@@ -766,6 +771,22 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
     return PTData.weekTemplateFor({ weekStart, slots: planSlots, config: rotationConfig });
   }, [useRotation, weekStart, planSlots, rotationConfig]);
+
+  // Ohne Wochenplan: „Wie letzte Woche starten“ – die Ziele der Vorwoche als
+  // Vorlage für dieselbe WeekFixCard, damit Woche 2 nicht leer beginnt. Eine
+  // angebrochene erste Woche wird auf sieben Tage hochgerechnet (stats-model.js).
+  const prevWeekTemplate = useMemo(() => {
+    if (useRotation || currentChallenges.length || !window.PTStats?.weekTemplateFromPrevious) return [];
+    const prevWeek = PTData.addDays(weekStart, -7);
+    const usable = new Set(categories.filter(c => allowWork || (c.kind || 'sports') !== 'work').map(c => c.id));
+    const prev = allChallenges.filter(c => c.week_start === prevWeek && usable.has(c.category_id));
+    if (!prev.length) return [];
+    return PTStats.weekTemplateFromPrevious(prev, {
+      fullWeekFactor: (ch) => PTStats.fullWeekFactor({ weekStart: prevWeek, startDate: competition.start_date, createdAt: ch.created_at }),
+    });
+  }, [useRotation, currentChallenges, weekStart, categories, allowWork, allChallenges, competition.start_date]);
+  const fixTemplate = weekTemplate.length ? weekTemplate : prevWeekTemplate;
+  const fixFromPrev = !weekTemplate.length && prevWeekTemplate.length > 0;
 
   // Next week preview — actual challenges if already set up, otherwise rotation suggestions.
   const nextWeekStart = useMemo(() => PTData.addDays(weekStart, 7), [weekStart]);
@@ -1150,8 +1171,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           <ObInviteCard competition={competition} members={members} onInvite={() => openLayer(['invite'])} />
         )}
 
-        {tab === 'home' && !currentChallenges.length && !proposalDismissed && weekTemplate.length > 0 &&
-          <WeekFixCard template={weekTemplate} categories={categories} me={me}
+        {tab === 'home' && !currentChallenges.length && !proposalDismissed && fixTemplate.length > 0 &&
+          <WeekFixCard key={`${weekStart}-${fixFromPrev ? 'prev' : 'plan'}`}
+            template={fixTemplate} categories={categories} me={me}
+            title={fixFromPrev ? 'Wie letzte Woche starten' : undefined}
+            sub={fixFromPrev ? 'Gleiche Übungen wie letzte Woche. Ziele anpassen und los.' : undefined}
             onFix={fixWeek}
             onDismiss={() => setProposalDismissed(true)} />
         }
