@@ -235,6 +235,15 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
       <SettingsDeviceGroup themePref={themePref} onSetThemePref={onSetThemePref}
         notificationsEnabled={notificationsEnabled} onSetNotifications={onSetNotifications} />
 
+      {api?.mode === 'demo' && window.PTDemo && (
+        <SettingsGroup title="Demo">
+          <SettingsRow icon="calendar" title="Eine Woche vorspulen" onClick={() => window.PTDemo.shiftWeek()} />
+          <SettingsRow icon="refresh" title="Demo zurücksetzen"
+            onClick={() => { if (confirm('Alle Demo-Daten neu erzeugen?')) window.PTDemo.reset(); }} />
+          <SettingsRow icon="close" title="Demo beenden" onClick={() => window.PTDemo.exit()} />
+        </SettingsGroup>
+      )}
+
       {onSignOut && (
         <SettingsGroup>
           <SettingsRow title="Abmelden" tone="danger" onClick={onSignOut} />

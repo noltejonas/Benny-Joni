@@ -479,3 +479,4 @@
 .ob-layer ~ .toast, .ob-cele ~ .toast { top: calc(var(--safe-top) + 12px); bottom: auto; }
 
 .ob-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ob-layer .ob-confetti { position: fixed; z-index: 5; }

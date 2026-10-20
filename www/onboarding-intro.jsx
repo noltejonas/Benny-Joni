@@ -117,7 +117,7 @@ function obGoalCategories(categories) {
   return categories.filter(c => (c.kind || 'sports') === 'sports' && (c.challenge_type || 'standard') === 'standard');
 }
 
-function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, onDone, onSkip }) {
+function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = 'Euer erstes Wochenziel', onDone, onSkip }) {
   const online = useObOnline();
   const cats = obGoalCategories(categories);
   const [showAll, setShowAll] = React.useState(false);
@@ -151,7 +151,7 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
         <button type="button" className="btn" disabled={busy || !cat} onClick={save}>{busy ? '…' : 'Ziel setzen'}</button>
         <button type="button" className="btn-link" onClick={onSkip}>Später</button>
       </>}>
-        <h1 className="ob-title">Euer erstes Wochenziel</h1>
+        <h1 className="ob-title">{title}</h1>
         <p className="ob-sub">Was macht ihr bis Sonntag?{daysLeft < 7 ? ` Noch ${daysLeft} ${daysLeft === 1 ? 'Tag' : 'Tage'}.` : ''}</p>
         <div className="ob-ex-grid" role="radiogroup" aria-label="Übung">
           {visible.map(c => (
@@ -345,6 +345,39 @@ function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
   );
 }
 
+// ─── Woche 1 geschafft ──────────────────────────────────────────────────────
+// summary aus PTOnboarding.weekOneSummary.
+function obWeekOneResult(s) {
+  if (s.result === 'won') return { emoji: '🏆', line: s.diff > 0 ? `Du hast die Woche geholt, ${s.diff} vorne.` : 'Du hast die Woche geholt.' };
+  if (s.result === 'lost') return { emoji: '💪', line: `${s.leader} lag ${s.diff} vorne. Revanche?` };
+  if (s.result === 'tie') return { emoji: '🤝', line: 'Gleichstand. Woche 2 entscheidet.' };
+  return { emoji: '🏁', line: 'Solo durchgezogen.' };
+}
+
+function ObWeekOne({ summary, onDone }) {
+  React.useEffect(() => { PTHaptics.celebrate(); PTSound.play('first-log', 0.6); }, []);
+  const r = obWeekOneResult(summary);
+  const main = summary.myMinutes && !summary.myReps
+    ? { num: formatDuration(summary.myMinutes), cap: 'Fokuszeit' }
+    : { num: summary.myReps, cap: 'Reps' };
+  return (
+    <ObLayer label="Woche 1 geschafft">
+      <ObConfetti count={40} />
+      <ObScreen stepKey="week1" center foot={<button type="button" className="btn" onClick={onDone}>Auf in Woche 2</button>}>
+        <div className="ob-trophy" aria-hidden="true">{r.emoji}</div>
+        <div className="ob-overline" style={{ textAlign: 'center' }}>Woche 1</div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>Geschafft 🏁</h1>
+        <div className="ob-stats">
+          <div className="ob-stat"><span className="ob-stat-num">{main.num}</span><span className="ob-stat-cap">{main.cap}</span></div>
+          <div className="ob-stat"><span className="ob-stat-num">{summary.activeDays}</span><span className="ob-stat-cap">aktive Tage</span></div>
+          <div className="ob-stat"><span className="ob-stat-num">{summary.sharesHit}/{summary.sharesTotal}</span><span className="ob-stat-cap">Teile erfüllt</span></div>
+        </div>
+        <div className="ob-result">{r.line}</div>
+      </ObScreen>
+    </ObLayer>
+  );
+}
+
 // ─── Home: Startkarte ───────────────────────────────────────────────────────
 // Punkte aus PTOnboarding.starterItems; erledigt ist, was die Daten hergeben.
 const OB_STARTER_LABELS = {
@@ -400,5 +433,5 @@ function ObInviteCard({ competition, members, onInvite }) {
 
 Object.assign(window, {
   ObLayer, ObInviteLayer, ObAmount, ObGoalLayer, ObFirstLogLayer, ObConfetti, ObCelebrate, obGoalCategories,
-  PTPush, ObPushPrimer, ObStarterCard, ObInviteCard,
+  PTPush, ObPushPrimer, ObStarterCard, ObInviteCard, ObWeekOne, obWeekOneResult,
 });

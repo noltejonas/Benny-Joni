@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -635,6 +635,21 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     else if (id === 'log') openLayer(sportsGoalsNow.length ? ['log'] : ['goal', 'log']);
     else if (id === 'push') openLayer(['push'], { manual: true });
   }
+  // Rückblick beim ersten Öffnen in Woche 2 einer Mitgliedschaft (nur neue Leute, einmal).
+  const weekOneChecked = React.useRef(false);
+  useEffect(() => {
+    if (loading || intro || !newcomer || weekOneChecked.current || !myMembership) return;
+    weekOneChecked.current = true;
+    const first = PTOnboarding.weekOneDue({ joinedAt: myMembership.joined_at, startDate: competition.start_date,
+      seen: obState.weekOne?.[competition.id] });
+    if (!first) return;
+    const people = PTOnboarding.expectedPeople(competition.mode, PTData.participantsFor(members, first).length);
+    const summary = PTOnboarding.weekOneSummary({ weekStart: first, me, sides, sets: allSets,
+      challenges: allChallenges, categories, participantCount: people });
+    setTab('home');
+    setLayer({ kind: 'week1', summary, first });
+  }, [loading, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories]);
+
   // „Ersten Satz loggen“ aus leeren Zuständen: Ziel fehlt → Ziel, sonst Satz.
   function startFirstLog() {
     setTab('home');
@@ -1117,7 +1132,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       )}
       {layer?.kind === 'goal' && (
         <ObGoalLayer api={capi} competition={competition} categories={categories} me={me}
-          activeCount={participantsNow.length} weekStart={weekStart}
+          activeCount={participantsNow.length} weekStart={weekStart} title={layer.title}
           onDone={(ch) => { reload(); advance({ goals: 1, data: { extra: [ch] } }); }}
           onSkip={() => advance({ goals: live.current.goals })} />
       )}
@@ -1130,6 +1145,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {layer?.kind === 'cele' && (
         <ObCelebrate value={layer.value} category={layer.cat} myDone={layer.myDone} share={layer.share}
           onDone={() => advance({ sets: 1 })} />
+      )}
+      {layer?.kind === 'week1' && (
+        <ObWeekOne summary={layer.summary} onDone={() => {
+          onObPatch?.({ weekOne: { [competition.id]: layer.first } });
+          if (!sportsGoalsNow.length) openLayer(['goal'], { data: { title: 'Ziel für Woche 2' } });
+          else setLayer(null);
+        }} />
       )}
       {layer?.kind === 'push' && (
         <ObPushPrimer competition={competition} busy={pushBusy}
