@@ -13,7 +13,8 @@
   // Numerische Apple-ID der App: morgens aus App Store Connect eintragen
   // (App-Informationen → Apple-ID). Leer = Einladung ohne Store-Link.
   const APP_STORE_ID = '';
-  const APP_STORE_URL = APP_STORE_ID ? `https://apps.apple.com/de/app/id${APP_STORE_ID}` : '';
+  const STORE_DIGITS = APP_STORE_ID.replace(/\D/g, ''); // verzeiht „id…“ und Leerzeichen
+  const APP_STORE_URL = STORE_DIGITS ? `https://apps.apple.com/de/app/id${STORE_DIGITS}` : '';
   // Support-Adresse: morgens eintragen. Leer = Support und Meldungen öffnen
   // stattdessen die Support-Seite (LEGAL.support).
   const SUPPORT_EMAIL = '';
@@ -42,12 +43,13 @@
 
   // mailto:-Link an den Support, leer ohne SUPPORT_EMAIL.
   function supportMailto(subject = '', body = '') {
-    if (!SUPPORT_EMAIL) return '';
+    const to = SUPPORT_EMAIL.trim();
+    if (!to) return '';
     const query = [
       subject && `subject=${encodeURIComponent(subject)}`,
       body && `body=${encodeURIComponent(body)}`,
     ].filter(Boolean).join('&');
-    return `mailto:${SUPPORT_EMAIL}${query ? `?${query}` : ''}`;
+    return `mailto:${to}${query ? `?${query}` : ''}`;
   }
 
   // Inhalt melden (Apple 1.2): Mail an den Support mit allen IDs, ohne

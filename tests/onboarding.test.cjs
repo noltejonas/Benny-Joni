@@ -110,6 +110,8 @@ test('inviteText mit App-Store-ID: Link zum Laden', () => {
   assert.equal(o.normalizeCode(text), 'BJ4K7X', 'Store-Link stört das Einlesen nicht');
   // Ohne die letzte Zeile (z. B. abgeschnitten) findet „Code:“ den Code.
   assert.equal(o.normalizeCode(lines.slice(0, 3).join('\n')), 'BJ4K7X');
+  // Versehentlich mit „id“ oder Leerzeichen eingetragen
+  assert.equal(load({ APP_STORE_ID: ' id6741234567 ' }).O.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
 });
 
 test('LEGAL: alle Rechtstexte per https', () => {
