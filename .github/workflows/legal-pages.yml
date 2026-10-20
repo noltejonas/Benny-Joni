@@ -1,0 +1,60 @@
+# Veröffentlicht NUR docs/launch/site (Start, Datenschutz, Impressum,
+# Nutzungsbedingungen, Support) auf GitHub Pages:
+#   https://noltejonas.github.io/Benny-Joni/
+# Die App verlinkt diese Seiten über PTOnboarding.LEGAL (www/onboarding-model.js).
+# Specs und Pläne aus docs/ landen bewusst NICHT auf der Seite.
+#
+# Einmalig: GitHub → Settings → Pages → Build and deployment → Source „GitHub Actions“.
+#
+# Schutz: Stehen in den Seiten noch [BITTE AUSFÜLLEN] oder der Entwurfs-Kasten,
+# bricht der Lauf vor dem Veröffentlichen ab. Nur zum Testen lässt sich das per
+# Hand übergehen: Actions → legal-pages → Run workflow → „Platzhalter erlauben“.
+name: legal-pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/launch/site/**"
+  workflow_dispatch:
+    inputs:
+      allow_placeholders:
+        description: "Platzhalter erlauben (nur zum Testen, nicht für den Launch)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Nie zwei Veröffentlichungen gleichzeitig; eine laufende wird nicht abgebrochen.
+concurrency:
+  group: legal-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Platzhalter prüfen
+        if: ${{ !inputs.allow_placeholders }}
+        run: |
+          if grep -rn -e '\[BITTE AUSFÜLLEN' -e 'class="draft"' docs/launch/site; then
+            echo "::error::In docs/launch/site stehen noch [BITTE AUSFÜLLEN] oder der Entwurfs-Kasten. Erst ausfüllen und prüfen, dann veröffentlichen."
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/launch/site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

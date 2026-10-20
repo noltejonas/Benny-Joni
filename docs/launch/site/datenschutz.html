@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Datenschutz · Benny &amp; Joni</title>
+  <!-- Keine externen Ressourcen: keine Schriften, Skripte oder Bilder von fremden Servern. -->
+  <style>
+    :root {
+      --bg: #f4f3f8; --card: #ffffff; --text: #1c1c1e; --text-2: #5b5b63; --line: #e3e2e8;
+      --accent: #1f8f3a; --todo-bg: #fff1a8; --todo-text: #4d3a00; --draft-bg: #fff4e5; --draft-line: #e8a33d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000; --card: #1c1c1e; --text: #f2f2f7; --text-2: #a1a1aa; --line: #2c2c30;
+        --accent: #32d74b; --todo-bg: #5c4500; --todo-text: #fff1a8; --draft-bg: #2b2111; --draft-line: #a8752a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+    header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-bottom: 20px; }
+    .brand { font-weight: 800; font-size: 20px; color: var(--text); text-decoration: none; }
+    nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; }
+    nav a { color: var(--text-2); text-decoration: none; }
+    nav a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+    main { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; }
+    h2 { font-size: 20px; margin: 32px 0 8px; }
+    h3 { font-size: 17px; margin: 22px 0 6px; }
+    p, ul { margin: 0 0 12px; }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    a { color: var(--accent); }
+    .meta { color: var(--text-2); font-size: 14px; margin-bottom: 20px; }
+    .box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+    mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 3px; border-radius: 4px; }
+    .draft { background: var(--draft-bg); border: 1px solid var(--draft-line); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px; font-size: 15px; }
+    footer { color: var(--text-2); font-size: 14px; margin-top: 24px; text-align: center; }
+    footer a { color: var(--text-2); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="index.html">Benny &amp; Joni</a>
+    <nav aria-label="Rechtliches">
+      <a href="datenschutz.html" aria-current="page">Datenschutz</a>
+      <a href="impressum.html">Impressum</a>
+      <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>
+      <a href="support.html">Support</a>
+    </nav>
+  </header>
+
+  <div class="draft" role="note">
+    <strong>Entwurf – so nicht veröffentlichen.</strong>
+    Dieser Text beschreibt die Datenflüsse der App nach dem Stand des Codes vom 21.10.2026. Er ist keine Rechtsberatung.
+    Vor dem Veröffentlichen alle gelb markierten Stellen <mark class="todo">[BITTE AUSFÜLLEN]</mark> ersetzen,
+    den Text prüfen lassen (z.&nbsp;B. Abgleich mit einem Generator wie eRecht24 oder durch eine Anwältin bzw. einen Anwalt)
+    und danach diesen Kasten löschen. Der Workflow <code>legal-pages</code> veröffentlicht erst, wenn beides erledigt ist.
+  </div>
+
+  <main>
+    <h1>Datenschutzerklärung</h1>
+    <p class="meta">für die iPhone-App „Benny &amp; Joni“ und diese Website · Stand: 21. Oktober 2026</p>
+
+    <div class="box">
+      <strong>Kurz gesagt</strong>
+      <ul>
+        <li>Wir speichern nur, was die App zum Funktionieren braucht: dein Konto, dein Profil und deine Trainingsdaten.</li>
+        <li>Keine Werbung, kein Tracking, keine Analyse-Tools. Wir verkaufen keine Daten und geben sie nicht an Werbepartner.</li>
+        <li>Die App lädt keine Schriften oder Skripte von Google oder anderen Fremdservern nach. Alles dafür steckt in der App.</li>
+        <li>Dein Profil und deine Sätze sehen nur die Leute, die mit dir in einer Challenge sind.</li>
+        <li>Du kannst dein Konto jederzeit in der App löschen. Dann löschen wir deine Daten.</li>
+      </ul>
+    </div>
+
+    <h2>1. Wer ist verantwortlich?</h2>
+    <p>
+      <mark class="todo">[BITTE AUSFÜLLEN: Vor- und Nachname bzw. Name der GbR mit allen Gesellschafterinnen und Gesellschaftern]</mark><br />
+      <mark class="todo">[BITTE AUSFÜLLEN: Straße und Hausnummer]</mark><br />
+      <mark class="todo">[BITTE AUSFÜLLEN: PLZ und Ort]</mark>, Deutschland<br />
+      E-Mail: <mark class="todo">[BITTE AUSFÜLLEN: Support-E-Mail-Adresse]</mark>
+    </p>
+    <p>Weitere Angaben findest du im <a href="impressum.html">Impressum</a>. Wir sind nicht verpflichtet, eine Datenschutzbeauftragte oder einen Datenschutzbeauftragten zu benennen.</p>
+
+    <h2>2. Welche Daten die App verarbeitet</h2>
+    <p>Ohne Konto kannst du nur die Demo ansehen. Die Demo läuft komplett auf deinem Gerät und schickt nichts an unsere Server.</p>
+
+    <h3>2.1 Konto</h3>
+    <ul>
+      <li>E-Mail-Adresse und Passwort. Das Passwort speichern wir nur als Hash, wir können es nicht lesen.</li>
+      <li>Nutzer-ID sowie Zeitpunkt der Registrierung und der letzten Anmeldung.</li>
+    </ul>
+    <p>Zweck: Anmeldung und „Passwort vergessen“. Andere Nutzer sehen deine E-Mail-Adresse nicht.</p>
+
+    <h3>2.2 Profil</h3>
+    <ul>
+      <li>Anzeigename, Profilfarbe und, wenn du willst, ein Profilfoto.</li>
+      <li>Deine Haupt-Challenge und dein Fortschritt beim Einstieg in die App.</li>
+    </ul>
+    <p>
+      Anzeigename, Farbe und Foto sehen die Mitglieder deiner Challenges.
+      Das Profilfoto wird auf deinem Gerät verkleinert und in einem Dateispeicher abgelegt, dessen Dateien über eine Internetadresse abrufbar sind.
+      Die App zeigt diese Adresse nur Mitgliedern deiner Challenges. Wer sie kennt, kann das Bild aber auch ohne Anmeldung öffnen.
+      Lade deshalb nur ein Foto hoch, das du so zeigen möchtest.
+      Für die Auswahl fragt iOS dich nach Zugriff auf Kamera oder Fotos. Die App liest nur das Foto, das du auswählst.
+    </p>
+
+    <h3>2.3 Challenges und Training</h3>
+    <ul>
+      <li>Challenge: Name, Emoji, Modus, Einladungscode, Zeitraum und Einstellungen.</li>
+      <li>Mitgliedschaft: Rolle, Team, Beitritts- und Austrittsdatum.</li>
+      <li>Wochenziele und selbst angelegte Übungen.</li>
+      <li>Sätze: Übung, Anzahl der Wiederholungen (bei Workouts Zeit oder Runden), Zeitpunkt und eine optionale Notiz.</li>
+      <li>Work-Tracking, falls in der Challenge eingeschaltet: Minuten sowie Projekt- und Tool-Schlagworte.</li>
+      <li>Reaktionen: Emojis, die du auf Sätze anderer setzt.</li>
+    </ul>
+    <p>
+      Diese Daten sehen alle Mitglieder der jeweiligen Challenge, auch wer später beitritt. Beitreten kann, wer den Einladungscode hat.
+      Die App erfasst nur Übungen und Zahlen, die du selbst einträgst. Körper- oder Gesundheitswerte wie Gewicht, Puls oder Schlaf erfasst sie nicht.
+    </p>
+
+    <h3>2.4 Strafkonto</h3>
+    <p>
+      Nur wenn es in einer Challenge eingeschaltet ist: Strafen (Woche, Betrag, Grund, bezahlt oder offen, Notiz), Einzahlungen (Betrag, Notiz) und Wochenabschlüsse.
+      Das ist nur eine gemeinsame Liste unter euch. Die App wickelt keine Zahlungen ab und speichert keine Bank- oder Zahlungsdaten.
+    </p>
+
+    <h3>2.5 Push-Mitteilungen</h3>
+    <p>
+      Nur wenn du Mitteilungen in iOS erlaubst, speichern wir eine Gerätekennung für Mitteilungen (Push-Token), die Plattform und wann das Gerät zuletzt aktiv war.
+      Außerdem protokollieren wir, welche Art von Mitteilung du an welchem Tag zu welcher Challenge bekommen hast. So bekommst du höchstens eine Mitteilung pro Tag und Challenge.
+    </p>
+    <p>
+      Zugestellt werden Mitteilungen über den Apple Push Notification service (APNs) von Apple.
+      Dafür übermitteln wir Apple den Push-Token und den Text der Mitteilung, zum Beispiel den Anzeigenamen einer anderen Person, den Namen der Challenge und eine Anzahl Wiederholungen.
+      Ausschalten kannst du Mitteilungen jederzeit in den iOS-Einstellungen unter „Benny &amp; Joni“ → „Mitteilungen“.
+      Beim Abmelden und beim Löschen des Kontos entfernen wir den Push-Token.
+    </p>
+
+    <h3>2.6 Daten nur auf deinem Gerät</h3>
+    <p>
+      Die App speichert auf deinem Gerät deine Anmeldung (Sitzung), das Farbschema, deinen Fortschritt beim Einstieg, zuletzt geöffnete Ansichten und deine Blockliste.
+      Diese Daten bleiben auf dem Gerät. Sie sind unbedingt nötig, damit die App so funktioniert, wie du sie nutzt (§ 25 Abs. 2 Nr. 2 TDDDG).
+    </p>
+
+    <h3>2.7 Server- und Sicherheitsprotokolle</h3>
+    <p>
+      Bei jedem Zugriff der App auf den Server verarbeitet unser Hosting-Dienstleister technisch nötige Daten:
+      IP-Adresse, Zeitpunkt, die aufgerufene Funktion, Fehlercodes sowie Angaben zu App und Gerät (User-Agent).
+      Zweck sind ein sicherer und stabiler Betrieb und das Abwehren von Missbrauch. Die Protokolle werden je nach Tarif nach 1 bis 7 Tagen gelöscht.
+    </p>
+
+    <h3>2.8 Technische Fehlerberichte</h3>
+    <p>
+      Tritt in der App ein Fehler auf, kann sie eine kurze technische Meldung an unsere Datenbank schicken, höchstens fünf pro Sitzung:
+      Fehlertext, betroffene Stelle in der App, Zeitpunkt, App-Version und deine Nutzer-ID. Damit finden und beheben wir Fehler.
+      Wir löschen diese Meldungen nach spätestens <mark class="todo">[BITTE AUSFÜLLEN: Löschfrist für Fehlerberichte, Vorschlag 90]</mark> Tagen.
+    </p>
+
+    <h3>2.9 Kontakt, Support und Meldungen</h3>
+    <p>
+      Wenn du uns schreibst, etwa über „Support &amp; Feedback“ oder „Melden“ in der App, verarbeiten wir deine E-Mail-Adresse, den Inhalt deiner Nachricht
+      und die mitgeschickten Kennungen (z.&nbsp;B. Nutzer-, Challenge- oder Satz-ID). Damit beantworten wir deine Anfrage oder prüfen eine Meldung.
+      Unser E-Mail-Postfach liegt bei <mark class="todo">[BITTE AUSFÜLLEN: E-Mail-Anbieter der Support-Adresse, z. B. Google Ireland Ltd. (Gmail)]</mark>.
+      Wir löschen die Nachrichten, wenn die Anfrage erledigt ist und keine gesetzliche Aufbewahrungspflicht besteht.
+    </p>
+
+    <h3>2.10 E-Mails der App</h3>
+    <p>
+      Wenn du „Passwort vergessen“ nutzt, schickt dir unser Hosting-Dienstleister in unserem Auftrag eine E-Mail mit einem Code.
+      Für den Versand nutzen wir <mark class="todo">[BITTE AUSFÜLLEN: E-Mail-Versanddienst (SMTP), z. B. Resend, Brevo oder Postmark, oder den Standardversand von Supabase]</mark>.
+      Werbe-E-Mails verschicken wir nicht.
+    </p>
+
+    <h2>3. Dienstleister und Empfänger</h2>
+    <ul>
+      <li>
+        <strong>Supabase</strong> (Supabase, Inc., USA) betreibt für uns Datenbank, Anmeldung, Dateispeicher und Server-Funktionen.
+        Die Server stehen in einem Rechenzentrum von Amazon Web Services in Irland (Region eu-west-1).
+        <mark class="todo">[BITTE AUSFÜLLEN: Bestätigen, dass der Vertrag zur Auftragsverarbeitung (DPA) mit Supabase abgeschlossen ist – Supabase-Dashboard → Organization → Legal Documents]</mark>
+        Wir haben mit Supabase einen Vertrag zur Auftragsverarbeitung nach Art. 28 DSGVO geschlossen.
+        Ein Zugriff aus den USA lässt sich nicht ganz ausschließen. Grundlage dafür sind die EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO).
+      </li>
+      <li>
+        <strong>Apple</strong> stellt Push-Mitteilungen zu (siehe 2.5) und vertreibt die App über den App Store.
+        Für den Download und den App Store ist Apple selbst verantwortlich. Von Apple erhalten wir nur zusammengefasste Statistiken, etwa die Zahl der Downloads.
+      </li>
+      <li>
+        <strong>E-Mail</strong>: der unter 2.9 und 2.10 genannte Anbieter.
+      </li>
+      <li>
+        <strong>GitHub</strong> (GitHub, Inc., USA) stellt diese Website bereit, siehe Abschnitt 4.
+      </li>
+    </ul>
+    <p>Andere Nutzer sehen nur, was unter 2.2 bis 2.4 als sichtbar beschrieben ist. Darüber hinaus geben wir Daten nur weiter, wenn uns ein Gesetz dazu verpflichtet.</p>
+
+    <h2>4. Diese Website</h2>
+    <p>
+      Diese Seiten liegen bei GitHub Pages. Beim Aufruf verarbeitet GitHub technisch nötige Daten wie IP-Adresse, Zeitpunkt und Browser, um die Seiten auszuliefern und vor Angriffen zu schützen.
+      Wir setzen keine Cookies, keine Analyse-Tools und laden keine Inhalte von anderen Servern.
+      Für Übermittlungen in die USA nutzt GitHub das EU-US Data Privacy Framework bzw. EU-Standardvertragsklauseln.
+      Rechtsgrundlage ist unser berechtigtes Interesse an einer sicheren, einfachen Bereitstellung dieser Informationen (Art. 6 Abs. 1 lit. f DSGVO).
+    </p>
+
+    <h2>5. Rechtsgrundlagen</h2>
+    <ul>
+      <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertrag): Konto, Profil, Challenges, Trainingsdaten, Strafkonto, Push-Mitteilungen und Support. Ohne diese Daten können wir dir die App nicht anbieten.</li>
+      <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> (berechtigtes Interesse): Server- und Sicherheitsprotokolle, Fehlerberichte, die Prüfung von Meldungen und der Schutz anderer Nutzer sowie diese Website.</li>
+      <li><strong>Art. 6 Abs. 1 lit. c DSGVO</strong> (rechtliche Pflicht): wenn uns ein Gesetz zur Aufbewahrung oder Herausgabe verpflichtet.</li>
+      <li><strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong>: Speichern auf deinem Gerät (Abschnitt 2.6).</li>
+    </ul>
+
+    <h2>6. Wie lange wir Daten speichern</h2>
+    <ul>
+      <li>Grundsätzlich so lange, wie dein Konto besteht.</li>
+      <li>
+        <strong>Konto löschen:</strong> In der App unter Einstellungen (dein Profilbild oben rechts) → „Konto löschen“.
+        Dann löschen wir sofort dein Konto, dein Profil, deine Profilfotos, Sätze, Reaktionen, Strafkonto-Einträge, Push-Tokens und Mitgliedschaften.
+        Challenges, in denen danach niemand mehr ist, löschen wir ganz. In anderen Challenges übernimmt ein anderes Mitglied die Leitung.
+        Übungen, die du in einer Challenge angelegt hast, bleiben dort ohne Bezug zu dir.
+      </li>
+      <li>Verlässt du nur eine Challenge, bleiben deine bisherigen Sätze dort sichtbar, bis du dein Konto löschst.</li>
+      <li>Server-Protokolle: 1 bis 7 Tage. In Sicherungskopien unseres Hosting-Dienstleisters können gelöschte Daten noch bis zu 7 Tage enthalten sein.</li>
+      <li>Support-Nachrichten: bis die Anfrage erledigt ist, außer eine gesetzliche Pflicht verlangt mehr.</li>
+    </ul>
+
+    <h2>7. Deine Rechte</h2>
+    <p>Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20). Anzeigename und Foto kannst du jederzeit selbst in der App ändern, dein Konto selbst löschen.</p>
+    <div class="box">
+      <strong>Widerspruchsrecht (Art. 21 DSGVO)</strong><br />
+      Verarbeiten wir Daten auf Grundlage unseres berechtigten Interesses (Art. 6 Abs. 1 lit. f DSGVO), kannst du aus Gründen, die sich aus deiner besonderen Situation ergeben, jederzeit widersprechen.
+      Schreib uns dazu einfach eine E-Mail.
+    </div>
+    <p>
+      Für alle Anfragen genügt eine E-Mail an <mark class="todo">[BITTE AUSFÜLLEN: Support-E-Mail-Adresse]</mark>.
+      Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), zum Beispiel bei der Behörde an deinem Wohnort oder bei der für uns zuständigen Behörde:
+      <mark class="todo">[BITTE AUSFÜLLEN: Landesdatenschutzbehörde am Sitz des Anbieters mit Anschrift und Website]</mark>.
+    </p>
+
+    <h2>8. Mindestalter</h2>
+    <p>Die App richtet sich an Personen ab 16 Jahren (siehe <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>).</p>
+
+    <h2>9. Keine automatisierten Entscheidungen</h2>
+    <p>Wir treffen keine automatisierten Entscheidungen und erstellen keine Profile im Sinne von Art. 22 DSGVO. Statistiken und Vergleiche in der App zählen nur eure eingetragenen Sätze zusammen.</p>
+
+    <h2>10. Änderungen</h2>
+    <p>Ändert sich die App, passen wir diese Erklärung an. Die aktuelle Fassung steht immer auf dieser Seite und ist in der App unter Einstellungen verlinkt.</p>
+  </main>
+
+  <footer>
+    <a href="index.html">Start</a> · <a href="impressum.html">Impressum</a> · <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="support.html">Support</a>
+  </footer>
+</div>
+</body>
+</html>
