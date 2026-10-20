@@ -46,11 +46,13 @@
     return `${SCHEME}://join/${String(code || '').toUpperCase()}`;
   }
 
+  // In der Sprache des Absenders. Die Zeile „Code: …“ bleibt in jeder Sprache
+  // gleich, weil normalizeCode den Code ohne Link nur über dieses Etikett findet.
   function inviteText(competition) {
     const code = String(competition.invite_code || '').toUpperCase();
-    return `Komm in meine Challenge „${competition.name}“ bei Projekt Terminator 💪\n`
+    return tr('Komm in meine Challenge „{name}“ bei Projekt Terminator 💪', { name: competition.name }) + '\n'
       + `Code: ${code}\n`
-      + `Direkt öffnen: ${inviteLink(code)}`;
+      + tr('Direkt öffnen: {link}', { link: inviteLink(code) });
   }
 
   // ── Einstieg ────────────────────────────────────────────────────────

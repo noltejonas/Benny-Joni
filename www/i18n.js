@@ -59,6 +59,7 @@
   const pref = readPref();
   const tags = deviceTags();
   const lang = resolve(pref, tags);
+  const deviceLang = resolve('system', tags);
   const locale = resolveLocale(lang, tags);
   let plural = null;
 
@@ -143,7 +144,7 @@
   if (root.document?.documentElement) root.document.documentElement.lang = lang;
 
   const api = {
-    lang, locale, pref, source: SOURCE, storeKey: STORE_KEY,
+    lang, locale, pref, deviceLang, source: SOURCE, storeKey: STORE_KEY,
     languages: LANGUAGES.map(l => Object.assign({}, l)),
     tr, trn, trc, add, setPref,
     number, date, time, day, euro, weekdays,

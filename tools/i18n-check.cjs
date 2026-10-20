@@ -3,6 +3,8 @@
 //   node tools/i18n-check.cjs                 alle Dateien, Wörterbuch en
 //   node tools/i18n-check.cjs www/feed.jsx    nur diese Dateien
 //   node tools/i18n-check.cjs --dict x.json   zusätzliche Einträge (Entwurf) mitprüfen
+//   node tools/i18n-check.cjs --lang fr       anderes Wörterbuch (www/i18n/fr.js)
+//   node tools/i18n-check.cjs --lang fr --todo   fehlende Einträge als JSON-Vorlage
 //
 // Meldet:
 //   missing    tr/trn/trc-Schlüssel ohne englischen Eintrag
@@ -33,6 +35,7 @@ function loadDict(lang = 'en', extraJson = []) {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
   for (const f of ['i18n.js', `i18n/${lang}.js`]) {
+    if (!fs.existsSync(path.join(WWW, f))) continue; // neue Sprache ohne Datei: alles fehlt
     vm.runInContext(fs.readFileSync(path.join(WWW, f), 'utf8'), ctx, { filename: f });
   }
   const dict = Object.assign({}, ctx.PTi18n._dicts[lang] || {});
@@ -245,11 +248,25 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const extraJson = [];
   const files = [];
+  let lang = 'en';
+  let todo = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--dict') extraJson.push(args[++i]);
+    else if (args[i] === '--lang') lang = args[++i];
+    else if (args[i] === '--todo') todo = true;
     else files.push(args[i]);
   }
-  const r = check({ files: files.length ? files : undefined, extraJson });
+  const r = check({ files: files.length ? files : undefined, lang, extraJson });
+  if (todo) {
+    // Vorlage: deutscher Text als Platzhalter, Mehrzahl mit beiden Formen
+    const out = {};
+    for (const c of r.calls) {
+      if (Object.prototype.hasOwnProperty.call(r.dict, c.key) || c.key in out) continue;
+      out[c.key] = c.fn === 'trn' ? { one: c.one, other: c.other } : c.text;
+    }
+    console.log(JSON.stringify(out, null, 2));
+    return;
+  }
   const out = (label, list) => {
     if (!list.length) return;
     console.log(`\n${label} (${list.length})`);

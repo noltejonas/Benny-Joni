@@ -1,4 +1,4 @@
-/* global React, PTData, PTStats, weekNumber */
+/* global React, PTData, PTStats, weekNumber, tr, trn, PTi18n */
 // Diagramme für den Stats-Tab. SVGs werden in echter Pixelbreite gezeichnet
 // (kein preserveAspectRatio="none"), damit Schrift und Linien nicht verzerren.
 
@@ -12,7 +12,7 @@ function sideInk(side) {
 
 // Anzeigename einer Seite: „Du“ für mich allein, Vorname für Personen, Teamname für Teams.
 function sideName(side) {
-  if (side.isMine && side.userIds.length === 1) return 'Du';
+  if (side.isMine && side.userIds.length === 1) return tr('Du');
   return side.userIds.length === 1 ? side.label.split(/\s+/)[0] : side.label;
 }
 
@@ -71,7 +71,8 @@ function GapChart({ dates, gap, sides }) {
     <div ref={ref} className="stats-chart">
       {W > 0 && n > 0 && (
         <svg width={W} height={H} role="img"
-          aria-label={`Vorsprung über ${n} Tage, aktuell ${Math.abs(last)} Reps für ${sideName(sides[last >= 0 ? 0 : 1])}`}>
+          aria-label={trn(n, 'Vorsprung über {n} Tag, aktuell {reps} Reps für {name}', 'Vorsprung über {n} Tage, aktuell {reps} Reps für {name}',
+            { reps: PTi18n.number(Math.abs(last)), name: sideName(sides[last >= 0 ? 0 : 1]) })}>
           <defs>
             <clipPath id={`${id}-up`}><rect x="0" y="0" width={W} height={y0} /></clipPath>
             <clipPath id={`${id}-down`}><rect x="0" y={y0} width={W} height={H - y0} /></clipPath>
@@ -79,7 +80,7 @@ function GapChart({ dates, gap, sides }) {
           {ticks.map(t => (
             <g key={t.i}>
               <line x1={x(t.i)} x2={x(t.i)} y1={TOP} y2={H - BOTTOM} stroke="var(--line)" strokeWidth="1" />
-              <text x={x(t.i)} y={H - 7} fontSize="10" fill="var(--text-3)" textAnchor="middle">KW {t.kw}</text>
+              <text x={x(t.i)} y={H - 7} fontSize="10" fill="var(--text-3)" textAnchor="middle">{tr('KW {n}', { n: t.kw })}</text>
             </g>
           ))}
           <g clipPath={`url(#${id}-up)`}>
@@ -96,7 +97,7 @@ function GapChart({ dates, gap, sides }) {
           <text x="2" y={H - BOTTOM - 6} fontSize="11" fontWeight="700" fill={sideInk(sides[1])} style={halo}>{sideName(sides[1])}</text>
           {[M, 0, -M].map(v => (
             <text key={v} x={W - 2} y={y(v) + 4} fontSize="10" fill="var(--text-3)" textAnchor="end" className="mono">
-              {Math.abs(v).toLocaleString('de-DE')}
+              {PTi18n.number(Math.abs(v))}
             </text>
           ))}
         </svg>
@@ -125,16 +126,16 @@ function RaceChart({ dates, cum, sides }) {
   return (
     <div ref={ref} className="stats-chart">
       {W > 0 && n > 0 && (
-        <svg width={W} height={H} role="img" aria-label="Kumulierte Reps pro Seite">
+        <svg width={W} height={H} role="img" aria-label={tr('Kumulierte Reps pro Seite')}>
           {[0.5, 1].map(f => (
             <g key={f}>
               <line x1="0" x2={plotW} y1={y(f * M)} y2={y(f * M)} stroke="var(--line)" strokeWidth="1" />
-              <text x="0" y={y(f * M) - 4} fontSize="10" fill="var(--text-3)" className="mono">{(f * M).toLocaleString('de-DE')}</text>
+              <text x="0" y={y(f * M) - 4} fontSize="10" fill="var(--text-3)" className="mono">{PTi18n.number(f * M)}</text>
             </g>
           ))}
           <line x1="0" x2={plotW} y1={y(0)} y2={y(0)} stroke="var(--text-4)" strokeWidth="1" />
           {ticks.map(t => (
-            <text key={t.i} x={x(t.i)} y={H - 7} fontSize="10" fill="var(--text-3)" textAnchor="middle">KW {t.kw}</text>
+            <text key={t.i} x={x(t.i)} y={H - 7} fontSize="10" fill="var(--text-3)" textAnchor="middle">{tr('KW {n}', { n: t.kw })}</text>
           ))}
           {sides.map((side, i) => (
             <path key={side.key}
@@ -157,7 +158,10 @@ function RaceChart({ dates, cum, sides }) {
 function ActivityHeatmap({ repsByDay, today }) {
   const [ref, W] = useElementWidth();
   const [picked, setPicked] = React.useState(null);
-  const GAP = 3, LABEL_W = 22, MONTH_H = 16;
+  // Wochentage Mo/Mi/Fr links; Platz je nach Länge (de „Mo“ → 22 px, en „Wed“ → 29 px)
+  const wd = PTi18n.weekdays();
+  const dayLabels = [wd[0], wd[2], wd[4]];
+  const GAP = 3, LABEL_W = 8 + 7 * Math.max(...dayLabels.map(d => d.length)), MONTH_H = 16;
   const weeks = Math.max(8, Math.min(26, Math.floor((W - LABEL_W + GAP) / (14 + GAP))));
   const cell = Math.min(18, Math.floor((W - LABEL_W - GAP * (weeks - 1)) / weeks));
   const start = PTData.addDays(PTData.isoDate(PTData.mondayOf(new Date(today + 'T00:00:00'))), -7 * (weeks - 1));
@@ -168,21 +172,21 @@ function ActivityHeatmap({ repsByDay, today }) {
     const monday = PTData.addDays(start, 7 * c);
     return { c, monday, days: Array.from({ length: 7 }, (_, r) => PTData.addDays(monday, r)) };
   });
-  const monthLabel = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { month: 'short' });
-  const fmtDay = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+  const monthLabel = (iso) => PTi18n.day(iso, { month: 'short' });
+  const fmtDay = (iso) => PTi18n.day(iso, { weekday: 'short', day: 'numeric', month: 'short' });
   const H = MONTH_H + 7 * cell + 6 * GAP;
 
   return (
     <div ref={ref} className="stats-heat">
       {W > 0 && (
-        <svg width={W} height={H} role="img" aria-label={`Trainingstage der letzten ${weeks} Wochen`}>
+        <svg width={W} height={H} role="img" aria-label={tr('Trainingstage der letzten {n} Wochen', { n: weeks })}>
           {cols.map(({ c, monday }) => {
             const prev = c ? cols[c - 1].monday : null;
             if (prev && monthLabel(prev) === monthLabel(monday)) return null;
             if (!prev && new Date(monday + 'T00:00:00').getDate() > 21) return null;
             return <text key={`m${c}`} x={LABEL_W + c * (cell + GAP)} y="11" fontSize="10" fill="var(--text-3)">{monthLabel(monday)}</text>;
           })}
-          {['Mo', 'Mi', 'Fr'].map((d, k) => (
+          {dayLabels.map((d, k) => (
             <text key={d} x="0" y={MONTH_H + k * 2 * (cell + GAP) + cell - 2} fontSize="10" fill="var(--text-3)">{d}</text>
           ))}
           {cols.map(({ c, days }) => days.map((d, r) => {
@@ -200,12 +204,14 @@ function ActivityHeatmap({ repsByDay, today }) {
       )}
       <div className="stats-heat-foot">
         {picked ? (
-          <span className="mono">{fmtDay(picked)} · {repsByDay[picked] != null ? `${repsByDay[picked].toLocaleString('de-DE')} Reps` : 'kein Training'}</span>
+          <span className="mono">{fmtDay(picked)} · {repsByDay[picked] != null
+            ? trn(repsByDay[picked], '{n} Rep', '{n} Reps', { n: PTi18n.number(repsByDay[picked]) })
+            : tr('kein Training')}</span>
         ) : (
           <span className="stats-heat-scale">
-            weniger
+            {tr('weniger')}
             {opacity.map((o, i) => <i key={i} style={{ background: i ? 'var(--primary)' : 'var(--track)', opacity: i ? o : 1 }} />)}
-            mehr
+            {tr('mehr')}
           </span>
         )}
       </div>

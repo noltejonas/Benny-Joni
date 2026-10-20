@@ -12,6 +12,11 @@
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>de</string>
+	</array>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -36,9 +41,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Damit du ein Foto als Profilbild aufnehmen kannst.</string>
+	<string>So you can take a photo for your profile picture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Damit du ein Foto aus deiner Mediathek als Profilbild wählen kannst.</string>
+	<string>So you can pick a photo from your library as your profile picture.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

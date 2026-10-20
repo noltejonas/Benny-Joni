@@ -1,4 +1,4 @@
-/* global React, Sheet, Avatar, PTPeople, PTOnboarding, SIDE_COLORS, modeLabel */
+/* global React, Sheet, Avatar, PTPeople, PTOnboarding, SIDE_COLORS, modeLabel, tr */
 // Challenge-Switcher, Einladen und Profil. Login, Onboarding, Erstellen und
 // Beitreten liegen in onboarding.jsx, die Challenge-Einstellungen in settings.jsx.
 
@@ -31,13 +31,13 @@ function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId
           <span className="mu-comp-emoji">{c.emoji}</span>
           <span className="mu-comp-text">
             <span className="mu-comp-name">{c.name}</span>
-            <span className="mu-comp-meta">{modeLabel(c.mode)}{c.my_role === 'owner' ? ' · Ersteller' : ''}{c.archived_at ? ' · archiviert' : ''}</span>
+            <span className="mu-comp-meta">{modeLabel(c.mode)}{c.my_role === 'owner' ? ` · ${tr('Ersteller')}` : ''}{c.archived_at ? ` · ${tr('archiviert')}` : ''}</span>
           </span>
           {c.id === activeId && <span className="mu-comp-check">✓</span>}
         </button>
         {!c.archived_at && (
           <button className={`mu-comp-star ${isMain ? 'on' : ''}`}
-            aria-label={isMain ? 'Haupt-Challenge' : 'Als Haupt-Challenge setzen'}
+            aria-label={isMain ? tr('Haupt-Challenge') : tr('Als Haupt-Challenge setzen')}
             onClick={() => onSetMain(isMain ? null : c.id)}>
             {isMain ? '★' : '☆'}
           </button>
@@ -51,32 +51,32 @@ function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId
         <Avatar profile={profile} size={44} />
         <span className="mu-profile-text">
           <span className="mu-profile-name">{profile.display_name}</span>
-          <span className="mu-profile-sub">Profil bearbeiten</span>
+          <span className="mu-profile-sub">{tr('Profil bearbeiten')}</span>
         </span>
         <span className="mu-chev">›</span>
       </button>
 
-      <div className="label" style={{ margin: '18px 0 8px' }}>Deine Challenges</div>
+      <div className="label" style={{ margin: '18px 0 8px' }}>{tr('Deine Challenges')}</div>
       <div className="mu-comp-list">
         {active.map(row)}
-        {!active.length && <div className="subtitle">Noch keine aktive Challenge.</div>}
+        {!active.length && <div className="subtitle">{tr('Noch keine aktive Challenge.')}</div>}
       </div>
 
       <div className="btn-row" style={{ marginTop: 16 }}>
-        <button className="btn" onClick={onCreate}>+ Neue Challenge</button>
-        <button className="btn btn-secondary" onClick={onJoin}>Code eingeben</button>
+        <button className="btn" onClick={onCreate}>+ {tr('Neue Challenge')}</button>
+        <button className="btn btn-secondary" onClick={onJoin}>{tr('Code eingeben')}</button>
       </div>
 
       {archived.length > 0 && (
         <>
           <button className="btn-link" style={{ marginTop: 14 }} onClick={() => setShowArchived(v => !v)}>
-            {showArchived ? 'Archivierte ausblenden' : `Archivierte anzeigen (${archived.length})`}
+            {showArchived ? tr('Archivierte ausblenden') : tr('Archivierte anzeigen ({n})', { n: archived.length })}
           </button>
           {showArchived && <div className="mu-comp-list" style={{ marginTop: 8 }}>{archived.map(row)}</div>}
         </>
       )}
 
-      <button className="btn btn-danger-ghost" style={{ marginTop: 20 }} onClick={onSignOut}>Abmelden</button>
+      <button className="btn btn-danger-ghost" style={{ marginTop: 20 }} onClick={onSignOut}>{tr('Abmelden')}</button>
     </Sheet>
   );
 }
@@ -126,17 +126,17 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
 
   return (
     <Sheet open={open} onClose={onClose}>
-      <h2 className="title" style={{ marginBottom: 16 }}>Profil</h2>
+      <h2 className="title" style={{ marginBottom: 16 }}>{tr('Profil')}</h2>
       <div className="mu-avatar-edit">
         <button className="mu-avatar-btn" onClick={() => fileRef.current?.click()} disabled={busy}>
           <Avatar profile={{ ...profile, display_name: name || profile.display_name, color }} size={84} />
-          <span className="mu-avatar-btn-label">Foto ändern</span>
+          <span className="mu-avatar-btn-label">{tr('Foto ändern')}</span>
         </button>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pickAvatar} />
       </div>
-      <div className="label" style={{ marginBottom: 8 }}>Name</div>
+      <div className="label" style={{ marginBottom: 8 }}>{tr('Name')}</div>
       <input className="input" maxLength={30} value={name} onChange={e => setName(e.target.value)} />
-      <div className="label" style={{ margin: '16px 0 8px' }}>Farbe</div>
+      <div className="label" style={{ margin: '16px 0 8px' }}>{tr('Farbe')}</div>
       <div className="mu-color-row">
         {SIDE_COLORS.map(c => (
           <button key={c} className={`mu-color ${color === c ? 'active' : ''}`} style={{ background: c }}
@@ -144,10 +144,10 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
         ))}
       </div>
       <div className="btn-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-secondary" onClick={onClose}>Schließen</button>
-        <button className="btn" disabled={busy || !name.trim()} onClick={save}>{busy ? '…' : 'Speichern'}</button>
+        <button className="btn btn-secondary" onClick={onClose}>{tr('Schließen')}</button>
+        <button className="btn" disabled={busy || !name.trim()} onClick={save}>{busy ? '…' : tr('Speichern')}</button>
       </div>
-      {onSignOut && <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={onSignOut}>Abmelden</button>}
+      {onSignOut && <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={onSignOut}>{tr('Abmelden')}</button>}
     </Sheet>
   );
 }

@@ -1,4 +1,4 @@
-/* global React, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser */
+/* global React, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo } = React;
 
 // Per-athlete-per-category quick-log values, stored locally.
@@ -43,7 +43,7 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
   if (editing) {
     return (
       <div className="quick-row quick-row-edit">
-        <div className="quick-row-label">Schnellsatz bearbeiten</div>
+        <div className="quick-row-label">{tr('Schnellsatz bearbeiten')}</div>
         <div className="quick-chips">
           {draft.map((v, i) => (
             <div key={i} className="quick-chip-edit">
@@ -54,17 +54,17 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
                   const next = [...draft]; next[i] = Number.isFinite(n) ? n : 0; setDraft(next);
                 }}
                 onFocus={e => e.target.select()} />
-              <button className="quick-chip-del" aria-label="Entfernen"
+              <button className="quick-chip-del" aria-label={tr('Entfernen')}
                 onClick={() => setDraft(draft.filter((_, j) => j !== i))}>×</button>
             </div>
           ))}
           {draft.length < 6 && (
-            <button className="quick-chip-add" aria-label="Wert hinzufügen" onClick={() => setDraft([...draft, 10])}>＋</button>
+            <button className="quick-chip-add" aria-label={tr('Wert hinzufügen')} onClick={() => setDraft([...draft, 10])}>＋</button>
           )}
         </div>
         <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:10}}>
-          <button className="btn-ghost-sm" onClick={() => { setDraft(values); setEditing(false); }}>Abbrechen</button>
-          <button className="btn-ghost-sm primary" onClick={() => commit(draft)}>Speichern</button>
+          <button className="btn-ghost-sm" onClick={() => { setDraft(values); setEditing(false); }}>{tr('Abbrechen')}</button>
+          <button className="btn-ghost-sm primary" onClick={() => commit(draft)}>{tr('Speichern')}</button>
         </div>
       </div>
     );
@@ -73,25 +73,25 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
   return (
     <div className="quick-row" ref={rowRef}>
       <div className="quick-row-head">
-        <span className="quick-row-label">Schnellsatz</span>
+        <span className="quick-row-label">{tr('Schnellsatz')}</span>
         {values.length > 0 && (
-          <button className="quick-edit-btn" aria-label="Schnellsatz bearbeiten" onClick={() => { setDraft(values); setEditing(true); }}>
+          <button className="quick-edit-btn" aria-label={tr('Schnellsatz bearbeiten')} onClick={() => { setDraft(values); setEditing(true); }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           </button>
         )}
       </div>
       {coach && values.length > 0 && (
         <div className="ob-coach" role="note" style={arrowX != null ? { '--ob-arrow-x': `${arrowX}px` } : undefined}>
-          Satz gemacht? Tipp hier.
+          {tr('Satz gemacht? Tipp hier.')}
         </div>
       )}
       <div className="quick-chips">
         {onLog && (
-          <button className="quick-chip-open" onClick={onLog}>+ Satz</button>
+          <button className="quick-chip-open" onClick={onLog}>{tr('+ Satz')}</button>
         )}
         {values.length === 0 ? (
           <button className="quick-chip-setup" onClick={() => { setDraft([5, 10, 15]); setEditing(true); }}>
-            Schnellsatz festlegen
+            {tr('Schnellsatz festlegen')}
           </button>
         ) : values.map((v, i) => (
           <button key={i} className={`quick-chip mono${coach && i === 0 ? ' ob-pulse' : ''}`} onClick={() => onQuick(v)}>+{v}</button>
@@ -152,9 +152,10 @@ function dailyBreakdownFor(weekStart, sets, groups) {
     const g = groupOf[s.athlete];
     if (bucket && !bucket.isFuture && g != null) bucket.vals[g] += PTData.setValue(s);
   }
-  const labels = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  // Wochentage ab Montag; getDay() zählt ab Sonntag (0)
+  const labels = PTi18n.weekdays();
   return days
-    .map(d => ({ ...d, label: labels[d.dow] }))
+    .map(d => ({ ...d, label: labels[(d.dow + 6) % 7] }))
     .sort((a, b) => (a.dow === 0 ? 7 : a.dow) - (b.dow === 0 ? 7 : b.dow));
 }
 
@@ -163,16 +164,16 @@ function DailyStatus({ variant, done, fairShare, dailyTarget, todayReps, trackDe
   const footerClass = variant === 'tug' ? 'tug-foot' : 'owe';
 
   if (isDone) {
-    return <div className={`${footerClass} mono done`}>✓ erledigt</div>;
+    return <div className={`${footerClass} mono done`}>{tr('✓ erledigt')}</div>;
   }
 
   const statusClass = trackDelta >= 0 ? 'ok' : 'behind';
-  const statusText = trackDelta >= 0 ? '✓ Auf Kurs' : `${Math.abs(trackDelta)} hinten`;
+  const statusText = trackDelta >= 0 ? tr('✓ Auf Kurs') : tr('{n} hinten', { n: Math.abs(trackDelta) });
 
   return (
     <>
       <div className="daily-line mono">
-        <span>heute {todayReps} / {dailyTarget}</span>
+        <span>{tr('heute {done} / {target}', { done: todayReps, target: dailyTarget })}</span>
       </div>
       <div className={`track-status ${statusClass}`}>{statusText}</div>
     </>
@@ -188,9 +189,9 @@ function WeekCloseBanner({ weekStart, onClose }) {
   }
   return (
     <div className="weekclose-banner">
-      <div className="weekclose-banner-title">KW {weekKW(weekStart)} ist um.</div>
-      <div className="weekclose-banner-sub">Strafkonto-Abschluss noch offen.</div>
-      <button className="weekclose-banner-btn" onClick={() => onClose(weekStart)}>Woche abschließen</button>
+      <div className="weekclose-banner-title">{tr('KW {week} ist um.', { week: weekKW(weekStart) })}</div>
+      <div className="weekclose-banner-sub">{tr('Strafkonto-Abschluss noch offen.')}</div>
+      <button className="weekclose-banner-btn" onClick={() => onClose(weekStart)}>{tr('Woche abschließen')}</button>
     </div>
   );
 }
@@ -202,8 +203,8 @@ function RankList({ sides, stats, target, sideShares, fmtVal, total, remaining }
   return (
     <div className="mu-rank">
       <div className="mu-rank-head mono">
-        <span>Gesamt {fmtVal(total)} / {fmtVal(target)}</span>
-        <span className={remaining === 0 ? 'done' : ''}>{remaining === 0 ? '🎉 erreicht' : `noch ${fmtVal(remaining)}`}</span>
+        <span>{tr('Gesamt {done} / {target}', { done: fmtVal(total), target: fmtVal(target) })}</span>
+        <span className={remaining === 0 ? 'done' : ''}>{remaining === 0 ? tr('🎉 erreicht') : tr('noch {amount}', { amount: fmtVal(remaining) })}</span>
       </div>
       {order.map((i, rank) => {
         const side = sides[i];
@@ -213,7 +214,7 @@ function RankList({ sides, stats, target, sideShares, fmtVal, total, remaining }
           <div key={side.key} className={`mu-rank-row ${side.cls} ${side.isMine ? 'mine' : ''}`} style={sideStyle(side)}>
             <span className="mu-rank-pos mono">{rank + 1}</span>
             <SideAvatar side={side} size={26} />
-            <span className="mu-rank-name">{side.isMine ? 'Du' : side.label}</span>
+            <span className="mu-rank-name">{side.isMine ? tr('Du') : side.label}</span>
             <span className="mu-rank-bar"><span className="mu-rank-fill" style={{ width: `${(s.done / max) * 100}%`, background: side.color }} /></span>
             <span className="mu-rank-val mono">{fmtVal(s.done)}{doneShare ? ' ✓' : ''}</span>
           </div>
@@ -222,8 +223,6 @@ function RankList({ sides, stats, target, sideShares, fmtVal, total, remaining }
     </div>
   );
 }
-
-const challengeCount = (n) => n === 1 ? 'eine Challenge' : `${n} Challenges`;
 
 // Vergleichskarte auf „Heute“. Zwei Seiten (1v1, 2v2): Duell mit Score und geteiltem Balken.
 // Mehr Seiten (Jeder gegen jeden): Rangliste. entries[0] ist immer die eigene Seite.
@@ -235,16 +234,16 @@ function DuelCard({ entries, title, meta }) {
     const max = Math.max(1, ranked[0]?.reps || 0);
     const myRank = ranked.findIndex(e => e.side.isMine) + 1;
     return (
-      <section className="rd-card rd-duel" aria-label="Rangliste diese Woche">
+      <section className="rd-card rd-duel" aria-label={tr('Rangliste diese Woche')}>
         <div className="rd-duel-head"><span>{title}</span><span>{meta}</span></div>
-        <p className="rd-duel-line">{total === 0 ? 'Noch nichts geloggt. Wer legt vor?' : `Du bist auf Platz ${myRank}.`}</p>
+        <p className="rd-duel-line">{total === 0 ? tr('Noch nichts geloggt. Wer legt vor?') : tr('Du bist auf Platz {rank}.', { rank: myRank })}</p>
         <ol className="rd-rank">
           {ranked.map((e, i) => (
             <li key={e.side.key} className={e.side.isMine ? 'is-me' : ''} style={sideStyle(e.side)}>
               <span className="rd-rank-pos">{i + 1}</span>
               <SideAvatar side={e.side} size={32} />
               <span className="rd-rank-body">
-                <span className="rd-rank-name">{e.side.isMine && e.side.userIds.length === 1 ? 'Du' : e.side.label}</span>
+                <span className="rd-rank-name">{e.side.isMine && e.side.userIds.length === 1 ? tr('Du') : e.side.label}</span>
                 <span className="rd-rank-track"><span className="rd-rank-fill" style={{ width: `${(e.reps / max) * 100}%` }} /></span>
               </span>
               <span className="rd-rank-val"><CountUp value={e.reps} /></span>
@@ -258,13 +257,17 @@ function DuelCard({ entries, title, meta }) {
   const [a, b] = entries;
   const we = a.side.userIds.length > 1;
   const lead = a.wins - b.wins;
-  const line = total === 0 ? 'Noch nichts geloggt. Wer legt vor?'
-    : lead > 0 ? `${we ? 'Ihr liegt' : 'Du liegst'} ${challengeCount(lead)} vorne.`
-    : lead < 0 ? `${b.side.label} ${b.side.userIds.length > 1 ? 'liegen' : 'liegt'} ${challengeCount(-lead)} vorne.`
-    : 'Gleichstand. Jetzt zählt jeder Satz.';
+  const line = total === 0 ? tr('Noch nichts geloggt. Wer legt vor?')
+    : lead > 0 ? (we
+      ? trn(lead, 'Ihr liegt eine Challenge vorne.', 'Ihr liegt {n} Challenges vorne.')
+      : trn(lead, 'Du liegst eine Challenge vorne.', 'Du liegst {n} Challenges vorne.'))
+    : lead < 0 ? (b.side.userIds.length > 1
+      ? trn(-lead, '{name} liegen eine Challenge vorne.', '{name} liegen {n} Challenges vorne.', { name: b.side.label })
+      : trn(-lead, '{name} liegt eine Challenge vorne.', '{name} liegt {n} Challenges vorne.', { name: b.side.label }))
+    : tr('Gleichstand. Jetzt zählt jeder Satz.');
   const aShare = total ? Math.round((a.reps / total) * 100) : 50;
   return (
-    <section className="rd-card rd-duel" aria-label="Duell diese Woche">
+    <section className="rd-card rd-duel" aria-label={tr('Duell diese Woche')}>
       <div className="rd-duel-head"><span>{title}</span><span>{meta}</span></div>
       <div className="rd-duel-main">
         {[a, null, b].map((e, i) => e ? (
@@ -275,18 +278,18 @@ function DuelCard({ entries, title, meta }) {
         ) : (
           <div key="score" className="rd-duel-score">
             <div className="rd-duel-num"><CountUp value={a.wins} /> : <CountUp value={b.wins} /></div>
-            <div className="rd-duel-cap">Challenges vorne</div>
+            <div className="rd-duel-cap">{tr('Challenges vorne')}</div>
           </div>
         ))}
       </div>
       <p className="rd-duel-line">{line}</p>
-      <div className="rd-split" role="img" aria-label={`${a.side.label} ${a.reps} Reps, ${b.side.label} ${b.reps} Reps`}>
+      <div className="rd-split" role="img" aria-label={tr('{nameA} {repsA} Reps, {nameB} {repsB} Reps', { nameA: a.side.label, repsA: a.reps, nameB: b.side.label, repsB: b.reps })}>
         <div className="rd-split-a" style={{ width: `${aShare}%`, ...sideStyle(a.side) }} />
         <div className="rd-split-b" style={sideStyle(b.side)} />
       </div>
       <div className="rd-split-legend">
-        <span><CountUp value={a.reps} /> Reps</span>
-        <span><CountUp value={b.reps} /> Reps</span>
+        <span>{trn(a.reps, '{n} Reps', '{n} Reps', { n: <CountUp value={a.reps} /> })}</span>
+        <span>{trn(b.reps, '{n} Reps', '{n} Reps', { n: <CountUp value={b.reps} /> })}</span>
       </div>
     </section>
   );
@@ -382,12 +385,12 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     return days;
   }, [tabChallenges, allSets, weekStart, sides]);
   const weekSeries = twoSided || sides.length < 2
-    ? sides.map(s => ({ key: s.key, label: s.isMine && s.userIds.length === 1 ? 'Du' : s.label, style: sideStyle(s) }))
-    : [{ key: 'me', label: 'Du', style: sideStyle(sides[0]) }, { key: 'avg', label: 'Ø andere', style: { '--sc': 'var(--text-4)' } }];
+    ? sides.map(s => ({ key: s.key, label: s.isMine && s.userIds.length === 1 ? tr('Du') : s.label, style: sideStyle(s) }))
+    : [{ key: 'me', label: tr('Du'), style: sideStyle(sides[0]) }, { key: 'avg', label: tr('Ø andere'), style: { '--sc': 'var(--text-4)' } }];
   const weekMax = Math.max(1, ...week.flatMap(d => d.vals));
   const daysLeft = week.filter(d => d.isFuture).length;
   const finishedCount = rows.filter(r => r.meFinished).length;
-  const nameOf = (id) => id === me ? 'dir' : PTPeople.firstNameOf(id);
+  const chosenByLabel = (id) => id === me ? tr('gewählt von dir') : tr('gewählt von {name}', { name: PTPeople.firstNameOf(id) });
 
   const pick = (id) => {
     setSelectedId(id);
@@ -398,9 +401,9 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   if (!tabChallenges.length) {
     return (
       <div className="rd-empty">
-        <div className="rd-empty-title">Diese Woche ist noch offen</div>
-        <div className="rd-empty-text">Legt euer erstes Wochenziel fest.</div>
-        <button className="btn" onClick={onAddGoal}>Ziel anlegen</button>
+        <div className="rd-empty-title">{tr('Diese Woche ist noch offen')}</div>
+        <div className="rd-empty-text">{tr('Legt euer erstes Wochenziel fest.')}</div>
+        <button className="btn" onClick={onAddGoal}>{tr('Ziel anlegen')}</button>
       </div>
     );
   }
@@ -412,23 +415,25 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
       {timerRunning && (
         <button type="button" className="timer-banner" onClick={onAddGoal}>
           <span className="timer-banner-dot" />
-          <span>Timer läuft · tippe zum Loggen</span>
+          <span>{tr('Timer läuft · tippe zum Loggen')}</span>
         </button>
       )}
 
       {sides.length >= 2 && (
         <DuelCard entries={duelEntries}
-          title={`KW ${weekNumber(tabChallenges[0].week_start)} · ${twoSided ? 'Duell' : 'Rangliste'}`}
-          meta={daysLeft === 0 ? 'letzter Tag' : daysLeft === 1 ? 'noch 1 Tag' : `noch ${daysLeft} Tage`} />
+          title={twoSided
+            ? tr('KW {week} · Duell', { week: weekNumber(tabChallenges[0].week_start) })
+            : tr('KW {week} · Rangliste', { week: weekNumber(tabChallenges[0].week_start) })}
+          meta={daysLeft === 0 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')} />
       )}
 
       {focus && (
-        <section ref={focusRef} className="rd-focus" aria-label={focus.isObligatory ? 'Pflicht-Challenge' : 'Wochenziel im Fokus'}>
+        <section ref={focusRef} className="rd-focus" aria-label={focus.isObligatory ? tr('Pflicht-Challenge') : tr('Wochenziel im Fokus')}>
           <div className="rd-focus-top">
             <div className="rd-focus-text">
-              <div className="rd-overline">{focus.isObligatory ? 'Pflicht-Challenge' : 'Im Fokus'}</div>
+              <div className="rd-overline">{focus.isObligatory ? tr('Pflicht-Challenge') : tr('Im Fokus')}</div>
               <h2 className="rd-focus-title">{focus.cat?.name}</h2>
-              {focus.ch.chosen_by && <div className="rd-focus-sub">gewählt von {nameOf(focus.ch.chosen_by)}</div>}
+              {focus.ch.chosen_by && <div className="rd-focus-sub">{chosenByLabel(focus.ch.chosen_by)}</div>}
             </div>
             <MiniRing pct={fPct} size={72} stroke={7} color="#fff" track="rgba(255,255,255,0.22)">
               {Math.round(fPct * 100)}%
@@ -437,22 +442,24 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
           <div className="rd-focus-chips">
             <span className="rd-chip-glass">
               {focus.isObligatory
-                ? `${focus.total} von ${focus.goal} erledigt`
-                : <>{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}{focus.isWork ? '' : ' Reps'}</>}
+                ? tr('{done} von {total} erledigt', { done: focus.total, total: focus.goal })
+                : focus.isWork
+                  ? <>{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}</>
+                  : tr('{done} / {target} Reps', { done: focus.fmt(focus.total), target: focus.fmt(focus.ch.target_reps) })}
             </span>
             <span className="rd-chip-glass">
-              {focus.isObligatory ? (focus.meFinished ? `du: ${focus.mySummary}` : 'einmal diese Woche')
-                : focus.meFinished ? 'dein Teil ist erledigt'
-                : focus.myTodayLeft > 0 ? `heute noch ${focus.fmt(focus.myTodayLeft)}` : 'du bist auf Kurs'}
+              {focus.isObligatory ? (focus.meFinished ? tr('du: {summary}', { summary: focus.mySummary }) : tr('einmal diese Woche'))
+                : focus.meFinished ? tr('dein Teil ist erledigt')
+                : focus.myTodayLeft > 0 ? tr('heute noch {amount}', { amount: focus.fmt(focus.myTodayLeft) }) : tr('du bist auf Kurs')}
             </span>
-            <button className="rd-icon-glass" aria-label={`${focus.cat?.name} bearbeiten`} onClick={() => onEditChallenge(focus.ch)}>
+            <button className="rd-icon-glass" aria-label={tr('{name} bearbeiten', { name: focus.cat?.name })} onClick={() => onEditChallenge(focus.ch)}>
               <Icon name="edit" size={16} />
             </button>
           </div>
           {focus.isObligatory ? (
             <button className="rd-btn-white" onClick={() => onLogChallenge(focus.ch)}>
               <Icon name="play" size={18} />
-              {focus.catType === 'tom_holland' ? 'Workout starten' : 'Bring Sally Up starten'}
+              {focus.catType === 'tom_holland' ? tr('Workout starten') : tr('Bring Sally Up starten')}
             </button>
           ) : (
             <QuickLogRow me={me} catId={focus.ch.category_id} coach={coach}
@@ -461,19 +468,22 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
         </section>
       )}
 
-      <section className="rd-section" aria-label="Deine Übungen">
+      <section className="rd-section" aria-label={tr('Deine Übungen')}>
         <div className="rd-section-head">
-          <h2>Deine Übungen</h2>
-          <span>{finishedCount} von {rows.length} erledigt</span>
+          <h2>{tr('Deine Übungen')}</h2>
+          <span>{tr('{done} von {total} erledigt', { done: finishedCount, total: rows.length })}</span>
         </div>
         <ul className="rd-card rd-list">
           {orderedRows.map(r => {
             const isFocus = focus && r.ch.id === focus.ch.id;
+            const progress = { done: r.fmt(r.myDone), total: r.fmt(r.share) };
             const sub = r.isObligatory
-              ? (r.meFinished ? `erledigt · ${r.mySummary}` : 'einmal diese Woche')
+              ? (r.meFinished ? tr('erledigt · {summary}', { summary: r.mySummary }) : tr('einmal diese Woche'))
               : r.meFinished
-                ? `${r.fmt(r.myDone)} von ${r.fmt(r.share)}`
-                : `${r.fmt(r.myDone)} von ${r.fmt(r.share)} · ${r.myTodayLeft > 0 ? `heute noch ${r.fmt(r.myTodayLeft)}` : 'auf Kurs'}`;
+                ? tr('{done} von {total}', progress)
+                : r.myTodayLeft > 0
+                  ? tr('{done} von {total} · heute noch {left}', { ...progress, left: r.fmt(r.myTodayLeft) })
+                  : tr('{done} von {total} · auf Kurs', progress);
             return (
               <li key={r.ch.id}>
                 <button type="button" className={`rd-row${r.meFinished ? ' is-done' : ''}${isFocus ? ' is-focus' : ''}`}
@@ -486,7 +496,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
                     <span className="rd-row-sub">{sub}</span>
                   </span>
                   {r.meFinished ? (
-                    <span className="rd-check" aria-label="Erledigt"><Icon name="check" size={16} strokeWidth={3} /></span>
+                    <span className="rd-check" aria-label={tr('Erledigt')}><Icon name="check" size={16} strokeWidth={3} /></span>
                   ) : (
                     <MiniRing pct={r.isObligatory ? 0 : r.myDone / r.share} />
                   )}
@@ -497,9 +507,9 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
         </ul>
       </section>
 
-      <section className="rd-section" aria-label="Diese Woche">
+      <section className="rd-section" aria-label={tr('Diese Woche')}>
         <div className="rd-section-head">
-          <h2>Diese Woche</h2>
+          <h2>{tr('Diese Woche')}</h2>
           <span className="rd-legend">
             {weekSeries.map(s => <span key={s.key} style={s.style}><i />{s.label}</span>)}
           </span>
@@ -507,7 +517,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
         <div className="rd-card rd-week">
           {week.map((d, i) => (
             <div key={d.iso} className={`rd-week-day${d.isToday ? ' is-today' : ''}${d.isFuture ? ' is-future' : ''}`}
-              aria-label={d.isFuture ? `${d.label}: noch offen` : `${d.label}: ${weekSeries.map((s, j) => `${s.label} ${d.vals[j] ?? 0}`).join(', ')}`}>
+              aria-label={d.isFuture ? tr('{day}: noch offen', { day: d.label }) : `${d.label}: ${weekSeries.map((s, j) => `${s.label} ${d.vals[j] ?? 0}`).join(', ')}`}>
               <div className="rd-week-bars">
                 {weekSeries.map((s, j) => (
                   <div key={s.key} className="rd-bar"
@@ -530,12 +540,13 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const monday = new Date(nextWeekStart + 'T00:00:00');
       const daysUntil = Math.max(0, Math.round((monday - today) / 86400000));
-      const whenLabel = daysUntil === 0 ? 'heute' : daysUntil === 1 ? 'morgen' : `in ${daysUntil} Tagen`;
+      const whenLabel = daysUntil === 0 ? tr('heute') : daysUntil === 1 ? tr('morgen') : tr('in {n} Tagen', { n: daysUntil });
+      const weekVars = { week: weekNumber(nextWeekStart), when: whenLabel };
       return (
-        <section className="rd-section" aria-label="Nächste Woche">
+        <section className="rd-section" aria-label={tr('Nächste Woche')}>
           <div className="rd-section-head">
-            <h2>Nächste Woche</h2>
-            <span>KW {weekNumber(nextWeekStart)} · {whenLabel}{!isConfirmed && ' · Vorschau'}</span>
+            <h2>{tr('Nächste Woche')}</h2>
+            <span>{isConfirmed ? tr('KW {week} · {when}', weekVars) : tr('KW {week} · {when} · Vorschau', weekVars)}</span>
           </div>
           <ul className="rd-card rd-list">
             {items.map((ch, i) => {
@@ -549,14 +560,14 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
                     </span>
                     <span className="rd-row-text">
                       <span className="rd-row-name">{cat?.name}</span>
-                      <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? `gewählt von ${nameOf(ch.chosen_by)}` : 'noch offen'}</span>
+                      <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? chosenByLabel(ch.chosen_by) : tr('noch offen')}</span>
                     </span>
                     <span className="rd-row-value">
-                      {PTData.isWorkoutType(ctype) ? <>1×<small>pro Person</small></> : <>
+                      {PTData.isWorkoutType(ctype) ? <>1×<small>{tr('pro Person')}</small></> : <>
                         {!isConfirmed && ch.bonus_max > 0
                           ? <>{ch.target_reps}–{ch.target_reps + ch.bonus_max}</>
                           : ch.target_reps}
-                        <small>Reps</small>
+                        <small>{trc('Einheit', 'Reps')}</small>
                       </>}
                     </span>
                   </div>
@@ -605,13 +616,13 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   async function deleteChallenge() {
     if (!existing?.id) return;
     const cat = categories.find(c => c.id === existing.category_id);
-    if (!confirm(`„${cat?.name || 'Challenge'}" wirklich aus dieser Woche entfernen? Bisher geloggte Sätze bleiben erhalten.`)) return;
+    if (!confirm(tr('„{name}“ wirklich aus dieser Woche entfernen? Bisher geloggte Sätze bleiben erhalten.', { name: cat?.name || tr('Challenge') }))) return;
     setDeleting(true);
     try {
       await api.deleteChallenge(existing.id);
       onDeleted?.();
     } catch (e) {
-      alert(e.message || 'Fehler beim Löschen');
+      alert(e.message || tr('Fehler beim Löschen'));
     } finally {
       setDeleting(false);
     }
@@ -629,7 +640,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
       });
       onSaved();
     } catch (e) {
-      alert(e.message || 'Fehler beim Speichern');
+      alert(e.message || tr('Fehler beim Speichern'));
     } finally {
       setSaving(false);
     }
@@ -660,7 +671,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   }
   async function deleteEdit() {
     if (!editingCat) return;
-    if (!confirm(`Kategorie „${editingCat.name}" wirklich löschen?`)) return;
+    if (!confirm(tr('Kategorie „{name}“ wirklich löschen?', { name: editingCat.name }))) return;
     try {
       await api.deleteCategory(editingCat.id);
       if (catId === editingCat.id) setCatId(categories.find((c) => c.id !== editingCat.id)?.id || '');
@@ -671,10 +682,10 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
 
   return (
     <>
-      <h2 className="title" style={{ marginBottom: 4 }}>Wochen-Ziel festlegen</h2>
+      <h2 className="title" style={{ marginBottom: 4 }}>{tr('Wochen-Ziel festlegen')}</h2>
       <div className="subtitle" style={{ marginBottom: 18, fontSize: 15 }}>{formatWeek(weekStart)}</div>
 
-      <div className="label" style={{ marginBottom: 8 }}>Kategorie</div>
+      <div className="label" style={{ marginBottom: 8 }}>{tr('Kategorie')}</div>
 
       <div className="cat-grid">
         {(() => {
@@ -689,7 +700,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
                     <div className="name">{c.name}</div>
                   </button>
                   {c.competition_id && (
-                    <button className="cat-edit" aria-label="Bearbeiten"
+                    <button className="cat-edit" aria-label={tr('Bearbeiten')}
                       onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
                       ✎
                     </button>
@@ -698,7 +709,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
               ))}
               {work.length > 0 && (
                 <>
-                  <div className="cat-grid-divider">💻 Work</div>
+                  <div className="cat-grid-divider">{tr('💻 Work')}</div>
                   {work.map((c) => (
                     <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
                       <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
@@ -706,7 +717,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
                         <div className="name">{c.name}</div>
                       </button>
                       {c.competition_id && (
-                        <button className="cat-edit" aria-label="Bearbeiten"
+                        <button className="cat-edit" aria-label={tr('Bearbeiten')}
                           onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
                           ✎
                         </button>
@@ -718,7 +729,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
               <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
                 onClick={() => {setShowNewCat((s) => !s);setEditingCat(null);}}>
                 <div className="emoji">＋</div>
-                <div className="name">Neue Kategorie</div>
+                <div className="name">{tr('Neue Kategorie')}</div>
               </button>
             </>
           );
@@ -735,8 +746,8 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
         value={editingCat.name} autoFocus
         onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
         onKeyDown={(e) => e.key === 'Enter' && saveEdit()} />
-          <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label="Löschen">🗑️</button>
-          <button className="new-cat-add" onClick={saveEdit} aria-label="Speichern">✓</button>
+          <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label={tr('Löschen')}>🗑️</button>
+          <button className="new-cat-add" onClick={saveEdit} aria-label={tr('Speichern')}>✓</button>
         </div>
       }
 
@@ -744,7 +755,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
         <div className="new-cat-row">
           <input className="input new-cat-emoji"
             value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} maxLength={2} />
-          <input className="input" placeholder="Name (z.B. Dips)" autoFocus
+          <input className="input" placeholder={tr('Name (z.B. Dips)')} autoFocus
             value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
           {allowWork && (
@@ -753,23 +764,23 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
               <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
             </div>
           )}
-          <button className="new-cat-add" onClick={addNewCat} aria-label="Hinzufügen">✓</button>
+          <button className="new-cat-add" onClick={addNewCat} aria-label={tr('Hinzufügen')}>✓</button>
         </div>
       }
 
       {isWork ? (
         <>
-          <div className="label" style={{ marginBottom: 0 }}>Ziel-Stunden / Woche</div>
+          <div className="label" style={{ marginBottom: 0 }}>{tr('Ziel-Stunden / Woche')}</div>
           <Stepper value={hoursTarget ?? 10} onChange={setHoursTarget} step={1} min={1} />
           <div className="chip-row" style={{ justifyContent: 'center' }}>
             {[5, 10, 20, 40].map((v) =>
-              <button key={v} className="chip" onClick={() => setHoursTarget(v)}>{v}h</button>
+              <button key={v} className="chip" onClick={() => setHoursTarget(v)}>{v}h</button> // i18n-ignore: Einheit
             )}
           </div>
         </>
       ) : (
         <>
-          <div className="label" style={{ marginBottom: 0 }}>Ziel-Wiederholungen / Woche</div>
+          <div className="label" style={{ marginBottom: 0 }}>{tr('Ziel-Wiederholungen / Woche')}</div>
           <Stepper value={target} onChange={setTarget} step={target < 30 ? 1 : target < 100 ? 5 : 10} />
           <div className="chip-row" style={{ justifyContent: 'center' }}>
             {[15, 25, 40, 60, 80, 100].map((v) =>
@@ -780,14 +791,14 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
       )}
 
       <div className="btn-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
         <button className="btn" onClick={save} disabled={saving || !catId}>
-          {saving ? '…' : 'Speichern'}
+          {saving ? '…' : tr('Speichern')}
         </button>
       </div>
       {existing?.id &&
         <button className="btn btn-danger-ghost" style={{ marginTop: 12 }} onClick={deleteChallenge} disabled={deleting}>
-          {deleting ? '…' : '🗑️ Challenge aus dieser Woche entfernen'}
+          {deleting ? '…' : tr('🗑️ Challenge aus dieser Woche entfernen')}
         </button>
       }
     </>);
@@ -871,7 +882,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         setElapsedSec(0);
         onLogged(durationMinutes, true);
       } catch (e) {
-        alert(e.message || 'Fehler');
+        alert(e.message || tr('Fehler'));
       } finally {
         setSaving(false);
       }
@@ -887,7 +898,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         });
         onLogged(reps, false);
       } catch (e) {
-        alert(e.message || 'Fehler');
+        alert(e.message || tr('Fehler'));
       } finally {
         setSaving(false);
       }
@@ -897,7 +908,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
   if (isWork) {
     return (
       <>
-        <h2 className="title" style={{ marginBottom: 4 }}>Session loggen</h2>
+        <h2 className="title" style={{ marginBottom: 4 }}>{tr('Session loggen')}</h2>
         <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
           {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
         </div>
@@ -907,26 +918,26 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
           {timerStart ? (
             <>
               <div className="work-timer-display mono">{fmtElapsed(elapsedSec)}</div>
-              <button className="btn btn-danger" onClick={stopTimer}>⏹ Stop</button>
+              <button className="btn btn-danger" onClick={stopTimer}>{tr('⏹ Stop')}</button>
             </>
           ) : (
-            <button className="btn btn-secondary" onClick={startTimer}>▶ Timer starten</button>
+            <button className="btn btn-secondary" onClick={startTimer}>{tr('▶ Timer starten')}</button>
           )}
         </div>
 
         {/* Manual duration input */}
-        <div className="label" style={{ marginTop: 16, marginBottom: 0 }}>Minuten (manuell)</div>
+        <div className="label" style={{ marginTop: 16, marginBottom: 0 }}>{tr('Minuten (manuell)')}</div>
         <Stepper value={durationMinutes} onChange={setDurationMinutes} step={15} min={0} />
         <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
           {[30, 60, 90, 120].map((v) =>
-            <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button>
+            <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button> // i18n-ignore: Einheit
           )}
         </div>
 
         {/* Project tag picker */}
-        <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Projekt</div>
+        <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>{tr('Projekt')}</div>
         {projectTags.length === 0
-          ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>Keine Projekte — in Einstellungen hinzufügen</div>
+          ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>{tr('Keine Projekte — in Einstellungen hinzufügen')}</div>
           : <div className="chip-row" style={{ flexWrap: 'wrap' }}>
               {projectTags.map(t =>
                 <button key={t.id}
@@ -939,9 +950,9 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         }
 
         {/* Tool tag picker */}
-        <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Tool</div>
+        <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>{tr('Tool')}</div>
         {toolTags.length === 0
-          ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>Keine Tools — in Einstellungen hinzufügen</div>
+          ? <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '4px 0' }}>{tr('Keine Tools — in Einstellungen hinzufügen')}</div>
           : <div className="chip-row" style={{ flexWrap: 'wrap' }}>
               {toolTags.map(t =>
                 <button key={t.id}
@@ -955,16 +966,16 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
 
         <input
           className="input"
-          placeholder="Notiz (optional)"
+          placeholder={tr('Notiz (optional)')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           style={{ marginTop: 16 }} />
 
         <div className="btn-row" style={{ marginTop: 24 }}>
-          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
           <button className="btn" onClick={save}
             disabled={saving || durationMinutes <= 0 || !projectTagId || !toolTagId}>
-            {saving ? '…' : `${durationMinutes}m loggen`}
+            {saving ? '…' : tr('{n}m loggen', { n: durationMinutes })}
           </button>
         </div>
       </>
@@ -974,7 +985,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
   // Sports branch (original UI)
   return (
     <>
-      <h2 className="title" style={{ marginBottom: 4 }}>Satz loggen</h2>
+      <h2 className="title" style={{ marginBottom: 4 }}>{tr('Satz loggen')}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
         {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
       </div>
@@ -992,14 +1003,14 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
       </div>
       <input
         className="input"
-        placeholder="Notiz (optional, z.B. ‚saubere Form')"
+        placeholder={tr('Notiz (optional, z.B. ‚saubere Form‘)')}
         value={note}
         onChange={(e) => setNote(e.target.value)}
         style={{ marginTop: 16 }} />
       <div className="btn-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
         <button className="btn" onClick={save} disabled={saving || reps <= 0}>
-          {saving ? '…' : `+${reps} loggen`}
+          {saving ? '…' : tr('+{n} loggen', { n: reps })}
         </button>
       </div>
     </>
@@ -1034,8 +1045,8 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
   return (
     <div className="weekfix-card">
       <div className="weekfix-header">
-        <div className="weekfix-title">Woche starten</div>
-        <div className="weekfix-sub">Targets anpassen & alle Challenges anlegen</div>
+        <div className="weekfix-title">{tr('Woche starten')}</div>
+        <div className="weekfix-sub">{tr('Targets anpassen & alle Challenges anlegen')}</div>
       </div>
 
       <div className="weekfix-slots">
@@ -1049,7 +1060,7 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
               <span className="weekfix-emoji">{cat.emoji}</span>
               <span className="weekfix-name">{cat.name}</span>
               {isObligatory ? (
-                <span className="weekfix-pflicht">PFLICHT</span>
+                <span className="weekfix-pflicht">{tr('PFLICHT')}</span>
               ) : (
                 <div className="weekfix-stepper">
                   <button className="weekfix-step-btn"
@@ -1075,8 +1086,8 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
       </div>
 
       <div className="btn-row" style={{ marginTop: 16 }}>
-        <button className="btn btn-secondary" onClick={onDismiss}>Später</button>
-        <button className="btn" onClick={handleFix}>🏁 Woche starten</button>
+        <button className="btn btn-secondary" onClick={onDismiss}>{tr('Später')}</button>
+        <button className="btn" onClick={handleFix}>{tr('🏁 Woche starten')}</button>
       </div>
     </div>
   );
@@ -1164,14 +1175,14 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
         challenge_id: challenge.id,
         athlete: me,
         reps: rounds,
-        note: `Zeit: ${elapsedStr()}`,
+        note: `Zeit: ${elapsedStr()}`, // i18n-ignore: steht in der DB und im Feed aller Mitglieder
       });
       localStorage.removeItem(TH_TIMER_KEY);
       localStorage.removeItem(TH_ROUNDS_KEY);
       localStorage.removeItem(TH_CHALL_KEY);
       onLogged(rounds);
     } catch (e) {
-      alert(e.message || 'Fehler');
+      alert(e.message || tr('Fehler'));
     } finally {
       setSaving(false);
     }
@@ -1182,9 +1193,10 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
 
   return (
     <>
+      {/* i18n-ignore: Name des Workouts */}
       <h2 className="title" style={{ marginBottom: 4 }}>Tom Holland Workout</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        🦸 5 Klimmzüge · 10 Liegestütze · 15 Squats · {PTPeople.firstNameOf(me)}
+        {tr('🦸 5 Klimmzüge · 10 Liegestütze · 15 Squats · {name}', { name: PTPeople.firstNameOf(me) })}
       </div>
 
       {/* Countdown display */}
@@ -1195,7 +1207,7 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
       {/* Start timer button — only before first start */}
       {!timerStart && (
         <button className="btn btn-secondary" style={{ width: '100%', marginBottom: 20 }} onClick={startTimer}>
-          ▶ 20-Minuten-Timer starten
+          {tr('▶ 20-Minuten-Timer starten')}
         </button>
       )}
 
@@ -1205,15 +1217,15 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
           className="th-round-btn"
           onClick={addRound}
           disabled={!timerRunning && !timeUp}
-          aria-label="Runde hinzufügen">
+          aria-label={tr('Runde hinzufügen')}>
           <span className="th-round-count">{rounds}</span>
-          <span className="th-round-label">Runden</span>
+          <span className="th-round-label">{tr('Runden')}</span>
           <span className="th-round-plus">＋</span>
         </button>
       </div>
 
       {timeUp && (
-        <div className="th-time-up-banner">⏰ Zeit ist um! Drücke + für jede fertige Runde.</div>
+        <div className="th-time-up-banner">{tr('⏰ Zeit ist um! Drücke + für jede fertige Runde.')}</div>
       )}
 
       {/* History: last weeks */}
@@ -1226,13 +1238,14 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
         const best = Math.max(...chSets.map(s => s.reps));
         return (
           <div className="th-history">
-            <div className="th-history-label">Diese Woche bisher</div>
-            <div className="th-history-best mono">{best} Rd. persönliches Best</div>
+            <div className="th-history-label">{tr('Diese Woche bisher')}</div>
+            <div className="th-history-best mono">{trn(best, '{n} Rd. persönliches Best', '{n} Rd. persönliches Best')}</div>
             <div className="th-history-sets">
               {chSets.slice(-5).reverse().map(s => (
                 <div key={s.id} className="th-history-row">
-                  <span className="mono">{s.reps} Rd.</span>
-                  <span className="th-history-time">{s.note || ''}</span>
+                  <span className="mono">{trn(s.reps, '{n} Rd.', '{n} Rd.')}</span>
+                  {/* Notiz steht deutsch in der DB („Zeit: 12:34“, siehe saveSession) */}
+                  <span className="th-history-time">{PTData.noteText(s.note) || ''}</span>
                 </div>
               ))}
             </div>
@@ -1241,9 +1254,9 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
       })()}
 
       <div className="btn-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-secondary" onClick={cancelSession}>Abbrechen</button>
+        <button className="btn btn-secondary" onClick={cancelSession}>{tr('Abbrechen')}</button>
         <button className="btn" onClick={saveSession} disabled={saving || !canSave}>
-          {saving ? '…' : `${rounds} Runden loggen`}
+          {saving ? '…' : trn(rounds, '{n} Runde loggen', '{n} Runden loggen')}
         </button>
       </div>
     </>
@@ -1272,11 +1285,11 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
         challenge_id: challenge.id,
         athlete: me,
         reps: value,
-        note: value >= BSU_MAX_SEC ? null : `${bsuFmt(value)} von 3:24`,
+        note: value >= BSU_MAX_SEC ? null : `${bsuFmt(value)} von 3:24`, // i18n-ignore: steht in der DB und im Feed aller Mitglieder
       });
       onLogged(value);
     } catch (e) {
-      alert(e.message || 'Fehler');
+      alert(e.message || tr('Fehler'));
     } finally {
       setSaving(false);
     }
@@ -1284,9 +1297,10 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
 
   return (
     <>
+      {/* i18n-ignore: Name des Songs */}
       <h2 className="title" style={{ marginBottom: 4 }}>Bring Sally Up</h2>
       <div className="subtitle" style={{ marginBottom: 24, fontSize: 15 }}>
-        🌸 Liegestütze zum Song · {PTPeople.firstNameOf(me)} · Max: 3:24
+        {tr('🌸 Liegestütze zum Song · {name} · Max: 3:24', { name: PTPeople.firstNameOf(me) })}
       </div>
 
       {/* Success button */}
@@ -1294,14 +1308,14 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
         className="bsu-done-btn"
         onClick={() => saveResult(BSU_MAX_SEC)}
         disabled={saving}
-        aria-label="Komplett geschafft">
+        aria-label={tr('Komplett geschafft')}>
         <span className="bsu-done-icon">✅</span>
-        <span className="bsu-done-label">Geschafft! (3:24)</span>
+        <span className="bsu-done-label">{tr('Geschafft! (3:24)')}</span>
       </button>
 
       {/* Partial progress */}
       <div className="bsu-partial">
-        <div className="label" style={{ marginBottom: 12 }}>Nicht ganz... wie weit?</div>
+        <div className="label" style={{ marginBottom: 12 }}>{tr('Nicht ganz... wie weit?')}</div>
 
         {/* Quick-chips: landmark times */}
         <div className="chip-row" style={{ justifyContent: 'center', marginBottom: 16 }}>
@@ -1318,13 +1332,13 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
           value={sec}
           onChange={e => setSec(parseInt(e.target.value))}
           className="bsu-slider"
-          aria-label="Zeitfortschritt" />
+          aria-label={tr('Zeitfortschritt')} />
         <div className="bsu-slider-val mono">{bsuFmt(sec)}</div>
 
         <button className="btn btn-secondary" style={{ width: '100%', marginTop: 16 }}
           onClick={() => saveResult(sec)}
           disabled={saving}>
-          {saving ? '…' : `${bsuFmt(sec)} loggen`}
+          {saving ? '…' : tr('{time} loggen', { time: bsuFmt(sec) })}
         </button>
       </div>
 
@@ -1335,14 +1349,14 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
         const best = Math.max(...chSets.map(s => s.reps));
         return (
           <div className="bsu-history">
-            <div className="bsu-history-label">Bisherige Versuche diese Woche</div>
+            <div className="bsu-history-label">{tr('Bisherige Versuche diese Woche')}</div>
             <div className="bsu-history-sets">
               {chSets.slice(-5).reverse().map(s => (
                 <div key={s.id} className="bsu-history-row">
                   <span className={`mono ${s.reps >= BSU_MAX_SEC ? 'bsu-hist-done' : ''}`}>
                     {s.reps >= BSU_MAX_SEC ? '✅ 3:24' : bsuFmt(s.reps)}
                   </span>
-                  {s.reps === best && chSets.length > 1 && <span className="bsu-hist-best">🏆 Best</span>}
+                  {s.reps === best && chSets.length > 1 && <span className="bsu-hist-best">{tr('🏆 Best')}</span>}
                 </div>
               ))}
             </div>
@@ -1351,7 +1365,7 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
       })()}
 
       <div style={{ marginTop: 16, textAlign: 'center' }}>
-        <button className="btn-link" onClick={onClose}>Schließen</button>
+        <button className="btn-link" onClick={onClose}>{tr('Schließen')}</button>
       </div>
     </>
   );
@@ -1362,9 +1376,7 @@ function WeekRecap({ recap, me, sides = [] }) {
   const { week_start, challStats, totals = [], winnerIdx, sumAll, hitCount, totalChallenges, analysis,
     perSide = [], penCentsBySide = [], weekNumber } = recap;
   const isWorkWeek = challStats.length > 0 && challStats.every(c => c.cat?.kind === 'work');
-  const unit = isWorkWeek ? 'min' : 'Reps';
   const fmtRecapVal = (v) => isWorkWeek ? formatDuration(v) : v;
-  const formatEuroCents = (c) => (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
   const winner = winnerIdx != null ? sides[winnerIdx] : null;
   const twoSided = sides.length === 2;
   const order = sides.map((s, i) => i).sort((a, b) => (totals[b] || 0) - (totals[a] || 0));
@@ -1380,7 +1392,7 @@ function WeekRecap({ recap, me, sides = [] }) {
   );
   const monday = new Date(week_start + 'T00:00:00');
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-  const fmtD = (d) => `${d.getDate()}.${d.getMonth()+1}.`;
+  const fmtD = (d) => PTi18n.date(d, { day: 'numeric', month: 'numeric' });
   const winnerCls = winner ? winner.cls : 'tie';
   // Confetti pieces (only when there's a winner)
   const confetti = winner ? Array.from({ length: 28 }, (_, i) => {
@@ -1408,8 +1420,8 @@ function WeekRecap({ recap, me, sides = [] }) {
       ))}
       <div className="recap-head">
         <div className="recap-head-left">
-          <div className="recap-label">🏁 Wochenabschluss</div>
-          {weekNumber != null && <div className="recap-week-num">Woche {weekNumber}</div>}
+          <div className="recap-label">{tr('🏁 Wochenabschluss')}</div>
+          {weekNumber != null && <div className="recap-week-num">{tr('Woche {n}', { n: weekNumber })}</div>}
         </div>
         <div className="recap-date">{fmtD(monday)} – {fmtD(sunday)}</div>
       </div>
@@ -1421,19 +1433,22 @@ function WeekRecap({ recap, me, sides = [] }) {
               <span className="recap-winner-crown">👑</span>
             </div>
             <div className={`recap-winner-name ${winnerCls}`} style={sideStyle(winner)}>{winner.label}</div>
-            <div className="recap-winner-sub">{winner.userIds.length > 1 ? 'gewinnen die Woche' : 'gewinnt die Woche'}</div>
+            <div className="recap-winner-sub">{winner.userIds.length > 1 ? tr('gewinnen die Woche') : tr('gewinnt die Woche')}</div>
           </>
         ) : (
           <>
             <div className="recap-trophy">🤝</div>
-            <div className="recap-winner-name tie">Unentschieden</div>
-            <div className="recap-winner-sub">{fmtRecapVal(sumAll)} {unit} · gleichauf an der Spitze</div>
+            <div className="recap-winner-name tie">{tr('Unentschieden')}</div>
+            <div className="recap-winner-sub">{isWorkWeek
+              ? tr('{time} · gleichauf an der Spitze', { time: formatDuration(sumAll) })
+              : trn(sumAll, '{n} Reps · gleichauf an der Spitze', '{n} Reps · gleichauf an der Spitze')}</div>
           </>
         )}
       </div>
       {twoSided ? (
         <div className="recap-tally">
           {recapTallySide(sides[0], false)}
+          {/* i18n-ignore: in beiden Sprachen gleich */}
           <div className="recap-tally-vs">vs</div>
           {recapTallySide(sides[1], true)}
         </div>
@@ -1480,13 +1495,16 @@ function WeekRecap({ recap, me, sides = [] }) {
               <SideAvatar side={side} size={22} className="recap-athlete-mini-avatar"/>
               <div className="recap-athlete-stats-text">
                 <div>
-                  {ps.byCat.length === 0 ? '— keine Reps —' : ps.byCat.map((x, j) => (
+                  {ps.byCat.length === 0 ? tr('— keine Reps —') : ps.byCat.map((x, j) => (
                     <span key={j}>{j > 0 && ' · '}<span className="mono">{x.reps}</span> {x.name}</span>
                   ))}
                 </div>
                 {ps.setCount > 0 && (
                   <div className="recap-athlete-meta">
-                    in <span className="mono">{ps.setCount}</span> {ps.setCount === 1 ? 'Satz' : 'Sätzen'} · größter <span className="mono">+{ps.maxSet}</span>
+                    {trn(ps.setCount, 'in {n} Satz · größter {max}', 'in {n} Sätzen · größter {max}', {
+                      n: <span className="mono">{ps.setCount}</span>,
+                      max: <span className="mono">+{ps.maxSet}</span>,
+                    })}
                   </div>
                 )}
               </div>
@@ -1497,11 +1515,11 @@ function WeekRecap({ recap, me, sides = [] }) {
       <div className="recap-analysis">{analysis}</div>
       {anyPenalty && (
         <div className="recap-penalties">
-          <div className="recap-penalties-label">Neue Schulden</div>
+          <div className="recap-penalties-label">{tr('Neue Schulden')}</div>
           <div className="recap-penalties-row mu-wrap">
             {sides.map((side, i) => (
               <span key={side.key} className={`${i === 0 ? 'b' : 'j'} ${penCentsBySide[i] > 0 ? 'has' : ''}`}>
-                {side.label} {penCentsBySide[i] > 0 ? `–${formatEuroCents(penCentsBySide[i])}` : '✓'}
+                {side.label} {penCentsBySide[i] > 0 ? `–${PTi18n.euro(penCentsBySide[i])}` : '✓'}
               </span>
             ))}
           </div>
@@ -1509,7 +1527,7 @@ function WeekRecap({ recap, me, sides = [] }) {
       )}
       {totalChallenges > 0 && (
         <div className="recap-foot">
-          {hitCount} von {totalChallenges} Ziel{totalChallenges===1?'':'en'} erreicht
+          {trn(totalChallenges, '{done} von {n} Ziel erreicht', '{done} von {n} Zielen erreicht', { done: hitCount })}
         </div>
       )}
     </div>
@@ -1525,22 +1543,22 @@ function EmojiPickerSheet({ onPick, onClose }) {
   };
   return (
     <>
-      <h2 className="title" style={{ marginBottom: 4 }}>Reaktion hinzufügen</h2>
+      <h2 className="title" style={{ marginBottom: 4 }}>{tr('Reaktion hinzufügen')}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        Tippe einen Emoji ein (iOS-Tastatur 🌐 → Emoji)
+        {tr('Tippe einen Emoji ein (iOS-Tastatur 🌐 → Emoji)')}
       </div>
       <input
         className="input input-lg"
         type="text"
         value={val}
         autoFocus
-        placeholder="z. B. 🔥"
+        placeholder={tr('z. B. 🔥')}
         style={{ textAlign: 'center', fontSize: 32 }}
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
       <div className="btn-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
-        <button className="btn" onClick={submit} disabled={!val.trim()}>Hinzufügen</button>
+        <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
+        <button className="btn" onClick={submit} disabled={!val.trim()}>{tr('Hinzufügen')}</button>
       </div>
     </>
   );
@@ -1574,7 +1592,7 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
   const labelIdx = days <= 7
     ? axis.map((_, i) => i)
     : Array.from({ length: labelCount }, (_, k) => Math.round((k * (days - 1)) / (labelCount - 1)));
-  const fmt = (s) => { const d = new Date(s); return `${d.getDate()}.${d.getMonth() + 1}`; };
+  const fmt = (s) => PTi18n.day(s, { day: 'numeric', month: 'numeric' });
 
   // Y labels — 5 ticks
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * maxV));
@@ -1604,7 +1622,7 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
       {weekMarks.map(({idx, kw}) => (
         <g key={`wk${idx}`}>
           <line className="chart-week-line" x1={xPos(idx)} x2={xPos(idx)} y1={PAD_Y * 0.7} y2={H - PAD_Y}/>
-          <text x={xPos(idx)} y={PAD_Y * 0.6} fill="var(--text-2)" fontSize="10" textAnchor="middle" opacity="0.8">KW {kw}</text>
+          <text x={xPos(idx)} y={PAD_Y * 0.6} fill="var(--text-2)" fontSize="10" textAnchor="middle" opacity="0.8">{tr('KW {week}', { week: kw })}</text>
         </g>
       ))}
       {showArea && series.map((s, i) => <path key={`a${s.key}`} d={areaFor(s.data)} fill={`url(#grad-fs-s${i})`}/>)}
@@ -1686,26 +1704,23 @@ function ChartFullscreen({
     setActiveIdx(Math.max(0, Math.min(totalDays - 1, idx)));
   };
 
-  const fmtDate = (iso) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
+  const fmtDate = (iso) => PTi18n.day(iso, { day: '2-digit', month: 'short', year: 'numeric' });
 
 
   return (
     <div className="chart-fs">
       <div className="chart-fs-top">
-        <button className="chart-fs-close" onClick={onClose} aria-label="Schließen">✕</button>
+        <button className="chart-fs-close" onClick={onClose} aria-label={tr('Schließen')}>✕</button>
         <div className="chart-fs-title">{title}</div>
         <div className="chart-fs-controls">
           <div className="segmented segmented-sm">
-            <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>7T</button>
-            <button className={range==='30'?'active':''} onClick={()=>setRange('30')}>30T</button>
-            <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>All</button>
+            <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>{tr('{n}T', { n: 7 })}</button>
+            <button className={range==='30'?'active':''} onClick={()=>setRange('30')}>{tr('{n}T', { n: 30 })}</button>
+            <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>{tr('All')}</button>
           </div>
           <div className="segmented segmented-sm">
-            <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label="Kumuliert">Σ</button>
-            <button className={!cumulative?'active':''} onClick={()=>setCumulative(false)} aria-label="Pro Tag">Tag</button>
+            <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label={tr('Kumuliert')}>Σ</button>
+            <button className={!cumulative?'active':''} onClick={()=>setCumulative(false)} aria-label={tr('Pro Tag')}>{tr('Tag')}</button>
           </div>
         </div>
       </div>
@@ -1730,7 +1745,7 @@ function ChartFullscreen({
 
       <div className="chart-fs-bottom">
         {activeIdx === null ? (
-          <div className="chart-fs-hint">Tippe in das Diagramm für Tageswerte</div>
+          <div className="chart-fs-hint">{tr('Tippe in das Diagramm für Tageswerte')}</div>
         ) : (
           <div className="chart-fs-values">
             <span className="chart-fs-date">{fmtDate(axis[activeIdx].date)}</span>
@@ -1797,22 +1812,22 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
       await api.addSet(payload);
       onSaved?.(isWork ? durationMinutes : reps, isWork);
     } catch (e) {
-      alert(e.message || 'Fehler');
+      alert(e.message || tr('Fehler'));
     } finally {
       setSaving(false);
     }
   }
 
-  const dayLabels = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const dayLabels = PTi18n.weekdays();
 
   return (
     <>
-      <h2 className="title" style={{ marginBottom: 4 }}>Nachtrag</h2>
+      <h2 className="title" style={{ marginBottom: 4 }}>{tr('Nachtrag')}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        Satz für diese Woche nachtragen
+        {tr('Satz für diese Woche nachtragen')}
       </div>
 
-      <div className="label" style={{ marginBottom: 8 }}>Tag</div>
+      <div className="label" style={{ marginBottom: 8 }}>{tr('Tag')}</div>
       <div className="chip-row" style={{ marginBottom: 16 }}>
         {days.map((d, i) => {
           const iso = localDateOf(d);
@@ -1829,15 +1844,15 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
                 background: selected ? 'var(--accent)' : undefined,
                 color: selected ? '#000' : undefined,
               }}>
-              {dayLabels[i]} {d.getDate()}.
+              {tr('{weekday} {day}.', { weekday: dayLabels[i], day: d.getDate() })}
             </button>
           );
         })}
       </div>
 
-      <div className="label" style={{ marginBottom: 8 }}>Challenge</div>
+      <div className="label" style={{ marginBottom: 8 }}>{tr('Challenge')}</div>
       {challenges.length === 0 ? (
-        <div className="subtitle" style={{ marginBottom: 16 }}>Keine Challenges diese Woche</div>
+        <div className="subtitle" style={{ marginBottom: 16 }}>{tr('Keine Challenges diese Woche')}</div>
       ) : (
         <div className="chip-row" style={{ marginBottom: 16 }}>
           {challenges.map(ch => {
@@ -1861,14 +1876,14 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
 
       {isWork ? (
         <>
-          <div className="label" style={{ marginBottom: 0 }}>Minuten</div>
+          <div className="label" style={{ marginBottom: 0 }}>{tr('Minuten')}</div>
           <Stepper value={durationMinutes} onChange={setDurationMinutes} step={15} min={15} />
           <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
             {[30, 60, 90, 120].map(v =>
-              <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button>
+              <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button> // i18n-ignore: Einheit
             )}
           </div>
-          <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Projekt</div>
+          <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>{tr('Projekt')}</div>
           <div className="chip-row" style={{ flexWrap: 'wrap' }}>
             {projectTags.map(t =>
               <button key={t.id}
@@ -1878,7 +1893,7 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
               </button>
             )}
           </div>
-          <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>Tool</div>
+          <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>{tr('Tool')}</div>
           <div className="chip-row" style={{ flexWrap: 'wrap' }}>
             {toolTags.map(t =>
               <button key={t.id}
@@ -1891,7 +1906,7 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
         </>
       ) : (
         <>
-          <div className="label" style={{ marginBottom: 8 }}>Reps</div>
+          <div className="label" style={{ marginBottom: 8 }}>{tr('Reps')}</div>
           <input
             className="input input-lg mono"
             type="number"
@@ -1909,10 +1924,10 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
       )}
 
       <div className="btn-row" style={{ marginTop: 24 }}>
-        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
         <button className="btn" onClick={save}
           disabled={saving || !challengeId || (isWork ? durationMinutes <= 0 : reps <= 0)}>
-          {saving ? '…' : isWork ? `+${durationMinutes}min nachtragen` : `+${reps} nachtragen`}
+          {saving ? '…' : isWork ? tr('+{n}min nachtragen', { n: durationMinutes }) : tr('+{n} nachtragen', { n: reps })}
         </button>
       </div>
     </>

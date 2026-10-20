@@ -65,6 +65,40 @@ test('inviteLink und inviteText enthalten Code, Name und Link', () => {
   assert.equal(O.normalizeCode(text), 'BJ4K7X', 'die eigene Einladung lässt sich wieder einlesen');
 });
 
+// Wie auf einem englischen Gerät. Die Einladungstexte stehen hier selbst, damit
+// der Test nicht vom Stand von i18n/en.js abhängt.
+function loadEnglish() {
+  const ctx = { window: {}, console, navigator: { languages: ['en-US'], language: 'en-US' } };
+  vm.createContext(ctx);
+  for (const f of ['i18n.js', 'i18n/en.js', 'data.js', 'onboarding-model.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+    vm.runInContext(src, ctx, { filename: f });
+  }
+  ctx.PTi18n.add('en', {
+    'Komm in meine Challenge „{name}“ bei Projekt Terminator 💪': 'Join my challenge “{name}” on Projekt Terminator 💪',
+    'Direkt öffnen: {link}': 'Open in the app: {link}',
+  });
+  return { O: ctx.window.PTOnboarding, I: ctx.PTi18n };
+}
+
+test('englische Einladung lässt sich wieder einlesen, auch ohne Link', () => {
+  const { O: E, I } = loadEnglish();
+  assert.equal(I.lang, 'en');
+  const text = E.inviteText({ name: 'Office Battle', invite_code: 'bj4k7x' });
+  assert.match(text, /^Join my challenge “Office Battle”/);
+  assert.match(text, /Code: BJ4K7X/);
+  assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
+  assert.equal(E.normalizeCode(text), 'BJ4K7X');
+  const withoutLink = text.split('\n').slice(0, 2).join('\n');
+  assert.equal(E.normalizeCode(withoutLink), 'BJ4K7X', 'nur über „Code:“');
+  // englische Wörter mit sechs Buchstaben („Office“, „Battle“) sind kein Code
+  assert.equal(E.normalizeCode('Office Battle is great'), null);
+  assert.equal(E.normalizeCode('Join my challenge “Office” on Projekt Terminator 💪'), null);
+  // Einladungen in der jeweils anderen Sprache gehen auch
+  assert.equal(O.normalizeCode(text), 'BJ4K7X');
+  assert.equal(E.normalizeCode(O.inviteText({ name: 'Büro-Battle', invite_code: '3A9UQM' })), '3A9UQM');
+});
+
 // ── Einstieg ────────────────────────────────────────────────────────────────
 
 const NOW = new Date(2026, 9, 21, 12, 0).getTime(); // Mi 21.10.2026
