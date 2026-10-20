@@ -256,17 +256,18 @@ button, input, select, textarea { font-family: inherit; }
 }
 .sheet-handle { background: var(--surface-3); width: 40px; }
 
-/* Kompakte blaue Kachel über der Navigation. `top: auto` hebt das `top` aus
-   styles.css auf, sonst spannt sich der Toast über den ganzen Bildschirm.
-   Nach dem Einfahren zieht einmal ein heller Glanzstreifen darüber. */
+/* Kompakte Kachel über der Navigation, im Verlauf der Fokus-Karte.
+   `top: auto` hebt das `top` aus styles.css auf, sonst spannt sich der
+   Toast über den ganzen Bildschirm. Nach dem Einfahren zieht einmal ein
+   heller Glanzstreifen darüber. */
 .toast {
   top: auto; bottom: calc(104px + var(--safe-bot));
   width: max-content; max-width: calc(100vw - 48px);
   padding: 14px 22px; text-align: center;
-  background: linear-gradient(135deg, #3B7BF0 0%, #2563EB 45%, #1D4ED8 100%);
+  background: var(--grad);
   color: #fff;
   border: none; border-radius: 18px; font-weight: 600;
-  box-shadow: 0 8px 28px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: var(--grad-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   overflow: hidden;
   animation: toastUp .3s var(--ease);
 }
