@@ -26,7 +26,7 @@ App freigegeben ist (realistisch 21.10. nachmittags bis 22.10.).
 | 06:40–06:50 | Apple-ID an B geben | Konstanten im Code eintragen | 6 |
 | 06:50–07:05 | Rechtsseiten veröffentlichen, URLs prüfen | Supabase: Prüfskript, Migration | 7, 8 |
 | 07:05–07:45 | Build bauen und hochladen | Review-Konten mit Daten anlegen | 9, 10 |
-| 07:45–08:30 | Version 1.4 in App Store Connect ausfüllen | Gerätetest auf echtem iPhone | 11, 12 |
+| 07:45–08:30 | Version 1.4 in App Store Connect ausfüllen | Gerätetest auf echtem iPhone + Screenshots | 11, 11a, 12 |
 | 08:30–08:45 | Build wählen, einreichen, Expedited Review beantragen | | 13 |
 | 09:00–11:30 | Status beobachten, Rückfragen sofort beantworten | Server-Aufgaben ohne Prüfung | 14 |
 | 11:30 | Go/No-Go | | 15 |
@@ -242,9 +242,9 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
 
 1. Texte: Werbetext, Beschreibung, Schlüsselwörter, Support-URL,
    Marketing-URL aus `ios/App/fastlane/metadata/de-DE/*.txt` kopieren.
-2. Screenshots aus `docs/launch/screenshots/` hochladen: die Größe, die App
-   Store Connect als Pflicht anzeigt (`iphone-6.3` = 1206×2622 oder
-   `iphone-6.9` = 1320×2868). Keine iPad-Screenshots.
+2. Screenshots aus Schritt 11a hochladen, Pflicht ist „iPhone mit Dynamic
+   Island (mittel)“ (1206×2622 oder 1179×2556). Die großen Größen sind
+   optional. Keine iPad-Screenshots.
 3. App-Informationen: Kategorie Gesundheit und Fitness, Inhaltsrechte,
    **Altersfreigabe** nach Abschnitt 3 der Liste.
 4. **App-Datenschutz** nach Abschnitt 4 (ohne Werbung, Tracking: Nein),
@@ -255,6 +255,50 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
    Kontakt (Name, Telefon, E-Mail), Notizen = englischer Block aus
    `REVIEW_NOTES.md` mit eingesetztem Einladungscode.
 8. **Veröffentlichung: „Diese Version manuell veröffentlichen“.**
+
+## 11a. Screenshots (B, 08:00–08:30, parallel zum Gerätetest) – P0
+
+Es gibt noch keine Screenshots im Repo. Ohne mindestens einen Screenshot für
+**„iPhone mit Dynamic Island (mittel)“** lässt sich nicht einreichen. Erlaubt
+sind 1206×2622 oder 1179×2556, JPG oder PNG ohne Alphakanal, höchstens 10.
+
+**Weg 1 (bevorzugt): echtes iPhone**
+
+1. Xcode → Run (Debug-Build) auf ein iPhone mit Dynamic Island, nicht Max oder
+   Plus. iPhone 15/16 ergibt 1179×2556, iPhone 16 Pro/17/17 Pro ergibt
+   1206×2622. **Nicht** den iOS-27.1-Simulator nehmen, der zeigt Emojis als
+   Kästchen.
+2. Auf dem Willkommen-Bildschirm „Demo ansehen“ wählen.
+3. Am Mac: Safari → Entwickler → `<iPhone>` → `localhost` → Konsole:
+   ```js
+   localStorage.setItem('pt:shots','1'); location.reload()
+   ```
+   Das blendet den Demo-Knopf über der Tab-Leiste aus (`www/demo.js`).
+4. 4–6 Motive aufnehmen (Seitentaste + Lauter): Heute mit Duell und Serie,
+   Feed mit Reaktionen, Stats/Duell, Strafkonto, Einladen. Per AirDrop an den
+   Mac schicken.
+
+**Weg 2 (Notlösung ohne passendes iPhone): Chrome am Mac**
+
+1. Im Repo:
+   ```bash
+   python3 -m http.server 8137 -d www
+   ```
+2. In Chrome http://localhost:8137/?demo=reset öffnen, DevTools → Gerätemodus
+   → eigene Größe **402×874** mit **DPR 3**.
+3. In der Konsole denselben Befehl wie oben ausführen
+   (`localStorage.setItem('pt:shots','1'); location.reload()`).
+4. Pro Motiv DevTools → ⋮ → „Capture screenshot“ (ergibt 1206×2622).
+
+**Für beide Wege vor dem Hochladen** den Alphakanal entfernen und die Größe
+prüfen (im Ordner mit den PNGs):
+
+```bash
+mkdir -p jpg && for f in *.png; do sips -s format jpeg "$f" --out "jpg/${f%.png}.jpg"; done
+sips -g pixelWidth -g pixelHeight jpg/*
+```
+
+Die JPGs aus `jpg/` lädt A in Schritt 11.2 hoch.
 
 ## 12. Gerätetest auf einem echten iPhone (07:45, B, 25 min) – P0
 
@@ -428,7 +472,8 @@ kein Entwurfs-Kasten mehr da ist.
 DSA-Händlerstatus, Vereinbarungen, Apple-ID, primäre Sprache Deutsch, Name und
 Untertitel, Version 1.4, Texte, Screenshots, Kategorie, Altersfreigabe,
 App-Datenschutz, Preis kostenlos, Verfügbarkeit DE/AT/CH, App-Prüfung,
-manuelle Veröffentlichung, Expedited Review. Alles in Schritt 2, 4, 11 und 13.
+manuelle Veröffentlichung, Expedited Review. Alles in Schritt 2, 4, 11, 11a
+(Screenshots) und 13.
 
 ### Nie ins Repo (es ist öffentlich)
 

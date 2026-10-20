@@ -88,7 +88,7 @@ Alle Limits eingehalten.
 | Version | **1.4** anlegen bzw. die vorbereitete „1.0“ umbenennen. Muss zu `MARKETING_VERSION = 1.4` passen, nicht auf 1.0 zurückgehen. |
 | Version → Build | Den neuen Build wählen (Build-Nummer ab 20). |
 | Version → Verschlüsselung | Beantwortet die Info.plist (`ITSAppUsesNonExemptEncryption = false`), keine Frage mehr. |
-| Version → Screenshots | `docs/launch/screenshots/iphone-6.3/` (1206×2622) bzw. `iphone-6.9/` (1320×2868), je nachdem, welche Größe App Store Connect als Pflicht anzeigt. Keine iPad-Screenshots: die App ist nur fürs iPhone. |
+| Version → Screenshots | Aus Schritt 11a in `MORGEN.md` (am Gerät bzw. in Chrome aufgenommen, als JPG ohne Alphakanal). Pflicht ist „iPhone mit Dynamic Island (mittel)“: 1206×2622 oder 1179×2556, 1 bis 10 Bilder. Größere Formate sind optional. Keine iPad-Screenshots: die App ist nur fürs iPhone. |
 | Version → App-Prüfung | Login und Notizen aus `docs/launch/REVIEW_NOTES.md`. Zugangsdaten nur dort, nie im Repo. |
 | Version → Veröffentlichung | **„Diese Version manuell veröffentlichen“**. |
 
