@@ -1,12 +1,14 @@
-/* global React, PTData, PTFeed, PTPeople, Icon, Avatar, sideStyle, sideIndexByUser, formatRelative, formatDuration, WeekRecap, bsuFmt, BSU_MAX_SEC */
+/* global React, PTData, PTFeed, PTPeople, PTOnboarding, Icon, Avatar, sideStyle, sideIndexByUser, formatRelative, formatDuration, weekNumber, WeekRecap, bsuFmt, BSU_MAX_SEC, confirmReps */
 // Live-Feed der Challenge. Das Rechenmodell (Serien, Meilensteine, Anteile)
 // steckt in feed-model.js; hier geht es um die Darstellung:
 // - Neue Einträge rutschen oben hinein. Wer weiter unten liest, wird nicht
 //   verschoben, sondern bekommt eine Pille „↑ n neue Aktivitäten“.
 // - Zeiten aktualisieren sich alle 30 Sekunden.
 // - Antippen klappt eine Zeile auf: Schnell-Reaktionen, einzelne Sätze, für
-//   eigene Sätze Bearbeiten und Löschen.
+//   eigene Sätze Bearbeiten und Löschen, für fremde Melden und Blockieren.
 // - Reaktionen erscheinen sofort und werden danach vom Server bestätigt.
+// - Blockierte Personen (PTFeed.isBlocked, nur auf diesem Gerät): keine
+//   Notizen, Initiale statt Foto.
 
 // Nur Emojis bis Version 13.1, die kennt jedes iPhone ab iOS 15.0 (Mindestversion der App).
 const QUICK_REACTIONS = ['🔥', '💪', '👏', '😤', '💯'];
@@ -55,6 +57,38 @@ function burstValueLabel(b) {
 
 const clockOf = (ts) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 const personName = (id, me) => (id === me ? 'Du' : PTPeople.firstNameOf(id));
+
+// Melden (Apple 1.2): normalerweise über PTOnboarding.reportContent (Mail an
+// den Support mit den IDs). Fehlt das, bauen wir die Mail selbst bzw. öffnen
+// die Support-Seite.
+const FEED_SUPPORT_PAGE = 'https://noltejonas.github.io/Benny-Joni/support.html';
+
+function feedOpenExternal(url) {
+  if (!url) return;
+  const O = window.PTOnboarding;
+  if (typeof O?.openExternal === 'function') { O.openExternal(url); return; }
+  // mailto direkt, sonst bliebe ein leerer Tab zurück.
+  if (url.startsWith('mailto:')) { location.href = url; return; }
+  const w = window.open(url, '_blank');
+  if (!w) location.href = url;
+}
+
+function reportSet(s) {
+  const O = window.PTOnboarding;
+  const info = { kind: 'set', setId: s.id, userId: s.athlete, challengeId: s.competition_id || null, note: s.note || '' };
+  if (typeof O?.reportContent === 'function') {
+    try { O.reportContent(info); return; } catch (e) { console.warn('Melden', e); }
+  }
+  feedOpenExternal(PTFeed.reportMailto(info, O?.SUPPORT_EMAIL || '') || O?.LEGAL?.support || FEED_SUPPORT_PAGE);
+}
+
+// Avatar ohne Foto: für Blockierte nur die Initiale auf Profilfarbe.
+function FeedAvatar({ userId, blocked }) {
+  if (!blocked) return <Avatar userId={userId} size={36} className="avatar-img" />;
+  const p = PTPeople.get(userId);
+  return <Avatar userId={userId} profile={{ display_name: PTPeople.nameOf(userId), ...(p || {}), avatar_url: null }}
+    size={36} className="avatar-img" />;
+}
 
 // Reaktionen aller Sätze einer Serie, mit sofortiger Rückmeldung aus `opt`
 // ({ emoji: 'on' | 'off' }), bis der Server den Stand bestätigt.
@@ -139,16 +173,17 @@ function FeedMilestone({ e, parts, side, arriving }) {
 }
 
 function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions, onReact, onMore,
-  progressLabel, tags, editId, editVal, setEditVal, startEdit, commitEdit, cancelEdit, onDeleteSet }) {
+  progressLabel, tags, editId, editVal, setEditVal, startEdit, commitEdit, cancelEdit, onDeleteSet,
+  blocked = false, onReport, onToggleBlock }) {
   const mine = b.athlete === me;
-  const note = b.sets[0].note;
+  const note = blocked ? null : b.sets[0].note;
   const showSets = mine || b.count > 1;
   return (
-    <div className={`lf-row ${side ? side.cls : 'side-n'}${arriving ? ' is-arriving' : ''}${open ? ' is-open' : ''}`}
+    <div className={`lf-row ${side ? side.cls : 'side-n'}${arriving ? ' is-arriving' : ''}${open ? ' is-open' : ''}${blocked ? ' is-blocked' : ''}`}
       style={sideStyle(side)} data-lf-key={b.key}>
       <button className="lf-main" onClick={onToggleOpen} aria-expanded={open}>
         <span className="lf-avatar">
-          <Avatar userId={b.athlete} size={36} className="avatar-img" />
+          <FeedAvatar userId={b.athlete} blocked={blocked} />
           {isNew && <span className="lf-dot" aria-label="neu" />}
         </span>
         <span className="lf-body">
@@ -157,6 +192,7 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
             {formatRelative(b.created_at)}
             {b.count > 1 && ` · ${b.count} Sätze`}
             {progressLabel && ` · ${progressLabel}`}
+            {blocked && ' · blockiert'}
           </span>
           {note && <span className="lf-note">„{note}“</span>}
         </span>
@@ -216,6 +252,19 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
               ))}
             </div>
           )}
+          {!mine && (onReport || onToggleBlock) && (
+            <div className="lf-mod">
+              {blocked && <div className="lf-mod-hint">Blockiert – Challenge verlassen geht in den Einstellungen.</div>}
+              <div className="lf-mod-actions">
+                {onReport && <button type="button" className="btn-link lf-mod-btn" onClick={() => onReport(b.sets[0])}>Melden</button>}
+                {onToggleBlock && (
+                  <button type="button" className="btn-link lf-mod-btn" onClick={onToggleBlock}>
+                    {blocked ? 'Entsperren' : 'Blockieren'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -223,8 +272,9 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
 }
 
 // `alone`, `onFirstLog`, `onInvite`: leerer Zustand und Hinweis für neue Challenges.
+// `competition` (optional): Name und Einladungscode für „Ergebnis teilen“.
 function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], weekSets = [], participantCount = 2,
-  projectTags = [], toolTags = [], loading = false, alone = false,
+  projectTags = [], toolTags = [], loading = false, alone = false, competition = null,
   onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill, onFirstLog, onInvite }) {
   useTicker(30000);
   const online = useOnline();
@@ -334,11 +384,44 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
 
   const startEdit = (s) => { setEditId(s.id); setEditVal(String(isWorkSet(s) ? s.duration_minutes : s.reps)); };
   const cancelEdit = () => setEditId(null);
+  // Während der Rückfrage verliert das Feld den Fokus; der zweite Aufruf über
+  // onBlur darf dann nicht noch einmal fragen.
+  const asking = React.useRef(false);
   const commitEdit = (s) => {
+    if (asking.current) return;
     const v = parseInt(editVal, 10) || 0;
     const field = isWorkSet(s) ? 'duration_minutes' : 'reps';
-    if (v > 0 && v !== s[field]) onEditSet?.(s, { [field]: v });
+    const changed = v > 0 && v !== s[field];
+    // Plausibilität nur für Wiederholungen, nicht für Workouts und Work-Minuten.
+    if (changed && field === 'reps' && !s.workout && typeof confirmReps === 'function') {
+      asking.current = true;
+      const ok = confirmReps(v);
+      asking.current = false;
+      if (!ok) { setEditId(null); return; }
+    }
+    if (changed) onEditSet?.(s, { [field]: v });
     setEditId(null);
+  };
+
+  // Blockierte Personen (nur auf diesem Gerät, PTFeed.setBlocked).
+  const [blocked, setBlockedIds] = React.useState(() => PTFeed.blockedIds?.() || []);
+  const toggleBlock = (userId) => {
+    const on = !blocked.includes(userId);
+    const name = PTPeople.firstNameOf(userId);
+    if (on && !confirm(`${name} blockieren? Du siehst dann keine Notizen und kein Foto mehr von ${name}. Das gilt nur auf diesem Gerät.`)) return;
+    setBlockedIds(PTFeed.setBlocked(userId, on));
+  };
+
+  // „Ergebnis teilen“ gibt es nur auf dem neuesten Wochenabschluss mit Aktivität.
+  const newestRecap = entries.find((e) => e.kind === 'recap');
+  const recapShareText = (r) => {
+    const O = window.PTOnboarding;
+    const work = r.challStats?.length > 0 && r.challStats.every((c) => c.cat?.kind === 'work');
+    return PTFeed.recapShareText({
+      recap: r, sides, kw: weekNumber(r.week_start), name: competition?.name || '',
+      unit: work ? '' : 'Reps', fmt: work ? formatDuration : String,
+      appName: O?.APP_NAME || 'Benny & Joni', appUrl: O?.APP_STORE_URL || '', code: competition?.invite_code || '',
+    });
   };
 
   if (loading && !feed.length) return <FeedSkeleton />;
@@ -385,7 +468,8 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
         if (day) lastDay = day;
 
         if (e.kind === 'recap') {
-          return <React.Fragment key={e.key}>{heading}<WeekRecap recap={e} me={me} sides={sides} /></React.Fragment>;
+          const share = e === newestRecap && e.sumAll > 0 && PTFeed.recapShareText ? () => recapShareText(e) : undefined;
+          return <React.Fragment key={e.key}>{heading}<WeekRecap recap={e} me={me} sides={sides} getShareText={share} /></React.Fragment>;
         }
         if (e.kind === 'milestone') {
           const side = e.type === 'lead' ? sides[e.sideIndex] : sides[sideIdx[e.athlete]];
@@ -419,7 +503,10 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
               progressLabel={progressLabel} tags={tags}
               editId={editId} editVal={editVal} setEditVal={setEditVal}
               startEdit={startEdit} commitEdit={commitEdit} cancelEdit={cancelEdit}
-              onDeleteSet={onDeleteSet} />
+              onDeleteSet={onDeleteSet}
+              blocked={blocked.includes(e.athlete)}
+              onReport={reportSet}
+              onToggleBlock={PTFeed.setBlocked ? () => toggleBlock(e.athlete) : undefined} />
           </React.Fragment>
         );
       })}

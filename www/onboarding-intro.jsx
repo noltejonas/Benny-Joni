@@ -160,7 +160,7 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
         <button type="button" className="btn-link" onClick={onSkip}>Später</button>
       </>}>
         <h1 className="ob-title">{title}</h1>
-        <p className="ob-sub">Was macht ihr bis Sonntag?{daysLeft < 7 ? ` Noch ${daysLeft} ${daysLeft === 1 ? 'Tag' : 'Tage'}.` : ''}</p>
+        <p className="ob-sub">Was macht ihr bis Sonntag?{daysLeft <= 1 ? ' Heute ist der letzte Tag.' : daysLeft < 7 ? ` Noch ${daysLeft} Tage.` : ''}</p>
         <div className="ob-ex-grid" role="radiogroup" aria-label="Übung">
           {visible.map(c => (
             <button key={c.id} type="button" role="radio" aria-checked={c.id === catId}
@@ -174,7 +174,10 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
         {cat && (
           <ObAmount value={amount} onChange={setAmount} unit="pro Person bis Sonntag"
             choices={PTOnboarding.goalChoices(def)}
-            note={`Zusammen ${PTOnboarding.goalTarget(amount, people)} für ${obPeopleWord(people)}.`} />
+            note={competition.mode === 'ffa'
+              // Jeder gegen jeden: gespeichert wird die Summe, geteilt durch alle, die mitmachen.
+              ? `Zusammen ${PTOnboarding.goalTarget(amount, people)} – wird auf alle verteilt, die mitmachen.`
+              : `Zusammen ${PTOnboarding.goalTarget(amount, people)} für ${obPeopleWord(people)}.`} />
         )}
         <ObMessage error={error} />
       </ObScreen>
@@ -200,6 +203,7 @@ function ObFirstLogLayer({ api, challenges, categories, people = 2, onLogged, on
   async function log() {
     if (!ch) return;
     if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    if (typeof window.confirmReps === 'function' && !window.confirmReps(reps)) return;
     setError(''); setBusy(true);
     try {
       await api.addSet({ challenge_id: ch.id, reps, note: null });
@@ -363,16 +367,28 @@ function obWeekOneResult(s) {
   return { emoji: '🏁', line: 'Solo durchgezogen.' };
 }
 
-function ObWeekOne({ summary, onDone }) {
+// competition (optional): Einladungscode für „Ergebnis teilen“.
+function ObWeekOne({ summary, competition = null, onDone }) {
   React.useEffect(() => { PTHaptics.celebrate(); PTSound.play('first-log', 0.6); }, []);
   const r = obWeekOneResult(summary);
   const main = summary.myMinutes && !summary.myReps
     ? { num: formatDuration(summary.myMinutes), cap: 'Fokuszeit' }
     : { num: summary.myReps, cap: 'Reps' };
+  // Teilen-Knopf und Text kommen aus screens.jsx bzw. feed-model.js.
+  const Share = window.ShareResultButton;
+  const canShare = typeof Share === 'function' && typeof window.PTFeed?.weekOneShareText === 'function';
+  const shareText = () => PTFeed.weekOneShareText({
+    summary, fmtMinutes: formatDuration,
+    appName: PTOnboarding.APP_NAME || 'Benny & Joni', appUrl: PTOnboarding.APP_STORE_URL || '',
+    code: competition?.invite_code || '',
+  });
   return (
     <ObLayer label="Woche 1 geschafft">
       <ObConfetti count={40} />
-      <ObScreen stepKey="week1" center foot={<button type="button" className="btn" onClick={onDone}>Auf in Woche 2</button>}>
+      <ObScreen stepKey="week1" center foot={<>
+        {canShare && <Share getText={shareText} title="Woche 1" />}
+        <button type="button" className="btn" onClick={onDone}>Auf in Woche 2</button>
+      </>}>
         <div className="ob-trophy" aria-hidden="true">{r.emoji}</div>
         <div className="ob-overline" style={{ textAlign: 'center' }}>Woche 1</div>
         <h1 className="ob-title" style={{ textAlign: 'center' }}>Geschafft 🏁</h1>
@@ -404,7 +420,8 @@ function ObStarterCard({ items, midWeek, daysLeft, onOpen, onDismiss }) {
           <Icon name="close" size={16} strokeWidth={2.4} />
         </button>
       </div>
-      {midWeek && <div className="ob-starter-sub">Die Woche läuft seit Montag · noch {daysLeft} {daysLeft === 1 ? 'Tag' : 'Tage'}</div>}
+      {/* Resttage zählen heute mit – genau wie die Duell-Karte auf „Heute“. */}
+      {midWeek && <div className="ob-starter-sub">Die Woche läuft seit Montag · {daysLeft <= 1 ? 'letzter Tag' : `noch ${daysLeft} Tage`}</div>}
       <div className="ob-progress" aria-hidden="true"><span style={{ width: `${(done / items.length) * 100}%` }} /></div>
       <ul className="ob-starter-list">
         {items.map(i => (
