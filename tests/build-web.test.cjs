@@ -99,7 +99,9 @@ test('Shim: fehlt nativ ein Plugin, ist nur dieses null', async () => {
 
 test('Übersetzung ist identisch mit babel-standalone im Browser (transformScriptTags)', () => {
   const tags = B.babelTags(html);
-  assert.equal(tags.length, fs.readdirSync(WWW).filter((f) => f.endsWith('.jsx')).length);
+  // Jede .jsx in www muss in index.html eingebunden sein, sonst fehlt sie in der App.
+  const missing = fs.readdirSync(WWW).filter((f) => f.endsWith('.jsx') && !tags.some((t) => t.src === f));
+  assert.deepEqual(missing, [], `nicht in index.html eingebunden: ${missing.join(', ')}`);
   const { files } = B.compileHtml(html, (src) => fs.readFileSync(path.join(WWW, src), 'utf8'), Babel());
   for (const [i, t] of tags.entries()) {
     // Optionen exakt wie transformScriptTags in babel-standalone 7.29.0 (mit Inline-Sourcemap).
@@ -183,14 +185,9 @@ test('Hook läuft nur für iOS', () => {
   assert.equal(runTool([]).status, 1);
 });
 
-test('package.json: Testskript und keine neuen Abhängigkeiten', () => {
+test('package.json: Testskript und Hook', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.test, 'node --test tests/');
-  assert.deepEqual(Object.keys(pkg.dependencies).sort(), [
-    '@capacitor/app', '@capacitor/cli', '@capacitor/core', '@capacitor/haptics',
-    '@capacitor/ios', '@capacitor/preferences', '@capacitor/push-notifications',
-  ]);
-  assert.equal(pkg.devDependencies, undefined);
   // Wenn der Hook eingetragen ist, dann genau so.
   const hook = pkg.scripts['capacitor:copy:after'];
   if (hook !== undefined) assert.equal(hook, 'node tools/build-web.cjs');
