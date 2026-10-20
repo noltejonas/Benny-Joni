@@ -34,6 +34,43 @@ function stEuroInput(cents) {
   return (cents / 100).toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
 }
 
+// ─── Rechtliches, Support, Melden ───────────────────────────────────────────
+// Adressen und Links stehen zentral in PTOnboarding (APP_NAME, LEGAL, SUPPORT_EMAIL,
+// APP_STORE_ID). Fehlt etwas davon, bleibt die jeweilige Zeile weg.
+const stLaunch = () => window.PTOnboarding || {};
+
+// Öffnet Links in Safari bzw. der Mail-App.
+function stOpen(url) {
+  if (!url) return;
+  const O = stLaunch();
+  if (typeof O.openExternal === 'function') { O.openExternal(url); return; }
+  if (/^(mailto|itms-apps):/i.test(url)) { window.location.href = url; return; }
+  window.open(url, '_blank');
+}
+
+// mailto an den Support mit Betreff und Text; ohne Adresse die Support-Seite.
+function stSupportUrl(subject, body) {
+  const O = stLaunch();
+  const mail = typeof O.supportMailto === 'function' ? O.supportMailto(subject, body)
+    : O.SUPPORT_EMAIL ? `mailto:${O.SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}` : '';
+  return mail || O.LEGAL?.support || '';
+}
+
+const stIds = (userId, challengeId) =>
+  [userId && `Nutzer-ID: ${userId}`, challengeId && `Challenge-ID: ${challengeId}`].filter(Boolean).join('\n');
+
+function stCanReport() {
+  const O = stLaunch();
+  return typeof O.reportContent === 'function' || !!stSupportUrl('-', '-');
+}
+
+// Meldung per Mail (Apple 1.2). `label` landet im Betreff, wenn wir die Mail selbst bauen.
+function stReport({ kind, label, userId, challengeId, note }) {
+  const O = stLaunch();
+  if (typeof O.reportContent === 'function') { O.reportContent({ kind, userId, challengeId, note }); return; }
+  stOpen(stSupportUrl(`Meldung: ${label}`, `${note}\n\n\n${stIds(userId, challengeId)}`));
+}
+
 // ─── Bausteine ──────────────────────────────────────────────────────────────
 function SettingsPageHeader({ title, onBack }) {
   return (
@@ -244,12 +281,70 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
         </SettingsGroup>
       )}
 
+      <SettingsInfoGroup me={me} competition={competition} />
+
       {onSignOut && (
         <SettingsGroup>
           <SettingsRow title="Abmelden" tone="danger" onClick={onSignOut} />
         </SettingsGroup>
       )}
+
+      <SettingsDeleteAccountGroup baseApi={baseApi} />
     </div>
+  );
+}
+
+// ─── Info & Rechtliches ─────────────────────────────────────────────────────
+function SettingsInfoGroup({ me, competition }) {
+  const O = stLaunch();
+  const legal = O.LEGAL || null;
+  const appName = O.APP_NAME || 'Benny & Joni';
+  const ids = stIds(me, competition?.id);
+  const supportUrl = stSupportUrl(`${appName}: Support & Feedback`, `\n\n\n${ids}`);
+  const rateUrl = O.APP_STORE_ID ? `itms-apps://apps.apple.com/app/id${O.APP_STORE_ID}?action=write-review` : '';
+  const canReport = stCanReport();
+  if (!legal && !supportUrl && !rateUrl) return null;
+
+  const report = () => stReport({
+    kind: 'problem', label: 'Problem oder Inhalt', userId: me, challengeId: competition?.id,
+    note: 'Beschreib kurz, was passiert ist oder welchen Inhalt du meldest:',
+  });
+
+  return (
+    <SettingsGroup title="Info & Rechtliches">
+      {legal?.privacy && <SettingsRow title="Datenschutz" onClick={() => stOpen(legal.privacy)} />}
+      {legal?.imprint && <SettingsRow title="Impressum" onClick={() => stOpen(legal.imprint)} />}
+      {legal?.terms && <SettingsRow title="Nutzungsbedingungen" onClick={() => stOpen(legal.terms)} />}
+      {supportUrl && <SettingsRow title="Support & Feedback" onClick={() => stOpen(supportUrl)} />}
+      {canReport && <SettingsRow title="Problem oder Inhalt melden" onClick={report} />}
+      {rateUrl && <SettingsRow title="App bewerten" onClick={() => stOpen(rateUrl)} />}
+    </SettingsGroup>
+  );
+}
+
+// ─── Konto löschen (App Store 5.1.1(v)) ─────────────────────────────────────
+// Zweimal fragen, dann löschen; danach startet die App neu auf der Startseite.
+function SettingsDeleteAccountGroup({ baseApi }) {
+  const [busy, setBusy] = useState(false);
+  if (typeof baseApi?.deleteAccount !== 'function') return null;
+
+  async function remove() {
+    if (!confirm('Dein Profil, alle Sätze, Reaktionen, Strafkonto-Einträge und dein Foto werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.')) return;
+    if (!confirm('Konto jetzt wirklich löschen?')) return;
+    setBusy(true);
+    try {
+      await baseApi.deleteAccount();
+      window.location.replace(window.location.pathname);
+    } catch (e) {
+      alert(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SettingsGroup footer="Challenges mit anderen laufen ohne dich weiter.">
+      <SettingsRow title={busy ? 'Konto wird gelöscht…' : 'Konto löschen'} tone="danger" disabled={busy} onClick={remove} />
+    </SettingsGroup>
   );
 }
 
@@ -431,6 +526,12 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
     if (!confirm(`${who} aus der Challenge entfernen? Die Sätze bleiben in der Historie.`)) return;
     run(() => baseApi.removeMember(competition.id, m.user_id), `${who} entfernt`);
   };
+  // Melden per Mail an den Support (Apple 1.2); Name, Nutzer- und Challenge-ID im Text.
+  const canReport = stCanReport();
+  const report = (m) => stReport({
+    kind: 'member', label: 'Person', userId: m.user_id, challengeId: competition.id,
+    note: `Gemeldete Person: ${m.profile?.display_name || 'Unbekannt'}\nWas ist passiert?`,
+  });
 
   const memberRow = (m) => {
     const isMe = m.user_id === me;
@@ -451,6 +552,10 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
               </button>
             ))}
           </div>
+        )}
+        {canReport && !isMe && (
+          <button type="button" className="st-link" aria-label={`${m.profile?.display_name} melden`}
+            onClick={() => report(m)}>Melden</button>
         )}
         {isOwner && !isMe && (
           <SettingsIconButton icon="close" label={`${m.profile?.display_name} entfernen`} tone="danger"
