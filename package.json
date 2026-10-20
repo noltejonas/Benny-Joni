@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "capacitor:copy:after": "node tools/build-web.cjs",
+    "test": "node --test tests/"
   },
   "keywords": [],
   "author": "",
