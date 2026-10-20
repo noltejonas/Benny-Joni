@@ -246,7 +246,8 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
    Island (mittel)“ (1206×2622 oder 1179×2556). Die großen Größen sind
    optional. Keine iPad-Screenshots.
 3. App-Informationen: Kategorie Gesundheit und Fitness, Inhaltsrechte,
-   **Altersfreigabe** nach Abschnitt 3 der Liste.
+   **Altersfreigabe** nach Abschnitt 3 der Liste, **am Ende auf 16+
+   überschreiben**.
 4. **App-Datenschutz** nach Abschnitt 4 (ohne Werbung, Tracking: Nein),
    Datenschutz-URL `https://noltejonas.github.io/Benny-Joni/datenschutz.html`.
 5. Preise und Verfügbarkeit: kostenlos, nur Deutschland, Österreich, Schweiz.
