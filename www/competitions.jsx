@@ -19,8 +19,23 @@ function shareInvite(competition) {
   return 'copied';
 }
 
+// Schaltet den lokalen Demo-Modus (demo.js) ohne `?demo` in der URL um, damit
+// er auch in der iOS-App erreichbar ist. Ein `demo`-Parameter in der URL würde
+// das Flag beim Neuladen wieder setzen, deshalb fliegt er raus.
+function setDemoMode(on) {
+  try {
+    if (on) localStorage.setItem('pt_demo', '1');
+    else localStorage.removeItem('pt_demo');
+    sessionStorage.removeItem('pt_demo_signed_out');
+  } catch (e) {}
+  const url = new URL(location.href);
+  url.searchParams.delete('demo');
+  location.replace(url.toString());
+}
+
 // ─── Login / Registrierung ──────────────────────────────────────────────────
 function AuthScreen({ api }) {
+  const isDemo = api.mode === 'demo';
   const [mode, setMode] = React.useState('login'); // login | signup | reset | reset-code
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -66,6 +81,7 @@ function AuthScreen({ api }) {
         {mode === 'signup' ? 'Einmal anlegen, danach bleibst du in der App angemeldet.'
           : mode === 'reset' ? 'Gib deine E-Mail ein, du bekommst einen Code.'
           : mode === 'reset-code' ? 'Code aus der Mail und neues Passwort eingeben.'
+          : isDemo ? 'Demo: Jede E-Mail und jedes Passwort funktioniert.'
           : 'Melde dich an, um zu deinen Challenges zu kommen.'}
       </p>
       <form className="mu-auth-form" onSubmit={submit}>
@@ -95,6 +111,9 @@ function AuthScreen({ api }) {
         {mode === 'login' && <>
           <button className="btn-link" onClick={() => { setMode('signup'); setError(''); }}>Neu hier? Account erstellen</button>
           <button className="btn-link" onClick={() => { setMode('reset'); setError(''); }}>Passwort vergessen</button>
+          {isDemo
+            ? <button className="btn-link" onClick={() => setDemoMode(false)}>Demo beenden</button>
+            : <button className="btn-link" onClick={() => setDemoMode(true)}>Demo ansehen, ohne Konto</button>}
         </>}
         {mode !== 'login' && (
           <button className="btn-link" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>Zurück zum Login</button>
