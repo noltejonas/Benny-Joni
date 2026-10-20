@@ -301,7 +301,9 @@ function SettingsInfoGroup({ me, competition }) {
   const appName = O.APP_NAME || 'Benny & Joni';
   const ids = stIds(me, competition?.id);
   const supportUrl = stSupportUrl(`${appName}: Support & Feedback`, `\n\n\n${ids}`);
-  const rateUrl = O.APP_STORE_ID ? `itms-apps://apps.apple.com/app/id${O.APP_STORE_ID}?action=write-review` : '';
+  // Wie STORE_DIGITS im Onboarding-Modell: verzeiht „id…“ und Leerzeichen.
+  const storeDigits = String(O.APP_STORE_ID || '').replace(/\D/g, '');
+  const rateUrl = storeDigits ? `itms-apps://apps.apple.com/app/id${storeDigits}?action=write-review` : '';
   const canReport = stCanReport();
   if (!legal && !supportUrl && !rateUrl) return null;
 
