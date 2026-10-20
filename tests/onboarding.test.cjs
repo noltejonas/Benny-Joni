@@ -119,3 +119,151 @@ test('mergeState vereint Gerät und Profil', () => {
   });
   assert.deepEqual(JSON.parse(JSON.stringify(O.mergeState(null, undefined))), {});
 });
+
+// ── Wochenziel ──────────────────────────────────────────────────────────────
+
+test('expectedPeople rechnet mit freien Plätzen, nie unter der echten Zahl', () => {
+  assert.equal(O.expectedPeople('1v1', 1), 2);
+  assert.equal(O.expectedPeople('1v1', 2), 2);
+  assert.equal(O.expectedPeople('2v2', 1), 4);
+  assert.equal(O.expectedPeople('ffa', 1), 2);
+  assert.equal(O.expectedPeople('ffa', 5), 5);
+  assert.equal(O.expectedPeople('2v2', 0), 4);
+});
+
+const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
+const MON = at(2026, 10, 19), THU = at(2026, 10, 22), SUN = at(2026, 10, 25);
+
+test('weekProgress: Tag der Woche und Resttage inklusive heute', () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(O.weekProgress(MON))), { dayIndex: 1, daysLeft: 7 });
+  assert.deepEqual(JSON.parse(JSON.stringify(O.weekProgress(THU))), { dayIndex: 4, daysLeft: 4 });
+  assert.deepEqual(JSON.parse(JSON.stringify(O.weekProgress(SUN))), { dayIndex: 7, daysLeft: 1 });
+});
+
+test('goalDefault: Vorschlag je Übung, unter der Woche anteilig', () => {
+  const push = { name: 'Liegestütze' }, pull = { name: 'Klimmzüge' }, other = { name: 'Burpee-Variante X' };
+  assert.equal(O.goalDefault(push, MON), 100);
+  assert.equal(O.goalDefault(pull, MON), 30);
+  assert.equal(O.goalDefault(push, THU), 55, '100 × 4/7 ≈ 57 → auf 5 gerundet');
+  assert.equal(O.goalDefault(push, SUN), 15);
+  assert.equal(O.goalDefault({ name: 'HSPU' }, SUN), 10, 'nie unter 10');
+  assert.equal(O.goalDefault(other, MON), 50);
+});
+
+test('goalChoices liefert Chips rund um den Vorschlag', () => {
+  assert.deepEqual([...O.goalChoices(100)], [50, 100, 150, 200]);
+  assert.deepEqual([...O.goalChoices(10)], [5, 10, 15, 20]);
+});
+
+test('goalTarget = pro Person × Personen', () => {
+  assert.equal(O.goalTarget(100, 2), 200);
+  assert.equal(O.goalTarget(30, 4), 120);
+  assert.equal(O.goalTarget(0, 2), 1, 'Datenbank verlangt target_reps > 0');
+});
+
+// ── Startkarte ──────────────────────────────────────────────────────────────
+
+test('starterItems: Daten haken Punkte ab, Push nur wenn fragbar oder erlaubt', () => {
+  const items = O.starterItems({ activeMembers: 1, weekGoals: 0, mySets: 0, push: 'prompt' });
+  assert.deepEqual(JSON.parse(JSON.stringify(items.map(i => [i.id, i.done]))), [['invite', false], ['goal', false], ['log', false], ['push', false]]);
+  const done = O.starterItems({ activeMembers: 2, weekGoals: 1, mySets: 3, push: 'granted' });
+  assert.ok(done.every(i => i.done));
+  assert.deepEqual([...O.starterItems({ activeMembers: 2, weekGoals: 1, mySets: 0, push: 'denied' }).map(i => i.id)], ['invite', 'goal', 'log']);
+  assert.deepEqual([...O.starterItems({ activeMembers: 2, weekGoals: 1, mySets: 0, push: 'unsupported' }).map(i => i.id)], ['invite', 'goal', 'log']);
+});
+
+test('showStarter: nur für Neue, nicht weggetippt, offen und in den ersten 14 Tagen', () => {
+  const open = O.starterItems({ activeMembers: 1, weekGoals: 0, mySets: 0, push: 'prompt' });
+  const all = O.starterItems({ activeMembers: 2, weekGoals: 1, mySets: 1, push: 'granted' });
+  const base = { newcomer: true, items: open, dismissedAt: null, joinedAt: daysAgo(2), now: NOW };
+  assert.equal(O.showStarter(base), true);
+  assert.equal(O.showStarter({ ...base, newcomer: false }), false);
+  assert.equal(O.showStarter({ ...base, dismissedAt: daysAgo(1) }), false);
+  assert.equal(O.showStarter({ ...base, items: all }), false);
+  assert.equal(O.showStarter({ ...base, joinedAt: daysAgo(15) }), false);
+});
+
+test('joinedMidWeek: Beitritt nach Montag in der laufenden Woche', () => {
+  assert.equal(O.joinedMidWeek({ joinedAt: new Date(THU).toISOString(), now: THU }), true);
+  assert.equal(O.joinedMidWeek({ joinedAt: new Date(MON).toISOString(), now: THU }), false);
+  assert.equal(O.joinedMidWeek({ joinedAt: new Date(at(2026, 10, 15)).toISOString(), now: THU }), false, 'letzte Woche');
+});
+
+// ── Push ────────────────────────────────────────────────────────────────────
+
+test('pushPrimerDue: nur wenn iOS noch fragen darf, mit wachsender Pause', () => {
+  const D = 86400000;
+  const base = { permission: 'prompt', enabled: true, primer: {}, now: NOW };
+  assert.equal(O.pushPrimerDue(base), true);
+  assert.equal(O.pushPrimerDue({ ...base, permission: 'granted' }), false);
+  assert.equal(O.pushPrimerDue({ ...base, permission: 'denied' }), false);
+  assert.equal(O.pushPrimerDue({ ...base, permission: 'unsupported' }), false);
+  assert.equal(O.pushPrimerDue({ ...base, enabled: false }), false, 'in der App ausgeschaltet');
+  assert.equal(O.pushPrimerDue({ ...base, primer: { asks: 1, lastAt: NOW - 2 * D } }), false);
+  assert.equal(O.pushPrimerDue({ ...base, primer: { asks: 1, lastAt: NOW - 3 * D } }), true);
+  assert.equal(O.pushPrimerDue({ ...base, primer: { asks: 2, lastAt: NOW - 5 * D } }), false);
+  assert.equal(O.pushPrimerDue({ ...base, primer: { asks: 2, lastAt: NOW - 7 * D } }), true);
+  assert.equal(O.pushPrimerDue({ ...base, primer: { asks: 3, lastAt: NOW - 30 * D } }), false);
+  assert.equal(O.pushPrimerDue({ ...base, primer: { asks: 3, lastAt: NOW }, manual: true }), true, 'selbst angetippt');
+});
+
+test('nextPrimerState zählt Nachfragen und merkt das Ergebnis', () => {
+  const s1 = O.nextPrimerState({}, 'later', NOW);
+  assert.deepEqual(JSON.parse(JSON.stringify(s1)), { asks: 1, lastAt: NOW });
+  const s2 = O.nextPrimerState(s1, 'granted', NOW + 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(s2)), { asks: 2, lastAt: NOW + 1, result: 'granted' });
+});
+
+// ── Woche 1 ─────────────────────────────────────────────────────────────────
+
+test('weekOneDue: genau in Woche 2 der Mitgliedschaft und nur einmal', () => {
+  const joined = new Date(at(2026, 10, 14)).toISOString(); // Mi der Vorwoche
+  assert.equal(O.weekOneDue({ joinedAt: joined, startDate: '2026-10-01', now: THU }), '2026-10-12');
+  assert.equal(O.weekOneDue({ joinedAt: joined, startDate: '2026-10-01', now: THU, seen: '2026-10-12' }), null);
+  assert.equal(O.weekOneDue({ joinedAt: new Date(MON).toISOString(), startDate: '2026-10-01', now: THU }), null, 'noch Woche 1');
+  assert.equal(O.weekOneDue({ joinedAt: new Date(at(2026, 10, 5)).toISOString(), startDate: '2026-10-01', now: THU }), null, 'schon Woche 3');
+  assert.equal(O.weekOneDue({ joinedAt: new Date(at(2026, 10, 5)).toISOString(), startDate: '2026-10-14', now: THU }), '2026-10-12',
+    'Start der Challenge nach dem Beitritt zählt');
+});
+
+test('weekOneSummary: Reps, aktive Tage, erfüllte Teile und Ergebnis', () => {
+  const ws = '2026-10-12';
+  const categories = [
+    { id: 'push', name: 'Liegestütze', kind: 'sports', challenge_type: 'standard' },
+    { id: 'th', name: 'Tom Holland', kind: 'sports', challenge_type: 'tom_holland' },
+  ];
+  const challenges = [
+    { id: 'ch1', week_start: ws, category_id: 'push', target_reps: 200 },
+    { id: 'ch2', week_start: ws, category_id: 'th', target_reps: 1 },
+    { id: 'old', week_start: '2026-10-05', category_id: 'push', target_reps: 200 },
+  ];
+  const t = (d, h) => new Date(2026, 9, d, h).toISOString();
+  const sets = [
+    { challenge_id: 'ch1', athlete: 'me', reps: 60, created_at: t(12, 9) },
+    { challenge_id: 'ch1', athlete: 'me', reps: 50, created_at: t(12, 19) },
+    { challenge_id: 'ch1', athlete: 'me', reps: 20, created_at: t(14, 9) },
+    { challenge_id: 'ch2', athlete: 'me', reps: 8, created_at: t(15, 9) },
+    { challenge_id: 'ch1', athlete: 'jo', reps: 90, created_at: t(13, 9) },
+    { challenge_id: 'old', athlete: 'me', reps: 999, created_at: t(6, 9) },
+  ];
+  const sides = [
+    { userIds: ['me'], label: 'Benny', isMine: true },
+    { userIds: ['jo'], label: 'Jonas', isMine: false },
+  ];
+  const s = O.weekOneSummary({ weekStart: ws, me: 'me', sides, sets, challenges, categories, participantCount: 2 });
+  assert.equal(s.myReps, 130, 'Pflicht-Workouts und alte Wochen zählen nicht');
+  assert.equal(s.activeDays, 3);
+  assert.equal(s.sharesTotal, 2);
+  assert.equal(s.sharesHit, 2, '130 ≥ 100 und ein Tom-Holland-Durchgang');
+  assert.equal(s.result, 'won');
+  assert.equal(s.diff, 40);
+
+  const jonasView = [{ ...sides[1], isMine: true }, { ...sides[0], isMine: false }];
+  const lost = O.weekOneSummary({ weekStart: ws, me: 'jo', sides: jonasView, sets, challenges, categories, participantCount: 2 });
+  assert.equal(lost.result, 'lost');
+  assert.equal(lost.leader, 'Benny');
+  assert.equal(lost.sharesHit, 0);
+
+  const solo = O.weekOneSummary({ weekStart: ws, me: 'me', sides: [sides[0]], sets, challenges, categories, participantCount: 1 });
+  assert.equal(solo.result, 'solo');
+});

@@ -102,9 +102,160 @@
     return `pt:onboarding:${userId}`;
   }
 
+  // ── Woche ───────────────────────────────────────────────────────────
+  const D = () => window.PTData;
+  const localIso = (ts) => D().isoDate(new Date(ts));
+  const mondayIso = (ts) => D().isoDate(D().mondayOf(new Date(ts)));
+
+  // Mo = 1 … So = 7; Resttage zählen heute mit.
+  function weekProgress(now = Date.now()) {
+    const dow = new Date(now).getDay();
+    const dayIndex = dow === 0 ? 7 : dow;
+    return { dayIndex, daysLeft: 8 - dayIndex };
+  }
+
+  function joinedMidWeek({ joinedAt, now = Date.now() }) {
+    const t = Date.parse(joinedAt);
+    if (!Number.isFinite(t)) return false;
+    return mondayIso(t) === mondayIso(now) && weekProgress(t).dayIndex > 1;
+  }
+
+  // ── Wochenziel ──────────────────────────────────────────────────────
+  // Gespeichert wird die Gruppensumme (target_reps), gefragt wird pro Person.
+  // Solange Plätze frei sind, rechnet die App mit der vollen Besetzung.
+  function expectedPeople(mode, activeCount = 0) {
+    const full = mode === '1v1' ? 2 : mode === '2v2' ? 4 : 2;
+    return Math.max(activeCount || 0, full);
+  }
+
+  const GOAL_BASE = [
+    [/liegest|push/i, 100], [/klimmz|pull/i, 30], [/dips/i, 50], [/leg ?raise|beinheb/i, 50],
+    [/hspu|handstand/i, 20], [/sit-?up|crunch/i, 100], [/squat|kniebeu/i, 100],
+  ];
+  const round5 = (v) => Math.round(v / 5) * 5;
+
+  // Vorschlag pro Person bis Sonntag; unter der Woche anteilig gekürzt.
+  function goalDefault(category, now = Date.now()) {
+    const base = (GOAL_BASE.find(([re]) => re.test(category?.name || '')) || [null, 50])[1];
+    return Math.max(10, round5(base * weekProgress(now).daysLeft / 7));
+  }
+
+  function goalChoices(def) {
+    const vals = [def / 2, def, def * 1.5, def * 2].map(v => Math.max(5, round5(v)));
+    return [...new Set(vals)];
+  }
+
+  function goalTarget(perPerson, people) {
+    return Math.max(1, Math.round(perPerson) * Math.max(1, people));
+  }
+
+  // ── Startkarte ──────────────────────────────────────────────────────
+  // Punkte erledigen sich aus den Daten. Push erscheint nur, solange iOS
+  // fragen darf oder es schon erlaubt ist.
+  function starterItems({ activeMembers = 0, weekGoals = 0, mySets = 0, push = 'unsupported' }) {
+    const items = [
+      { id: 'invite', done: activeMembers >= 2 },
+      { id: 'goal', done: weekGoals > 0 },
+      { id: 'log', done: mySets > 0 },
+    ];
+    if (push === 'prompt' || push === 'granted') items.push({ id: 'push', done: push === 'granted' });
+    return items;
+  }
+
+  function showStarter({ newcomer, items, dismissedAt, joinedAt, now = Date.now() }) {
+    if (!newcomer || dismissedAt || !items?.some(i => !i.done)) return false;
+    const joined = Date.parse(joinedAt);
+    return !Number.isFinite(joined) || now - joined < NEWCOMER_DAYS * DAY;
+  }
+
+  // ── Push-Vorab ──────────────────────────────────────────────────────
+  // permission: 'prompt' | 'granted' | 'denied' | 'unsupported'.
+  // primer: { asks, lastAt, result } (pt:push-primer, pro Gerät).
+  function pushPrimerDue({ permission, enabled = true, primer = {}, now = Date.now(), manual = false }) {
+    if (permission !== 'prompt') return false;
+    if (manual) return true;
+    if (!enabled) return false;
+    const asks = primer.asks || 0;
+    if (asks >= 3) return false;
+    if (!primer.lastAt) return true;
+    return now - primer.lastAt >= (asks <= 1 ? 3 : 7) * DAY;
+  }
+
+  function nextPrimerState(primer, outcome, now = Date.now()) {
+    const next = { asks: (primer?.asks || 0) + 1, lastAt: now };
+    if (outcome === 'granted' || outcome === 'denied') next.result = outcome;
+    return next;
+  }
+
+  // ── Woche 1 ─────────────────────────────────────────────────────────
+  // Rückblick beim ersten Öffnen in der zweiten Woche der Mitgliedschaft.
+  // Liefert den Montag der ersten Woche oder null.
+  function weekOneDue({ joinedAt, startDate, now = Date.now(), seen }) {
+    const joined = Date.parse(joinedAt);
+    if (!Number.isFinite(joined)) return null;
+    const joinedIso = localIso(joined);
+    const begin = startDate && startDate > joinedIso ? startDate : joinedIso;
+    const first = mondayIso(new Date(begin + 'T00:00:00'));
+    if (D().addDays(first, 7) !== mondayIso(now)) return null;
+    return seen === first ? null : first;
+  }
+
+  function weekOneSummary({ weekStart, me, sides = [], sets = [], challenges = [], categories = [], participantCount = 1 }) {
+    const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+    const week = challenges.filter(ch => ch.week_start === weekStart);
+    const kindOf = (ch) => {
+      const cat = catById[ch.category_id];
+      if (D().isWorkoutType(cat?.challenge_type)) return 'workout';
+      return (cat?.kind || 'sports') === 'work' ? 'work' : 'reps';
+    };
+    const kinds = Object.fromEntries(week.map(ch => [ch.id, kindOf(ch)]));
+    const weekSets = sets.filter(s => kinds[s.challenge_id]);
+    const mine = weekSets.filter(s => s.athlete === me);
+    const sum = (list, key) => list.reduce((a, s) => a + (s[key] || 0), 0);
+
+    const myReps = sum(mine.filter(s => kinds[s.challenge_id] === 'reps'), 'reps');
+    const myMinutes = sum(mine.filter(s => kinds[s.challenge_id] === 'work'), 'duration_minutes');
+    const activeDays = new Set(mine.map(s => localIso(s.created_at))).size;
+
+    let sharesHit = 0;
+    for (const ch of week) {
+      const own = mine.filter(s => s.challenge_id === ch.id);
+      if (kinds[ch.id] === 'workout') { if (own.length) sharesHit++; continue; }
+      const done = sum(own, kinds[ch.id] === 'work' ? 'duration_minutes' : 'reps');
+      if (done >= D().fairShareOf(ch.target_reps, participantCount)) sharesHit++;
+    }
+
+    let result = 'solo', leader = null, diff = 0;
+    if (sides.length >= 2) {
+      const repSets = weekSets.filter(s => kinds[s.challenge_id] === 'reps');
+      const totals = sides.map(side => {
+        const ids = side.statUserIds || side.userIds || [];
+        return sum(repSets.filter(s => ids.includes(s.athlete)), 'reps');
+      });
+      const mineIdx = Math.max(0, sides.findIndex(s => s.isMine));
+      const best = Math.max(...totals);
+      const others = totals.filter((_, i) => i !== mineIdx);
+      const bestOther = Math.max(...others);
+      if (totals[mineIdx] > bestOther) { result = 'won'; diff = totals[mineIdx] - bestOther; }
+      else if (totals[mineIdx] === best) { result = 'tie'; }
+      else {
+        result = 'lost';
+        const leaderIdx = totals.findIndex((t, i) => i !== mineIdx && t === best);
+        leader = sides[leaderIdx].label;
+        diff = best - totals[mineIdx];
+      }
+    }
+    return { myReps, myMinutes, activeDays, sharesHit, sharesTotal: week.length, result, leader, diff };
+  }
+
   window.PTOnboarding = {
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
     entryRoute, isNewcomer, suggestName, mergeState, stateKey,
+    weekProgress, joinedMidWeek,
+    expectedPeople, goalDefault, goalChoices, goalTarget,
+    starterItems, showStarter,
+    pushPrimerDue, nextPrimerState,
+    weekOneDue, weekOneSummary,
   };
 })();
