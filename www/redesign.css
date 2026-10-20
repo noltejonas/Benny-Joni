@@ -256,11 +256,19 @@ button, input, select, textarea { font-family: inherit; }
 }
 .sheet-handle { background: var(--surface-3); width: 40px; }
 
+/* Kompakte Kachel über der Navigation. `top: auto` hebt das `top` aus
+   styles.css auf, sonst spannt sich der Toast über den ganzen Bildschirm. */
 .toast {
+  top: auto; bottom: calc(104px + var(--safe-bot));
+  width: max-content; max-width: calc(100vw - 48px);
+  padding: 14px 20px; text-align: center;
   background: var(--text); color: var(--bg);
-  border-radius: 16px; font-weight: 600; box-shadow: var(--shadow-float);
-  top: auto; /* styles.css setzt top, sonst zieht sich der Toast über den ganzen Screen */
-  bottom: calc(104px + var(--safe-bot));
+  border: none; border-radius: 18px; font-weight: 600; box-shadow: var(--shadow-float);
+  animation: toastUp .3s var(--ease);
+}
+@keyframes toastUp {
+  from { transform: translate(-50%, 16px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
 }
 
 .banner { background: var(--primary-tint); border: none; border-radius: 20px; color: var(--text); }

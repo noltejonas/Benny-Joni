@@ -631,7 +631,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 ? { challenge_id: ch.id, reps: null, duration_minutes: parseInt(val), note: null }
                 : { challenge_id: ch.id, reps: parseInt(val), note: null };
               await capi.addSet(payload);
-              setToast(`+${val} ${isWork ? 'min 💻' : 'geloggt 💪'}`);
+              const what = cat?.name ? ` ${cat.name}` : '';
+              setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt ${isWork ? '💻' : '💪'}`);
               reload();
             } catch (e) { alert(e.message); }
           }} />
@@ -741,6 +742,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           if (!logForChallenge) return null;
           const logCat = categories.find(c => c.id === logForChallenge.category_id);
           const ctype = logCat?.challenge_type || 'standard';
+          const what = logCat?.name ? ` ${logCat.name}` : '';
           if (ctype === 'tom_holland') {
             return (
               <TomHollandSheet
@@ -751,7 +753,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 onClose={() => setLogForChallenge(null)}
                 onLogged={(rounds) => {
                   setLogForChallenge(null);
-                  setToast(`${rounds} Runden geloggt 🦸`);
+                  setToast(`${rounds} Runden${what} geloggt 🦸`);
                   reload();
                 }} />
             );
@@ -767,7 +769,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 onLogged={(val) => {
                   setLogForChallenge(null);
                   const m = Math.floor(val/60), s = val%60;
-                  setToast(val >= 204 ? '✅ Bring Sally Up geschafft!' : `${m}:${String(s).padStart(2,'0')} geloggt 🌸`);
+                  setToast(val >= 204 ? '✅ Bring Sally Up geschafft!' : `${m}:${String(s).padStart(2,'0')}${what} geloggt 🌸`);
                   reload();
                 }} />
             );
@@ -784,7 +786,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               onLogged={(r, isWork) => {
                 setLogForChallenge(null);
                 const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
-                setToast(`${valStr} geloggt ${isWork ? '💻' : '💪'}`);
+                setToast(`${valStr}${what} geloggt ${isWork ? '💻' : '💪'}`);
                 reload();
               }} />
           );
