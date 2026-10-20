@@ -46,6 +46,9 @@ test('Format-Region folgt dem Gerät, wenn die Sprache passt', () => {
   assert.equal(load({ languages: ['en-US'] }).PTi18n.locale, 'en-US');
   assert.equal(load({ languages: ['de-CH'] }).PTi18n.locale, 'de-CH');
   assert.equal(load({ languages: ['de-DE'], stored: 'en' }).PTi18n.locale, 'en-GB');
+  // Englisch gewählt auf deutschem Gerät: keine deutsche Zahlenschreibweise aus en-DE
+  assert.equal(load({ languages: ['de', 'de-DE', 'en-DE'], stored: 'en' }).PTi18n.locale, 'en-GB');
+  assert.equal(load({ languages: ['en-DE', 'de-DE'] }).PTi18n.locale, 'en-DE');
   assert.equal(load({ languages: ['en'] }).PTi18n.locale, 'en-GB');
 });
 

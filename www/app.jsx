@@ -449,9 +449,9 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
     let analysis;
     if (sumAll === 0) analysis = tr('Stille Woche. Auf in die nächste!');
     else if (winnerIdx == null) analysis = tr('Unentschieden an der Spitze — perfekt ausbalanciert.');
-    else if (diff / sumAll > 0.4) analysis = allWork ? tr('Klare Sache: {name} dominiert mit {n} min Vorsprung.', v) : tr('Klare Sache: {name} dominiert mit {n} Reps Vorsprung.', v);
-    else if (diff / sumAll > 0.15) analysis = allWork ? tr('{name} setzt sich durch — {n} min Vorsprung.', v) : tr('{name} setzt sich durch — {n} Reps Vorsprung.', v);
-    else analysis = allWork ? tr('Knapper Sieg für {name} — nur {n} min Unterschied.', v) : tr('Knapper Sieg für {name} — nur {n} Reps Unterschied.', v);
+    else if (diff / sumAll > 0.4) analysis = allWork ? tr('Klare Sache: {name} dominiert mit {n} min Vorsprung.', v) : trn(v.n, 'Klare Sache: {name} dominiert mit {n} Rep Vorsprung.', 'Klare Sache: {name} dominiert mit {n} Reps Vorsprung.', v);
+    else if (diff / sumAll > 0.15) analysis = allWork ? tr('{name} setzt sich durch — {n} min Vorsprung.', v) : trn(v.n, '{name} setzt sich durch — {n} Rep Vorsprung.', '{name} setzt sich durch — {n} Reps Vorsprung.', v);
+    else analysis = allWork ? tr('Knapper Sieg für {name} — nur {n} min Unterschied.', v) : trn(v.n, 'Knapper Sieg für {name} — nur {n} Rep Unterschied.', 'Knapper Sieg für {name} — nur {n} Reps Unterschied.', v);
 
     const weekSets = allSets.filter(s => challs.some(ch => ch.id === s.challenge_id));
     const sideIdx = window.sideIndexByUser(sides);

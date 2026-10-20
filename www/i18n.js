@@ -46,10 +46,12 @@
     return tags.length ? FALLBACK : SOURCE;
   }
 
-  // Datums- und Zahlenformat: die Region des Geräts, wenn seine Sprache passt
-  // (en-US → 12-Stunden-Uhr), sonst die übliche Region der Sprache.
+  // Datums- und Zahlenformat: die Region des Geräts, wenn das Gerät selbst in
+  // dieser Sprache läuft (en-US → 12-Stunden-Uhr, en-DE → 1.411). Wer auf einem
+  // deutschen Gerät Englisch wählt, bekommt die übliche Region der Sprache.
   function resolveLocale(lang, tags) {
-    const own = tags.find(tag => baseOf(tag) === lang && /[-_]/.test(tag));
+    const primary = tags.find(tag => supported(baseOf(tag)));
+    const own = primary && baseOf(primary) === lang && /[-_]/.test(primary) ? primary : null;
     if (own) {
       try { return Intl.getCanonicalLocales(own.replace('_', '-'))[0]; } catch (e) {}
     }
