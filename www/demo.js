@@ -472,8 +472,51 @@
     return api;
   }
 
+  // ── Live-Simulation ───────────────────────────────────────────────
+  // Damit sich der Live-Feed wie im Echtbetrieb anfühlt, loggt ab und zu ein
+  // anderes Mitglied der offenen Challenge einen Satz oder reagiert auf deinen
+  // letzten. Nur bei sichtbarer App und aktiver Session.
+  // Abschalten: PTDemo.live(false) bzw. localStorage pt_demo_live = '0'.
+  const LIVE_KEY = 'pt_demo_live';
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  function simulateTick() {
+    try { if (localStorage.getItem(LIVE_KEY) === '0') return; } catch (e) {}
+    if (!session || document.visibilityState !== 'visible') return;
+    const open = [...compListeners.entries()].filter(([, l]) => l.size > 0).map(([cid]) => cid);
+    if (!open.length) return;
+    const cid = pick(open);
+    const monday = isoDate(mondayOf(new Date()));
+    const others = db.members.filter(m => m.competition_id === cid && !m.left_at && m.user_id !== ME);
+    const challs = db.weekly_challenges.filter(c => c.competition_id === cid && c.week_start === monday && db.categories
+      .some(cat => cat.id === c.category_id && (cat.challenge_type || 'standard') === 'standard'));
+    if (!others.length || !challs.length) return;
+    const who = pick(others).user_id;
+    const myLatest = db.sets.filter(s => s.competition_id === cid && s.user_id === ME)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    if (myLatest && Math.random() < 0.25) {
+      const emoji = pick(['🔥', '💪', '👏', '😤']);
+      if (db.reactions.some(r => r.set_id === myLatest.id && r.user_id === who && r.emoji === emoji)) return;
+      db.reactions.push({ id: newId('r'), set_id: myLatest.id, user_id: who, emoji });
+    } else {
+      const ch = pick(challs);
+      const work = db.categories.find(cat => cat.id === ch.category_id)?.kind === 'work';
+      db.sets.push({ id: newId('s'), challenge_id: ch.id, competition_id: cid, user_id: who,
+        reps: work ? null : pick([5, 6, 8, 10, 12, 15]),
+        duration_minutes: work ? pick([15, 25, 30, 45]) : null,
+        note: null, created_at: new Date().toISOString() });
+    }
+    save();
+    compListeners.get(cid).forEach(fn => setTimeout(fn, 0));
+  }
+  (function schedule() {
+    setTimeout(() => { simulateTick(); schedule(); }, 18000 + Math.random() * 17000);
+  })();
+
   window.PTData.init = () => createDemoAPI();
-  window.PTDemo = { reset() { localStorage.removeItem(DB_KEY); location.reload(); } };
+  window.PTDemo = {
+    reset() { localStorage.removeItem(DB_KEY); location.reload(); },
+    live(on = true) { try { localStorage.setItem(LIVE_KEY, on ? '1' : '0'); } catch (e) {} },
+  };
 
   // Kleiner Hinweis, damit niemand Demo und echte Daten verwechselt.
   const showBadge = () => {
