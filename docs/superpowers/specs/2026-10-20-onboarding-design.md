@@ -58,7 +58,7 @@ Stand 2026-10-20. Neu gebaut wird der Weg vom ersten App-Start bis zu dem Moment
       - Haptik „Erfolg“ plus zwei Impulse
       - Ton `www/sounds/first-log.wav`, erzeugt per `tools/make-sounds.cjs`
     - Ab dann gibt jeder Schnellsatz einen leichten Haptik-Impuls.
-    - Wer den Schritt überspringt, sieht am Schnellsatz bis zum ersten Satz „Satz gemacht? Tipp auf die Zahl.“
+    - Wer den Schritt überspringt, sieht am Schnellsatz bis zum ersten Satz „Satz gemacht? Tipp hier.“ (Pfeil auf den ersten Zahl-Chip)
 12. **Push nur nach einem Vorab-Bildschirm.**
     - Die automatische Abfrage fällt weg.
     - Der Vorab-Bildschirm kommt direkt nach der Feier zum ersten Satz. Er verspricht genau das, was `notify-set` verschickt:
@@ -139,7 +139,7 @@ Abbruch an jeder Stelle: Beim nächsten Start führt die Ableitung aus Entscheid
 **Home**
 - *Startklar* (Entscheidung 13): „x von 4“, ✕ zum Ausblenden. Die Punkte heißen „Leute einladen“, „Wochenziel setzen“, „Ersten Satz loggen“, „Mitteilungen an“.
 - *Einladen-Karte* für alle, die allein sind, solange keine Startkarte steht: Avatare und freie Plätze, „Noch allein hier.“, „Schick deinen Leuten den Code ABC123.“ und „Einladen“.
-- *Tipp am Schnellsatz:* „Satz gemacht? Tipp auf die Zahl.“
+- *Tipp am Schnellsatz:* „Satz gemacht? Tipp hier.“ (Pfeil auf den ersten Zahl-Chip)
 - Neue Mitglieder: Toast „Jonas ist dabei 🎉“.
 
 **Einstellungen**

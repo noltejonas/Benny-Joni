@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -466,6 +466,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Tabs
   const [tab, setTab] = useState(() => {
+    if (intro) return 'home'; // frisch erstellt oder beigetreten: immer „Heute“
     try { return sessionStorage.getItem('pt:tab') || 'home'; } catch { return 'home'; }
   });
   useEffect(() => {
@@ -620,6 +621,24 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }, [peopleForShare, allSets, me, onObPatch]);
   const isFirstLog = newcomer && !obState.firstLog && mySetCount === 0;
 
+  // Startkarte (nur neue Leute, erste 14 Tage, nicht weggetippt).
+  const myMembership = members.find(m => m.user_id === me);
+  const starterItems = PTOnboarding.starterItems({
+    activeMembers: activeMembers.length, weekGoals: sportsGoalsNow.length, mySets: mySetCount, push: pushPerm,
+  });
+  const starterVisible = !loading && PTOnboarding.showStarter({
+    newcomer, items: starterItems, dismissedAt: obState.dismissed?.[competition.id], joinedAt: myMembership?.joined_at,
+  });
+  function openStarter(id) {
+    if (id === 'invite') openLayer(['invite']);
+    else if (id === 'goal') openLayer(['goal', 'log']);
+    else if (id === 'log') openLayer(sportsGoalsNow.length ? ['log'] : ['goal', 'log']);
+    else if (id === 'push') openLayer(['push'], { manual: true });
+  }
+  const layerRef = React.useRef(null);
+  layerRef.current = layer;
+  const memberIdsRef = React.useRef(null);
+
   const weekTemplate = useMemo(() => {
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
     return PTData.weekTemplateFor({ weekStart, slots: planSlots, config: rotationConfig });
@@ -691,6 +710,16 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       PTData.annotateWorkouts(allSetsData, challs, cats);
       PTData.annotateWorkouts(feedData, challs, cats);
       PTPeople.set(mems.map(m => m.profile).filter(Boolean));
+      // Neue Mitglieder ankündigen (nicht beim ersten Laden; die Einladen-Ebene zeigt es selbst).
+      const activeIds = mems.filter(m => !m.left_at).map(m => m.user_id);
+      if (memberIdsRef.current) {
+        const fresh = mems.find(m => !m.left_at && m.user_id !== me && !memberIdsRef.current.includes(m.user_id));
+        if (fresh && layerRef.current?.kind !== 'invite') {
+          setToast(`${(fresh.profile?.display_name || 'Jemand').split(/\s+/)[0]} ist dabei 🎉`);
+          PTHaptics.success();
+        }
+      }
+      memberIdsRef.current = activeIds;
       setCompetition(comp);
       setMembers(mems);
       setCategories(cats);
@@ -829,14 +858,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
       <main className="app-main">
         {loading ? <Loader /> : (<>
-        {tab === 'home' && sides.length < 2 && (
-          <div className="banner mu-invite-banner">
-            <div className="banner-icon">👋</div>
-            <div className="banner-text">
-              <strong>Noch allein hier.</strong> Lade Freunde mit dem Code <span className="mono">{competition.invite_code}</span> ein.
-              <button className="btn-link" onClick={() => window.shareInvite(competition)}>Einladen</button>
-            </div>
-          </div>
+        {tab === 'home' && starterVisible && (
+          <ObStarterCard items={starterItems} daysLeft={PTOnboarding.weekProgress().daysLeft}
+            midWeek={PTOnboarding.joinedMidWeek({ joinedAt: myMembership?.joined_at })}
+            onOpen={openStarter}
+            onDismiss={() => onObPatch?.({ dismissed: { [competition.id]: new Date().toISOString() } })} />
+        )}
+        {tab === 'home' && !starterVisible && (sides.length < 2 || sides.some(x => !x.userIds.length)) && (
+          <ObInviteCard competition={competition} members={members} onInvite={() => openLayer(['invite'])} />
         )}
 
         {tab === 'home' && !currentChallenges.length && !proposalDismissed && weekTemplate.length > 0 &&
@@ -864,6 +893,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onAddGoal={() => (newcomer && !sportsGoalsNow.length ? openLayer(['goal', 'log']) : setSetupForChallenge({}))}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
           onLogChallenge={(ch) => setLogForChallenge(ch)}
+          coach={newcomer && mySetCount === 0 && !layer}
           onQuickLog={async (ch, val) => {
             try {
               const cat = categories.find(c => c.id === ch.category_id);

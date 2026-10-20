@@ -345,7 +345,60 @@ function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
   );
 }
 
+// ─── Home: Startkarte ───────────────────────────────────────────────────────
+// Punkte aus PTOnboarding.starterItems; erledigt ist, was die Daten hergeben.
+const OB_STARTER_LABELS = {
+  invite: 'Leute einladen', goal: 'Wochenziel setzen', log: 'Ersten Satz loggen', push: 'Mitteilungen an',
+};
+
+function ObStarterCard({ items, midWeek, daysLeft, onOpen, onDismiss }) {
+  const done = items.filter(i => i.done).length;
+  return (
+    <section className="ob-starter" aria-label="Startklar">
+      <div className="ob-starter-head">
+        <span className="ob-starter-title">Startklar</span>
+        <span className="ob-starter-count">{done} von {items.length}</span>
+        <button type="button" className="ob-starter-close" aria-label="Startkarte ausblenden" onClick={onDismiss}>
+          <Icon name="close" size={16} strokeWidth={2.4} />
+        </button>
+      </div>
+      {midWeek && <div className="ob-starter-sub">Die Woche läuft seit Montag · noch {daysLeft} {daysLeft === 1 ? 'Tag' : 'Tage'}</div>}
+      <div className="ob-progress" aria-hidden="true"><span style={{ width: `${(done / items.length) * 100}%` }} /></div>
+      <ul className="ob-starter-list">
+        {items.map(i => (
+          <li key={i.id}>
+            <button type="button" className={`ob-starter-item${i.done ? ' is-done' : ''}`} disabled={i.done}
+              onClick={() => onOpen(i.id)}>
+              <span className="ob-check" aria-hidden="true">{i.done && <Icon name="check" size={14} strokeWidth={3} />}</span>
+              <span className="ob-starter-label">{OB_STARTER_LABELS[i.id]}</span>
+              {i.done ? <span className="ob-sr">erledigt</span> : <span className="ob-chev"><Icon name="chevron" size={18} /></span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ─── Home: Einladen-Karte (für alle, die allein sind) ──────────────────────
+function ObInviteCard({ competition, members, onInvite }) {
+  const active = members.filter(m => !m.left_at);
+  const capacity = OB_CAPACITY[competition.mode] || 12;
+  return (
+    <section className="ob-invite-card" aria-label="Leute einladen">
+      <div className="ob-invite-card-top">
+        <ObSlots members={active} capacity={capacity} size={40} />
+      </div>
+      <div className="ob-invite-card-text">
+        <strong>{active.length < 2 ? 'Noch allein hier.' : 'Noch kein Gegner-Team.'}</strong>{' '}
+        Schick deinen Leuten den Code <span className="mono">{competition.invite_code}</span>.
+      </div>
+      <button type="button" className="btn" onClick={onInvite}><Icon name="share" size={18} /> Einladen</button>
+    </section>
+  );
+}
+
 Object.assign(window, {
   ObLayer, ObInviteLayer, ObAmount, ObGoalLayer, ObFirstLogLayer, ObConfetti, ObCelebrate, obGoalCategories,
-  PTPush, ObPushPrimer,
+  PTPush, ObPushPrimer, ObStarterCard, ObInviteCard,
 });

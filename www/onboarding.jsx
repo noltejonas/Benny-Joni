@@ -492,19 +492,19 @@ function ObStart({ profile, onCreate, onJoin, onProfile, onDemo }) {
 }
 
 // ─── Plätze: Mitglieder als Avatare, freie Plätze gestrichelt ───────────────
-function ObSlots({ members = [], capacity = 2, newIds = [] }) {
+function ObSlots({ members = [], capacity = 2, newIds = [], size = 52 }) {
   const free = Math.max(0, capacity - members.length);
   const shown = Math.min(free, Math.max(1, 4 - members.length)); // höchstens vier Kreise in einer Reihe
   return (
     <div className="ob-slots">
       {members.map((m, i) => (
         <div key={m.user_id || m.id || i} className={`ob-slot${newIds.includes(m.user_id || m.id) ? ' is-new' : ''}`}>
-          <Avatar profile={m.profile || m} size={52} />
+          <Avatar profile={m.profile || m} size={size} />
           <span className="ob-slot-name">{((m.profile || m).display_name || '').split(/\s+/)[0]}</span>
         </div>
       ))}
       {Array.from({ length: shown }, (_, i) => (
-        <div key={`free-${i}`} className="ob-slot"><span className="ob-slot-empty" aria-hidden="true">?</span><span className="ob-slot-name">frei</span></div>
+        <div key={`free-${i}`} className="ob-slot"><span className="ob-slot-empty" style={{ width: size, height: size }} aria-hidden="true">?</span><span className="ob-slot-name">frei</span></div>
       ))}
       {free > shown && <span className="ob-slots-more">bis {capacity}</span>}
     </div>

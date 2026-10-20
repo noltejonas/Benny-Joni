@@ -428,13 +428,15 @@
 .ob-invite-card-top { display: flex; align-items: center; gap: 14px; }
 .ob-invite-card .ob-slots { justify-content: flex-start; gap: 6px; flex-wrap: nowrap; }
 .ob-invite-card .ob-slot { width: auto; }
-.ob-invite-card .ob-slot-empty { width: 40px; height: 40px; border-color: color-mix(in srgb, var(--primary) 35%, transparent); font-size: 16px; }
+.ob-invite-card .ob-slot-empty { border-color: color-mix(in srgb, var(--primary) 35%, transparent); font-size: 16px; }
+.ob-invite-card .ob-slot-name { display: none; }
 .ob-invite-card-text { font-size: 15px; line-height: 21px; color: var(--text); }
 .ob-invite-card-text strong { font-weight: 800; }
 .ob-invite-card .btn { height: 46px; }
 
 .ob-coach {
-  position: relative; align-self: flex-start; margin: -6px 0 2px;
+  position: relative; width: fit-content; max-width: 100%; white-space: nowrap;
+  margin: -4px 0 4px max(0px, calc(var(--ob-arrow-x, 28px) - 28px));
   padding: 8px 12px; border-radius: 12px; background: #fff; color: #4338CA;
   font-size: 13px; line-height: 17px; font-weight: 700; box-shadow: 0 6px 18px rgba(28, 27, 46, .18);
   animation: ob-bob 1.8s ease-in-out infinite;
@@ -475,3 +477,5 @@
 
 /* Toasts über Ebenen oben zeigen, damit sie keine Aktion verdecken */
 .ob-layer ~ .toast, .ob-cele ~ .toast { top: calc(var(--safe-top) + 12px); bottom: auto; }
+
+.ob-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
