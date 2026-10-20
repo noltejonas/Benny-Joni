@@ -382,60 +382,6 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
   );
 }
 
-function PenaltyConfigCard({ api, cfg, me, onChange }) {
-  const [busy, setBusy] = useState(false);
-  const modes = [
-    { id: 'per_week_aggregate', name: 'Aggregiert pro Woche', desc: 'Summe Reps < Summe fairShare → Strafe' },
-    { id: 'per_challenge',      name: 'Pro Challenge',         desc: 'Eine Strafe pro verfehlter Challenge' },
-    { id: 'per_week_any',       name: 'Min. 1 Challenge verfehlt', desc: 'Eine Strafe pro Woche, falls min. 1 nicht geschafft' },
-    { id: 'per_week_all',       name: 'Alle Challenges verfehlt',  desc: 'Strafe nur, wenn gar nichts geschafft' },
-  ];
-
-  async function patch(p) {
-    setBusy(true);
-    try { await api.setPenaltyConfig({ ...p, _by: me }); onChange?.(); }
-    catch (e) { alert(e.message); } finally { setBusy(false); }
-  }
-
-  return (
-    <div className="card">
-      <div className="label" style={{marginBottom:10}}>Strafkonto</div>
-      <div className="penalty-config">
-        <div className="penalty-config-row">
-          <label>Aktiv</label>
-          <label className="toggle-switch">
-            <input type="checkbox" checked={!!cfg?.enabled}
-              onChange={e => patch({ enabled: e.target.checked })} disabled={busy}/>
-            <span className="toggle-slider"/>
-          </label>
-        </div>
-        <div className="penalty-config-row">
-          <label>Betrag pro Strafe (€)</label>
-          <input type="number" min="1" step="1" disabled={busy}
-            defaultValue={cfg ? Math.round(cfg.amount_cents / 100) : 5}
-            onBlur={e => {
-              const eur = parseInt(e.target.value);
-              if (Number.isFinite(eur) && eur > 0) patch({ amount_cents: eur * 100 });
-            }}/>
-        </div>
-        <div className="penalty-mode-list">
-          {modes.map(m => (
-            <div key={m.id}
-              className={`penalty-mode-row ${cfg?.rule_mode === m.id ? 'active' : ''}`}
-              onClick={() => !busy && patch({ rule_mode: m.id })}>
-              <span className="penalty-mode-radio"/>
-              <div className="penalty-mode-text">
-                <div className="penalty-mode-name">{m.name}</div>
-                <div className="penalty-mode-desc">{m.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 window.StrafkontoScreen = StrafkontoScreen;
-window.PenaltyConfigCard = PenaltyConfigCard;
+window.formatEuro = formatEuro;
 window.WeekCloseSheet = WeekCloseSheet;

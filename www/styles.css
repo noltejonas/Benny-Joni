@@ -1143,20 +1143,6 @@ a { color: var(--accent); text-decoration: none; }
 .header-gear { background: transparent; border: 1px solid var(--border); color: var(--text-1); width: 36px; height: 36px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .header-gear:hover { background: var(--surface-2); }
 
-/* ─── Rotation plan editor ─── */
-.plan-week { padding: 14px; }
-.plan-week-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
-.plan-week-num { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.plan-slot { display:flex; flex-direction:column; gap:10px; padding:12px; background:var(--surface-2); border-radius:12px; margin-bottom:10px; }
-.plan-slot-cat { display:flex; align-items:center; gap:10px; }
-.plan-slot-emoji { font-size:20px; }
-.plan-slot-select { flex:1; background:transparent; color:var(--text-1); border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:15px; font-weight:600; appearance:none; }
-.plan-slot-controls { display:flex; gap:8px; align-items:flex-end; }
-.plan-field { flex:1; display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--text-2); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
-.plan-input { padding:9px 12px; font-size:17px; font-weight:700; width:100%; box-sizing:border-box; }
-.plan-input-suffix { position:relative; }
-.plan-input-suffix .suffix { position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--text-2); font-size:15px; font-weight:600; pointer-events:none; }
-
 .icon-btn-danger { color:var(--text-2); }
 .icon-btn-danger:hover { color:#ff453a; background:rgba(255,69,58,0.08); }
 
@@ -1239,9 +1225,6 @@ a { color: var(--accent); text-decoration: none; }
 .co-row.done .co-val { color: var(--accent); }
 
 
-.plan-sync-btn { margin-top:14px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
-
-
 .feed-actions { display:flex; gap:4px; margin-left:8px; opacity:0.55; transition:opacity 0.15s; }
 .feed-item:hover .feed-actions, .feed-item:active .feed-actions { opacity:1; }
 .feed-action-btn { width:28px; height:28px; border-radius:14px; }
@@ -1279,7 +1262,6 @@ a { color: var(--accent); text-decoration: none; }
 
 .plan-owner-tag.tag-a { background: rgba(120,120,128,0.16); color: var(--text-1); }
 .plan-owner-tag.tag-b { background: rgba(120,120,128,0.10); color: var(--text-2); }
-input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 
 /* === Account Switch === */
 /* Avatar 3D coin-flip. backface-visibility:hidden makes the button invisible
@@ -2143,73 +2125,6 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 }
 
 
-/* ─── Plan range slider (Settings) ────────────────────────────────── */
-.plan-range {
-  display: flex; flex-direction: column;
-  gap: 14px;
-  padding: 6px 6px 0;
-}
-.plan-range-track {
-  position: relative;
-  height: 8px;
-  background: var(--surface);
-  border-radius: 4px;
-  margin: 14px 16px 6px;
-}
-.plan-range-fill {
-  position: absolute;
-  top: 0; bottom: 0;
-  background: linear-gradient(90deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 60%, var(--accent-3, var(--accent))) 100%);
-  border-radius: 4px;
-  transition: left 0.15s ease, width 0.15s ease;
-}
-.plan-range-handle {
-  position: absolute;
-  top: 50%;
-  width: 18px; height: 18px;
-  margin-left: -9px;
-  background: #fff;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  transform: translateY(-50%);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-  transition: left 0.15s ease;
-  pointer-events: none;
-}
-.plan-range-inputs {
-  display: flex; align-items: flex-end;
-  gap: 10px;
-}
-.plan-range-input {
-  flex: 1;
-  display: flex; flex-direction: column;
-  gap: 4px;
-  font-size: 11px; color: var(--text-2);
-  font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.plan-range-input input {
-  padding: 10px 12px;
-  font-size: 17px; font-weight: 700;
-  width: 100%; box-sizing: border-box;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  -moz-appearance: textfield;
-}
-.plan-range-input input::-webkit-outer-spin-button,
-.plan-range-input input::-webkit-inner-spin-button {
-  -webkit-appearance: none; margin: 0;
-}
-.plan-range-arrow {
-  font-size: 18px; color: var(--text-2);
-  padding-bottom: 12px;
-  font-weight: 500;
-  user-select: none;
-}
-.plan-slot .plan-slot-cat .icon-btn-danger {
-  margin-left: auto;
-}
-
 /* ── Strafkonto ──────────────────────────────────────────────────────── */
 .strafkonto-screen { padding: 0; }
 .strafkonto-header {
@@ -2311,48 +2226,6 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   font-size: 15px; font-weight: 700;
   cursor: pointer;
 }
-
-.penalty-config { display: flex; flex-direction: column; gap: 12px; }
-.penalty-config-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px;
-}
-.penalty-config-row label { font-size: 15px; font-weight: 500; }
-.penalty-config-row input[type="number"] {
-  width: 80px; padding: 8px 10px; border-radius: 8px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 15px; text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.penalty-mode-list { display: flex; flex-direction: column; gap: 6px; }
-.penalty-mode-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px;
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.penalty-mode-row.active {
-  background: color-mix(in oklab, var(--accent) 10%, var(--surface-2));
-  border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent);
-}
-.penalty-mode-radio {
-  width: 20px; height: 20px; border-radius: 999px;
-  border: 1.5px solid var(--border);
-  display: inline-flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.penalty-mode-row.active .penalty-mode-radio {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-.penalty-mode-row.active .penalty-mode-radio::after {
-  content: ''; width: 8px; height: 8px; border-radius: 999px; background: #000;
-}
-.penalty-mode-text { flex: 1; }
-.penalty-mode-name { font-size: 15px; font-weight: 600; }
-.penalty-mode-desc { font-size: 13px; color: var(--text-2); margin-top: 2px; }
 
 .tab-btn { position: relative; }
 .tab-badge {
@@ -2481,26 +2354,6 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
   white-space: nowrap;
   flex-shrink: 0;
 }
-
-/* ── Settings tag list ────────────────────────────────────────────────────── */
-.settings-section-label {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-3);
-  margin-bottom: 8px;
-}
-.tag-list { display: flex; flex-direction: column; gap: 4px; }
-.tag-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
-  border-radius: 8px;
-}
-.tag-emoji { font-size: 18px; }
-.tag-name  { flex: 1; font-size: 14px; }
 
 /* ── Running timer banner ─────────────────────────────────────────────────── */
 .timer-banner {
@@ -2935,8 +2788,6 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 .mu-date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 .mu-date-row label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mu-code { font-size: 40px; font-weight: 800; letter-spacing: 0.18em; text-align: center; padding: 18px; background: var(--surface-2); border-radius: var(--radius); }
-.mu-code.small { font-size: 20px; padding: 8px 12px; letter-spacing: 0.12em; }
-.mu-code-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mu-code-input { text-align: center; letter-spacing: 0.2em; text-transform: uppercase; }
 .mu-preview { text-align: center; padding: 16px 0; }
 .mu-preview-emoji { font-size: 44px; }
@@ -2962,14 +2813,6 @@ input.plan-input[type="date"] { font-size:15px; padding:9px 12px; }
 .mu-color-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .mu-color { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
 .mu-color.active { border-color: var(--text); }
-
-/* ── Challenge-Einstellungen ─────────────────────────────────────────── */
-.mu-settings-name { font-size: 20px; font-weight: 700; }
-.mu-member-list { display: flex; flex-direction: column; gap: 8px; }
-.mu-member-row { display: flex; align-items: center; gap: 10px; }
-.mu-member-name { flex: 1; min-width: 0; font-weight: 500; }
-.mu-badge { margin-left: 8px; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); }
-.mu-settings-danger { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
 
 /* ── Rangliste (Jeder gegen jeden) ───────────────────────────────────── */
 .mu-rank { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
