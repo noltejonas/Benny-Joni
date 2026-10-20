@@ -17,18 +17,14 @@
       document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
     } catch (e) {}
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Schrift liegt in der App (SIL OFL, vendor/fonts/OFL.txt): keine Anfrage an fremde Server. -->
+  <link rel="stylesheet" href="vendor/fonts/plus-jakarta-sans.css" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="redesign.css" />
   <link rel="stylesheet" href="onboarding.css" />
 </head>
 <body>
   <div id="root"></div>
-
-  <!-- Supabase client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
   <script>
     // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
@@ -87,10 +83,11 @@
     }
   </script>
 
-  <!-- React 18 -->
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <!-- Bibliotheken liegen in der App; Herkunft und sha384 stehen in tools/build-web.cjs (VENDOR). -->
+  <script src="vendor/supabase-js-2.45.4.min.js"></script>
+  <script src="vendor/react-18.3.1.production.min.js"></script>
+  <script src="vendor/react-dom-18.3.1.production.min.js"></script>
+  <script src="vendor/babel-standalone-7.29.0.min.js"></script>
 
   <!-- Data layer -->
   <script src="data.js"></script>
