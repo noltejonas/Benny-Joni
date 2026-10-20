@@ -349,12 +349,20 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
    Installation:
    ```bash
    npx supabase login
-   npx supabase functions deploy notify-set --project-ref jczyyupxxqrdgbeifcwe
+   npx supabase functions deploy notify-set --no-verify-jwt --project-ref jczyyupxxqrdgbeifcwe
    npx supabase secrets set RIVAL_THRESHOLD=10 --project-ref jczyyupxxqrdgbeifcwe   # optional, 10 ist Standard
    ```
-   Danach im SQL Editor `net._http_response` nach Status prüfen: 200 ok, 401
-   Secret falsch, 503 APNs-Secrets fehlen. Nur **einen** Auslöser behalten
-   (Trigger ODER Dashboard-Webhook).
+   **`--no-verify-jwt` ist Pflicht** (der Trigger schickt kein JWT). Danach
+   Dashboard → Edge Functions → notify-set: „Verify JWT“ muss AUS sein.
+   Verlangt die CLI Docker: `--use-api` anhängen.
+
+   Danach im SQL Editor
+   `select status_code, count(*) from net._http_response group by 1;`:
+   200 ok; 401 = ohne `--no-verify-jwt` deployt (Antwort nennt „authorization
+   header“, dann mit Flag neu deployen) ODER `WEBHOOK_SECRET` gesetzt (dann
+   `npx supabase secrets unset WEBHOOK_SECRET --project-ref jczyyupxxqrdgbeifcwe`);
+   503 = APNs-Secrets fehlen. Nur **einen** Auslöser behalten (Trigger ODER
+   Dashboard-Webhook).
 2. **E-Mail-Versand (P1, 30 min).** Authentication → Emails → **SMTP
    Settings**: eigenen Anbieter eintragen (Resend, Brevo oder Postmark) mit
    SPF/DKIM für die Absender-Domain, Absendername „Benny & Joni“.
@@ -451,12 +459,12 @@ kein Entwurfs-Kasten mehr da ist.
 | „Confirm email“ AUS | Authentication → Providers → Email | Schritt 8, **P0** |
 | AV-Vertrag (DPA) | Organization → Legal Documents | Schritt 5 |
 | Function `delete-account` | `supabase/functions/delete-account/` | nur falls die Löschung mit Rechtefehler scheitert |
-| Function `notify-set` (neue Version) | `supabase/functions/notify-set/` + `_shared/` | Schritt 14, P1 |
+| Function `notify-set` (neue Version) | `supabase/functions/notify-set/` + `_shared/`. Deploy nur mit `--no-verify-jwt` | Schritt 14, P1 |
 | Secret `RIVAL_THRESHOLD` | optional, Standard 10 | Schritt 14 |
 | Secrets `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_ENV`, `APNS_PRIVATE_KEY` | sollten schon gesetzt sein; prüfen mit `npx supabase secrets list --project-ref jczyyupxxqrdgbeifcwe` | Schritt 14 |
 | `WEBHOOK_SECRET` | in Prod nicht gesetzt; **nicht** heute setzen, sonst stoppen alle Pushes | nach dem Launch |
 | SMTP, Vorlage „Reset Password“ mit `{{ .Token }}`, Rate Limits, Site URL | Authentication → Emails / Rate Limits / URL Configuration | Schritt 14, P1 |
-| Function `daily-nudge` + Secret `NUDGE_SECRET` + `DRY_RUN` | `supabase/functions/daily-nudge/`, Migration `20261021001000_daily_nudge_cron.sql` | ab 22.10. |
+| Function `daily-nudge` + Secret `NUDGE_SECRET` + `DRY_RUN` | `supabase/functions/daily-nudge/`, Migration `20261021001000_daily_nudge_cron.sql`. Deploy nur mit `--no-verify-jwt` | ab 22.10. |
 | Optionale Migration | `20261021000100_launch_optional.sql` | nach dem Launch |
 | Social-Push | `20261021002000_social_push.sql` | später |
 | Tarif Pro, MFA, zwei Owner | Organization → Billing / Members | Schritt 14, P1 |
