@@ -6,6 +6,8 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const ACTIVE_KEY = 'pt_active_competition';
 const RETURNING_KEY = 'pt:returning';
+const INVITE_KEY = 'pt:invite'; // offene Einladung { code, at }, 7 Tage gültig
+const INVITE_TTL = 7 * 86400000;
 const THEME_KEY = 'pt:theme2';
 const PUSH_KEY = 'pt:notifications';
 
@@ -14,6 +16,19 @@ function readPref(key, fallback) {
 }
 function writePref(key, value) {
   try { localStorage.setItem(key, value); } catch (e) {}
+}
+function readInvite() {
+  try {
+    const v = JSON.parse(localStorage.getItem(INVITE_KEY) || 'null');
+    if (v?.code && Date.now() - v.at < INVITE_TTL) return v.code;
+  } catch (e) {}
+  return null;
+}
+function writeInvite(code) {
+  try {
+    if (code) localStorage.setItem(INVITE_KEY, JSON.stringify({ code, at: Date.now() }));
+    else localStorage.removeItem(INVITE_KEY);
+  } catch (e) {}
 }
 
 // Folgt dem Hell/Dunkel-Modus des Systems (iOS-Kontrollzentrum, macOS).
@@ -82,6 +97,8 @@ function App() {
   const [accountError, setAccountError] = useState('');
   const [sheet, setSheet] = useState(null); // 'switcher' | 'create' | 'join' | 'profile'
   const [toast, setToast] = useState('');
+  const [invite, setInviteState] = useState(readInvite);
+  const setInvite = useCallback((code) => { writeInvite(code); setInviteState(code || null); }, []);
 
   useEffect(() => {
     if (!api) return;
@@ -167,7 +184,10 @@ function App() {
     );
   }
   if (session === undefined) return <Loader text="Starte…" />;
-  if (!session) return <ObAuthFlow api={api} returning={readPref(RETURNING_KEY, '') === '1'} />;
+  if (!session) {
+    return <ObAuthFlow api={api} invite={invite} onInvite={setInvite}
+      returning={readPref(RETURNING_KEY, '') === '1'} />;
+  }
   if (accountError && !profile) {
     return (
       <div className="name-picker">

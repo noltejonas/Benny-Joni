@@ -19,112 +19,6 @@ function shareInvite(competition) {
   return 'copied';
 }
 
-// Schaltet den lokalen Demo-Modus (demo.js) ohne `?demo` in der URL um, damit
-// er auch in der iOS-App erreichbar ist. Ein `demo`-Parameter in der URL würde
-// das Flag beim Neuladen wieder setzen, deshalb fliegt er raus.
-function setDemoMode(on) {
-  try {
-    if (on) localStorage.setItem('pt_demo', '1');
-    else localStorage.removeItem('pt_demo');
-    sessionStorage.removeItem('pt_demo_signed_out');
-  } catch (e) {}
-  const url = new URL(location.href);
-  url.searchParams.delete('demo');
-  location.replace(url.toString());
-}
-
-// ─── Login / Registrierung ──────────────────────────────────────────────────
-function AuthScreen({ api, initialMode = 'login', onBack }) {
-  const isDemo = api.mode === 'demo';
-  const [mode, setMode] = React.useState(initialMode); // login | signup | reset | reset-code
-  const [name, setName] = React.useState('');
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [code, setCode] = React.useState('');
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState('');
-  const [info, setInfo] = React.useState('');
-
-  async function submit(e) {
-    e?.preventDefault();
-    setError(''); setInfo('');
-    setBusy(true);
-    try {
-      if (mode === 'login') await api.signIn({ email, password });
-      else if (mode === 'signup') {
-        if (!name.trim()) throw new Error('Bitte gib deinen Namen ein.');
-        const r = await api.signUp({ email, password, displayName: name });
-        if (r?.needsConfirm) { setMode('login'); setInfo('Bestätige den Link in der Mail und melde dich dann an.'); }
-      } else if (mode === 'reset') {
-        await api.requestPasswordReset(email);
-        setMode('reset-code');
-        setInfo('Wir haben dir einen Code per Mail geschickt.');
-      } else if (mode === 'reset-code') {
-        await api.resetPasswordWithCode({ email, code, password });
-      }
-    } catch (err) {
-      setError(err.message || String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const titles = {
-    login: 'Anmelden', signup: 'Account erstellen',
-    reset: 'Passwort vergessen', 'reset-code': 'Neues Passwort',
-  };
-
-  return (
-    <div className="name-picker mu-auth">
-      <div className="brand">Projekt Terminator</div>
-      <h1>{titles[mode]}</h1>
-      <p className="sub">
-        {mode === 'signup' ? 'Einmal anlegen, danach bleibst du in der App angemeldet.'
-          : mode === 'reset' ? 'Gib deine E-Mail ein, du bekommst einen Code.'
-          : mode === 'reset-code' ? 'Code aus der Mail und neues Passwort eingeben.'
-          : isDemo ? 'Demo: Jede E-Mail und jedes Passwort funktioniert.'
-          : 'Melde dich an, um zu deinen Challenges zu kommen.'}
-      </p>
-      <form className="mu-auth-form" onSubmit={submit}>
-        {mode === 'signup' && (
-          <input className="input" placeholder="Dein Name" autoComplete="nickname" maxLength={30}
-            value={name} onChange={e => setName(e.target.value)} />
-        )}
-        <input className="input" type="email" placeholder="E-Mail" autoComplete="email" autoCapitalize="none"
-          value={email} onChange={e => setEmail(e.target.value)} disabled={mode === 'reset-code'} />
-        {mode === 'reset-code' && (
-          <input className="input mono" placeholder="Code aus der Mail" inputMode="numeric" autoComplete="one-time-code"
-            value={code} onChange={e => setCode(e.target.value)} />
-        )}
-        {mode !== 'reset' && (
-          <input className="input" type="password" placeholder={mode === 'reset-code' ? 'Neues Passwort' : 'Passwort'}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            value={password} onChange={e => setPassword(e.target.value)} />
-        )}
-        {error && <div className="mu-error">{error}</div>}
-        {info && <div className="mu-info">{info}</div>}
-        <button className="btn" type="submit" disabled={busy || !email || (mode !== 'reset' && !password)}>
-          {busy ? '…' : mode === 'login' ? 'Anmelden' : mode === 'signup' ? 'Registrieren'
-            : mode === 'reset' ? 'Code anfordern' : 'Passwort setzen'}
-        </button>
-      </form>
-      <div className="mu-auth-links">
-        {mode === 'login' && <>
-          <button className="btn-link" onClick={() => { setMode('signup'); setError(''); }}>Neu hier? Account erstellen</button>
-          <button className="btn-link" onClick={() => { setMode('reset'); setError(''); }}>Passwort vergessen</button>
-          {isDemo
-            ? <button className="btn-link" onClick={() => setDemoMode(false)}>Demo beenden</button>
-            : <button className="btn-link" onClick={() => setDemoMode(true)}>Demo ansehen, ohne Konto</button>}
-        </>}
-        {mode !== 'login' && (
-          <button className="btn-link" onClick={() => { setMode('login'); setError(''); setInfo(''); }}>Zurück zum Login</button>
-        )}
-        {onBack && <button className="btn-link" onClick={onBack}>Zurück</button>}
-      </div>
-    </div>
-  );
-}
-
 // ─── Onboarding (noch keine Challenge) ──────────────────────────────────────
 function OnboardingScreen({ profile, onCreate, onJoin, onProfile, onSignOut }) {
   return (
@@ -488,6 +382,6 @@ function ProfileSheet({ open, api, profile, onClose, onSaved, onSignOut }) {
 }
 
 Object.assign(window, {
-  AuthScreen, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet,
+  OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet,
   JoinCompetitionSheet, ProfileSheet, shareInvite, COMP_EMOJIS,
 });
