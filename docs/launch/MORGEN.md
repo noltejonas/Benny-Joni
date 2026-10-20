@@ -48,7 +48,7 @@ jede Abweichung ist eine Konstante (Spalte „Wo ändern“):
 | Werbung in V1 | Nein. AdMob kommt als 1.4.1 (Branch `claude/admob-1.4.1`) | `ADS_ENABLED` in `www/ads.js`, nur im AdMob-Branch |
 | Rechtstexte | GitHub Pages, `https://noltejonas.github.io/Benny-Joni/` | `LEGAL_BASE` in `www/onboarding-model.js` |
 | Veröffentlichung | Manuell nach Freigabe, dazu Expedited Review | App Store Connect, Schritt 11 |
-| Anteil-Regel | Echte Teilnehmerzahl ab 2 Aktiven, sonst erwartete Personen | `SHARE_BASIS` in `www/app.jsx` |
+| Anteil-Regel | Echte Teilnehmerzahl ab 2 Aktiven, sonst erwartete Personen | `SHARE_BASIS` in `www/stats-model.js` und dieselbe Regel im Abschnitt „Anteil (SHARE_BASIS)“ in `supabase/functions/_shared/push-rules.ts` (danach notify-set/daily-nudge neu deployen) |
 | Push | Rivalen-Push ab 10 Wdh./Tag, Ruhezeit 22–7 Uhr, max. 1 pro Tag und Challenge; Tageserinnerung erst ab 22.10. | Secret `RIVAL_THRESHOLD`; Ruhezeit in `supabase/functions/_shared/push-rules.ts`; `DRY_RUN` bei daily-nudge |
 | Sprache, Geräte, Länder | Nur Deutsch, nur iPhone, DE/AT/CH | App Store Connect (Schritt 11) |
 | JSX vorkompiliert in V1 | [INTEGRATOR: ja/nein und Ergebnis des Simulator-Checks] | Zeile `"capacitor:copy:after"` in `package.json` |
@@ -191,7 +191,10 @@ Free-Plan ab, und die App-Links laufen ins Leere.
 Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
 
 1. **SQL Editor** → New query → Inhalt von `docs/launch/supabase-checks.sql`
-   einfügen → Run. Das Skript liest nur. Ergebnisse kopieren und Claude geben.
+   einfügen, dann **jeden Abschnitt einzeln markieren → Cmd+Enter** (der
+   Editor zeigt sonst nur das letzte Ergebnis). Vor der Einreichung mindestens
+   1, 2, 4b, 5, 5b, 9 und 13; Abschnitt 14 nur, wenn 10b true zeigt. Das
+   Skript liest nur. Ergebnisse kopieren und Claude geben.
 2. **SQL Editor** → New query → Inhalt von
    `supabase/migrations/20261021000000_delete_account.sql` einfügen → Run.
    Muss ohne Fehler durchlaufen (die Datei ist idempotent, ein zweiter Lauf
@@ -330,8 +333,11 @@ Die JPGs aus `jpg/` lädt A in Schritt 11.2 hoch.
 Neuen Build über TestFlight (intern) installieren oder per Xcode → Run aufs
 eigene iPhone. Prüfen:
 
-- [ ] Neu installieren, im **Flugmodus** starten: Hinweis „App konnte nicht
-      starten“ mit „Neu laden“ statt weißer Seite. Netz an: App lädt.
+- [ ] Neu installieren, im **Flugmodus** starten: Willkommen-Bildschirm
+      (alles liegt lokal). Angemeldet im Flugmodus starten: „Keine
+      Verbindung“ mit „Erneut versuchen“. Fällt das Netz erst nach dem Start
+      weg: Karte „Konnte nicht laden“ mit „Erneut versuchen“. Netz an → lädt.
+      Nie eine weiße Seite.
 - [ ] Mit einer Wegwerf-Adresse registrieren (Zustimmungszeile mit Links zu
       Nutzungsbedingungen und Datenschutz sichtbar), Challenge erstellen,
       Einladung teilen: Text enthält App-Store-Link und „Code: …“.
@@ -449,7 +455,7 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `www/onboarding-model.js` | `APP_STORE_URL` | aus `APP_STORE_ID` | nichts, wird berechnet | – |
 | `www/onboarding-model.js` | `SUPPORT_EMAIL` | `''` | Support-Adresse eintragen | Schritt 6, **P0** |
 | `www/onboarding-model.js` | `LEGAL_BASE` / `LEGAL` | GitHub Pages | nur bei anderem Hosting | – |
-| `www/app.jsx` | `SHARE_BASIS` | echte Teilnehmer ab 2 | nur bei anderer Anteil-Regel | – |
+| `www/stats-model.js` (+ `_shared/push-rules.ts`) | `SHARE_BASIS` | `'actual'`: echte Teilnehmer ab 2 | nur bei anderer Anteil-Regel | – |
 | `package.json` | `"capacitor:copy:after"` | [INTEGRATOR: drin/nicht drin] | Notlösung siehe `RELEASE.md` | nur bei Build-Problemen |
 | `capacitor.config.json` | `appName` | `Benny & Joni` | – | – |
 | `ios/App/App/Info.plist` | `CFBundleDisplayName` | `Benny & Joni` | – | – |
