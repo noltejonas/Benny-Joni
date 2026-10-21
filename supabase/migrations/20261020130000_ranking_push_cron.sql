@@ -20,7 +20,9 @@ begin
         headers := jsonb_build_object(
           'Content-Type', 'application/json',
           'x-webhook-secret', coalesce(current_setting('app.webhook_secret', true), '')
-        )
+        ),
+        -- Kaltstart plus Monatsabschluss dauert länger als die 5 s Standard
+        timeout_milliseconds := 30000
       )
     $cmd$);
   end if;
