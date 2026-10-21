@@ -35,8 +35,25 @@ interface WebhookPayload {
 interface Member {
   user_id: string;
   team: string | null;
-  profile: { display_name: string } | null;
+  profile: { display_name: string; language?: string | null } | null;
 }
+
+// Texte je App-Sprache (profiles.language, Migration 20261021000000). Ohne
+// Eintrag oder ohne Spalte: Deutsch wie bisher.
+const TEXT = {
+  de: {
+    someone: "Jemand",
+    title: (name: string) => `🔥 ${name} ist los`,
+    body: (reps: number) => `Schon ${reps} Reps heute — du noch bei 0.`,
+  },
+  en: {
+    someone: "Someone",
+    title: (name: string) => `🔥 ${name} is on a roll`,
+    body: (reps: number) => `Already ${reps} reps today — you’re still at 0.`,
+  },
+};
+type Lang = keyof typeof TEXT;
+const textFor = (lang: string | null | undefined) => TEXT[(lang ?? "de") as Lang] ?? TEXT.de;
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
@@ -95,19 +112,24 @@ Deno.serve(async (req) => {
 
   // 2. Challenge + Mitglieder. Empfänger sind die Gegner: alle anderen aktiven
   //    Mitglieder, bei 2v2 nur das andere Team.
-  const [{ data: competition }, { data: members, error: memErr }] = await Promise.all([
-    supabase.from("competitions").select("id, name, emoji, mode").eq("id", record.competition_id).single(),
+  const fetchMembers = (cols: string) =>
     supabase.from("competition_members")
-      .select("user_id, team, profile:user_id(display_name)")
+      .select(`user_id, team, profile:user_id(${cols})`)
       .eq("competition_id", record.competition_id)
-      .is("left_at", null),
+      .is("left_at", null);
+  const [{ data: competition }, firstTry] = await Promise.all([
+    supabase.from("competitions").select("id, name, emoji, mode").eq("id", record.competition_id).single(),
+    fetchMembers("display_name, language"),
   ]);
+  // Ohne Spalte profiles.language (Migration noch nicht eingespielt) wie bisher laden.
+  let { data: members, error: memErr } = firstTry;
+  if (memErr && /language/.test(memErr.message)) ({ data: members, error: memErr } = await fetchMembers("display_name"));
   if (memErr || !competition) {
     return Response.json({ error: "members", detail: memErr?.message }, { status: 500 });
   }
   const all = (members ?? []) as unknown as Member[];
   const sender = all.find((m) => m.user_id === record.user_id);
-  const senderName = sender?.profile?.display_name ?? "Jemand";
+  const senderName = sender?.profile?.display_name;
   const opponents = all.filter((m) =>
     m.user_id !== record.user_id &&
     !(competition.mode === "2v2" && sender?.team && m.team === sender.team)
@@ -167,12 +189,13 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const text = textFor(recipient.profile?.language);
     const apsPayload = {
       aps: {
         alert: {
-          title: `🔥 ${senderName} ist los`,
+          title: text.title(senderName ?? text.someone),
           subtitle: `${competition.emoji} ${competition.name}`,
-          body: `Schon ${senderToday} Reps heute — du noch bei 0.`,
+          body: text.body(senderToday),
         },
         sound: "default",
       },

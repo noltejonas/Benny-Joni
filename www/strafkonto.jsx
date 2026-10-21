@@ -1,9 +1,9 @@
-/* global React, PTData, Sheet, PTPeople, Avatar, Icon, CountUp */
+/* global React, PTData, Sheet, PTPeople, Avatar, Icon, CountUp, tr, trn, trc, PTi18n */
 const { useState } = React;
 
+// Cent-Betrag in der App-Sprache: 500 → „5 €“ / „€5“
 function formatEuro(cents) {
-  const v = cents / 100;
-  return v.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
+  return PTi18n.euro(cents);
 }
 
 function weekLabel(weekStart) {
@@ -12,15 +12,15 @@ function weekLabel(weekStart) {
   a.setDate(a.getDate() + 4 - (a.getDay() || 7));
   const yStart = new Date(a.getFullYear(), 0, 1);
   const kw = Math.ceil((((a - yStart) / 86400000) + 1) / 7);
-  return `KW ${kw}`;
+  return tr('KW {n}', { n: kw });
 }
 
 function reasonText(p) {
   switch (p.rule_mode) {
-    case 'per_challenge':      return 'einzelne Challenge verfehlt';
-    case 'per_week_any':       return 'min. 1 Challenge verfehlt';
-    case 'per_week_all':       return 'alle Challenges verfehlt';
-    case 'per_week_aggregate': return 'aggregiert verfehlt';
+    case 'per_challenge':      return tr('einzelne Challenge verfehlt');
+    case 'per_week_any':       return tr('min. 1 Challenge verfehlt');
+    case 'per_week_all':       return tr('alle Challenges verfehlt');
+    case 'per_week_aggregate': return tr('aggregiert verfehlt');
     default:                   return p.rule_mode;
   }
 }
@@ -29,10 +29,10 @@ function reasonText(p) {
 function obRuleLine(cfg) {
   const amount = formatEuro(cfg.amount_cents ?? 500);
   switch (cfg.rule_mode) {
-    case 'per_challenge': return `Für jede Übung unter deinem Teil zahlst du ${amount}.`;
-    case 'per_week_any': return `Wer sonntags bei einer Übung unter seinem Teil liegt, zahlt ${amount}.`;
-    case 'per_week_all': return `Wer sonntags bei allen Übungen unter seinem Teil liegt, zahlt ${amount}.`;
-    default: return `Wer sonntags unter seinem Teil liegt, zahlt ${amount} in die Kasse.`;
+    case 'per_challenge': return tr('Für jede Übung unter deinem Teil zahlst du {amount}.', { amount });
+    case 'per_week_any': return tr('Wer sonntags bei einer Übung unter seinem Teil liegt, zahlt {amount}.', { amount });
+    case 'per_week_all': return tr('Wer sonntags bei allen Übungen unter seinem Teil liegt, zahlt {amount}.', { amount });
+    default: return tr('Wer sonntags unter seinem Teil liegt, zahlt {amount} in die Kasse.', { amount });
   }
 }
 
@@ -67,7 +67,7 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
     .filter(x => x.id === me || x.pen > 0 || x.pay > 0 || members.some(m => m.user_id === x.id && !m.left_at));
   const anyPen = people.some(x => x.pen > 0);
   const anyPay = people.some(x => x.pay > 0);
-  const who = (id) => id === me ? 'Du' : PTPeople.firstNameOf(id);
+  const who = (id) => id === me ? tr('Du') : PTPeople.firstNameOf(id);
   const cls = (id) => id === me ? 'b' : 'j';
 
   const closuresWithoutPenalty = closures.filter(c => !penalties.find(p => p.week_start === c.week_start));
@@ -76,14 +76,14 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
     return (
       <div className="strafkonto-screen">
         <div className="strafkonto-header">
-          <div className="title">Strafkonto</div>
-          <button className="icon-btn" aria-label="Strafregeln einstellen" onClick={onOpenSettings}>
+          <div className="title">{tr('Strafkonto')}</div>
+          <button className="icon-btn" aria-label={tr('Strafregeln einstellen')} onClick={onOpenSettings}>
             <Icon name="settings" size={20} />
           </button>
         </div>
         <div className="rd-empty">
-          <div className="rd-empty-title">Noch sauber.</div>
-          <div className="rd-empty-text">Lasst es so.{cfg ? ` ${obRuleLine(cfg)}` : ''}</div>
+          <div className="rd-empty-title">{tr('Noch sauber.')}</div>
+          <div className="rd-empty-text">{tr('Lasst es so.')}{cfg ? ` ${obRuleLine(cfg)}` : ''}</div>
         </div>
       </div>
     );
@@ -92,18 +92,18 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
   return (
     <div className="strafkonto-screen">
       <div className="strafkonto-header">
-        <div className="title">Strafkonto</div>
-        <button className="icon-btn" aria-label="Strafregeln einstellen" onClick={onOpenSettings}>
+        <div className="title">{tr('Strafkonto')}</div>
+        <button className="icon-btn" aria-label={tr('Strafregeln einstellen')} onClick={onOpenSettings}>
           <Icon name="settings" size={20} />
         </button>
       </div>
 
-      <section className="rd-card rd-balance" aria-label="Kontostand">
-        <div className="rd-overline">Offen</div>
+      <section className="rd-card rd-balance" aria-label={tr('Kontostand')}>
+        <div className="rd-overline">{trc('Betrag', 'Offen')}</div>
         <div className="rd-balance-amount mono"><CountUp value={Math.max(0, potOpen)} format={formatEuro} /></div>
         <div className="rd-balance-sub">
-          {penalties.length === 1 ? '1 Strafe' : `${penalties.length} Strafen`}
-          {payouts.length > 0 && ` · ${formatEuro(totalPayouts)} eingezahlt`}
+          {trn(penalties.length, '{n} Strafe', '{n} Strafen')}
+          {payouts.length > 0 && ` · ${tr('{amount} eingezahlt', { amount: formatEuro(totalPayouts) })}`}
         </div>
         {anyPen && (
           <div className="rd-balance-split">
@@ -114,23 +114,23 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
                   <Avatar userId={x.id} size={32} />
                   <div>
                     <div className="rd-balance-person-name">{who(x.id)}</div>
-                    <div className="rd-balance-person-val mono">{saldo > 0 ? formatEuro(saldo) : 'beglichen'}</div>
+                    <div className="rd-balance-person-val mono">{saldo > 0 ? formatEuro(saldo) : tr('beglichen')}</div>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-        <button className="btn" onClick={() => setAddPayout(true)}>Begleichen</button>
+        <button className="btn" onClick={() => setAddPayout(true)}>{tr('Begleichen')}</button>
       </section>
 
       {openClosures.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Offene Abschlüsse</div>
+          <div className="strafkonto-section-label">{tr('Offene Abschlüsse')}</div>
           <div className="rd-card rd-list">
           {openClosures.map(w => (
             <div key={w} className="open-closure-row" onClick={() => setClosing(w)}>
-              <span className="open-closure-label">{weekLabel(w)} abschließen</span>
+              <span className="open-closure-label">{tr('{week} abschließen', { week: weekLabel(w) })}</span>
               <span className="open-closure-chev"><Icon name="chevron" size={18} /></span>
             </div>
           ))}
@@ -140,7 +140,7 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
 
       {penalties.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Strafen</div>
+          <div className="strafkonto-section-label">{tr('Strafen')}</div>
           <div className="rd-card rd-list">
           {penalties.map(p => (
             <div key={p.id} className="penalty-row" onClick={() => setPenaltyEdit(p)}>
@@ -159,15 +159,15 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
 
       {payouts.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Einzahlungen</div>
+          <div className="strafkonto-section-label">{tr('Einzahlungen')}</div>
           <div className="rd-card rd-list">
           {payouts.map(p => (
             <div key={p.id} className="penalty-row payout" onClick={() => setPayoutEdit(p)}>
               <div className="penalty-row-main">
                 <div className="penalty-row-head">
-                  {PTPeople.nameOf(p.athlete)} · {new Date(p.paid_at).toLocaleDateString('de-DE')}
+                  {PTPeople.nameOf(p.athlete)} · {PTi18n.date(p.paid_at)}
                 </div>
-                {p.note && <div className="penalty-row-meta">„{p.note}"</div>}
+                {p.note && <div className="penalty-row-meta">{tr('„{note}“', { note: p.note })}</div>}
               </div>
               <div className={`penalty-row-amount mono ${cls(p.athlete)}`}>
                 +{formatEuro(p.amount_cents)}
@@ -180,14 +180,14 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
 
       {closuresWithoutPenalty.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">Straffreie Wochen</div>
+          <div className="strafkonto-section-label">{tr('Straffreie Wochen')}</div>
           <div className="rd-card rd-list">
           {closuresWithoutPenalty.map(c => (
             <div key={c.week_start} className="penalty-row" onClick={() => setReopenWk(c.week_start)}>
               <div className="penalty-row-main">
-                <div className="penalty-row-head">{weekLabel(c.week_start)} · straffrei</div>
+                <div className="penalty-row-head">{weekLabel(c.week_start)} · {tr('straffrei')}</div>
               </div>
-              <span className="penalty-row-reopen" aria-label="Woche neu öffnen"><Icon name="history" size={18} /></span>
+              <span className="penalty-row-reopen" aria-label={tr('Woche neu öffnen')}><Icon name="history" size={18} /></span>
             </div>
           ))}
           </div>
@@ -227,24 +227,24 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
 function PenaltyEditSheet({ penalty, api, onClose, onReopen, onDone }) {
   const [busy, setBusy] = useState(false);
   async function remove() {
-    if (!confirm('Diese Strafe löschen?')) return;
+    if (!confirm(tr('Diese Strafe löschen?'))) return;
     setBusy(true);
     try { await api.deletePenalty(penalty.id); onDone(); }
     catch (e) { alert(e.message); } finally { setBusy(false); }
   }
   return (
     <Sheet open={true} onClose={onClose}>
-      <h2 className="title" style={{marginBottom:8}}>Strafe</h2>
+      <h2 className="title" style={{marginBottom:8}}>{tr('Strafe')}</h2>
       <div className="subtitle" style={{marginBottom:18}}>
         {weekLabel(penalty.week_start)} · {PTPeople.nameOf(penalty.athlete)} · {formatEuro(penalty.amount_cents)}
       </div>
       <div style={{color:'var(--text-2)',marginBottom:18,fontSize:15}}>
-        {reasonText(penalty)} · gebucht {new Date(penalty.created_at).toLocaleDateString('de-DE')}
+        {reasonText(penalty)} · {tr('gebucht {date}', { date: PTi18n.date(penalty.created_at) })}
       </div>
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap'}}>
-        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
-        <button className="btn-ghost-sm" onClick={remove} disabled={busy}>Strafe löschen</button>
-        <button className="btn-ghost-sm primary" onClick={onReopen} disabled={busy}>Woche neu öffnen</button>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>{tr('Abbrechen')}</button>
+        <button className="btn-ghost-sm" onClick={remove} disabled={busy}>{tr('Strafe löschen')}</button>
+        <button className="btn-ghost-sm primary" onClick={onReopen} disabled={busy}>{tr('Woche neu öffnen')}</button>
       </div>
     </Sheet>
   );
@@ -260,13 +260,13 @@ function ReopenSheet({ weekStart, api, penalties, onClose, onDone }) {
   }
   return (
     <Sheet open={true} onClose={onClose}>
-      <h2 className="title" style={{marginBottom:8}}>{weekLabel(weekStart)} neu öffnen?</h2>
+      <h2 className="title" style={{marginBottom:8}}>{tr('{week} neu öffnen?', { week: weekLabel(weekStart) })}</h2>
       <div className="subtitle" style={{marginBottom:18}}>
-        Closure wird gelöscht — danach kannst du nachloggen und neu abschließen.
+        {tr('Closure wird gelöscht — danach kannst du nachloggen und neu abschließen.')}
       </div>
       {weekPenalties.length > 0 && (
         <div style={{marginBottom:16,padding:'10px 12px',background:'var(--surface-2)',borderRadius:8,fontSize:14}}>
-          {weekPenalties.length} Strafe(n) dieser Woche werden ebenfalls gelöscht:
+          {trn(weekPenalties.length, '{n} Strafe dieser Woche wird ebenfalls gelöscht:', '{n} Strafen dieser Woche werden ebenfalls gelöscht:')}
           <ul style={{margin:'6px 0 0 18px',padding:0}}>
             {weekPenalties.map(p => (
               <li key={p.id}>{PTPeople.nameOf(p.athlete)} — {formatEuro(p.amount_cents)}</li>
@@ -275,8 +275,8 @@ function ReopenSheet({ weekStart, api, penalties, onClose, onDone }) {
         </div>
       )}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
-        <button className="btn-ghost-sm primary" onClick={reopen} disabled={busy}>Neu öffnen</button>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>{tr('Abbrechen')}</button>
+        <button className="btn-ghost-sm primary" onClick={reopen} disabled={busy}>{tr('Neu öffnen')}</button>
       </div>
     </Sheet>
   );
@@ -291,7 +291,7 @@ function PayoutSheet({ api, me, members = [], potOpen, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   async function save() {
     const eur = parseFloat(amount.replace(',', '.'));
-    if (!Number.isFinite(eur) || eur <= 0) { alert('Betrag muss > 0 sein'); return; }
+    if (!Number.isFinite(eur) || eur <= 0) { alert(tr('Betrag muss > 0 sein')); return; }
     setBusy(true);
     try {
       await api.addPayout({ athlete, amount_cents: Math.round(eur * 100), note: note || null });
@@ -300,32 +300,32 @@ function PayoutSheet({ api, me, members = [], potOpen, onClose, onDone }) {
   }
   return (
     <Sheet open={true} onClose={onClose}>
-      <h2 className="title" style={{marginBottom:8}}>Einzahlung verbuchen</h2>
-      <div className="subtitle" style={{marginBottom:18}}>Wer hat wieviel beglichen?</div>
+      <h2 className="title" style={{marginBottom:8}}>{tr('Einzahlung verbuchen')}</h2>
+      <div className="subtitle" style={{marginBottom:18}}>{tr('Wer hat wieviel beglichen?')}</div>
 
-      <div className="label" style={{marginBottom:8}}>Wer?</div>
+      <div className="label" style={{marginBottom:8}}>{tr('Wer?')}</div>
       <div className="chip-row" style={{marginBottom:16, flexWrap:'wrap'}}>
         {active.map(m => (
           <button key={m.user_id} className={`chip ${athlete===m.user_id?'chip-active':''}`} onClick={() => setAthlete(m.user_id)}>
-            {m.user_id === me ? 'Ich' : m.profile?.display_name}
+            {m.user_id === me ? tr('Ich') : m.profile?.display_name}
           </button>
         ))}
       </div>
 
-      <div className="label" style={{marginBottom:6}}>Betrag (€)</div>
+      <div className="label" style={{marginBottom:6}}>{tr('Betrag (€)')}</div>
       <input className="quick-chip-input" style={{width:'100%',marginBottom:14}}
         type="number" min="0.01" step="0.01" inputMode="decimal"
         value={amount} onChange={e => setAmount(e.target.value)}
         onFocus={e => e.target.select()}/>
 
-      <div className="label" style={{marginBottom:6}}>Notiz (optional)</div>
+      <div className="label" style={{marginBottom:6}}>{tr('Notiz (optional)')}</div>
       <input className="quick-chip-input" style={{width:'100%'}}
         type="text" value={note} onChange={e => setNote(e.target.value)}
-        placeholder="z.B. Pizza bezahlt, Bier-Runde"/>
+        placeholder={tr('z.B. Pizza bezahlt, Bier-Runde')}/>
 
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:18}}>
-        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
-        <button className="btn-ghost-sm primary" onClick={save} disabled={busy}>Verbuchen</button>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>{tr('Abbrechen')}</button>
+        <button className="btn-ghost-sm primary" onClick={save} disabled={busy}>{tr('Verbuchen')}</button>
       </div>
     </Sheet>
   );
@@ -334,23 +334,23 @@ function PayoutSheet({ api, me, members = [], potOpen, onClose, onDone }) {
 function PayoutEditSheet({ payout, api, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   async function remove() {
-    if (!confirm('Einzahlung löschen?')) return;
+    if (!confirm(tr('Einzahlung löschen?'))) return;
     setBusy(true);
     try { await api.deletePayout(payout.id); onDone(); }
     catch (e) { alert(e.message); } finally { setBusy(false); }
   }
   return (
     <Sheet open={true} onClose={onClose}>
-      <h2 className="title" style={{marginBottom:8}}>Einzahlung</h2>
+      <h2 className="title" style={{marginBottom:8}}>{tr('Einzahlung')}</h2>
       <div className="subtitle" style={{marginBottom:18}}>
-        {PTPeople.nameOf(payout.athlete)} · {formatEuro(payout.amount_cents)} · {new Date(payout.paid_at).toLocaleDateString('de-DE')}
+        {PTPeople.nameOf(payout.athlete)} · {formatEuro(payout.amount_cents)} · {PTi18n.date(payout.paid_at)}
       </div>
       {payout.note && (
-        <div style={{marginBottom:18,color:'var(--text-2)',fontSize:15}}>„{payout.note}"</div>
+        <div style={{marginBottom:18,color:'var(--text-2)',fontSize:15}}>{tr('„{note}“', { note: payout.note })}</div>
       )}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Schließen</button>
-        <button className="btn-ghost-sm primary" onClick={remove} disabled={busy}>Löschen</button>
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>{tr('Schließen')}</button>
+        <button className="btn-ghost-sm primary" onClick={remove} disabled={busy}>{tr('Löschen')}</button>
       </div>
     </Sheet>
   );
@@ -366,7 +366,7 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
     return () => { alive = false; };
   }, [api, weekStart]);
 
-  async function confirm() {
+  async function closeWeek() {
     setBusy(true);
     try { await api.closeWeek(weekStart); onDone(); }
     catch (e) { alert(e.message); onClose(); } finally { setBusy(false); }
@@ -377,25 +377,26 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
 
   return (
     <Sheet open={true} onClose={onClose}>
-      <h2 className="title" style={{marginBottom:8}}>{weekLabel(weekStart)} abschließen?</h2>
-      {!preview ? <div className="subtitle">Lade Vorschau…</div> : pens.length ? (
+      <h2 className="title" style={{marginBottom:8}}>{tr('{week} abschließen?', { week: weekLabel(weekStart) })}</h2>
+      {!preview ? <div className="subtitle">{tr('Lade Vorschau…')}</div> : pens.length ? (
         <>
-          <div className="subtitle" style={{marginBottom:12}}>Folgende Strafen werden gebucht:</div>
+          <div className="subtitle" style={{marginBottom:12}}>{tr('Folgende Strafen werden gebucht:')}</div>
           {pens.map((p, i) => (
             <div key={i} style={{padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
               <div style={{fontWeight:600}}>{PTPeople.nameOf(p.athlete)} — {formatEuro(p.amount_cents)}</div>
-              <div style={{fontSize:13,color:'var(--text-2)',marginTop:2}}>{p.reason}</div>
+              {/* Regel statt p.reason: der Grund aus PTData ist interner deutscher Text */}
+              <div style={{fontSize:13,color:'var(--text-2)',marginTop:2}}>{reasonText(p)}</div>
             </div>
           ))}
-          <div style={{marginTop:12,fontWeight:700,fontSize:17}}>Gesamt: {formatEuro(total)}</div>
+          <div style={{marginTop:12,fontWeight:700,fontSize:17}}>{tr('Gesamt: {amount}', { amount: formatEuro(total) })}</div>
         </>
       ) : (
-        <div className="subtitle">✓ Alle haben ihren Anteil geschafft. Keine Strafen.</div>
+        <div className="subtitle">✓ {tr('Alle haben ihren Anteil geschafft. Keine Strafen.')}</div>
       )}
       <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:18}}>
-        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>Abbrechen</button>
-        <button className="btn-ghost-sm primary" onClick={confirm} disabled={busy || !preview}>
-          {pens.length ? 'Verbuchen' : 'Abschließen'}
+        <button className="btn-ghost-sm" onClick={onClose} disabled={busy}>{tr('Abbrechen')}</button>
+        <button className="btn-ghost-sm primary" onClick={closeWeek} disabled={busy || !preview}>
+          {pens.length ? tr('Verbuchen') : trc('Woche', 'Abschließen')}
         </button>
       </div>
     </Sheet>

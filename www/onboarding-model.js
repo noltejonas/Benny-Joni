@@ -38,19 +38,32 @@
     if (fromLink) return fromLink;
     const compact = raw.replace(/[\s-]/g, '');
     if (compact.length === 6) return cleanCode(compact);
-    const labelled = raw.match(/code\s*[:=]?\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/i);
-    return labelled ? cleanCode(labelled[1]) : null;
+    // Strengstes Etikett zuerst: die eigene Zeile „Code: ABC234“ aus inviteText,
+    // dann „Code:“ irgendwo, zuletzt „Code ABC234“. Sonst gewinnt ein
+    // Challenge-Name wie „Code Sprint“, der vor der Code-Zeile steht.
+    const LABELS = [
+      /^\s*code\s*[:=]\s*([A-Za-z0-9]{6})\s*$/im,
+      /code\s*[:=]\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/i,
+      /code\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/i,
+    ];
+    for (const re of LABELS) {
+      const m = raw.match(re);
+      if (m) return cleanCode(m[1]);
+    }
+    return null;
   }
 
   function inviteLink(code) {
     return `${SCHEME}://join/${String(code || '').toUpperCase()}`;
   }
 
+  // In der Sprache des Absenders. Die Zeile „Code: …“ bleibt in jeder Sprache
+  // gleich, weil normalizeCode den Code ohne Link nur über dieses Etikett findet.
   function inviteText(competition) {
     const code = String(competition.invite_code || '').toUpperCase();
-    return `Komm in meine Challenge „${competition.name}“ bei Projekt Terminator 💪\n`
+    return tr('Komm in meine Challenge „{name}“ bei Projekt Terminator 💪', { name: competition.name }) + '\n'
       + `Code: ${code}\n`
-      + `Direkt öffnen: ${inviteLink(code)}`;
+      + tr('Direkt öffnen: {link}', { link: inviteLink(code) });
   }
 
   // ── Einstieg ────────────────────────────────────────────────────────
