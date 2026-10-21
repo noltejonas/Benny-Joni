@@ -1,27 +1,30 @@
 # Passwort-E-Mails mit dem vorhandenen Gmail-Konto
 
-Stand 21. Oktober 2026: **vorbereitet, nicht eingerichtet**. Bei dieser
-Prüfung wurden keine Auth-Einstellungen geändert und keine E-Mails versendet.
-Das Supabase-Formular ist inzwischen vorbereitet: Host, Port 587, Benutzer,
-Absenderadresse und Absendername sind korrekt befüllt. Der SMTP-Schalter ist
-nur im **ungespeicherten Formular** an; das Passwortfeld ist leer und Save
-wurde nicht betätigt. Im benachbarten Google-App-Passwortdialog steht die
-Passkey-Bestätigung durch den Nutzer aus. Die Aufforderung, ein App-Passwort
-selbst zu erstellen, direkt ins Supabase-Passwortfeld einzutragen und zu
-speichern, ist übergeben; eine Antwort liegt noch nicht vor.
+Stand 21. Oktober 2026: **SMTP-Versand und Recovery-Code-Verifikation bestanden**.
+Der Management-Readback bestätigt `smtp.gmail.com:587`, Benutzer und
+Absender `bennyundjoni@gmail.com`, Absendername `Benny & Joni` und ein
+vorhandenes SMTP-Passwort. Der Passwortwert wird nicht ausgegeben.
+Eine eigene Testmail wurde zugestellt und der achtstellige Recovery-Code
+erfolgreich geprüft. Das Setzen eines neuen Passworts in der App und die
+anschließende Anmeldung mit diesem Passwort wurden dabei nicht getestet.
 
 ## Tatsächlicher Readback
 
-Die produktive Supabase-Auth-Konfiguration wurde rein lesend geprüft:
+Die produktive Supabase-Auth-Konfiguration wurde nach dem Speichern rein lesend geprüft:
 
 | Einstellung | Bestätigter Wert |
 |---|---|
-| Eigener SMTP-Host | Nicht konfiguriert |
-| SMTP-Port | Nicht gesetzt |
-| E-Mail-Limit | Zwei Nachrichten pro Stunde |
+| Eigener SMTP-Host | `smtp.gmail.com` |
+| SMTP-Port | `587` |
+| Benutzer / Absenderadresse | `bennyundjoni@gmail.com` |
+| Absendername | `Benny & Joni` |
+| SMTP-Passwort | Vorhanden; nur Existenz bestätigt, kein Wert ausgegeben |
+| E-Mail-Limit | 30 Nachrichten pro Stunde |
 | Mindestabstand | 60 Sekunden |
 | Recovery-Vorlage | Enthält `{{ .Token }}`, keinen `{{ .ConfirmationURL }}` |
 | OTP-Länge | **Acht Ziffern**, beibehalten |
+| OTP-Gültigkeit | 3600 Sekunden |
+| E-Mail-Autoconfirm | Aktiviert, unverändert; Registrierungsbestätigung nicht getestet |
 
 Die App akzeptiert den Code ohne feste Längenbegrenzung und übergibt ihn an
 `verifyOtp` mit `type: 'recovery'`. Die acht Ziffern erfordern keinen neuen
@@ -33,7 +36,27 @@ und bytegleich mit `docs/launch/site/support.html` geprüft. Der Root-Pages-
 Commit `9b55f30aa335f51d22de554c3749f8af8371a3fd` ändert ausschließlich
 `Benny-Joni/support.html`; der Pages-Build ist abgeschlossen.
 
-## Nutzerübergabe und Konfiguration
+## Durchgeführter Test
+
+Mit einem eigenen, kurzzeitig angelegten Plusalias-Testkonto wurde genau
+eine Recovery-Mail angefordert (HTTP 200). Empfänger, Absender und
+achtstelliger Code wurden im eigenen Gmail-Postfach geprüft; die Mail kam
+am 21. Oktober 2026 um 17:26 Uhr an. `verifyOtp` mit `type: 'recovery'`
+antwortete mit HTTP 200; der authentisierte `/user`-Abruf bestätigte mit
+HTTP 200 dasselbe Testkonto. Es wurde kein Passwort geändert.
+
+Das Testkonto wurde anschließend gelöscht (DELETE 200, GET 404); auch das
+Profil war danach entfernt. Code- und temporäre Passwortdatei wurden
+gelöscht. Die dauerhaften Store-Review-Konten blieben unberührt.
+Geheimnisfreier lokaler Beleg: `.local/qa/smtp-20261021/status.json`.
+
+Die öffentliche Datenschutzerklärung nennt den tatsächlichen Gmail-Versand
+und die verarbeiteten Recovery-Daten. Die gezielte Aktualisierung ist
+veröffentlicht und bytegleich geprüft (HTTP 200, Pages-Build abgeschlossen;
+Root-Pages-Commit `d783559a9531169b29341ef0070aea85c9cefc53`, ausschließlich
+`Benny-Joni/datenschutz.html`).
+
+## Hinterlegte Konfiguration und erneute Einrichtung
 
 1. Im Google-Konto **bennyundjoni@gmail.com** die Zwei-Faktor-Authentifizierung
    selbst einrichten bzw. bestätigen. Dann
@@ -63,15 +86,14 @@ erhalten. [Google: Gmail SMTP](https://developers.google.com/workspace/gmail/ima
 3. Die vorhandene Recovery-Vorlage mit `{{ .Token }}` beibehalten. Die App
    nutzt den Code in der E-Mail statt eines Bestätigungslinks.
    [Supabase: Vorlagenvariablen](https://supabase.com/docs/guides/auth/auth-email-templates)
-4. Erst nach tatsächlichem Speichern und erneuter Prüfung der Konfiguration
-   mit einem separaten eigenen Testkonto an einem Postfach außerhalb des
-   Supabase-Teams „Passwort vergessen“ durchlaufen: Zustellung, achtstelliger
-   Code, neues Passwort und erneute Anmeldung. Damit bleibt der hinterlegte
-   Store-Review-Zugang unverändert. Einen Erfolg erst nach diesem Test melden.
+4. Nach späteren Konfigurationsänderungen den Versand und die Code-Prüfung
+   mit einem separaten eigenen Testkonto wiederholen. Für einen vollständigen
+   Test der Passwortoberfläche zusätzlich ein neues Passwort setzen und sich
+   damit erneut anmelden. Den hinterlegten Store-Review-Zugang dafür nicht
+   verändern. Dieser zusätzliche Oberflächentest ist noch offen.
 
 Supabase- und Gmail-Versandlimits gelten gemeinsam. Das Live-Limit steht
-derzeit bei zwei pro Stunde; nach der Einrichtung erneut ablesen und bewusst
-festlegen. Für private Gmail-Konten nennt Google mehr als 500 Nachrichten
+jetzt bei 30 pro Stunde. Für private Gmail-Konten nennt Google mehr als 500 Nachrichten
 pro Tag als möglichen Sperrauslöser; das ist keine garantierte Sendekapazität
 für ein neues Konto. [Google: Gmail-Limits](https://support.google.com/mail/answer/22839?hl=de)
 

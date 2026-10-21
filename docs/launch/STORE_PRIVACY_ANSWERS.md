@@ -20,6 +20,7 @@ Die Console bestätigte die folgenden Eingaben mit „Saved“:
 |---|---|
 | Privacy policy | Die unten genannte öffentlich erreichbare Datenschutz-URL. |
 | Contains ads | Yes. |
+| Werbe-ID-Erklärung nach AAB-Upload | Die nach dem Upload neu verlangte Erklärung ist gespeichert: **Yes**, mit Analytics, Advertising or marketing sowie Fraud prevention, security, and compliance. Die UI bestätigt die Speicherung und zeigt anschließend bei App-Inhalte **„Alles erledigt“**, keine offenen Deklarationen. Es wurde nichts zur Prüfung gesendet. |
 | Government apps / Financial features | Jeweils No. Das freiwillige Strafkonto bleibt als „Other financial info“ in Data safety offengelegt; die App verarbeitet keine Zahlungen. |
 | Health apps | Activity and Fitness. |
 | App category / öffentlicher Kontakt | Health & Fitness; `bennyundjoni@gmail.com`, `+491781479821`, HTTPS-Website. |
@@ -27,10 +28,10 @@ Die Console bestätigte die folgenden Eingaben mit „Saved“:
 | Optionale Partnertests | Ausgeschaltet. |
 | Target audience | 16–17 sowie 18 and over. |
 | Produktionsländer | Ausschließlich Deutschland, Österreich und Schweiz; UI-Readback „Ausgerichtet (3)“. Produktionstrack inaktiv, kein Produktionsrelease erstellt oder veröffentlicht. |
-| Fastlane-Zugang | Separate aktivierte Play-API und auf diese App begrenztes Servicekonto eingerichtet; `android verify_auth` bestätigt Version Code 1. Leerer Edit und serveridentische PUT/PATCHs validieren; echte Titeländerungen scheitern reproduzierbar mit 403, kein Commit. Beide gespeicherten Titel weiter „Benny & Joni“. Zusätzliche appbezogene Entwurfsberechtigung angefragt, Entscheidung offen; keine weiteren Rechte vergeben. Privater JSON-Schlüssel ausschließlich im ignorierten lokalen Release-Ordner. |
+| Fastlane-Zugang | Separate aktivierte Play-API und auf diese App begrenztes Servicekonto; zusätzliches Entwurfsrecht ausdrücklich genehmigt/gespeichert (sechs Apprechte, keine neuen Accountrechte). `verify_auth` und vollständige DE-/EN-Textvalidierung bestehen. API-Speicherversuch scheitert sicher am abgelehnten `changesNotSentForReview`; Fallback unverändert aus, kein erfolgreicher API-Commit/keine Review-Einreichung bestätigt. JSON-Schlüssel ausschließlich im ignorierten privaten Release-Ordner. |
 | Data safety | Alle zwölf Datentypen der folgenden Play-Tabelle einschließlich Erhebung, Weitergabe, Pflicht/Optional und Zwecken gespeichert. Bei App interactions und Diagnostics ist App functionality ausschließlich Erhebungszweck der eigenen Funktionsdaten, kein Weitergabezweck der Google-SDK-Daten. Eigene Crash logs: collected, required, nicht shared. |
 | IARC | Abgeschlossen und gespeichert: Other app; Fitness/UGC als primäre Inhalte; Melden/Blockieren vorhanden, keine Chatmoderation, Zugang per Einladung. Kein externer Content, keine altersbeschränkten Waren, GPS-Freigabe, Käufe, Auszahlungen, Browser- oder Nachrichtenfunktion. Ergebnis: USK 12, ESRB Teen, PEGI Parental Guidance. Die ausgewählte Zielgruppe bleibt 16+. |
-| Store-Listing | Deutsch und Englisch vollständig gespeichert, Status „Bereit für Überprüfung“; je vier echte Android-Screenshots, ein Icon und zwei lokalisierte Feature-Grafiken. |
+| Store-Listing | Deutsch und Englisch vollständig gespeichert, Status „Bereit für die Überprüfung“; je vier echte Android-Screenshots, ein Icon und zwei lokalisierte Feature-Grafiken. Die längeren Titel **Benny & Joni: Fitness-Duell** (de) und **Benny & Joni: Fitness Duel** (en) sind per UI als Entwurf gespeichert und nach Neuladen/Sprachwechsel bestätigt. Keine Review-Einreichung. |
 | KI-Kennzeichnung der Assets | Für alle elf Assets in der Play-Oberfläche gespeichert: ein Icon, zwei Feature-Grafiken und acht echte App-Aufnahmen, die KI-erstellte Avatare/Maskottchen enthalten. Echte Screenshots sind dadurch nicht als erfundene App-Oberflächen dargestellt. |
 
 Alle elf Play-Einrichtungsschritte sind abgeschlossen. Das finale AAB ist
@@ -77,8 +78,14 @@ Die App-Version ist weiterhin nicht zur Prüfung eingereicht oder veröffentlich
 Formular, nicht einen zusätzlich nachgewiesenen Datenfluss. `T1` dokumentiert
 die begründete Apple-Tracking-Antwort für die verifizierte Konfiguration;
 `E1` erläutert eigene Fehlerberichte.
-Aktuell geprüft: Supabase `eu-west-1`, Free-Tarif, kein Custom-SMTP,
-E-Mail-Autoconfirm aktiviert. Log-/Backup-Fristen bleiben Betriebsfakten;
+Geprüft: Supabase `eu-west-1`, Free-Tarif, E-Mail-Autoconfirm aktiviert.
+Gmail-SMTP ist im Backend gespeichert (`smtp.gmail.com:587`, Benutzer und
+Absender `bennyundjoni@gmail.com`, Passwort vorhanden, Limit 30/h).
+Eigene Testmail, achtstellige Recovery-Code-Verifikation und authentisierter
+Nutzerabruf sind bestanden; das Testkonto ist bereinigt. Das Setzen eines
+neuen Passworts in der App und die erneute Anmeldung damit waren nicht
+Testumfang.
+Log-/Backup-Fristen bleiben Betriebsfakten;
 daraus entstehen keine erfundenen Tageszusagen. Die regionale Zuordnung
 allein ändert keine der folgenden Store-Kategorien.
 

@@ -81,7 +81,8 @@ und geprüft. `screenshots:false` überspringt Bilder, `metadata_only:true`
 überspringt den Build. Vor dem Upload werden lokale Rechts-/Support-Entwürfe
 und Text-/Bilddateien geprüft.
 
-Alle Upload-Lanes lassen einen Entwurf zurück. `submit:true` ist gesperrt.
+Die iOS-Upload-Lanes lassen einen Entwurf zurück; `submit:true` ist gesperrt.
+Bei Play ist die unten beschriebene API-Commit-Grenze zusätzlich zu beachten.
 In App Store Connect den fertigen Build, Review-Zugang, Altersfreigabe,
 Datenschutz, Länder und Preis prüfen und dort manuell einreichen. Auch die
 Veröffentlichung nach einer Freigabe erfolgt manuell.
@@ -129,15 +130,28 @@ oder veröffentlicht. Der separate API-Zugang im Cloudprojekt
 `benny-joni-fastlane` ist eingerichtet, mit aktivierter API und auf diese App
 begrenztem Servicekonto. `android verify_auth` bestätigt Version Code 1 im
 internen Track. Der private JSON-Schlüssel bleibt im ignorierten lokalen
-Release-Ordner. Zwei Metadaten-Probeläufe akzeptierten DE-/EN-Texte im
-temporären Edit, scheiterten aber beim abschließenden `edits.validate` mit
-HTTP 403 (`caller permission`); kein Commit. Ein leerer Edit besteht
-insert → validate → delete. Das Fehlerbild ist eingegrenzt: Serveridentische PUT/PATCHs
-validieren, echte Änderungen der längeren lokalen Titel scheitern reproduzierbar
-mit 403. Beide gespeicherten Play-Titel sind „Benny & Joni“ (12 Zeichen).
-Keine Titeländerung wurde committed. Die zusätzliche Nutzerfreigabe für
-auf diese App begrenztes Bearbeiten/Löschen von Entwürfen ist angefragt und
-noch nicht entschieden; keine weiteren Rechte vergeben, keine Lösung behauptet.
+Release-Ordner. Nach ausdrücklicher Nutzerfreigabe ist das zusätzliche
+Entwurfsrecht nur für diese App gespeichert: sechs Apprechte, keine neuen
+kontoweiten Rechte. Die vollständige DE-/EN-Textvalidierung besteht jetzt.
+Der folgende Speicherversuch ohne Bilder wurde beim Commit sicher
+abgebrochen: Google lehnt `changesNotSentForReview` mit dem Hinweis auf
+automatisches Senden zur Prüfung ab. `rescue_changes_not_sent_for_review:
+false` bleibt unverändert. Kein erfolgreicher API-Commit und keine
+Review-Einreichung bestätigt. Die längeren Titel wurden anschließend über
+die Console als Entwurf gespeichert: **Benny & Joni: Fitness-Duell** (de)
+und **Benny & Joni: Fitness Duel** (en). Neuladen und Sprachwechsel bestätigen
+die Werte; Status „Bereit für die Überprüfung“, keine Review-Einreichung.
+Ein API-Commit kann sämtliche prüfbereiten Änderungen einschließlich der
+Console-Änderungen zur Prüfung senden. Ein Draft-Release-Status ist keine
+allgemeine Garantie für einen reinen Metadaten-Commit: Bei `store_metadata`
+schreibt Supply keinen Track, daher greift `release_status: draft` dort
+nicht als Schutz. Der unveränderte `rescue: false` verhindert den
+automatischen Fallback. [Google: Commit und parallele Console-Änderungen](https://developers.google.com/android-publisher/concurrency-considerations)
+
+Die nach dem AAB-Upload neu verlangte Werbe-ID-Erklärung ist gespeichert:
+Ja, mit Analyse, Werbung/Marketing und Betrugsprävention/Sicherheit/Compliance.
+Die UI bestätigte die Änderung; App-Inhalte zeigt danach **„Alles erledigt“**
+ohne offene Deklarationen. Es wurde nichts zur Review-Einreichung gesendet.
 Die Play-Vorschau zeigt keine Fehler und drei Warnungen: keine internen
 Tester, kein R8-Mapping bei `minifyEnabled=false` und fehlende native
 SDK-Debugsymbole. „Save and publish“ wurde nicht betätigt.
@@ -153,13 +167,20 @@ Deutsch und Englisch sind exportiert und geprüft. Vor einer Einführung
 fehlen das externe Schlüssel-Backup, vollständige Funktionstests,
 EWR-Dialogwahl/Widerruf und tatsächliche Anzeigenauslieferung. Artefakt-
 Hashes und Details stehen in [ANDROID.md](ANDROID.md).
-Die Vorbereitung für Gmail-SMTP steht in [SMTP.md](SMTP.md): fünf
-Konfigurationsfelder sind im ungespeicherten Formular korrekt befüllt,
-das Passwortfeld ist leer. App-Passwort-Eingabe und Speichern sind an den
-Nutzer übergeben; dessen Antwort und der Zustelltest stehen noch aus.
-Die produktiven Auth-Einstellungen sind unverändert.
-Eventuell vorgeschriebene geschlossene Tests bleiben Kontoschritte. Die Play-Lanes
-senden keine Änderung zur Prüfung und veröffentlichen keine Version.
+Gmail-SMTP ist gespeichert und bestätigt: `smtp.gmail.com:587`, Benutzer
+und Absender `bennyundjoni@gmail.com`, Absendername `Benny & Joni`, Passwort
+vorhanden, 30 Mails pro Stunde und 60 Sekunden Mindestabstand. Eine eigene
+Testmail kam an; Recovery-Code-Verifikation und authentisierter Nutzerabruf
+lieferten HTTP 200. Das temporäre Konto samt Profil und privaten Code-/
+Passwortdateien wurde bereinigt; Review-Konten blieben unberührt.
+Das Setzen eines neuen Passworts in der App und die Anmeldung damit sind
+noch ungeprüft; siehe [SMTP.md](SMTP.md). Die konkrete Gmail-Nennung ist
+in der öffentlichen Datenschutzerklärung ergänzt und bytegleich geprüft
+(HTTP 200, Root-Pages-Commit `d783559a9531169b29341ef0070aea85c9cefc53`).
+Eventuell vorgeschriebene geschlossene Tests bleiben Kontoschritte. Der
+bisherige API-Speicherversuch wurde abgebrochen; eine Review-Einreichung
+oder Veröffentlichung wurde nicht ausgelöst. Die Commit-Grenze oben gilt
+auch für spätere Aufrufe der Play-Lanes.
 
 Der Apple-API-Zugang ist eingerichtet, `verify_auth` erfolgreich. Die lokalen
 Zugangsdaten bleiben in der ignorierten `.env`; die private `.p8` liegt mit

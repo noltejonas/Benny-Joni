@@ -65,7 +65,7 @@
         <li>Für die App verarbeiten wir dein Konto, dein Profil und deine Trainingsdaten. Für Werbung, Sicherheit und Fehlerbehebung fallen außerdem die unten beschriebenen technischen Daten an.</li>
         <li>Wir verkaufen keine Daten. Neben technischen Fehlerberichten verarbeitet das Werbe-SDK Anzeigen- und Diagnosedaten, wie in Abschnitt 2.11 beschrieben.</li>
         <li>Ab Version 1.4.1 zeigt die App im Feed und in den Stats Werbebanner von Google: nur nicht personalisiert und entsprechend dem von Google ermittelten Einwilligungsstand (Abschnitt 2.11). Die App übergibt keine Trainingsdaten an das Werbe-SDK.</li>
-        <li>Die App lädt keine Schriften oder Skripte von Fremdservern nach. Mit Google verbindet sie sich nur für die Werbung.</li>
+        <li>Die App lädt keine Schriften oder Skripte von Fremdservern nach. Für die Werbung verbindet sie sich mit Google; Sicherheits-E-Mails werden serverseitig über Gmail versendet (Abschnitt 2.10).</li>
         <li>Deine Challenge-Daten sehen die Mitglieder deiner Challenge. Wenn du der Rangliste zustimmst, sehen andere App-Nutzer außerdem deinen Anzeigenamen, dein Foto und deine gewerteten Trainingsergebnisse (Abschnitt 2.12).</li>
         <li>Du kannst dein Konto jederzeit in der App löschen. Den Umfang und verbleibende Sicherungskopien erläutert Abschnitt 6.</li>
       </ul>
@@ -170,8 +170,10 @@
 
     <h3>2.10 E-Mails der App</h3>
     <p>
-      Wenn du „Passwort vergessen“ nutzt, schickt dir unser Hosting-Dienstleister in unserem Auftrag eine E-Mail mit einem Code.
-      Die Anmeldung und der Versand solcher Sicherheits-E-Mails werden über Supabase Auth und die dafür eingerichtete E-Mail-Infrastruktur abgewickelt. Dabei werden Empfängeradresse, Zustellinformationen und der für den Vorgang erforderliche Nachrichteninhalt verarbeitet.
+      Wenn du „Passwort vergessen“ nutzt, veranlasst Supabase Auth eine E-Mail mit einem Code.
+      Versendet wird sie über Gmail von Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland.
+      Dabei werden die Empfängeradresse, Zustellinformationen und der für die Wiederherstellung erforderliche Nachrichteninhalt einschließlich des Codes verarbeitet.
+      Weitere Informationen enthält die <a href="https://policies.google.com/privacy">Google-Datenschutzerklärung</a>, einschließlich der <a href="https://policies.google.com/privacy/frameworks">Informationen zu internationalen Datenübermittlungen</a>.
       Werbe-E-Mails verschicken wir nicht.
     </p>
 
@@ -243,7 +245,7 @@
         Für den Download und den App Store ist Apple selbst verantwortlich. Von Apple erhalten wir nur zusammengefasste Statistiken, etwa die Zahl der Downloads.
       </li>
       <li>
-        <strong>E-Mail</strong>: Google stellt unser Support-Postfach bereit; Supabase Auth und die dafür eingerichtete Versand-Infrastruktur verarbeiten Sicherheits-E-Mails der App (Abschnitte 2.9 und 2.10).
+        <strong>E-Mail</strong>: Gmail von Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland, stellt unser Support-Postfach bereit und versendet die von Supabase Auth veranlassten Sicherheits-E-Mails der App. Dabei werden Empfängeradresse, Zustellinformationen und der erforderliche Nachrichteninhalt einschließlich des Codes verarbeitet (Abschnitte 2.9 und 2.10).
       </li>
       <li>
         <strong>GitHub</strong> stellt diese Website über GitHub Pages bereit, siehe Abschnitt 4.

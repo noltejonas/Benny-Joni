@@ -121,18 +121,22 @@ Veröffentlichung der Datenschutzangaben reicht die App-Version nicht ein.
 Die Play-Produktionsländer sind auf Deutschland, Österreich und Schweiz
 ausgerichtet, UI-Readback „Ausgerichtet (3)“. Der Produktionstrack bleibt
 inaktiv; ein Produktionsrelease wurde weder erstellt noch veröffentlicht.
-Die tatsächlich gespeicherten Play-Titel lauten in beiden Sprachen
-**Benny & Joni** (12 Zeichen). Die längeren lokalen Titel sind noch nicht
-übernommen: Ihre temporäre API-Validierung scheitert mit 403, während
-serveridentische PUT/PATCHs validieren. Kein Titel-Commit. Die angefragte
-zusätzliche App-Entwurfsberechtigung wartet auf Nutzerentscheidung.
+Die tatsächlich gespeicherten Play-Titel lauten
+**Benny & Joni: Fitness-Duell** (Deutsch) und **Benny & Joni: Fitness Duel**
+(Englisch). Beide wurden in der Console als Entwurf gespeichert und nach
+Neuladen sowie Sprachwechsel bestätigt; Status „Bereit für die Überprüfung“.
+Nach ausdrücklicher Freigabe des zusätzlichen appbezogenen Entwurfsrechts
+besteht auch die vollständige DE-/EN-Validierung. Der separate API-
+Speicherversuch wurde bei der Commit-Ablehnung von `changesNotSentForReview`
+sicher abgebrochen; der automatische Fallback bleibt ausgeschaltet. Kein
+erfolgreicher API-Commit und keine Review-Einreichung bestätigt.
 
 ## Was aktuell noch fehlt
 
 - AdMob-Zahlungsprofil (auf Wunsch vorerst offen), Store-Verknüpfung und Googles Bestätigung von `app-ads.txt`. Beide Apps/Banner und die UMP-Nachricht sind eingerichtet; die Datei ist am Domain-Stamm erreichbar.
-- Produktions-E-Mail-Versand und verbleibende Betriebsfakten aus `LEGAL_FACTS.md` überprüfen. Im vorbereiteten Gmail-SMTP-Formular sind fünf Felder befüllt; Passwort leer, nicht gespeichert. Die Nutzerübergabe für App-Passwort und Save wartet auf Antwort; siehe [SMTP.md](SMTP.md). SMTP ist produktiv unverändert. Anbieter-/Supportdaten sind eingesetzt und die fünf App-/Rechtsseiten öffentlich erreichbar.
+- Verbleibende Betriebsfakten aus `LEGAL_FACTS.md` und die Passwortoberfläche bis zum neuen Passwort/erneuten Login prüfen. Gmail-SMTP (`smtp.gmail.com:587`, Absender `bennyundjoni@gmail.com`, Limit 30/h) ist gespeichert; eigene Testmail, Recovery-Code-Verifikation und authentisierter Nutzerabruf sind bestanden. Testkonto und temporäre Geheimnisdateien sind bereinigt; Review-Konten unverändert. Siehe [SMTP.md](SMTP.md). Die fünf App-/Rechtsseiten sind öffentlich erreichbar; auch die konkrete Gmail-Nennung in der Datenschutzerklärung ist veröffentlicht und bytegleich geprüft (HTTP 200, Root-Pages-Commit `d783559a…`).
 - Apple: abschließende Prüfung der Abläufe im hochgeladenen Build sowie gegebenenfalls noch im Konto angezeigte Anforderungen. App Privacy ist mit allen 15 Datentypen veröffentlicht; Build 25 ist zugeordnet. Altersfreigabe 16+, Inhaltsrechte, Medizinprodukt-Antwort Nein, kostenlose Preise und ausschließliche DACH-Verfügbarkeit sind gespeichert. Mac/Apple Vision sind ausgeschlossen. Beide isolierten Review-Logins sind gegen Supabase Auth bestätigt. Der bestehende Trader-Status ist keine hier neu geprüfte DSA-Verifizierung.
-- Google Play: Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist hochgeladen und als interner Entwurf **1.4.1 – Initial internal test** mit DE-/EN-Neuerungen (2/2) gespeichert. Kein Rollout und keine Testerbenachrichtigung. `android verify_auth` bestätigt Version Code 1. Leerer Edit und serveridentische Änderungen validieren; echte Titeländerungen scheitern reproduzierbar mit 403, kein Commit. Gespeicherte Titel weiterhin „Benny & Joni“. Eine zusätzliche, auf diese App begrenzte Entwurfsberechtigung ist angefragt, noch nicht genehmigt/vergeben. Alle elf Einrichtungsschritte und die UI-Listings sind abgeschlossen.
+- Google Play: Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist als interner Entwurf gespeichert. Kein Rollout und keine Testerbenachrichtigung. Das zusätzliche appbezogene Entwurfsrecht ist ausdrücklich genehmigt und gespeichert; sechs Apprechte, keine neuen Accountrechte. `verify_auth` und vollständige DE-/EN-Textvalidierung bestehen. API-Speichern scheitert sicher am nicht akzeptierten `changesNotSentForReview`; Fallback bleibt aus, kein erfolgreicher API-Commit/keine Review-Einreichung bestätigt. Die fertigen UI-Listings enthalten inzwischen die oben bestätigten längeren Titel.
 - Für Android: externes Backup des lokal erstellten Upload-Keys sowie vollständige Funktionstests, EWR-Dialogwahl/Widerruf und tatsächliche Anzeigenauslieferung. Kaltstart, Review-Login, Feed-Reproduktion und acht echte Screenshots sind geprüft. Der Emulator verifiziert UMP-Freigabe → SDK → native Datenschutzbestätigung → `npa: true`-Anfragen; Feed/Stats jeweils `NO_FILL`, keine Anzeigen oder Leerfläche, keine finalen Laufzeitfehler. Details/Beleg in [ADMOB.md](ADMOB.md). Beide Store-Bereitschaftschecks sind bestanden; keine vollständige Geräte-QA behauptet.
 
 Die Release-Sperren stoppen bei Test-Anzeigenkennungen oder unvollständigen

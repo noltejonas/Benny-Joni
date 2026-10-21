@@ -33,33 +33,44 @@ nur `docs/launch/site/`; diese Notiz gehört nicht zur öffentlichen Website.
   Android-Werbe-ID/App-Set-ID und Diagnosedaten des SDKs nicht pauschal aus.
   Banner können bewegte Inhalte enthalten; keine Vollbild-/Prämien-Placements.
 
-## Noch am tatsächlich verwendeten Dienst prüfen
+## Bestätigte Dienstkonfiguration
 
 Die bestehende Supabase Management API bestätigt für das aktive Projekt am
-21. Oktober 2026 die Region `eu-west-1` und den Tarif Free. Es ist kein eigener
-SMTP-Server konfiguriert; das Standardlimit beträgt zwei E-Mails pro Stunde,
-und automatische E-Mail-Bestätigung ist aktiviert. Produktionsfähiger
-Passwort-Reset-Versand ist damit noch nicht nachgewiesen.
-Der aktuelle Readback bestätigt `{{ .Token }}` in der Recovery-Vorlage,
-keinen Bestätigungslink und eine OTP-Länge von acht Ziffern. Die App
-akzeptiert diese Länge; ein neuer Build ist dafür nicht erforderlich.
-Der Gmail-SMTP-Weg mit notwendiger Nutzerübergabe ist in [SMTP.md](SMTP.md)
-vorbereitet; dabei wurden weder Auth-Einstellungen geändert noch E-Mails versendet.
+21. Oktober 2026 die Region `eu-west-1` und den Tarif Free. Gmail-SMTP ist
+als `smtp.gmail.com:587` mit Benutzer/Absender `bennyundjoni@gmail.com`,
+Absendername `Benny & Joni` und vorhandenem Passwort gespeichert; der
+geheime Wert wird nicht ausgegeben. E-Mail-Limit: 30 pro Stunde bei
+60 Sekunden Mindestabstand. Die Recovery-Vorlage enthält `{{ .Token }}`,
+keinen Bestätigungslink; die OTP-Länge beträgt acht Ziffern mit 3600 Sekunden
+Gültigkeit. E-Mail-Autoconfirm bleibt aktiviert.
+
+Zustellung einer eigenen Testmail, Recovery-Code-Verifikation und der
+authentisierte Nutzerabruf sind bestanden. Das kurzzeitig angelegte
+Testkonto samt Profil sowie Code-/temporäre Passwortdatei sind entfernt;
+Store-Review-Konten blieben unberührt. Das Setzen eines neuen Passworts in
+der App und die erneute Anmeldung damit wurden nicht getestet. Details und
+geheimnisfreier Beleg stehen in [SMTP.md](SMTP.md).
+Die konkrete Gmail-Nennung für Sicherheits-E-Mails ist auf der öffentlichen
+Datenschutzseite ergänzt. HTTP 200 und Bytegleichheit sind bestätigt;
+Root-Pages-Commit `d783559a9531169b29341ef0070aea85c9cefc53` ändert
+ausschließlich `Benny-Joni/datenschutz.html`.
 Die längenneutrale Recovery-Anleitung auf der öffentlichen Supportseite ist
 veröffentlicht und bytegleich geprüft (HTTP 200; Root-Pages-Commit
 `9b55f30aa335f51d22de554c3749f8af8371a3fd`, nur `Benny-Joni/support.html`).
 
+## Noch am tatsächlich verwendeten Dienst prüfen
+
 Diese Punkte werden auf den öffentlichen Seiten nicht durch erfundene
 Anbieter-, Regions- oder Tagesangaben ersetzt:
 
-- Tatsächlich anwendbarer Supabase-Vertrag/DPA und produktive E-Mail-Zustellung.
+- Tatsächlich anwendbarer Supabase-Vertrag/DPA.
 - Aufbewahrungszyklen von Serverprotokollen und Sicherungskopien. Die Erklärung
   beschreibt deren Konfigurationsbezug, verspricht weder 1–7 Tage noch eine
   ausschließlich europäische Verarbeitung.
-- Produktions-SMTP: eigenen Versanddienst einrichten und erfolgreichen
-  Registrierungs-/Passwort-Reset-Versand an eine Adresse außerhalb des
-  Supabase-Teams. Der Standard-SMTP von Supabase ist laut Dokumentation ein
-  Testdienst mit eingeschränktem Empfängerkreis.
+- Die Passwortoberfläche bis zum Setzen eines neuen Passworts und erneuter
+  Anmeldung prüfen; der separate SMTP-/Recovery-Code-Test ist bestanden.
+  Eine Registrierungsbestätigung wurde bei aktiviertem Autoconfirm nicht
+  getestet.
 - Tatsächliche Betriebsabläufe für Entfernung von Fehlerberichten und
   beantworteten Support-Nachrichten sowie Bearbeitung von Inhaltsmeldungen.
   Die Moderationstexte nennen 24 Stunden; diese Zusage muss im Betrieb

@@ -83,8 +83,11 @@ vorhanden), `20261021001000_daily_nudge_cron` und
 `20261021002000_social_push`. Tageserinnerungs- und Social-Push-Setup wurden
 nicht aktiviert. Der bereits aktive Rivalen- und Ranking-Push bleibt bestehen.
 
-Custom SMTP ist weiterhin nicht konfiguriert. Passwort-E-Mail-Zustellung an
-externe Nutzer muss vor Veröffentlichung eingerichtet und geprüft werden.
+Custom SMTP ist über Gmail (`smtp.gmail.com:587`) eingerichtet. Zustellung
+einer eigenen Testmail, achtstellige Recovery-Code-Verifikation und
+authentisierter Nutzerabruf sind bestanden; das temporäre Testkonto samt
+Profil ist bereinigt. Die Passwortoberfläche bis zum neuen Passwort und
+erneuter Anmeldung wurde dabei nicht getestet. Details: [SMTP.md](SMTP.md).
 
 Referenzen: [offizieller SQL-Endpunkt](https://supabase.com/docs/reference/api/v1-run-a-query),
 [Supabase-Migrationshistorie](https://supabase.com/docs/guides/deployment/database-migrations).

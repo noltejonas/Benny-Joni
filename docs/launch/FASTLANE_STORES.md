@@ -180,26 +180,31 @@ Der separate Play-API-Zugang im Cloudprojekt `benny-joni-fastlane` ist
 eingerichtet und die API als aktiviert bestätigt. Das Servicekonto hat
 Zugriff ausschließlich auf Benny & Joni: Read, Manage Store Presence und
 Release to Testing Tracks. Google hat Quality Read und Manage Policy
-Declarations als automatisch gesetzte Abhängigkeiten ergänzt. Kontoweite
+Declarations als automatisch gesetzte Abhängigkeiten ergänzt. Nach
+ausdrücklicher Nutzerfreigabe ist zusätzlich Bearbeiten/Löschen von
+App-Entwürfen ausschließlich für diese App gespeichert: sechs Apprechte,
+keine zusätzlichen kontoweiten Rechte. Kontoweite
 Play-Rechte, Cloud-IAM-Rollen und Impersonators sind nicht vergeben.
 Der lokale JSON-Schlüssel liegt ausschließlich ignoriert unter
 `.local/release/google-play/service-account.json` (`0600`, Ordner `0700`);
 sein Pfad ist in der privaten `.env` gesetzt. `tools/fastlane.sh android
 verify_auth` ist erfolgreich und liest Version Code 1 im internen Track.
-`android store_metadata screenshots:false validate:true` wurde zweimal
-ausgeführt: Die DE-/EN-Texte wurden im temporären API-Edit angenommen,
-das abschließende `edits.validate` scheiterte jeweils mit HTTP 403
-(`caller permission`). Es gab keinen Commit. Ein unabhängiger leerer Edit
-ließ sich dagegen anlegen, validieren und löschen; Authentifizierung,
-Leserechte und grundlegender Validate-Zugriff funktionieren. Das Fehlerbild
-ist inzwischen eingegrenzt: Serveridentische PUT/PATCHs validieren, echte
-Titeländerungen scheitern reproduzierbar mit 403. Die in Play gespeicherten
-Titel lauten in beiden Sprachen **Benny & Joni** (12 Zeichen); die längeren
-lokalen Titel wären tatsächliche Änderungen. Keine Titeländerung wurde
-committed. Eine zusätzliche Nutzerfreigabe für das ausschließlich auf diese
-App begrenzte Recht zum Bearbeiten/Löschen von Entwürfen ist angefragt;
-die Entscheidung steht aus. Es wurden keine weiteren Rechte vergeben und
-das Problem ist nicht gelöst. Die UI-Listings bleiben der bestätigte Stand.
+Nach dieser Berechtigung besteht die vollständige DE-/EN-Textvalidierung
+mit `android store_metadata screenshots:false validate:true`, einschließlich
+echter Änderungen der längeren lokalen Titel. Das frühere 403 bei echten
+Änderungen ist damit behoben. Der anschließende Speicherversuch ohne Bilder
+wurde jedoch beim Commit sicher abgebrochen: Google antwortet
+„Changes are sent for review automatically. The query parameter
+changesNotSentForReview must not be set.“ Der Schutz
+`rescue_changes_not_sent_for_review: false` ist unverändert. Es gibt keinen
+bestätigten API-Commit und keine dadurch bestätigte Review-Einreichung.
+Die längeren Titel wurden anschließend in Play Console als Entwurf
+gespeichert und nach Neuladen sowie Sprachwechsel bestätigt:
+Deutsch **Benny & Joni: Fitness-Duell**, Englisch **Benny & Joni: Fitness Duel**.
+Die Listings stehen auf „Bereit für die Überprüfung“; nichts wurde zur
+Prüfung gesendet. Dies ist ein UI-Speichervorgang, kein API-Commit.
+Bei späteren API-Speichervorgängen gilt die unten beschriebene Commit-Grenze;
+die aktuellen Store-Unterlagen sind bereits über die Console gespeichert.
 Beispielvariablen:
 
 ```dotenv
@@ -235,10 +240,15 @@ bundle exec fastlane android store_metadata
 bundle exec fastlane android internal_draft aab:/absoluter/pfad/app-release.aab
 ```
 
-Die Play-Lanes speichern Änderungen als Entwurf und senden sie nicht zur
-Prüfung. `store_metadata` lädt nur die Store-Unterlagen. `internal_draft`
-lädt das angegebene AAB als Entwurf im internen Testkanal und die vorhandenen
-Unterlagen hoch. Ein AAB muss vorher signiert gebaut worden sein.
+Die Play-Lanes verlangen `changes_not_sent_for_review: true`; der automatische
+Fallback bleibt mit `rescue_changes_not_sent_for_review: false` ausgeschaltet.
+Der aktuelle Metadaten-Speicherversuch bricht an Googles Ablehnung dieses
+Parameters ab. Ein Commit kann auch prüfbereite Console-Änderungen zur
+Prüfung senden. `release_status: draft` garantiert beim reinen
+`store_metadata` keine Review-Pause, da Supply dabei keinen Track schreibt.
+`internal_draft` bereitet einen Draft im internen Testkanal vor; eine
+generelle Garantie für alle Metadaten-Commits folgt daraus nicht.
+[Google: Commit und Console-Änderungen](https://developers.google.com/android-publisher/concurrency-considerations)
 
 Play-Bilder liegen je Sprache unter:
 
@@ -268,9 +278,13 @@ geschlossenen Test beantragt werden: mindestens zwölf Tester, die
 durchgehend mindestens vierzehn Tage angemeldet bleiben. Interne Tests
 erfüllen diese Voraussetzung nicht.
 
-Der vorbereitete Passwort-E-Mail-Versand über das bestehende Gmail-Konto
-steht in [SMTP.md](SMTP.md); Nutzerübergabe und erfolgreicher Zustelltest
-stehen noch aus.
+Der Passwort-E-Mail-Versand über das bestehende Gmail-Konto steht in
+[SMTP.md](SMTP.md). Gmail-SMTP ist gespeichert und im Backend bestätigt
+(`smtp.gmail.com:587`, Absender `bennyundjoni@gmail.com`, Limit 30/h).
+Zustellung einer eigenen Testmail, achtstellige Recovery-Code-Verifikation
+und authentisierter Nutzerabruf sind bestanden; das Testkonto wurde
+bereinigt. Das Setzen eines neuen Passworts in der App und die anschließende
+Anmeldung mit diesem Passwort wurden dabei nicht getestet.
 
 ## Quellen
 
