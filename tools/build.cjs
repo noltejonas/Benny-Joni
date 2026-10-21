@@ -28,8 +28,6 @@ const VENDOR = {
   'react.js': 'react/umd/react.production.min.js',
   'react-dom.js': 'react-dom/umd/react-dom.production.min.js',
   'supabase.js': '@supabase/supabase-js/dist/umd/supabase.js',
-  // Wird nur außerhalb des Browsers nachgeladen (ws); liegt daneben, falls doch.
-  '591.supabase.js': '@supabase/supabase-js/dist/umd/591.supabase.js',
   'capacitor.js': '@capacitor/core/dist/capacitor.js',
   'capacitor-app.js': '@capacitor/app/dist/plugin.js',
   'capacitor-preferences.js': '@capacitor/preferences/dist/plugin.js',
