@@ -2,10 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "www (main / capacitor webDir)",
+      "name": "www (Entwicklung, Babel im Browser)",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8000", "www"],
       "port": 8000
+    },
+    {
+      "name": "dist (iOS-Build, vorher npm run build)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8003", "dist"],
+      "port": 8003
+    },
+    {
+      "name": "Figuren-Labor",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8013", "."],
+      "port": 8013
     },
     {
       "name": "Projekt Terminator (legacy)",

@@ -21,12 +21,7 @@ const Babel = () => babel || (babel = B.loadBabel(path.join(WWW, 'vendor', B.BAB
 // Kopie der Teile von www, die der Build braucht.
 function copyWww() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pt-build-web-'));
-  for (const f of fs.readdirSync(WWW)) {
-    if (f === 'index.html' || /\.(js|jsx)$/.test(f)) fs.copyFileSync(path.join(WWW, f), path.join(dir, f));
-  }
-  fs.cpSync(path.join(WWW, 'vendor'), path.join(dir, 'vendor'), { recursive: true });
-  // Wörterbücher (i18n/en.js …) bindet index.html als klassische Skripte ein.
-  fs.cpSync(path.join(WWW, 'i18n'), path.join(dir, 'i18n'), { recursive: true });
+  fs.cpSync(WWW, dir, { recursive: true });
   return dir;
 }
 

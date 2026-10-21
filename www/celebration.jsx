@@ -1,4 +1,4 @@
-/* global React, tr, PTi18n */
+/* global React, tr, PTi18n, ObDuo, obFigTall */
 /* eslint-disable no-unused-vars */
 
 // Hook: detect unseen goal crossings + provide persistent style.
@@ -92,7 +92,9 @@ function SparkleLayer({ active }) {
 
 // Component: 5-second fullscreen celebration overlay.
 // Implementation grows over Tasks 4–7.
-function CelebrationOverlay({ category, targetReps, onDone }) {
+// hero / counterLabel / subtext ersetzen die Texte fürs Wochenziel
+// (z.B. Medaille im Monatsabschluss der Rangliste).
+function CelebrationOverlay({ category, targetReps, onDone, hero, counterLabel, subtext }) {
   const { useEffect, useState } = React;
   const [skipping, setSkipping] = useState(false);
 
@@ -309,13 +311,18 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
           <div className="cel-halo cel-halo-2">🔥</div>
           <div className="cel-halo cel-halo-3">⚡</div>
           <div className="cel-halo cel-halo-4">🏆</div>
-          <div className="cel-hero-text">{tr('ZIEL{br}ERREICHT', { br: <br/> })}</div>
+          <div className="cel-hero-text">{hero ?? tr('ZIEL{br}ERREICHT', { br: <br/> })}</div>
         </div>
         <div className="cel-counter-row">
           <span className="cel-counter-num" data-target={targetReps}>0</span>
-          <span className="cel-counter-of">/ {targetFormatted} {unit}</span>
+          <span className="cel-counter-of">{counterLabel ?? <>/ {targetFormatted} {unit}</>}</span>
         </div>
-        <div className="cel-subtext">{category?.emoji || '🏆'} {tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</div>
+        <div className="cel-subtext">{subtext ?? <>{category?.emoji || '🏆'} {tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</>}</div>
+        {window.ObDuo && (
+          <div className="cel-duo">
+            <ObDuo benny="cheer" joni="cheer" tall={window.obFigTall ? obFigTall(150) : 150} enter />
+          </div>
+        )}
       </div>
 
       <div className="cel-skip-hint">{tr('tap zum Überspringen')}</div>

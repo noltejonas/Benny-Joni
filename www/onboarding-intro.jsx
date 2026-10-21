@@ -1,4 +1,4 @@
-/* global React, PTData, PTOnboarding, PTHaptics, PTSound, PTPeople, Icon, Avatar, MiniRing, ObScreen, ObMessage, ObSlots, useObOnline, shareInvite, formatDuration, tr, trn */
+/* global React, PTData, PTOnboarding, PTHaptics, PTSound, PTPeople, Icon, Avatar, MiniRing, ObScreen, ObMessage, ObSlots, useObOnline, shareInvite, formatDuration, tr, trn, ObDuo, ObGuide, obFigTall */
 // Onboarding in der Challenge: Ebenen über Home (Einladen, Wochenziel, erster
 // Satz, Feier, Push-Vorab, Woche 1) und die Startkarte. Die Reihenfolge steuert
 // CompetitionApp; was erledigt ist, kommt aus den Daten (onboarding-model.js).
@@ -62,7 +62,7 @@ function ObInviteLayer({ competition, members, me, fresh, onDone }) {
         <button type="button" className={done ? 'btn' : 'btn-link'} onClick={onDone}>{done ? tr('Weiter') : tr('Später einladen')}</button>
       </>}>
         <h1 className="ob-title">{fresh ? tr('Challenge steht 🎉') : tr('Leute einladen')}</h1>
-        <p className="ob-sub">{obInviteLine(competition.mode, free)}</p>
+        <ObGuide who="benny" pose={fresh || free <= 0 ? 'cheer' : 'point'}>{obInviteLine(competition.mode, free)}</ObGuide>
         <div className="ob-preview">
           <div className="ob-preview-emoji" aria-hidden="true">{competition.emoji}</div>
           <div className="ob-preview-name">{competition.name}</div>
@@ -166,9 +166,9 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
         <button type="button" className="btn-link" onClick={onSkip}>{tr('Später')}</button>
       </>}>
         <h1 className="ob-title">{title}</h1>
-        <p className="ob-sub">{tr('Was macht ihr bis Sonntag?')}{daysLeft <= 1
+        <ObGuide who="benny" pose="flex">{tr('Was macht ihr bis Sonntag?')}{daysLeft <= 1
           ? ' ' + tr('Heute ist der letzte Tag.')
-          : daysLeft < 7 ? ' ' + trn(daysLeft, 'Noch {n} Tag.', 'Noch {n} Tage.') : ''}</p>
+          : daysLeft < 7 ? ' ' + trn(daysLeft, 'Noch {n} Tag.', 'Noch {n} Tage.') : ''}</ObGuide>
         <div className="ob-ex-grid" role="radiogroup" aria-label={tr('Übung')}>
           {visible.map(c => (
             <button key={c.id} type="button" role="radio" aria-checked={c.id === catId}
@@ -226,7 +226,7 @@ function ObFirstLogLayer({ api, challenges, categories, people = 2, onLogged, on
         <button type="button" className="btn-link" onClick={onSkip}>{tr('Später')}</button>
       </>}>
         <h1 className="ob-title">{tr('Dein erster Satz')}</h1>
-        <p className="ob-sub">{cat?.name ? tr('Mach ein paar {name}. Wir warten.', { name: cat.name }) : tr('Mach ein paar Wiederholungen. Wir warten.')}</p>
+        <ObGuide who="joni" pose="point">{cat?.name ? tr('Mach ein paar {name}. Wir warten.', { name: cat.name }) : tr('Mach ein paar Wiederholungen. Wir warten.')}</ObGuide>
         {options.length > 1 && (
           <div className="ob-chips" style={{ justifyContent: 'flex-start' }} role="radiogroup" aria-label={tr('Übung')}>
             {options.map(o => (
@@ -296,6 +296,7 @@ function ObCelebrate({ value, category, myDone, share, onDone }) {
       <ObConfetti />
       <div className="ob-cele-over">{category?.emoji} {category?.name}</div>
       <h1 className="ob-cele-title">{tr('Erster Satz! 💪')}</h1>
+      <ObDuo benny="cheer" joni="cheer" tall={obFigTall(118)} enter />
       <div className="ob-cele-num">+{shown}</div>
       <div className="ob-cele-ring">
         <MiniRing pct={pct} size={96} stroke={9} color="#fff" track="rgba(255,255,255,0.25)">{Math.round(pct * 100)}%</MiniRing>
@@ -344,9 +345,8 @@ function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
         <button type="button" className="btn" disabled={busy} onClick={onAllow}>{busy ? '…' : tr('Mitteilungen erlauben')}</button>
         <button type="button" className="btn-link" disabled={busy} onClick={onLater}>{tr('Jetzt nicht')}</button>
       </>}>
-        <div className="ob-bell" aria-hidden="true"><Icon name="bell" size={44} strokeWidth={2} /></div>
-        <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Bleib im Rennen')}</h1>
-        <p className="ob-sub" style={{ textAlign: 'center' }}>{tr('Wir melden uns nur, wenn es zählt.')}</p>
+        <h1 className="ob-title">{tr('Bleib im Rennen 🔔')}</h1>
+        <ObGuide who="joni" pose="point">{tr('Wir melden uns nur, wenn es zählt.')}</ObGuide>
         <div className="ob-preview-push" aria-label={tr('Beispiel einer Mitteilung')}>
           <img src="icons/icon-192.png" alt="" />
           <span>
@@ -367,12 +367,12 @@ function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
 }
 
 // ─── Woche 1 geschafft ──────────────────────────────────────────────────────
-// summary aus PTOnboarding.weekOneSummary.
+// summary aus PTOnboarding.weekOneSummary; Benny und Joni feiern je nach Ergebnis mit.
 function obWeekOneResult(s) {
-  if (s.result === 'won') return { emoji: '🏆', line: s.diff > 0 ? tr('Du hast die Woche geholt, {n} vorne.', { n: s.diff }) : tr('Du hast die Woche geholt.') };
-  if (s.result === 'lost') return { emoji: '💪', line: tr('{name} lag {n} vorne. Revanche?', { name: s.leader, n: s.diff }) };
-  if (s.result === 'tie') return { emoji: '🤝', line: tr('Gleichstand. Woche 2 entscheidet.') };
-  return { emoji: '🏁', line: tr('Solo durchgezogen.') };
+  if (s.result === 'won') return { pose: 'cheer', line: s.diff > 0 ? tr('Du hast die Woche geholt, {n} vorne.', { n: s.diff }) : tr('Du hast die Woche geholt.') };
+  if (s.result === 'lost') return { pose: 'flex', line: tr('{name} lag {n} vorne. Revanche?', { name: s.leader, n: s.diff }) };
+  if (s.result === 'tie') return { pose: 'wave', line: tr('Gleichstand. Woche 2 entscheidet.') };
+  return { pose: 'flex', line: tr('Solo durchgezogen.') };
 }
 
 // competition (optional): Einladungscode für „Ergebnis teilen“.
@@ -397,7 +397,7 @@ function ObWeekOne({ summary, competition = null, onDone }) {
         {canShare && <Share getText={shareText} title={tr('Woche 1')} />}
         <button type="button" className="btn" onClick={onDone}>{tr('Auf in Woche 2')}</button>
       </>}>
-        <div className="ob-trophy" aria-hidden="true">{r.emoji}</div>
+        <ObDuo benny={r.pose} joni={r.pose} tall={obFigTall(120)} tap enter />
         <div className="ob-overline" style={{ textAlign: 'center' }}>{tr('Woche 1')}</div>
         <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Geschafft 🏁')}</h1>
         <div className="ob-stats">

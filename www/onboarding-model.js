@@ -188,6 +188,74 @@
     return (first[0].toUpperCase() + first.slice(1).toLowerCase()).slice(0, 30);
   }
 
+  // ── E-Mail prüfen (nur Text, keine Bestätigungsmail) ────────────────
+  // Form der Adresse plus Tippfehler bei großen Anbietern, damit sich niemand
+  // mit „gmial.com“ registriert und später keine Mail zum Passwort bekommt.
+  const MAIL_DOMAINS = [
+    'gmail.com', 'googlemail.com', 'icloud.com', 'me.com', 'mac.com',
+    'outlook.com', 'outlook.de', 'hotmail.com', 'hotmail.de', 'live.com', 'live.de', 'msn.com',
+    'yahoo.com', 'yahoo.de', 'aol.com', 'gmx.de', 'gmx.net', 'gmx.at', 'gmx.ch', 'gmx.com',
+    'web.de', 't-online.de', 'freenet.de', 'posteo.de', 'mailbox.org', 'mail.de', 'mail.com',
+    'arcor.de', 'vodafone.de', 'bluewin.ch', 'proton.me', 'protonmail.com',
+  ];
+  // Anbieter mit genau einer Adresse: „gmail.de“ gibt es nicht.
+  const MAIL_ONLY = { gmail: 'gmail.com', googlemail: 'googlemail.com', icloud: 'icloud.com', web: 'web.de', 't-online': 't-online.de' };
+  // Endungen, die es nicht gibt, aber oft getippt werden.
+  const TLD_FIX = {
+    con: 'com', cmo: 'com', cpm: 'com', ocm: 'com', vom: 'com', xom: 'com', cim: 'com', comm: 'com', coom: 'com', conm: 'com',
+    ed: 'de', dee: 'de', nte: 'net', nett: 'net', ner: 'net', ogr: 'org', orgg: 'org',
+  };
+  const LABEL_RE = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
+  const TLD_RE = /^(?:\p{L}{2,}|xn--[a-z0-9-]+)$/u;
+
+  // Tippabstand mit Vertauschung als einem Fehler („gmial“ ↔ „gmail“ = 1).
+  function typoDistance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+    return d[a.length][b.length];
+  }
+
+  function closestMailDomain(domain) {
+    let best = null, bestDist = Infinity;
+    for (const d of MAIL_DOMAINS) {
+      const dist = typoDistance(domain, d);
+      if (dist < bestDist) { best = d; bestDist = dist; }
+    }
+    return bestDist <= (domain.length > 7 ? 2 : 1) ? best : null;
+  }
+
+  // → { ok, suggestion }. `ok`: Form stimmt. `suggestion`: vermutlich gemeinte
+  // Adresse („max@gmail.com“), auch bei ok = false („max@gmail“).
+  function checkEmail(input) {
+    const raw = String(input || '').trim();
+    const at = raw.lastIndexOf('@');
+    const local = raw.slice(0, at);
+    const domain = raw.slice(at + 1).toLowerCase().replace(/\.$/, '');
+    if (at < 1 || /[\s@]/.test(local) || /\s/.test(domain) || local.startsWith('.') || local.endsWith('.') || local.includes('..')) {
+      return { ok: false, suggestion: null };
+    }
+    const labels = domain.split('.');
+    if (labels.length === 1) {
+      const only = MAIL_ONLY[domain] || (domain && closestMailDomain(`${domain}.com`));
+      return { ok: false, suggestion: only ? `${local}@${only}` : null };
+    }
+    const tld = labels[labels.length - 1];
+    if (!labels.every(l => LABEL_RE.test(l)) || !TLD_RE.test(tld)) return { ok: false, suggestion: null };
+    const name = labels.slice(0, -1).join('.');
+    const fixed = TLD_FIX[tld] ? `${name}.${TLD_FIX[tld]}` : domain;
+    let target = fixed;
+    if (!MAIL_DOMAINS.includes(fixed)) target = MAIL_ONLY[name] || closestMailDomain(fixed) || fixed;
+    // Endungen aus TLD_FIX gibt es nicht — dort kommt nie eine Mail an.
+    return { ok: !TLD_FIX[tld], suggestion: target !== domain ? `${local}@${target}` : null };
+  }
+
   // Stand auf dem Gerät (localStorage) und im Profil (profiles.onboarding)
   // zusammenführen: Zeitstempel bleiben, Maps werden vereint.
   function mergeState(local, remote) {
@@ -351,16 +419,42 @@
     return { myReps, myMinutes, activeDays, sharesHit, sharesTotal: week.length, result, leader, diff };
   }
 
+  // ── Benny und Joni als Figuren ──────────────────────────────────────
+  // Bilder und Maße pro Pose kommen aus www/figures/manifest.js
+  // (tools/cut-figures.py): Bildgröße, Fußmitte `axis`, Kappe `top`, Boden
+  // `ground` in Pixeln. figureLayout skaliert jede Pose so, dass der Körper
+  // von Kappe bis Sohle zur echten Größe passt, egal wie weit die Kamera beim
+  // Erzeugen weg war. `tall` ist Bennys Körperhöhe in CSS-Pixeln.
+  const FIGURES = {
+    benny: { name: 'Benny', cm: 190 }, // i18n-ignore: Name der Figur
+    joni: { name: 'Joni', cm: 170 }, // i18n-ignore: Name der Figur
+  };
+
+  function figureLayout(meta, who, tall) {
+    const f = FIGURES[who];
+    if (!meta || !f || !(meta.ground > meta.top)) return null;
+    const body = tall * f.cm / FIGURES.benny.cm;
+    const k = body / (meta.ground - meta.top);
+    return {
+      body,
+      width: meta.w * k,
+      height: meta.h * k,
+      left: -meta.axis * k,                  // links von der Fußmitte
+      bottom: -(meta.h - meta.ground) * k,   // unter der Bodenlinie
+    };
+  }
+
   window.PTOnboarding = {
     APP_NAME, APP_STORE_ID, APP_STORE_URL, SUPPORT_EMAIL, LEGAL,
     openExternal, supportMailto, reportText, reportContent,
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
-    entryRoute, isNewcomer, youngProfile, suggestName, mergeState, stateKey,
+    entryRoute, isNewcomer, youngProfile, suggestName, checkEmail, mergeState, stateKey,
     weekProgress, joinedMidWeek,
     expectedPeople, goalDefault, goalChoices, goalTarget,
     starterItems, showStarter,
     pushPrimerDue, nextPrimerState,
     weekOneDue, weekOneSummary,
+    FIGURES, figureLayout,
   };
 })();

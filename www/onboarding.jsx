@@ -1,4 +1,4 @@
-/* global React, PTData, PTOnboarding, Icon, Avatar, Sheet, modeLabel, tr, trn, trc, PTi18n */
+/* global React, PTData, PTOnboarding, Icon, Avatar, Sheet, modeLabel, tr, trn, trc, PTi18n, ObFigure, ObGuide, obFigTall */
 // Onboarding vor der Challenge: Willkommen, Konto, Profil, Start, Erstellen,
 // Beitreten. Welcher Bildschirm dran ist, entscheidet PTOnboarding.entryRoute
 // (onboarding-model.js); die Ebenen in der Challenge liegen in onboarding-intro.jsx.
@@ -93,7 +93,7 @@ function obSetDemo(on) {
 }
 
 // ─── Willkommen ─────────────────────────────────────────────────────────────
-// Zählt einmalig von 0 hoch (CountUp aus components.jsx zeigt zuerst den Endwert).
+// Benny und Joni im Beispiel-Duell (onboarding-figures.jsx). Zählt einmalig von 0 hoch (CountUp aus components.jsx zeigt zuerst den Endwert).
 function useObCount(target, duration = 1100, delay = 250) {
   const [v, setV] = React.useState(0);
   React.useEffect(() => {
@@ -115,16 +115,17 @@ function useObCount(target, duration = 1100, delay = 250) {
 
 function ObHeroDuel() {
   const mine = useObCount(120), theirs = useObCount(95);
+  const tall = obFigTall(124);
   const kw = window.weekNumber ? window.weekNumber(PTData.isoDate(PTData.mondayOf(new Date()))) : '';
-  const you = tr('Du');
   return (
-    <div className="ob-hero" role="img" aria-label={tr('Beispiel: Du gegen Jonas, 120 zu 95 Liegestütze diese Woche')}>
+    <div className="ob-hero" role="img" aria-label={tr('Beispiel: Benny gegen Joni, 120 zu 95 Liegestütze diese Woche')}>
       <div className="ob-hero-head"><span>{tr('KW {kw} · Duell', { kw })}</span><span className="ob-hero-live">{tr('Live')}</span></div>
       <div className="ob-hero-main">
-        <div className="ob-hero-player"><span className="ob-hero-avatar" style={{ '--sc': 'var(--player-1)' }}>{you.charAt(0)}</span>{you}</div>
+        {/* i18n-ignore: Namen der Figuren */}
+        <div className="ob-hero-player"><ObFigure who="benny" pose="wave" tall={tall} enter />Benny</div>
         <div className="ob-hero-score">{mine} : {theirs}</div>
-        {/* i18n-ignore: Name im Beispiel */}
-        <div className="ob-hero-player"><span className="ob-hero-avatar" style={{ '--sc': 'var(--player-2)' }}>J</span>Jonas</div>
+        {/* i18n-ignore: Namen der Figuren */}
+        <div className="ob-hero-player"><ObFigure who="joni" pose="wave" tall={tall} enter />Joni</div>
       </div>
       <div className="ob-hero-split">
         <span style={{ width: '56%', '--sc': 'var(--player-1)' }} />
@@ -133,7 +134,7 @@ function ObHeroDuel() {
       <div className="ob-hero-feed">
         <span aria-hidden="true">🔥</span>
         {/* i18n-ignore: Name im Beispiel */}
-        <span>{tr('{name} · Liegestütze · gerade eben', { name: <strong>Jonas</strong> })}</span>
+        <span>{tr('{name} · Liegestütze · gerade eben', { name: <strong>Joni</strong> })}</span>
         <span className="ob-hero-plus">+20</span>
       </div>
     </div>
@@ -234,7 +235,6 @@ function ObLegalConsent() {
 }
 
 // ─── Ohne Konto: Willkommen, Code, Konto, Mail-Bestätigung ──────────────────
-const OB_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 // Erkennung über den Fehlercode; fehlt er (ältere Supabase-Antworten), über den
 // Text, den PTData.friendlyError für diesen Code liefert — egal in welcher Sprache.
 const obErrorText = (code) => PTData.friendlyError({ code }).message;
@@ -265,6 +265,10 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   const [error, setError] = React.useState('');
   const [info, setInfo] = React.useState('');
   const [cooldown, setCooldown] = React.useState(0);
+  // Vermuteter Tippfehler in der E-Mail („gmial.com“) und die Adresse, bei der
+  // trotzdem auf „Weiter“ getippt wurde — dann gilt sie wie eingegeben.
+  const [mailHint, setMailHint] = React.useState(null);
+  const [mailKept, setMailKept] = React.useState('');
 
   React.useEffect(() => {
     if (cooldown <= 0) return;
@@ -272,7 +276,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const go = (v, msg = {}) => { setView(v); setError(msg.error || ''); setInfo(msg.info || ''); };
+  const go = (v, msg = {}) => { setView(v); setError(msg.error || ''); setInfo(msg.info || ''); setMailHint(null); };
 
   async function run(fn) {
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
@@ -283,11 +287,17 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   }
 
   function checkFields({ withPassword = true } = {}) {
-    if (!OB_EMAIL_RE.test(email.trim())) throw new Error(tr('Diese E-Mail-Adresse sieht nicht richtig aus.'));
+    if (!PTOnboarding.checkEmail(email).ok) throw new Error(tr('Diese E-Mail-Adresse sieht nicht richtig aus.'));
     if (withPassword && password.length < 6) throw new Error(tr('Passwort muss mindestens 6 Zeichen haben.'));
   }
 
   const signup = () => run(async () => {
+    const mail = PTOnboarding.checkEmail(email);
+    if (mail.suggestion && email.trim() !== mailKept) {
+      setMailHint(mail.suggestion);
+      setMailKept(email.trim());
+      return;
+    }
     checkFields();
     try {
       const r = await api.signUp({ email, password, displayName: PTOnboarding.suggestName(email) });
@@ -347,7 +357,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   const emailInput = (
     <input className="input" type="email" placeholder={tr('E-Mail')} autoComplete="email" inputMode="email"
       autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email}
-      onChange={e => setEmail(e.target.value)} disabled={view === 'reset-code'} />
+      onChange={e => { setEmail(e.target.value); setMailHint(null); }} disabled={view === 'reset-code'} />
   );
   const passwordInput = (placeholder, autoComplete) => (
     <div className="ob-pass">
@@ -368,7 +378,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
         <button type="button" className="btn" disabled={!valid} onClick={next}>{tr('Weiter')}</button>
       }>
         <h1 className="ob-title">{tr('Hast du einen Code?')}</h1>
-        <p className="ob-sub">{tr('Steht in der Einladung. Danach legst du kurz ein Konto an und bist drin.')}</p>
+        <ObGuide who="joni" pose="point">{tr('Steht in der Einladung. Danach legst du kurz ein Konto an und bist drin.')}</ObGuide>
         <ObCodeField value={code} onChange={setCode} onSubmit={next} autoFocus onPasteFail={(m) => setInfo(m)} />
         <ObMessage error={error} info={info} />
       </ObScreen>
@@ -383,12 +393,18 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
         <button type="button" className="btn-link" onClick={() => go('login')}>{tr('Schon ein Konto? Anmelden')}</button>
       </>}>
         <h1 className="ob-title">{tr('Konto erstellen')}</h1>
-        <p className="ob-sub">{invite ? tr('Danach bist du direkt in der Challenge.') : tr('Dauert keine Minute.')}</p>
+        <ObGuide who="benny" pose="wave">{invite ? tr('Danach bist du direkt in der Challenge.') : tr('Dauert keine Minute.')}</ObGuide>
         {isDemo && <div className="ob-hint">{tr('Demo: Jede Adresse funktioniert, nichts verlässt dein Gerät.')}</div>}
         <form id="ob-signup" className="ob-fields" onSubmit={submitOn(signup)} noValidate>
           {emailInput}
           {passwordInput(tr('Passwort (mind. 6 Zeichen)'), 'new-password')}
         </form>
+        {mailHint && (
+          <button type="button" className="ob-msg is-info ob-mail-hint"
+            onClick={() => { setEmail(mailHint); setMailHint(null); setError(''); }}>
+            {tr('Meintest du {email}?', { email: <strong>{mailHint}</strong> })}
+          </button>
+        )}
         <ObMessage error={error} info={info} />
       </ObScreen>
     );
@@ -401,7 +417,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
         <button type="button" className="btn-link" onClick={() => go('signup')}>{tr('Neu hier? Konto erstellen')}</button>
       </>}>
         <h1 className="ob-title">{tr('Willkommen zurück')}</h1>
-        <p className="ob-sub">{isDemo ? tr('Demo: Jede Adresse funktioniert.') : tr('Schön, dass du da bist.')}</p>
+        <ObGuide who="joni" pose="wave">{isDemo ? tr('Demo: Jede Adresse funktioniert.') : tr('Schön, dass du da bist.')}</ObGuide>
         <form id="ob-login" className="ob-fields" onSubmit={submitOn(login)} noValidate>
           {emailInput}
           {passwordInput(tr('Passwort'), 'current-password')}
@@ -436,18 +452,17 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
 
   // view === 'confirm'
   return (
-    <ObScreen onBack={() => go('signup')} stepKey="confirm" center foot={<>
+    <ObScreen onBack={() => go('signup')} stepKey="confirm" foot={<>
       <button type="button" className="btn" disabled={busy} onClick={confirmed}>{label(tr('Ich hab bestätigt'))}</button>
       <button type="button" className="btn btn-secondary" disabled={busy || cooldown > 0} onClick={resend}>
         {cooldown > 0 ? tr('Nochmal senden in {n} s', { n: cooldown }) : tr('Mail nochmal senden')}
       </button>
       <button type="button" className="btn-link" onClick={() => go('signup')}>{tr('Andere E-Mail')}</button>
     </>}>
-      <div className="ob-trophy" aria-hidden="true">📬</div>
-      <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Check deine Mails')}</h1>
-      <p className="ob-sub" style={{ textAlign: 'center' }}>
+      <h1 className="ob-title">{tr('Check deine Mails 📬')}</h1>
+      <ObGuide who="benny" pose="point">
         {tr('Wir haben dir einen Link an {email} geschickt. Tipp ihn an und komm dann hierher zurück.', { email: <strong>{email.trim()}</strong> })}
-      </p>
+      </ObGuide>
       <ObMessage error={error} info={info} />
     </ObScreen>
   );
@@ -499,7 +514,7 @@ function ObProfile({ api, profile, email, onSaved, onDone, onSignOut }) {
       left={onSignOut && <button type="button" className="btn-link ob-top-link" onClick={onSignOut}>{tr('Abmelden')}</button>}
       foot={<button type="button" className="btn" disabled={busy || uploading || !name.trim()} onClick={next}>{busy ? '…' : tr('Weiter')}</button>}>
       <h1 className="ob-title">{tr('Wie sollen dich die anderen sehen?')}</h1>
-      <p className="ob-sub">{tr('So erscheinst du in Feed und Rangliste.')}</p>
+      <ObGuide who="joni" pose="idle">{tr('So erscheinst du in Feed und Rangliste.')}</ObGuide>
       <button type="button" className={`ob-avatar-pick${uploading ? ' is-busy' : ''}`} disabled={uploading}
         onClick={() => fileRef.current?.click()} aria-label={profile.avatar_url ? tr('Foto ändern') : tr('Foto wählen')}>
         <Avatar profile={preview} size={120} />
@@ -527,7 +542,7 @@ function ObStart({ profile, onCreate, onJoin, onProfile, onDemo, onArchived }) {
         <button type="button" className="btn-link" onClick={onDemo}>{tr('Erst mal die Demo ansehen')}</button>
       </>}>
       <h1 className="ob-title">{tr('Hi {name} 👋', { name: first })}</h1>
-      <p className="ob-sub">{tr('Wie startest du?')}</p>
+      <ObGuide who="benny" pose="wave">{tr('Wie startest du?')}</ObGuide>
       <div className="ob-choices">
         <button type="button" className="ob-choice is-primary" onClick={onCreate}>
           <span className="ob-choice-icon" aria-hidden="true">🏁</span>
@@ -598,7 +613,7 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
 
   const current = OB_MODES.find(m => m.id === mode);
   const pickMode = (m) => { setMode(m.id); if (!emojiTouched) setEmoji(m.emoji); };
-  const on = [penalties && tr('Strafkasse'), rotation && tr('Wochenplan'), work && tr('Arbeitszeit')].filter(Boolean);
+  const on = [penalties && tr('Strafkonto'), rotation && tr('Wochenplan'), work && tr('Work-Tracking')].filter(Boolean);
 
   async function create() {
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
@@ -662,9 +677,9 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
       </button>
       {extrasOpen && (
         <div className="ob-extras-body">
-          {toggle(tr('Strafkasse'), tr('Wer seinen Wochenteil nicht schafft, zahlt {amount} in die Kasse.', { amount: PTi18n.euro(500) }), penalties, setPenalties)}
+          {toggle(tr('Strafkonto'), tr('Wer seinen Wochenteil nicht schafft, zahlt {amount} in die Kasse.', { amount: PTi18n.euro(500) }), penalties, setPenalties)}
           {toggle(tr('Wochenplan'), tr('Ihr legt Übungen fest, die jede Woche wiederkommen.'), rotation, setRotation)}
-          {toggle(tr('Arbeitszeit'), tr('Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.'), work, setWork)}
+          {toggle(tr('Work-Tracking'), tr('Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.'), work, setWork)}
           <div className="ob-dates">
             <label>{tr('Start')}<input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value || PTData.isoDate(new Date()))} /></label>
             <label>{tr('Ende (optional)')}<input className="input" type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} /></label>
@@ -690,6 +705,7 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
   return (
     <ObScreen onBack={onCancel} stepKey="create" foot={cta}>
       <h1 className="ob-title">{tr('Neue Challenge')}</h1>
+      <ObGuide who="joni" pose="flex">{tr('Kurz einrichten, dann lädst du deine Leute ein.')}</ObGuide>
       {body}
     </ObScreen>
   );
@@ -813,7 +829,7 @@ function JoinPanel({ api, initialCode = '', variant = 'screen', onJoined, onCanc
       {onSkip && <button type="button" className="btn-link" onClick={onSkip}>{tr('Ohne Code weiter')}</button>}
     </>}>
       <h1 className="ob-title">{preview ? tr('Bist du dabei?') : tr('Challenge beitreten')}</h1>
-      {!preview && <p className="ob-sub">{tr('Gib den Code aus der Einladung ein. Ganze Nachricht einfügen geht auch.')}</p>}
+      {!preview && <ObGuide who="joni" pose="point">{tr('Gib den Code aus der Einladung ein. Ganze Nachricht einfügen geht auch.')}</ObGuide>}
       {preview ? previewBody : codeBody}
     </ObScreen>
   );

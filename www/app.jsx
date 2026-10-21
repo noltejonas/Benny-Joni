@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTStats, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTStats, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -26,6 +26,9 @@ function readInvite() {
     if (v?.code && Date.now() - v.at < INVITE_TTL) return v.code;
   } catch (e) {}
   return null;
+}
+function readObLocal(userId) {
+  try { return JSON.parse(localStorage.getItem(PTOnboarding.stateKey(userId)) || '{}'); } catch (e) { return {}; }
 }
 function writeInvite(code) {
   try {
@@ -202,26 +205,57 @@ function App() {
     return () => { alive = false; handle?.remove(); };
   }, [setInvite]);
 
-  useEffect(() => {
-    if (!api) return;
-    api.getSession().then(setSession).catch(() => setSession(null));
-    return api.onAuthChange((s) => setSession(s));
-  }, [api]);
-
-  const userId = session?.user?.id || null;
-  // „Willkommen zurück“ beim nächsten Start – nicht nach der Demo, sonst landen
-  // Neugierige nach „Demo ansehen“ beim Login statt bei der Registrierung.
-  const isDemo = api?.mode === 'demo' || !!session?.demo;
-  useEffect(() => { if (userId && !isDemo) writePref(RETURNING_KEY, '1'); }, [userId, isDemo]);
+  // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
+  const pickActive = useCallback((p, list, current) => {
+    const usable = list.filter(c => !c.archived_at);
+    const valid = (id) => id && list.some(c => c.id === id);
+    if (valid(current)) return current;
+    if (valid(p.main_competition_id) && usable.some(c => c.id === p.main_competition_id)) return p.main_competition_id;
+    let last = null;
+    try { last = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+    if (valid(last)) return last;
+    return usable[0]?.id || null;
+  }, []);
 
   // Onboarding-Stand: Gerät (localStorage) + Konto (profiles.onboarding, nur
   // wenn die Spalte existiert — Migration 20261020000000).
   const [obLocal, setObLocal] = useState({});
+
+  // Session übernehmen. Für ein neu angemeldetes Konto im selben Render den
+  // Stand vom letzten Öffnen zeigen (PTBootCache), statt „Lade Profil…“;
+  // loadAccount lädt danach frisch.
+  const sessionUserRef = React.useRef(null);
+  const adoptSession = useCallback((s) => {
+    const id = s?.user?.id || null;
+    if (id && id !== sessionUserRef.current) {
+      setObLocal(readObLocal(id));
+      const cached = PTBootCache.read(id, 'account');
+      if (cached?.profile && cached.competitions) {
+        PTPeople.set([cached.profile]);
+        setProfile(cached.profile);
+        setCompetitions(cached.competitions);
+        setActiveId(cur => pickActive(cached.profile, cached.competitions, cur));
+      }
+    }
+    sessionUserRef.current = id;
+    setSession(s);
+  }, [pickActive]);
+
   useEffect(() => {
-    if (!userId) { setObLocal({}); return; }
-    try { setObLocal(JSON.parse(localStorage.getItem(PTOnboarding.stateKey(userId)) || '{}')); }
-    catch (e) { setObLocal({}); }
-  }, [userId]);
+    if (!api) return;
+    api.getSession().then(adoptSession).catch(() => setSession(null));
+    return api.onAuthChange((s, evt) => {
+      if (evt === 'SIGNED_OUT') PTBootCache.clear();
+      adoptSession(s);
+    });
+  }, [api, adoptSession]);
+
+  const userId = session?.user?.id || null;
+  // Demo-Besuche gelten nicht als echte Anmeldung.
+  const isDemo = api?.mode === 'demo' || !!session?.demo;
+  useEffect(() => { if (userId && !isDemo) writePref(RETURNING_KEY, '1'); }, [userId, isDemo]);
+  useEffect(() => { if (!userId) setObLocal({}); }, [userId]);
+
   const obState = useMemo(() => PTOnboarding.mergeState(obLocal, profile?.onboarding), [obLocal, profile]);
   const obStateRef = React.useRef(obState);
   obStateRef.current = obState;
@@ -238,18 +272,6 @@ function App() {
     }
   }, [userId, profile, api]);
 
-  // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
-  const pickActive = useCallback((p, list, current) => {
-    const usable = list.filter(c => !c.archived_at);
-    const valid = (id) => id && list.some(c => c.id === id);
-    if (valid(current)) return current;
-    if (valid(p.main_competition_id) && usable.some(c => c.id === p.main_competition_id)) return p.main_competition_id;
-    let last = null;
-    try { last = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
-    if (valid(last)) return last;
-    return usable[0]?.id || null;
-  }, []);
-
   const loadAccount = useCallback(async (preferId) => {
     if (!api || !userId) return;
     try {
@@ -259,6 +281,7 @@ function App() {
       setCompetitions(list);
       setActiveId(cur => pickActive(p, list, preferId ?? cur));
       setAccountError(null);
+      PTBootCache.write(userId, 'account', { profile: p, competitions: list });
     } catch (e) {
       console.error('loadAccount failed', e);
       setAccountError({ text: e.message || String(e), offline: e?.code === 'offline' });
@@ -333,6 +356,9 @@ function App() {
       if (saved) { await api.deleteDeviceToken(saved).catch(() => {}); localStorage.removeItem('pt_apns_token'); }
     } catch (e) {}
     setSheet(null);
+    PTBootCache.clear();
+    // Nach dem nächsten Anmelden auf „Heute“ starten, nicht im zuletzt offenen Tab.
+    try { sessionStorage.removeItem('pt:tab'); } catch (e) {}
     await api.signOut();
   }
 
@@ -456,6 +482,7 @@ function App() {
         notificationsOn={notificationsOn} onSetNotifications={setNotificationsOn}
         onOpenSwitcher={() => setSheet('switcher')}
         onOpenProfile={() => setSheet('profile')}
+        onProfileChanged={(p) => { PTPeople.set([p]); setProfile(p); }}
         onSetMain={setMain}
         onSignOut={signOut}
         onCompetitionChanged={() => loadAccount()}
@@ -558,7 +585,7 @@ function markCelebrated(me, challengeIds) {
 
 function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
   themePref, onSetThemePref, notificationsOn, onSetNotifications,
-  onOpenSwitcher, onOpenProfile, onSetMain, onSignOut, onCompetitionChanged, onLeft,
+  onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft,
   intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
 
@@ -593,27 +620,37 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   });
   const openSettings = (page = 'root') => { setSettingsPage(page); setTab('settings'); };
 
-  // Data
-  const [members, setMembers] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [allChallenges, setAllChallenges] = useState([]);
-  const [feed, setFeed] = useState([]);
-  const [allSets, setAllSets] = useState([]);
-  const [planSlots, setPlanSlots] = useState([]);
-  const [rotationConfig, setRotationConfig] = useState(null);
-  const [penalties, setPenalties] = useState([]);
-  const [closures, setClosures] = useState([]);
-  const [openClosures, setOpenClosures] = useState([]);
-  const [payouts, setPayouts] = useState([]);
-  const [projectTags, setProjectTags] = useState([]);
-  const [toolTags, setToolTags]       = useState([]);
+  // Data. Startwerte: Stand vom letzten Öffnen (PTBootCache), reload() holt
+  // frisch. Frisch erstellt oder beigetreten (intro) gibt es keinen.
+  const cacheName = `comp:${initialCompetition.id}`;
+  const [boot] = useState(() => {
+    const b = intro ? null : PTBootCache.read(me, cacheName);
+    if (!b) return null;
+    PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
+    PTData.annotateWorkouts(b.allSets, b.allChallenges, b.categories);
+    PTData.annotateWorkouts(b.feed, b.allChallenges, b.categories);
+    return b;
+  });
+  const [members, setMembers] = useState(() => boot?.members || []);
+  const [categories, setCategories] = useState(() => boot?.categories || []);
+  const [allChallenges, setAllChallenges] = useState(() => boot?.allChallenges || []);
+  const [feed, setFeed] = useState(() => boot?.feed || []);
+  const [allSets, setAllSets] = useState(() => boot?.allSets || []);
+  const [planSlots, setPlanSlots] = useState(() => boot?.planSlots || []);
+  const [rotationConfig, setRotationConfig] = useState(() => boot?.rotationConfig || null);
+  const [penalties, setPenalties] = useState(() => boot?.penalties || []);
+  const [closures, setClosures] = useState(() => boot?.closures || []);
+  const [openClosures, setOpenClosures] = useState(() => boot?.openClosures || []);
+  const [payouts, setPayouts] = useState(() => boot?.payouts || []);
+  const [projectTags, setProjectTags] = useState(() => boot?.projectTags || []);
+  const [toolTags, setToolTags]       = useState(() => boot?.toolTags || []);
   const [closingWeek, setClosingWeek] = useState(null);
   const [proposalDismissed, setProposalDismissed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  // Erstes Laden gescheitert (meist offline): Karte „Konnte nicht laden“ statt
-  // einer scheinbar leeren Challenge. Nach einem Erfolg bleibt der letzte Stand.
+  const [loading, setLoading] = useState(!boot);
+  const [synced, setSynced] = useState(false);
+  // Cached data remains visible when a refresh fails.
   const [loadError, setLoadError] = useState(null);
-  const dataReady = !loading && !loadError;
+  const dataReady = synced && !loading && !loadError;
 
   // UI state
   const [setupForChallenge, setSetupForChallenge] = useState(null); // null=closed, {} = new, {id, ...} = edit
@@ -831,6 +868,47 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     [allChallenges, allSets, categories, penalties, sides, members]
   );
 
+/* global PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay */
+  // Rangliste: Ergebnis des letzten abgeschlossenen Monats für die Feed-Karte
+  // und die Feier, wenn ich eine Medaille geholt habe.
+  const [monthRecap, setMonthRecap] = useState(null);
+  const [medalCelebration, setMedalCelebration] = useState(null);
+  const memberKey = members.filter(m => !m.left_at).map(m => m.user_id).sort().join(',');
+  useEffect(() => {
+    if (!memberKey) return;
+    let off = false;
+    (async () => {
+      try {
+        await api.closeDueMonths().catch(() => 0);
+        const month = lastClosedMonth(await api.getRankingSettings());
+        if (!month) return;
+        const [rows, cats] = await Promise.all([api.rankingMonth(month), api.getRankedCategories()]);
+        if (off) return;
+        const ids = new Set(memberKey.split(','));
+        const mine = rows.filter(r => r.counted && r.points > 0 && ids.has(r.user_id));
+        setMonthRecap(mine.length ? { kind: 'month', id: `month-${month}`, month, rows: mine, cats,
+          created_at: PTRanking.closeDeadline(month).toISOString() } : null);
+        const medals = mine.filter(r => r.user_id === me && r.rank <= 3).sort((a, b) => a.rank - b.rank);
+        const key = `pt_month_celebrated_${month}_${me}`;
+        let seen = false;
+        try { seen = localStorage.getItem(key) === '1'; } catch (e) {}
+        if (medals.length && !seen) {
+          const catById = Object.fromEntries(cats.map(c => [c.id, c]));
+          const emoji = { 1: '🥇', 2: '🥈', 3: '🥉' };
+          setMedalCelebration({
+            key,
+            hero: medals[0].rank === 1 ? tr('MONATS{br}SIEG', { br: <br/> }) : tr('PODIUM'),
+            points: rows.filter(r => r.user_id === me && r.counted).reduce((a, r) => a + r.points, 0),
+            counterLabel: tr('Punkte im {month}', { month: PTRanking.monthLabel(month, false) }),
+            subtext: medals.slice(0, 3).map(r => `${emoji[r.rank]} ${catById[r.category_id]?.name || ''}`).join(' · ')
+              + (medals.length > 3 ? ` · +${medals.length - 3}` : ''),
+          });
+        }
+      } catch (e) { /* Rangliste noch nicht eingerichtet */ }
+    })();
+    return () => { off = true; };
+  }, [api, memberKey, me]);
+
   const feedItems = useMemo(() => {
     // Past-week sets are represented by their WeekRecap card — drop the
     // individual entries so the feed stays bounded.
@@ -838,10 +916,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       if (!s.created_at) return true;
       return PTData.isoDate(new Date(s.created_at)) >= weekStart;
     });
-    const items = [...weekRecaps, ...currentSets.map(s => ({ kind: 'set', ...s }))];
+    const items = [...weekRecaps, ...(monthRecap ? [monthRecap] : []), ...currentSets.map(s => ({ kind: 'set', ...s }))];
     items.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     return items;
-  }, [feed, weekRecaps, weekStart]);
+  }, [feed, weekRecaps, monthRecap, weekStart]);
 
   async function fixWeek(picks) {
     try {
@@ -867,7 +945,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const reloadSeq = React.useRef(0);
   const reloadRun = React.useRef(null);
   const reloadAgain = React.useRef(false);
-  const loadedOnce = React.useRef(false);
+  const loadedOnce = React.useRef(!!boot);
   const leftRef = React.useRef(false);
   const unmounted = React.useRef(false);
   useEffect(() => {
@@ -938,6 +1016,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       setPayouts(pys || []);
       setProjectTags(projTags || []);
       setToolTags(toolTagsData || []);
+      setSynced(true);
+      const member = mems.some(m => m.user_id === me && !m.left_at);
+      if (member) PTBootCache.write(me, cacheName, {
+        members: mems, categories: cats, allChallenges: challs, feed: feedData, allSets: allSetsData,
+        planSlots: slots, rotationConfig: cfg, penalties: pens || [], closures: cls || [],
+        openClosures: openCls || [], payouts: pys || [], projectTags: projTags || [], toolTags: toolTagsData || [],
+      });
 
       // Notification trigger
       if (lastFeedRef.current !== null && feedData[0] && feedData[0].id !== lastFeedRef.current &&
@@ -1119,10 +1204,15 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           console.warn('Push registrationError', e);
         });
         const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
-          const competitionId = action?.notification?.data?.competition_id;
+          const data = action?.notification?.data || {};
+          // Rangliste-Pushes öffnen die Rangliste, auch nach einem Neustart.
+          if (/^(rank_|month_)/.test(data.kind || '')) {
+            try { sessionStorage.setItem(TAB_KEY, 'ranking'); } catch (e) {}
+            window.dispatchEvent(new CustomEvent('pt:nav-ranking'));
+            return;
+          }
+          const competitionId = data.competition_id;
           if (competitionId) {
-            // Wechselt die Challenge, liest die neue Instanz den Tab beim Start
-            // aus sessionStorage – pt:nav-feed erreicht nur noch die alte.
             try { sessionStorage.setItem(TAB_KEY, 'feed'); } catch (e) {}
             window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId } }));
           }
@@ -1141,12 +1231,16 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return () => { cancelled = true; cleanup(); };
   }, [me, notificationsOn, api, pushPerm]);
 
-  // Tap on push → switch to Feed tab und neu laden (der Satz aus der Mitteilung
-  // kam evtl. an, während Realtime im Hintergrund schlief)
+  // Push-Taps öffnen den passenden Tab und aktualisieren nach dem Hintergrund.
   useEffect(() => {
     const onNavFeed = () => { setTab('feed'); reload(); };
+    const onNavRanking = () => { setTab('ranking'); reload(); };
     window.addEventListener('pt:nav-feed', onNavFeed);
-    return () => window.removeEventListener('pt:nav-feed', onNavFeed);
+    window.addEventListener('pt:nav-ranking', onNavRanking);
+    return () => {
+      window.removeEventListener('pt:nav-feed', onNavFeed);
+      window.removeEventListener('pt:nav-ranking', onNavRanking);
+    };
   }, [reload]);
 
   const setupCategories = allowWork ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
@@ -1216,6 +1310,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
+          celebrate={synced}
           layout={t.layout}
           weekStart={weekStart}
           nextWeekStart={nextWeekStart}
@@ -1286,6 +1381,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onFirstLog={startFirstLog}
           onInvite={() => { setTab('home'); openLayer(['invite']); }} />}
 
+        {tab === 'ranking' &&
+        <RankingScreen api={api} me={me} profile={profile}
+          onProfileSaved={onProfileChanged} onToast={setToast} />
+        }
+
         {tab === 'history' &&
         <StatsTab
           api={api}
@@ -1308,7 +1408,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags} toolTags={toolTags}
           themePref={themePref} onSetThemePref={onSetThemePref}
           notificationsEnabled={notificationsOn} onSetNotifications={onSetNotifications}
-          onProfile={onOpenProfile} onSetMain={onSetMain} onSignOut={onSignOut}
+          onProfile={onOpenProfile} onProfileChanged={onProfileChanged} onSetMain={onSetMain} onSignOut={onSignOut}
           onCompetitionChanged={() => { reload(); onCompetitionChanged?.(); }}
           onLeft={onLeft}
           onToast={setToast} />
@@ -1322,6 +1422,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           {[
             { id: 'home', icon: 'home', label: tr('Heute') },
             { id: 'feed', icon: 'feed', label: tr('Feed') },
+            { id: 'ranking', icon: 'trophy', label: tr('Rangliste') },
             { id: 'history', icon: 'stats', label: tr('Stats') },
             ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: tr('Strafkonto'), badge: openPenaltyCount }] : []),
           ].map(t => (
@@ -1486,6 +1587,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       )}
 
       <Toast message={toast} onDone={() => setToast('')} />
+
+      {medalCelebration && (
+        <CelebrationOverlay targetReps={medalCelebration.points}
+          hero={medalCelebration.hero} counterLabel={medalCelebration.counterLabel}
+          subtext={medalCelebration.subtext}
+          onDone={() => { try { localStorage.setItem(medalCelebration.key, '1'); } catch (e) {} setMedalCelebration(null); }} />
+      )}
 
       {/* i18n-ignore: Entwickler-Panel (nur im Bearbeiten-Modus des Design-Hosts), bleibt deutsch */}
       <TweaksPanel title="Tweaks">

@@ -126,8 +126,15 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
   let outcome: Outcome;
   try {
-    if (table === "sets") outcome = await rivalJob(supabase, payload.record);
-    else if (table === "competition_members") outcome = await joinJob(supabase, payload.record);
+    if (table === "sets") {
+      // Die Rangliste bleibt unabhängig von der Rivalen-Schwelle: auch ein
+      // einzelner Satz kann jemanden in der Monatsrangliste überholen.
+      outcome = await rivalJob(supabase, payload.record);
+      const rival = outcome instanceof Response ? await outcome.json() : await deliver(supabase, outcome);
+      const rank = await rankPush(supabase, payload.record);
+      // Wie bei den anderen Push-Arten nur Zählwerte zurückgeben.
+      return Response.json({ rival, rank }, { status: outcome instanceof Response ? outcome.status : 200 });
+    } else if (table === "competition_members") outcome = await joinJob(supabase, payload.record);
     else if (table === "reactions") outcome = await reactionJob(supabase, payload.record);
     else return ignored("unknown_table");
   } catch (e) {
@@ -363,5 +370,65 @@ async function deliver(supabase: SupabaseClient, job: PushJob) {
   if (dead.length > 0) {
     await supabase.from("device_tokens").delete().in("token", dead);
   }
+  return { sent, skipped, failures, cleaned: dead.length };
+}
+
+// ── Rangliste: „X hat dich bei Y auf Platz N verdrängt“ ──────────────────────
+// ranking_overtaken wertet nur die erste Zeile einer log_id aus; ein Satz, der
+// in mehreren Challenges zählt, löst also höchstens einen Durchlauf aus.
+// Die Rangliste hat wie bisher einen eigenen Tagesplatz (competition_id=null).
+async function rankPush(supabase: SupabaseClient, record: Record<string, unknown>) {
+  if (!isUuid(record.id)) return { ignored: true, reason: "legacy_record" };
+  const { data, error } = await supabase.rpc("ranking_overtaken", { p_set: record.id });
+  if (error) return { error: "overtaken_rpc", detail: error.message };
+  const overtaken = (data ?? []) as {
+    user_id: string; category_id: string; category_name: string; sender_name: string; new_rank: number;
+  }[];
+  if (overtaken.length === 0) return { ignored: true, reason: "nobody_overtaken" };
+
+  const languages: Record<string, string | null> = {};
+  const { data: langRows, error: langErr } = await supabase.from("profiles")
+    .select("id, language").in("id", overtaken.map((o) => o.user_id));
+  if (!langErr) for (const row of langRows ?? []) languages[row.id] = row.language;
+
+  const today = berlinDate(new Date());
+  let jwt: string | null = null;
+  let sent = 0;
+  let skipped = 0;
+  const dead: string[] = [];
+  const failures: Record<string, number> = {};
+  for (const entry of overtaken) {
+    // Ohne Gerät den Tagesplatz nicht verbrauchen.
+    const { data: tokens } = await supabase.from("device_tokens").select("token, platform").eq("user_id", entry.user_id);
+    const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios").map((t) => t.token);
+    if (iosTokens.length === 0) { skipped++; continue; }
+    const { error: logErr } = await supabase.from("push_log").insert({
+      user_id: entry.user_id, competition_id: null, kind: "rank_overtaken", day: today,
+    });
+    if (logErr) { skipped++; continue; }
+
+    const english = pushLang(languages[entry.user_id]) === "en";
+    jwt ??= await buildApnsJwt({ keyId: APNS.keyId, teamId: APNS.teamId, privateKeyPem: APNS.privateKeyPem });
+    const result = await sendToDevices(APNS, jwt, iosTokens, {
+      aps: {
+        alert: {
+          title: english ? "🏆 Leaderboard" : "🏆 Rangliste",
+          body: english
+            ? `${entry.sender_name} pushed you down to #${entry.new_rank} in ${entry.category_name}.`
+            : `${entry.sender_name} hat dich bei ${entry.category_name} auf Platz ${entry.new_rank} verdrängt.`,
+        },
+        sound: "default",
+      },
+      kind: "rank_overtaken",
+      category_id: entry.category_id,
+    });
+    sent += result.sent;
+    dead.push(...result.dead);
+    for (const failure of result.failures) {
+      const key = `${failure.status}${failure.reason ? ` ${failure.reason}` : ""}`;
+      failures[key] = (failures[key] ?? 0) + 1;
+    }
+  }
+  if (dead.length > 0) await supabase.from("device_tokens").delete().in("token", dead);
   return { sent, skipped, failures, cleaned: dead.length };
 }

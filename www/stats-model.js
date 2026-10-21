@@ -207,7 +207,15 @@
     const catById = Object.fromEntries(bundle.categories.map(c => [c.id, c]));
     const chById = Object.fromEntries(bundle.challenges.map(ch => [ch.id, ch]));
     const kindOf = (s) => catById[chById[s.challenge_id]?.category_id]?.kind || 'sports';
-    const mine = bundle.sets.filter(s => s.athlete === me && chById[s.challenge_id]);
+    // Ein Satz, der in mehreren Challenges zählt (gleiche log_id), nur einmal
+    const seenLogs = new Set();
+    const mine = bundle.sets.filter(s => {
+      if (s.athlete !== me || !chById[s.challenge_id]) return false;
+      if (!s.log_id) return true;
+      if (seenLogs.has(s.log_id)) return false;
+      seenLogs.add(s.log_id);
+      return true;
+    });
     const sport = mine.filter(s => kindOf(s) === 'sports');
 
     // Tageswerte (Reps); Workout-Tage zählen als aktiv
