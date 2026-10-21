@@ -11,11 +11,37 @@ ursprüngliche Versionsregistrierung wurden gemeinsam in einer SQL-Transaktion
 | `20261021000050_launch_vor_review` | Avatar-Bucket auf 2 MB und JPEG/PNG/WebP begrenzt; Listing nur für den eigenen Ordner; globaler Workoutname `20-Min-AMRAP`. |
 | `20261021120000_disable_work_mode` | Work ist deaktiviert; ein Trigger setzt auch Schreibversuche älterer Clients auf `false`. Vorhandene Kategorien und Trainingshistorie bleiben erhalten. |
 | `20261021130000_rotation_config_multi_competition` | Der alte Singleton-CHECK blockiert neue Challenges nicht mehr. Eindeutigkeit je Challenge und die übrigen Constraints bleiben erhalten. |
+| `20261021140000_app_release_ads_gate` | Produktiv angewendet und atomar registriert. Öffentlicher Singleton `app_release_settings.id = 1`, `ads_enabled = false`; RLS aktiv, Clients ausschließlich SELECT. |
 
 Die neue Rotation-Migration entfernt ausschließlich `rotation_config.single_row`,
 wenn dessen CHECK-Ausdruck nach Normalisierung genau `id=1` entspricht. Eine
 abweichende Definition bricht ab; ein bereits entfernter CHECK ist ein No-op.
 Der erneute No-op wurde innerhalb einer zurückgerollten Transaktion geprüft.
+
+## Werbefreier Launch und spätere Freigabe
+
+Der Management-Readback bestätigt `ads_enabled = false`, anonyme Leserechte
+und gesperrte Client-Schreibrechte (UPDATE für `anon`, UPDATE/INSERT/DELETE
+für `authenticated`). Beleg:
+`.local/qa/ads-release-gate-20261021/migration-readback.json`.
+Die App fragt die Zeile bei Start, Vordergrundwechsel und Online-Rückkehr
+frisch ab; unbekannte/fehlerhafte Antworten und Offline-Status bleiben aus.
+Bis zur Freigabe startet sie weder UMP noch das Werbe-SDK und zeigt keine
+Werbung oder Einwilligungsabfrage. Der neue iOS-Build 26 und Android-Build
+mit Version Code 2 sind hochgeladen: Apple 26 wartet auf Prüfung, Android 2
+liegt als interner Entwurf vor und ist in Produktion 2 zur Prüfung gesendet;
+Google-Review läuft. Der Gate-false-Smoke ist im originalen
+Android-Paket und nach seiner Wiederherstellung mit null Werbeaufrufen
+bestanden. Die physische iPhone-Lese-/Lifecycle-QA und Teile der schreibenden
+Funktionstests sind bestanden; weitere Prüfungen bleiben offen. Siehe
+[RELEASE.md](RELEASE.md) und [ADMOB.md](ADMOB.md).
+
+Nach AdMob-Zahlungseinrichtung, Googles Freigabe und der separaten Werbe-QA
+kann ein berechtigter Betreiber die Zeile im Supabase Table Editor auf
+`true` setzen; kein zusätzliches App-Update nötig. Konkreter Ablauf und
+Prompt-Beispiel: [ADMOB.md](ADMOB.md). Zum späteren Ausschalten `false`
+setzen; das beendet nach dem nächsten Abruf neue Werbeaufrufe und entfernt
+Banner, deinitialisiert aber kein bereits gestartetes SDK.
 
 ## Tatsächlich geprüfte Abläufe
 

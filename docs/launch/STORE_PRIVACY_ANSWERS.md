@@ -4,13 +4,27 @@ Ausfüllhilfe für Benny & Joni, Stand 21. Oktober 2026. Grundlage sind der
 aktuelle Code und die unten verlinkten Store-/SDK-Definitionen. Dieses Dokument
 ergänzt [STORE_LISTING.md](STORE_LISTING.md) mit konkreten Formularantworten.
 Es enthält keine Zugangsdaten. Die unten dokumentierten Play-Angaben wurden
-am 21. Oktober 2026 in der Console gespeichert; die App-Version wurde damit
-nicht eingereicht oder veröffentlicht. Apples App-Privacy-Angaben sind nach
+am 21. Oktober 2026 in der Console gespeichert und später mit Produktion 2
+zur Prüfung gesendet; Review läuft, keine Veröffentlichung.
+Apples App-Privacy-Angaben sind nach
 ausdrücklicher Nutzerzustimmung vollständig in der Oberfläche gesetzt und
 veröffentlicht: alle 15 Datentypen mit den Zwecken, Verknüpfungen und
 Tracking-Antworten des vorbereiteten JSONs. Der UI-Readback bestätigt
 13 verknüpfte und zwei nicht verknüpfte Datentypen, keine Tracking-Daten
-und die korrekte Datenschutz-URL. Die App-Version bleibt im Entwurf.
+und die korrekte Datenschutz-URL. Apple 1.4.1 mit Build 26 ist seit
+21. Oktober 2026, 18:15:25 CEST **WAITING_FOR_REVIEW**, Veröffentlichung
+**MANUAL**, Submission-ID `04ba9efd-76a8-423d-911f-e3abc54178a7`.
+
+**Werbefreier Start:** `app_release_settings.id = 1`, `ads_enabled = false`
+ist produktiv gesetzt. Der neue Launch-Quellstand startet dann weder UMP
+noch das Werbe-SDK und zeigt keine Anzeigen oder Einwilligungsdialoge.
+Die Funktion kann später ohne App-Update freigeschaltet werden; deshalb
+bleiben `Contains ads` und die folgenden SDK-Datenoffenlegungen erhalten.
+Diese SDK-Datenflüsse betreffen den später freigeschalteten Betrieb. Die
+neuen Gate-Builds sind hochgeladen: iOS 26 wartet auf Apple-Prüfung; Android
+Code 2 liegt als interner Entwurf vor und ist als Produktion 2 mit elf
+Änderungen zur Prüfung gesendet. Google-Review läuft; Managed
+Publishing ist aktiviert und nach Neuladen bestätigt. Kein öffentlicher Release.
 
 ## Tatsächlich in Play Console gespeichert
 
@@ -20,25 +34,26 @@ Die Console bestätigte die folgenden Eingaben mit „Saved“:
 |---|---|
 | Privacy policy | Die unten genannte öffentlich erreichbare Datenschutz-URL. |
 | Contains ads | Yes. |
-| Werbe-ID-Erklärung nach AAB-Upload | Die nach dem Upload neu verlangte Erklärung ist gespeichert: **Yes**, mit Analytics, Advertising or marketing sowie Fraud prevention, security, and compliance. Die UI bestätigt die Speicherung und zeigt anschließend bei App-Inhalte **„Alles erledigt“**, keine offenen Deklarationen. Es wurde nichts zur Prüfung gesendet. |
+| Werbe-ID-Erklärung nach AAB-Upload | Die nach dem Upload neu verlangte Erklärung ist gespeichert: **Yes**, mit Analytics, Advertising or marketing sowie Fraud prevention, security, and compliance. Die UI bestätigt die Speicherung und zeigt anschließend bei App-Inhalte **„Alles erledigt“**, keine offenen Deklarationen. |
 | Government apps / Financial features | Jeweils No. Das freiwillige Strafkonto bleibt als „Other financial info“ in Data safety offengelegt; die App verarbeitet keine Zahlungen. |
 | Health apps | Activity and Fitness. |
 | App category / öffentlicher Kontakt | Health & Fitness; `bennyundjoni@gmail.com`, `+491781479821`, HTTPS-Website. |
 | App access | Eingeschränkter Zugang, ausdrücklich freigegebener isolierter Review-Login, englische Anleitung mit 393 Zeichen und gesetzte Checkbox für vollständigen Prüferzugriff. Zugangsdaten bleiben ausschließlich in den privaten Feldern/Dateien. |
 | Optionale Partnertests | Ausgeschaltet. |
 | Target audience | 16–17 sowie 18 and over. |
-| Produktionsländer | Ausschließlich Deutschland, Österreich und Schweiz; UI-Readback „Ausgerichtet (3)“. Produktionstrack inaktiv, kein Produktionsrelease erstellt oder veröffentlicht. |
-| Fastlane-Zugang | Separate aktivierte Play-API und auf diese App begrenztes Servicekonto; zusätzliches Entwurfsrecht ausdrücklich genehmigt/gespeichert (sechs Apprechte, keine neuen Accountrechte). `verify_auth` und vollständige DE-/EN-Textvalidierung bestehen. API-Speicherversuch scheitert sicher am abgelehnten `changesNotSentForReview`; Fallback unverändert aus, kein erfolgreicher API-Commit/keine Review-Einreichung bestätigt. JSON-Schlüssel ausschließlich im ignorierten privaten Release-Ordner. |
+| Produktionsländer | Ausschließlich Deutschland, Österreich und Schweiz; UI-Readback „Ausgerichtet (3)“. Produktion 2 ist zur Prüfung gesendet, Review läuft. Managed Publishing aktiviert; kein öffentlicher Release. |
+| Fastlane-Zugang | Separate aktivierte Play-API und auf diese App begrenztes Servicekonto; zusätzliches Entwurfsrecht ausdrücklich genehmigt/gespeichert (sechs Apprechte, keine neuen Accountrechte). `verify_auth` und vollständige DE-/EN-Textvalidierung bestehen. Der geschützte Metadaten-API-Commit wurde am abgelehnten `changesNotSentForReview` abgebrochen; Fallback unverändert aus. Die tatsächliche Produktion-2-Einreichung erfolgte getrennt über die Console. JSON-Schlüssel ausschließlich im ignorierten privaten Release-Ordner. |
 | Data safety | Alle zwölf Datentypen der folgenden Play-Tabelle einschließlich Erhebung, Weitergabe, Pflicht/Optional und Zwecken gespeichert. Bei App interactions und Diagnostics ist App functionality ausschließlich Erhebungszweck der eigenen Funktionsdaten, kein Weitergabezweck der Google-SDK-Daten. Eigene Crash logs: collected, required, nicht shared. |
 | IARC | Abgeschlossen und gespeichert: Other app; Fitness/UGC als primäre Inhalte; Melden/Blockieren vorhanden, keine Chatmoderation, Zugang per Einladung. Kein externer Content, keine altersbeschränkten Waren, GPS-Freigabe, Käufe, Auszahlungen, Browser- oder Nachrichtenfunktion. Ergebnis: USK 12, ESRB Teen, PEGI Parental Guidance. Die ausgewählte Zielgruppe bleibt 16+. |
-| Store-Listing | Deutsch und Englisch vollständig gespeichert, Status „Bereit für die Überprüfung“; je vier echte Android-Screenshots, ein Icon und zwei lokalisierte Feature-Grafiken. Die längeren Titel **Benny & Joni: Fitness-Duell** (de) und **Benny & Joni: Fitness Duel** (en) sind per UI als Entwurf gespeichert und nach Neuladen/Sprachwechsel bestätigt. Keine Review-Einreichung. |
+| Store-Listing | Deutsch und Englisch vollständig gespeichert und mit Produktion 2 zur Prüfung gesendet; je vier echte Android-Screenshots, ein Icon und zwei lokalisierte Feature-Grafiken. Die Titel **Benny & Joni: Fitness-Duell** (de) und **Benny & Joni: Fitness Duel** (en) sind nach Neuladen/Sprachwechsel bestätigt. Review läuft. |
 | KI-Kennzeichnung der Assets | Für alle elf Assets in der Play-Oberfläche gespeichert: ein Icon, zwei Feature-Grafiken und acht echte App-Aufnahmen, die KI-erstellte Avatare/Maskottchen enthalten. Echte Screenshots sind dadurch nicht als erfundene App-Oberflächen dargestellt. |
 
-Alle elf Play-Einrichtungsschritte sind abgeschlossen. Das finale AAB ist
-hochgeladen: Version 1.4.1, Version Code 1, SHA-256 beginnt mit `5745afb5`;
-die Console bestätigt ein App Bundle und zeigt `1 (1.4.1)`. Der interne
-Entwurf **1.4.1 – Initial internal test** ist einschließlich Neuerungen in
-beiden Sprachen gespeichert (2/2). Kein Rollout und keine Testerbenachrichtigung.
+Alle elf Play-Einrichtungsschritte sind abgeschlossen. Das neue AAB ist
+hochgeladen: Version 1.4.1, Version Code 2, SHA-256 beginnt mit `4773dcdf`.
+Der interne Entwurf **1.4.1 – Werbefreier Start** ist gespeichert. Keine
+Verteilung an Tester. Produktion 2 ist mit elf Änderungen zur Prüfung
+gesendet; Vorabprüfungen sind abgeschlossen; die Console bestätigt
+„Deine Änderungen werden jetzt überprüft.“ Beleg: `.local/qa/google-submission-vcode2-20261021/status.json`.
 Das externe Keystore-Backup ist weiterhin offen. Apple App Privacy ist wie
 oben dokumentiert veröffentlicht. Auch die folgenden Apple-Einstellungen
 sind inzwischen gespeichert und in der Oberfläche zurückgelesen.
@@ -58,16 +73,20 @@ sind inzwischen gespeichert und in der Oberfläche zurückgelesen.
 | DSA | Bestehende Einstufung dieser App als Trader unverändert. Kein neu geprüfter oder abgeschlossener Verifikationsstatus behauptet. |
 | Apple Developer Program License Agreement | Aktualisierung nach ausdrücklicher kontoweiter Nutzerzustimmung akzeptiert. Nach Neuladen bestätigt: ausgegeben am 14. Oktober 2026, akzeptiert am 21. Oktober 2026; Warnbanner entfernt. |
 
-Die App-Version ist weiterhin nicht zur Prüfung eingereicht oder veröffentlicht.
+Apple Build 26 wartet auf Prüfung; es gab keine öffentliche Veröffentlichung.
+Google-Produktion 2 ist ebenfalls zur Prüfung gesendet; Review läuft
+noch. Die Console hat Managed Publishing erfolgreich aktiviert und nach
+Neuladen bestätigt. Auch nach Freigabe erfolgt damit kein automatischer
+öffentlicher Release.
 
 ## Gemeinsamer Ausgangspunkt
 
 | Frage | Eintragen / zugrunde liegender Stand |
 |---|---|
-| Werden Daten erhoben? | **Ja**, auf beiden Plattformen. Supabase verarbeitet Konten und App-Inhalte; hinzu kommen Google-Werbedaten. |
+| Werden Daten erhoben? | **Ja**, auf beiden Plattformen. Supabase verarbeitet Konten und App-Inhalte; nach späterer serverseitiger Werbefreigabe kommen Google-Werbedaten hinzu. |
 | Datenschutzerklärung | `https://noltejonas.github.io/Benny-Joni/datenschutz.html` |
 | Datenschutz-/Löschmöglichkeiten | `https://noltejonas.github.io/Benny-Joni/support.html` — enthält die Kontolöschanleitung und den E-Mail-Anfrageweg. |
-| Werbung | **Ja**: AdMob-Banner im Feed und in Stats. Keine eigenen Marketing-E-Mails oder eigenen Werbekampagnen im Code. |
+| Werbung | **Ja** für die ohne Update aktivierbare Funktion: NPA-Banner im Feed und in Stats. Zum Launch ist die Serverfreigabe **false**, daher keine UMP-/SDK-/Werbeaufrufe. Keine eigenen Marketing-E-Mails oder eigenen Werbekampagnen im Code. |
 | Personalisierte Werbung | App fordert ausschließlich **nicht personalisierte Anzeigen** an (`npa: true`). UMP bestimmt, ob und welche Anzeigen zulässig sind. |
 | Gerätekennungen | **Nicht pauschal verneinen.** Die Publisher-first-party-ID ist auf beiden Plattformen aus; Android-AD_ID/App-Set-ID und andere SDK-Daten sind damit nicht ausgeschaltet. |
 | iOS / Android | iOS: APNs-Push nach Freigabe. Android: **kein eingerichtetes FCM**, daher keine behaupteten Android-Push-Tokens. |

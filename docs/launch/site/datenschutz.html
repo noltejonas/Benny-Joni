@@ -62,10 +62,10 @@
     <div class="box">
       <strong>Kurz gesagt</strong>
       <ul>
-        <li>Für die App verarbeiten wir dein Konto, dein Profil und deine Trainingsdaten. Für Werbung, Sicherheit und Fehlerbehebung fallen außerdem die unten beschriebenen technischen Daten an.</li>
-        <li>Wir verkaufen keine Daten. Neben technischen Fehlerberichten verarbeitet das Werbe-SDK Anzeigen- und Diagnosedaten, wie in Abschnitt 2.11 beschrieben.</li>
-        <li>Ab Version 1.4.1 zeigt die App im Feed und in den Stats Werbebanner von Google: nur nicht personalisiert und entsprechend dem von Google ermittelten Einwilligungsstand (Abschnitt 2.11). Die App übergibt keine Trainingsdaten an das Werbe-SDK.</li>
-        <li>Die App lädt keine Schriften oder Skripte von Fremdservern nach. Für die Werbung verbindet sie sich mit Google; Sicherheits-E-Mails werden serverseitig über Gmail versendet (Abschnitt 2.10).</li>
+        <li>Für die App verarbeiten wir dein Konto, dein Profil und deine Trainingsdaten. Für Sicherheit und Fehlerbehebung fallen außerdem die unten beschriebenen technischen Daten an; Werbedaten erst nach einer späteren Freischaltung der Werbung.</li>
+        <li>Wir verkaufen keine Daten. Welche Anzeigen- und Diagnosedaten das Werbe-SDK bei aktivierter Werbung verarbeitet, beschreibt Abschnitt 2.11.</li>
+        <li>Die Werbefunktion ist zum Start zentral ausgeschaltet: keine Anzeigen, kein Werbeeinwilligungsdialog und kein Start des Werbe-SDKs. Wir können sie später ohne App-Update freischalten. Erst dann sind in Feed und Stats nicht personalisierte Google-Banner entsprechend dem Einwilligungsstand vorgesehen (Abschnitt 2.11). Die App übergibt keine Trainingsdaten an das Werbe-SDK.</li>
+        <li>Die App lädt keine Schriften oder Skripte von Fremdservern nach. Bei freigeschalteter Werbung verbindet sie sich dafür mit Google; Sicherheits-E-Mails werden serverseitig über Gmail versendet (Abschnitt 2.10).</li>
         <li>Deine Challenge-Daten sehen die Mitglieder deiner Challenge. Wenn du der Rangliste zustimmst, sehen andere App-Nutzer außerdem deinen Anzeigenamen, dein Foto und deine gewerteten Trainingsergebnisse (Abschnitt 2.12).</li>
         <li>Du kannst dein Konto jederzeit in der App löschen. Den Umfang und verbleibende Sicherungskopien erläutert Abschnitt 6.</li>
       </ul>
@@ -143,7 +143,7 @@
       Die App speichert auf deinem Gerät deine Anmeldung (Sitzung), das Farbschema, die gewählte Sprache, deinen Fortschritt beim Einstieg, zuletzt geöffnete Ansichten, deine Blockliste,
       eine noch offene Einladung (höchstens 7 Tage), deine Schnellsatz-Werte und die Mitteilungs-Einstellung samt Push-Token. Daten eines Arbeitszeit-Timers aus früheren Versionen können noch vorhanden sein; der Work-Modus ist nicht mehr aktivierbar.
       Diese lokalen Kopien und Einstellungen sind nötig, damit die App so funktioniert, wie du sie nutzt (§ 25 Abs. 2 Nr. 2 TDDDG). Inhalte wie Profil, Trainingsdaten und Einstiegsfortschritt werden daneben wie oben beschrieben deinem Konto auf dem Server zugeordnet.
-      Ab Version 1.4.1 speichert der Einwilligungsdialog von Google dort außerdem deine Auswahl zur Werbung (Abschnitt 2.11).
+      Bei serverseitig freigeschalteter Werbung speichert der Einwilligungsdialog von Google dort außerdem deine Auswahl zur Werbung (Abschnitt 2.11).
     </p>
 
     <h3>2.7 Server- und Sicherheitsprotokolle</h3>
@@ -177,9 +177,15 @@
       Werbe-E-Mails verschicken wir nicht.
     </p>
 
-    <h3>2.11 Werbung (Google AdMob, ab Version 1.4.1)</h3>
+    <h3>2.11 Werbung nach serverseitiger Freischaltung (Google AdMob)</h3>
     <p>
-      Ab Version 1.4.1 zeigt die App in den Bereichen „Feed“ und „Stats“ ein Werbebanner. Auf „Heute“, im Strafkonto, in den Einstellungen,
+      <strong>Zum Start ausgeschaltet.</strong> Die App enthält eine Werbefunktion, deren zentrale Freigabe zunächst ausgeschaltet ist.
+      Solange die Freigabe fehlt, fragt die App Google nicht nach einer Werbeeinwilligung, startet das Werbe-SDK nicht und fordert keine Anzeigen an.
+      Die Freigabe wird beim Start, bei Rückkehr in den Vordergrund und nach Wiederherstellung der Verbindung frisch von unserem Server gelesen. Bei Offline-Status oder einem Ladefehler bleibt sie ausgeschaltet.
+      Wir können die Funktion später ohne App-Update aktivieren. Die folgenden Angaben beschreiben diesen freigeschalteten Werbebetrieb.
+    </p>
+    <p>
+      Erst nach serverseitiger Freischaltung kann die App in den Bereichen „Feed“ und „Stats“ ein Werbebanner zeigen. Auf „Heute“, im Strafkonto, in den Einstellungen,
       während des Einstiegs und in der Demo gibt es keine Werbung. Wir nutzen keine Vollbild-, Prämien- oder App-Start-Anzeigen. Ein Banner kann auch bewegte Inhalte enthalten.
       Die Anzeigen liefert Google AdMob. Anbieter ist die Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland („Google“).
       Google verarbeitet die Daten für die Werbung in eigener Verantwortung (Google Ads Controller-Controller Data Protection Terms).
@@ -203,7 +209,7 @@
       <a href="https://policies.google.com/privacy">Datenschutzerklärung von Google</a>.
     </p>
     <p>
-      <strong>Einwilligung.</strong> Vor dem Laden von Werbung prüft die App den Einwilligungsstand mit Googles User Messaging Platform. Soweit eine Auswahl erforderlich ist, erscheint beim Öffnen von „Feed“ oder „Stats“ der Einwilligungsdialog von Google (IAB Transparency &amp; Consent Framework).
+      <strong>Einwilligung.</strong> Nach der serverseitigen Freischaltung und vor dem Laden von Werbung prüft die App den Einwilligungsstand mit Googles User Messaging Platform. Soweit eine Auswahl erforderlich ist, erscheint beim Öffnen von „Feed“ oder „Stats“ der Einwilligungsdialog von Google (IAB Transparency &amp; Consent Framework).
       Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, für das Speichern und Auslesen auf deinem Gerät § 25 Abs. 1 TDDDG).
       Lehnst du ab, kannst du die App ganz normal weiter nutzen. Welche Anzeigen noch zulässig sind, bestimmt das Google-SDK anhand deiner Auswahl.
       Bei eingeschränkten Anzeigen („Limited Ads“) kann Google für die Erkennung ungültiger Zugriffe weiterhin lokalen Speicher verwenden. Eine Ablehnung bedeutet deshalb nicht pauschal, dass keinerlei Datenverarbeitung stattfindet.
@@ -251,7 +257,7 @@
         <strong>GitHub</strong> stellt diese Website über GitHub Pages bereit, siehe Abschnitt 4.
       </li>
       <li>
-        <strong>Google</strong> (Google Ireland Limited, Irland, und Google LLC, USA) liefert ab Version 1.4.1 die Werbung aus, in eigener Verantwortung, siehe 2.11.
+        <strong>Google</strong> (Google Ireland Limited, Irland, und Google LLC, USA) liefert nach serverseitiger Freischaltung die Werbung aus, in eigener Verantwortung, siehe 2.11.
       </li>
     </ul>
     <p>Andere Nutzer sehen, was unter 2.2 bis 2.4 und bei freiwilliger Ranglisten-Teilnahme unter 2.12 als sichtbar beschrieben ist. Neben den in dieser Erklärung genannten Empfängern geben wir Daten nur weiter, wenn uns ein Gesetz dazu verpflichtet.</p>
@@ -269,7 +275,7 @@
       <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertrag): Konto, Profil, Challenges, Trainingsdaten, ein von dir genutztes Strafkonto, gewünschte Push-Mitteilungen und Support. Welche Daten dafür nötig sind, hängt von den Funktionen ab, die du nutzt; etwa Profilfoto, Strafkonto und Push-Mitteilungen sind freiwillig.</li>
       <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> (berechtigtes Interesse): Server- und Sicherheitsprotokolle, Fehlerberichte, die Prüfung von Meldungen und der Schutz anderer Nutzer sowie diese Website.</li>
       <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> (Einwilligung): freiwillige Veröffentlichung in der Rangliste (Abschnitt 2.12), jederzeit in den Einstellungen ausschaltbar.</li>
-      <li><strong>Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG</strong> (Einwilligung): Werbung ab Version 1.4.1 (Abschnitt 2.11). Widerruf jederzeit unter Einstellungen → „Werbe-Einwilligung“, sofern Google diesen Eintrag verlangt.</li>
+      <li><strong>Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG</strong> (Einwilligung): Werbung nach serverseitiger Freischaltung (Abschnitt 2.11). Widerruf jederzeit unter Einstellungen → „Werbe-Einwilligung“, sofern Google diesen Eintrag verlangt.</li>
       <li><strong>Art. 6 Abs. 1 lit. c DSGVO</strong> (rechtliche Pflicht): wenn uns ein Gesetz zur Aufbewahrung oder Herausgabe verpflichtet.</li>
       <li><strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong>: Speichern auf deinem Gerät (Abschnitt 2.6).</li>
     </ul>
@@ -305,7 +311,7 @@
     <p>Die App richtet sich an Personen ab 16 Jahren (siehe <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>).</p>
 
     <h2>9. Keine automatisierten Entscheidungen</h2>
-    <p>Die App trifft keine ausschließlich automatisierten Entscheidungen mit rechtlicher oder ähnlich erheblicher Wirkung über dich. Statistiken und Vergleiche in der App werden aus den von euch eingetragenen Sätzen berechnet. Auch für die Werbung fordert die App nur nicht personalisierte Anzeigen an.</p>
+    <p>Die App trifft keine ausschließlich automatisierten Entscheidungen mit rechtlicher oder ähnlich erheblicher Wirkung über dich. Statistiken und Vergleiche in der App werden aus den von euch eingetragenen Sätzen berechnet. Bei später freigeschalteter Werbung fordert die App nur nicht personalisierte Anzeigen an.</p>
 
     <h2>10. Änderungen</h2>
     <p>Ändert sich die App, passen wir diese Erklärung an. Die aktuelle Fassung steht immer auf dieser Seite und ist in der App unter Einstellungen verlinkt.</p>

@@ -10,12 +10,21 @@ Am 21. Oktober 2026 wurden die Apple-Metadaten für Version **1.4.1** mit
 über Apples API verglichen: Beide Lokalisierungen und ihre URLs stimmen mit
 den lokalen Dateien überein. Je Sprache sind vier Screenshots vollständig
 verarbeitet (`COMPLETE`, keine Fehler/Warnungen). Die Review-Angaben sind
-hinterlegt. Status: `PREPARE_FOR_SUBMISSION`, Veröffentlichung `MANUAL`,
-Build 25 zugeordnet und keine Einreichung zur Prüfung.
-Der neueste TestFlight-Build **1.4.1 (25)** ist erfolgreich hochgeladen und
-per API als `VALID` bestätigt; die Zuordnung zur Store-Version ist ebenfalls
-per API zurückgelesen, weiterhin im Entwurf mit manueller Veröffentlichung.
+hinterlegt. Apple **1.4.1 (26)** ist nach expliziter Nutzerfreigabe am
+21. Oktober 2026 um **18:15:25 CEST** eingereicht. API-Readback:
+Build 26 ausgewählt, `VALID`, Version und Submission **`WAITING_FOR_REVIEW`**,
+Veröffentlichung **`MANUAL`**. Submission-ID:
+`04ba9efd-76a8-423d-911f-e3abc54178a7`.
 IPA-Pfad, SHA-256 und Tests stehen in [RELEASE.md](RELEASE.md).
+
+**Änderung für den Launch:** Der produktive Schalter
+`app_release_settings.id = 1`, `ads_enabled = false` sperrt Werbung,
+Testanzeigen, UMP-Dialog und Werbe-SDK-Start. Der neue Quellstand ist für
+iOS Build 26 zur Prüfung eingereicht. Android Version Code 2 ist als
+interner Entwurf **1.4.1 – Werbefreier Start** gespeichert und als Produktion 2
+mit elf Änderungen zur Prüfung gesendet. Review läuft; Managed
+Publishing ist aktiviert und nach Neuladen bestätigt. Die Apple-Review-Notizen sind
+hochgeladen; die vier öffentlichen Seiten sind live und bytegleich geprüft.
 
 ## Texte und Bilder
 
@@ -29,7 +38,7 @@ IPA-Pfad, SHA-256 und Tests stehen in [RELEASE.md](RELEASE.md).
 
 Die Beschreibungen nennen private Fitness-Challenges, Wochenziele,
 Live-Feed, Statistiken, Workouts und die freiwillige appweite Rangliste.
-Sie versprechen weder Werbefreiheit noch pauschal fehlende Datenverarbeitung
+Sie versprechen weder dauerhafte Werbefreiheit noch pauschal fehlende Datenverarbeitung
 durch AdMob. Das Strafkonto ist eine Liste privater Absprachen; die App
 verarbeitet und überweist kein Geld. Der Work-Modus ist nicht aktivierbar.
 
@@ -53,7 +62,7 @@ die längere Seite darf höchstens doppelt so lang wie die kürzere sein.
 - Bundle-ID: `com.bennyjoni.terminator`, Name aus dem jeweiligen `name.txt`.
 - Primäre Sprache: Deutsch; zusätzliche Lokalisierung: Englisch (UK).
 - Kategorie: Gesundheit und Fitness; die App erfasst vom Nutzer eingetragene Trainingswerte.
-- Der Store-Entwurf ist auf Version 1.4.1 gesetzt und enthält den passenden Build 25; `MARKETING_VERSION` steht im Xcode-Projekt.
+- Version 1.4.1 enthält Build 26 und wartet auf Apple-Prüfung; `MARKETING_VERSION` steht im Xcode-Projekt.
 - Copyright: Jonas Nolte und Benjamin Frey, wie in den veröffentlichten Anbieterangaben.
 - Support-, Marketing- und Datenschutz-URL: Dateien `*_url.txt`; die öffentlich erreichbaren Seiten müssen vollständig und aktuell sein.
 - Review-Zugang und Notizen: `REVIEW_NOTES.md`; `REVIEW_*` nur in der ignorierten `.env`.
@@ -128,18 +137,21 @@ Neuladen sowie Sprachwechsel bestätigt; Status „Bereit für die Überprüfung
 Nach ausdrücklicher Freigabe des zusätzlichen appbezogenen Entwurfsrechts
 besteht auch die vollständige DE-/EN-Validierung. Der separate API-
 Speicherversuch wurde bei der Commit-Ablehnung von `changesNotSentForReview`
-sicher abgebrochen; der automatische Fallback bleibt ausgeschaltet. Kein
-erfolgreicher API-Commit und keine Review-Einreichung bestätigt.
+sicher abgebrochen; der automatische Fallback bleibt ausgeschaltet. Es gab
+keinen erfolgreichen Metadaten-API-Commit. Die spätere Produktionsversion 2
+ist getrennt über die Console zur Prüfung gesendet, Review läuft.
 
 ## Was aktuell noch fehlt
 
-- AdMob-Zahlungsprofil (auf Wunsch vorerst offen), Store-Verknüpfung und Googles Bestätigung von `app-ads.txt`. Beide Apps/Banner und die UMP-Nachricht sind eingerichtet; die Datei ist am Domain-Stamm erreichbar.
-- Verbleibende Betriebsfakten aus `LEGAL_FACTS.md` und die Passwortoberfläche bis zum neuen Passwort/erneuten Login prüfen. Gmail-SMTP (`smtp.gmail.com:587`, Absender `bennyundjoni@gmail.com`, Limit 30/h) ist gespeichert; eigene Testmail, Recovery-Code-Verifikation und authentisierter Nutzerabruf sind bestanden. Testkonto und temporäre Geheimnisdateien sind bereinigt; Review-Konten unverändert. Siehe [SMTP.md](SMTP.md). Die fünf App-/Rechtsseiten sind öffentlich erreichbar; auch die konkrete Gmail-Nennung in der Datenschutzerklärung ist veröffentlicht und bytegleich geprüft (HTTP 200, Root-Pages-Commit `d783559a…`).
-- Apple: abschließende Prüfung der Abläufe im hochgeladenen Build sowie gegebenenfalls noch im Konto angezeigte Anforderungen. App Privacy ist mit allen 15 Datentypen veröffentlicht; Build 25 ist zugeordnet. Altersfreigabe 16+, Inhaltsrechte, Medizinprodukt-Antwort Nein, kostenlose Preise und ausschließliche DACH-Verfügbarkeit sind gespeichert. Mac/Apple Vision sind ausgeschlossen. Beide isolierten Review-Logins sind gegen Supabase Auth bestätigt. Der bestehende Trader-Status ist keine hier neu geprüfte DSA-Verifizierung.
-- Google Play: Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist als interner Entwurf gespeichert. Kein Rollout und keine Testerbenachrichtigung. Das zusätzliche appbezogene Entwurfsrecht ist ausdrücklich genehmigt und gespeichert; sechs Apprechte, keine neuen Accountrechte. `verify_auth` und vollständige DE-/EN-Textvalidierung bestehen. API-Speichern scheitert sicher am nicht akzeptierten `changesNotSentForReview`; Fallback bleibt aus, kein erfolgreicher API-Commit/keine Review-Einreichung bestätigt. Die fertigen UI-Listings enthalten inzwischen die oben bestätigten längeren Titel.
-- Für Android: externes Backup des lokal erstellten Upload-Keys sowie vollständige Funktionstests, EWR-Dialogwahl/Widerruf und tatsächliche Anzeigenauslieferung. Kaltstart, Review-Login, Feed-Reproduktion und acht echte Screenshots sind geprüft. Der Emulator verifiziert UMP-Freigabe → SDK → native Datenschutzbestätigung → `npa: true`-Anfragen; Feed/Stats jeweils `NO_FILL`, keine Anzeigen oder Leerfläche, keine finalen Laufzeitfehler. Details/Beleg in [ADMOB.md](ADMOB.md). Beide Store-Bereitschaftschecks sind bestanden; keine vollständige Geräte-QA behauptet.
+- Schreibende Gerätefunktionstests abschließen. Der originale Android-Code-2-Gate-Smoke samt Wiederherstellung und die physische iPhone-Lese-/Lifecycle-QA sind bestanden. Apple Build 26 ist `WAITING_FOR_REVIEW`; Google Produktion 2 ist zur Prüfung gesendet, Review läuft. Beide Stores halten die Veröffentlichung nach Freigabe zurück.
+- Vor späterer Werbeaktivierung: AdMob-Zahlungsprofil (auf Wunsch vorerst offen), Store-Verknüpfung, Googles Bestätigung von `app-ads.txt`, Google-Freigabe und EWR-/Anzeigen-QA. Ohne Zahlungsdaten gibt es weder Anzeigen noch Aufbau von Werbeguthaben. Beide Apps/Banner und UMP-Nachricht sind eingerichtet; die Datei ist am Domain-Stamm erreichbar. Der Schalter bleibt bis dahin `false`; spätere Aktivierung ohne weiteren Build siehe [ADMOB.md](ADMOB.md).
+- Verbleibende Betriebsfakten aus `LEGAL_FACTS.md` und die Passwortoberfläche bis zum neuen Passwort/erneuten Login prüfen. Gmail-SMTP (`smtp.gmail.com:587`, Absender `bennyundjoni@gmail.com`, Limit 30/h) ist gespeichert; eigene Testmail, Recovery-Code-Verifikation und authentisierter Nutzerabruf sind bestanden. Testkonto und temporäre Geheimnisdateien sind bereinigt; Review-Konten unverändert. Siehe [SMTP.md](SMTP.md). Die App-/Rechtsseiten sind öffentlich erreichbar; auch die vier Gate-/Gmail-angepassten HTML-Seiten sind veröffentlicht und bytegleich geprüft (HTTP 200, Root-Pages-Commit `b9ba3c78…`).
+- Apple: abschließende Prüfung der Abläufe im hochgeladenen Build sowie gegebenenfalls noch im Konto angezeigte Anforderungen. App Privacy ist mit allen 15 Datentypen veröffentlicht; Build 26 ist ausgewählt und zur Prüfung eingereicht. Altersfreigabe 16+, Inhaltsrechte, Medizinprodukt-Antwort Nein, kostenlose Preise und ausschließliche DACH-Verfügbarkeit sind gespeichert. Mac/Apple Vision sind ausgeschlossen. Beide isolierten Review-Logins sind gegen Supabase Auth bestätigt. Der bestehende Trader-Status ist keine hier neu geprüfte DSA-Verifizierung.
+- Google Play: Das neue AAB (1.4.1, Version Code 2, SHA-256 `4773dcdf…`) ist als interner Entwurf **1.4.1 – Werbefreier Start** gespeichert und in Produktion 2 mit elf Änderungen zur Prüfung gesendet. Review läuft; Managed Publishing ist nach Neuladen bestätigt aktiviert. Kein öffentlicher Rollout und keine Testerbenachrichtigung. API-Zugang und Textvalidierung sind geprüft; der frühere Metadaten-API-Commit scheiterte am geschützten `changesNotSentForReview`, der Fallback bleibt aus. Die tatsächliche Einreichung erfolgte getrennt über die Console.
+- Für Android: externes Backup des lokal erstellten Upload-Keys und vollständige Funktionstests des neuen Launch-Builds. Kaltstart, Review-Login, Feed-Reproduktion und acht echte Screenshots sind für den Vorgänger geprüft. Dessen Emulatorlauf verifiziert UMP-Freigabe → SDK → native Datenschutzbestätigung → `npa: true`-Anfragen; Feed/Stats jeweils `NO_FILL`, keine Anzeigen oder Leerfläche, keine finalen Laufzeitfehler. Der zusätzliche originale Code-2-Gate-false-Nachweis ist inzwischen bestanden. EWR-Wahl/Widerruf und ausgelieferte Anzeigen sind vor späterer Freischaltung zu prüfen. Details in [ADMOB.md](ADMOB.md).
 
 Die Release-Sperren stoppen bei Test-Anzeigenkennungen oder unvollständigen
 Unterlagen. Die vollständigen Befehle stehen in
-[FASTLANE_STORES.md](FASTLANE_STORES.md). Es wurde keine App-Version zur
-Store-Prüfung abgesendet oder veröffentlicht.
+[FASTLANE_STORES.md](FASTLANE_STORES.md). Beide Stores sind zur Prüfung
+abgesendet; Google-Review läuft. Apple bleibt `MANUAL`, Google
+Managed Publishing ist aktiviert. Keine öffentliche Veröffentlichung.

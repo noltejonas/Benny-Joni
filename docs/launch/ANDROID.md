@@ -1,20 +1,31 @@
 # Android bis zum Play-Store-Upload
 
-Das native Projekt unter `android/` verwendet dieselbe App und die Paket-ID
-`com.bennyjoni.terminator`. App-Icon, Startbild, Einladungslinks und Hochformat
-sind eingerichtet. Die aktuelle AdMob-Konfiguration steht in
-[ADMOB.md](ADMOB.md). Debug-APK und signiertes Release-AAB wurden am
-21. Oktober 2026 erfolgreich gebaut. Der Kaltstart der aktuellen APK wurde
-im Android-Emulator bis zur vollständigen Willkommensoberfläche geprüft,
-ohne neuen nativen Absturz oder JavaScript-/WebView-Fehler. Mit dem isolierten
-Reviewkonto sind außerdem UMP-Freigabe, native Publisher-ID-Deaktivierung
-und nicht personalisierte Banneranfragen geprüft. Vollständige Funktionstests,
-EWR-Dialogwahl/Widerruf und tatsächlich gelieferte Anzeigen bleiben offen.
-Der zuvor sichtbare Feed-Zeichenfehler ist ebenfalls im Emulator geprüft:
-Nach dem Tabwechsel, zwei natürlichen Live-Updatezyklen und demselben
-Abwärtswischen bleiben Kopfzeile und Feed sauber. Dafür verwenden die
-Tagesüberschrift und ausschließlich im Feed die Tab-Leiste deckende
-Hintergründe ohne `backdrop-filter`.
+Das native Projekt verwendet `com.bennyjoni.terminator`, Version 1.4.1,
+**Version Code 2** und Ziel-API 36. Debug-APK und signiertes Release-AAB sind
+gebaut; das AAB ist in Play Console als interner Entwurf
+**1.4.1 – Werbefreier Start** gespeichert. Keine Verteilung an Tester;
+Produktion 2 ist mit elf Änderungen **zur Prüfung gesendet**; die Console
+bestätigt „Deine Änderungen werden jetzt überprüft.“ Vorabprüfungen sind
+abgeschlossen. Managed Publishing ist aktiviert und nach Neuladen bestätigt;
+kein öffentlicher Release.
+
+Der Launch-Schalter `app_release_settings.id = 1`, `ads_enabled = false`
+ist produktiv gesetzt: keine Werbung, kein UMP-Dialog und kein Werbe-SDK-Start.
+Der originale Code-2-Gate-Smoke ist bestanden, einschließlich erneutem
+Kaltstart/Heute/Feed/Stats/Hintergrund-Vordergrund nach Wiederherstellung
+des Originals aus den getrennten UMP-Versuchen. Null AdMob-/AdPrivacy-Aufrufe,
+keine FATAL-Exception, ANR oder ungefangenen JavaScript-Fehler. Beleg:
+`.local/qa/android-final-vcode2-gate-off/restored/summary.json`.
+
+Der schreibende Android-Funktionstest im isolierten Wegwerfkonto ist
+bestanden: Satz 10 anlegen → auf 15 ändern → Kaltstart zeigt 15 → Satz
+löschen → Feed/Stats zeigen null. Die Reviewfixture wurde dafür nicht verändert.
+
+Der frühere Feed-Zeichenfehler wurde durch deckende Tagesüberschriften und
+eine ausschließlich im Feed deckende Tab-Leiste behoben und nach Live-Updates
+und Wischen geprüft. Beim erweiterten iOS-Funktionstest sind Teile bestanden,
+weitere Prüfungen bleiben offen; Details stehen in [RELEASE.md](RELEASE.md).
+Werbe-QA und ihre offenen Grenzen stehen unten und in [ADMOB.md](ADMOB.md).
 
 ## Build-Umgebung
 
@@ -52,7 +63,7 @@ registriert aktuell nur iOS-Push-Tokens. Für Android fehlen FCM-Konfiguration
 und Versand; Android-Tokens dürfen nicht an den APNs-Versand gehen.
 
 Geprüfter Stand: `app-debug.apk`, Paket `com.bennyjoni.terminator`, Version
-1.4.1 (Code 1), Ziel-SDK 36. Die APK-Signatur und die enthaltenen produktiven
+1.4.1 (Code 2), Ziel-SDK 36. Die APK-Signatur und die enthaltenen produktiven
 Android-AdMob-IDs stimmen mit dem Projekt überein. Diese APK verwendet den
 üblichen lokalen Debug-Schlüssel. Das separat signierte Release-Bundle steht
 im nächsten Abschnitt. Die registrierte `AdPrivacy`-Bridge startet kein SDK
@@ -61,7 +72,7 @@ Publisher-ID-Deaktivierung bestätigt sein, bevor eine Anzeige angefordert wird.
 Der erfolgreiche Kaltstart wurde mit genau dieser APK im genannten AVD geprüft.
 
 SHA-256 von `android/app/build/outputs/apk/debug/app-debug.apk`:
-`4b0782fa892830d3dd99ea49c99d06713a99ee6c94785eeeff0961fccfefc73b`
+`e33a219fa79f3d86904481f13d95c31e4b3b75cc91d3d1398ec02aaaf49ef81c`
 
 Unveränderte Vorher-Belege liegen unter
 `.local/screenshots/android/{de-DE,en-GB}/03-feed.png`; die bestandene
@@ -69,23 +80,24 @@ Vergleichsfolge liegt unter `.local/screenshots/android/feed-after-tabbar/`.
 
 ## Android-Laufzeitprüfung der Werbung
 
-Im abschließenden Lauf nach Host-GPU-Wiederherstellung funktionierten normaler
-Review-Login und Kaltstart. UMP: `NOT_REQUIRED`, kein Formular,
-`canRequestAds: true`, Datenschutzoptionen `NOT_REQUIRED`. Die strenge
-Reihenfolge UMP-Freigabe → SDK-Initialisierung → native Bestätigung
-`disabled: true` → `showBanner` ist im Laufzeitlog verifiziert.
-Feed und Stats setzen `npa: true`; beide Anfragen liefern Code 3 / `NO_FILL`.
-Es wurden keine Anzeigen geladen oder angeklickt; eine leere Anzeigenlücke
-blieb nicht stehen. Google erkennt den Emulator als Testgerät. Der finale
-Lauf enthält keine ANR/FATAL-Exception oder ungefangenen JavaScript-/
-Datenschutzfehler. EWR-Auswahl, Widerruf und echte Auslieferung wurden nicht geprüft.
+Die ursprüngliche Konfiguration vor dem Freigabeschalter wurde mit UMP
+`NOT_REQUIRED`, SDK-Initialisierung, bestätigter Publisher-ID-Deaktivierung
+und nicht personalisierten Anfragen geprüft; Feed/Stats lieferten `NO_FILL`.
+Das ist ein historischer Anfrage-/Fehlernachweis, kein aktueller Launchbetrieb.
+Der aktuelle originale Code-2-Lauf bleibt vollständig ohne Werbeaufrufe.
 
-Beleg: `.local/qa/android-ads-review-20261021/recovered/summary.json`;
-Einzelheiten und Logreferenzen stehen in [ADMOB.md](ADMOB.md). Nur der
-Fortschrittsmarker des ersten Satzes wurde an der isolierten Fixture aus
-einem vorhandenen synthetischen Satz ergänzt. Sonstige Profil-/Onboarding-,
-Terms-/Consent-Felder und Trainingszeilen blieben unverändert; private
-Vorher-/Nachherstände und abgesicherte Wiederherstellung liegen bereit.
+In einer lokalen QA-Kopie wurden danach Google-Demo-Testbanner wirklich
+geladen (`npa: true`, `disabled: true`). Heute und Overlays verbergen die
+Banner; nach Abbruch/Rückkehr erscheinen sie wieder. Beleg:
+`.local/qa/ump-eea/gate-on-corrected/summary.json`.
+
+**EWR-Auswahl und Widerruf sind offen.** Auch mit originaler Paket-ID,
+produktiver AdMob-App-ID, offiziellem Testreset und Debug-EWR meldet UMP
+`NOT_REQUIRED` ohne Formular. Die passende Zwei-App-Botschaft ist
+veröffentlicht; Ursache ungeklärt. Beleg:
+`.local/qa/ump-eea/same-package/summary.json`. Vor späterer Aktivierung
+klären; Testbanner belegen keine Monetarisierungsfreigabe. Das Originalpaket
+ist nach diesen Versuchen mit geprüftem Hash wiederhergestellt.
 
 ## Signierter Release
 
@@ -125,26 +137,28 @@ source .local/release/android/signing.env
 tools/android.sh bundleRelease
 ```
 
-Der signierte Release-Build ist erfolgreich. Das geprüfte Bundle liegt unter
-`android/app/build/outputs/bundle/release/app-release.aab` (ca. 13 MB), auf
-diesem Mac unter
-`/Users/jonasnolte/Developer/Benny-Joni/android/app/build/outputs/bundle/release/app-release.aab`.
-`bundletool validate` und die JAR-Signaturprüfung bestehen; alle 630
-Payload-Einträge sind mit dem erwarteten Upload-Zertifikat signiert.
-Paket-ID `com.bennyjoni.terminator`, Version 1.4.1 (Code 1), Ziel-SDK 36,
-`debuggable=false`, produktive AdMob-IDs und Support-Adresse sind im AAB geprüft.
-SHA-256: `5745afb5f8f66d3a42a048c7103e67e4f149767901d9793434379ae68ecffb10`.
-Genau dieses finale AAB ist in Play Console hochgeladen: Die UI bestätigt
-ein App Bundle und zeigt Version Code 1 (`1 (1.4.1)`). Die Delegation an
-Play App Signing ist vom Nutzer ausdrücklich freigegeben. Der interne
-Entwurf **1.4.1 – Initial internal test** ist mit Neuerungen in Deutsch und
-Englisch (2/2) gespeichert. Kein Rollout und keine Testerbenachrichtigung.
-Die Play-Vorschau meldet **keine Fehler und drei Warnungen**: noch keine
-internen Tester, kein R8-Mapping (der Build nutzt `minifyEnabled=false`)
-und fehlende native SDK-Debugsymbole. „Save and publish“ wurde nicht betätigt.
+Der signierte Code-2-Release-Build ist erfolgreich. Das neue Bundle liegt
+unter `android/app/build/outputs/bundle/release/app-release.aab`.
+SHA-256: `4773dcdf4f60d254acf7fbc5caccc375ffbe5184b527b708417e74af319a38da`.
+Die Webinhalte von AAB/APK entsprechen `dist/`; der originale APK-Hash ist
+nach der Wiederherstellung unabhängig bestätigt.
+
+Das AAB ist hochgeladen und als interner Entwurf
+**1.4.1 – Werbefreier Start** gespeichert. Die Delegation an Play App Signing
+ist ausdrücklich freigegeben. Keine Tester-Verteilung und noch keine
+Testerbenachrichtigung. Produktion 2 ist mit elf Änderungen zur Prüfung
+gesendet. Die Vorschau zeigte null Fehler und zwei Warnungen (native
+Symbole/R8-Mapping). Produktionsländer bleiben Deutschland, Österreich
+und Schweiz. Review läuft, die Console bestätigt
+„Deine Änderungen werden jetzt überprüft.“ Beleg:
+`.local/qa/google-submission-vcode2-20261021/status.json`.
+
+Managed Publishing ist in dieser Console erfolgreich aktiviert und nach
+Neuladen bestätigt. Nach Google-Freigabe bleibt die Veröffentlichung
+zurückgehalten; es gab keinen öffentlichen Release.
 
 Bei jedem weiteren Upload `versionCode` in `android/app/build.gradle` erhöhen.
-Für weitere Uploads Fastlane separat anbinden:
+Die bereits eingerichteten Fastlane-Zugänge für weitere Uploads stehen in:
 [FASTLANE_STORES.md](FASTLANE_STORES.md).
 
 Die Play-Grafiken und je vier echte Android-Screenshots für Deutsch und

@@ -28,12 +28,25 @@ nur `docs/launch/site/`; diese Notiz gehört nicht zur öffentlichen Website.
 - Freiwillig öffentliche Ranglistenwerte; Challenge-Inhalte nur für Mitglieder.
   Profilbilder sind bei Kenntnis ihrer URL öffentlich abrufbar.
 - iOS-Push über APNs; Android-FCM ist noch nicht eingerichtet.
-- AdMob: nur nicht personalisierte Anfragen, UMP-Freigabe vor Werbung,
+- AdMob ist zum Launch serverseitig ausgeschaltet: `app_release_settings`
+  mit `id = 1`, `ads_enabled = false`. Kein UMP-Dialog, kein Werbe-SDK-Start
+  und keine Anzeigen, auch keine Testanzeigen. Bei späterer Freigabe gelten
+  nur nicht personalisierte Anfragen und UMP-Freigabe vor Werbung,
   Publisher-first-party-ID deaktiviert. Das schließt technische Kennungen,
   Android-Werbe-ID/App-Set-ID und Diagnosedaten des SDKs nicht pauschal aus.
   Banner können bewegte Inhalte enthalten; keine Vollbild-/Prämien-Placements.
 
 ## Bestätigte Dienstkonfiguration
+
+Die Ads-Gate-Migration `20261021140000_app_release_ads_gate` ist produktiv
+angewendet und registriert. Der Readback bestätigt die ausgeschaltete Zeile,
+aktive RLS, Client-Leserechte und gesperrte Client-Schreibrechte; Beleg:
+`.local/qa/ads-release-gate-20261021/migration-readback.json`.
+Nach Zahlungseinrichtung und Google-Freigabe ist eine spätere Aktivierung
+per Supabase Table Editor oder entsprechendem Nutzerauftrag ohne weiteren
+Store-Build vorgesehen. Vorher gibt es keine AdMob-Anzeigen und keinen
+Aufbau von Werbeguthaben. Start, Vordergrundwechsel und Online-Rückkehr
+lesen die Freigabe neu; Offline-Status bleibt aus. [Ablauf](ADMOB.md)
 
 Die bestehende Supabase Management API bestätigt für das aktive Projekt am
 21. Oktober 2026 die Region `eu-west-1` und den Tarif Free. Gmail-SMTP ist
@@ -54,6 +67,11 @@ Die konkrete Gmail-Nennung für Sicherheits-E-Mails ist auf der öffentlichen
 Datenschutzseite ergänzt. HTTP 200 und Bytegleichheit sind bestätigt;
 Root-Pages-Commit `d783559a9531169b29341ef0070aea85c9cefc53` ändert
 ausschließlich `Benny-Joni/datenschutz.html`.
+Die Hinweise zum zunächst ausgeschalteten Werbebetrieb in Datenschutz,
+Nutzungsbedingungen, Start- und Supportseite sind ebenfalls gezielt
+veröffentlicht: Root-Pages-Commit `b9ba3c78f3314c7f85c226f53cb80b2706b9a357`.
+Alle vier Seiten wurden mit HTTP 200 und Bytegleichheit bestätigt; Beleg:
+`.local/qa/ads-release-gate-20261021/pages-http-readback.json`.
 Die längenneutrale Recovery-Anleitung auf der öffentlichen Supportseite ist
 veröffentlicht und bytegleich geprüft (HTTP 200; Root-Pages-Commit
 `9b55f30aa335f51d22de554c3749f8af8371a3fd`, nur `Benny-Joni/support.html`).

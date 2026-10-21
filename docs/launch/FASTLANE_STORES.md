@@ -1,12 +1,24 @@
 # App Store und Google Play mit Fastlane
 
 Die Store-Texte liegen für Deutsch und Englisch vor. Der Apple-Metadaten-
-Upload für Version 1.4.1 ist abgeschlossen und per API geprüft; Build 25 ist
-dieser Version im Entwurf zugeordnet. TestFlight-Build 1.4.1 (25) ist
-erfolgreich hochgeladen und per API als `VALID` bestätigt. Apple liest
+Upload für Version 1.4.1 ist abgeschlossen und per API geprüft; Build 26 ist
+ausgewählt, `VALID` und seit 21. Oktober 2026, 18:15 Uhr CEST zur Prüfung
+eingereicht: **`WAITING_FOR_REVIEW`**, Veröffentlichung **`MANUAL`**. Apple liest
 `ios/App/fastlane/metadata/`, Google Play liest
 `ios/App/fastlane/play-metadata/`. Zugangsdaten gehören ausschließlich in die
 ignorierte `ios/App/fastlane/.env` oder in die Umgebung des Prozesses.
+
+**Neuer Launch-Quellstand:** Werbung ist mit dem produktiven Serverflag
+`app_release_settings.id = 1`, `ads_enabled = false` ausgeschaltet.
+Kein UMP-Dialog, kein Werbe-SDK-Start und keine Anzeigen einschließlich
+Testanzeigen. iOS Build 26 ist eingereicht. Android Version Code 2 ist
+hochgeladen und als interner Entwurf **1.4.1 – Werbefreier Start** gespeichert;
+Produktion 2 ist zur Prüfung gesendet; Review läuft und Managed
+Publishing ist nach Neuladen bestätigt aktiviert. Die öffentlichen Texte sind live,
+die aktualisierten Apple-Review-Notizen hochgeladen.
+Spätere Aktivierung ohne weiteres Update: [ADMOB.md](ADMOB.md). Neue
+Artefakthashes, bestandener originaler Android-Gate-Smoke und die physische
+iPhone-Lese-/Lifecycle-QA stehen in [RELEASE.md](RELEASE.md).
 
 ## 1. Lokale Vorbereitung
 
@@ -25,7 +37,8 @@ Apple-Team-Key und die Review-Angaben sind lokal hinterlegt;
 `ios verify_auth` war erfolgreich. Die private `.p8` liegt nicht versioniert
 unter `.local/release/apple/` mit Dateirechten `0600`. Der separate
 Google-Play-Zugang ist ebenfalls eingerichtet; `android verify_auth`
-bestätigt Version Code 1 im internen Track.
+war beim Einrichten mit dem damaligen Version Code 1 erfolgreich; der
+aktuelle Console-Entwurf und die Produktion verwenden Code 2.
 
 Die Gem-Versionen sind in `ios/App/Gemfile.lock` festgelegt. Auf einem
 anderen Mac werden sie vor dem ersten Aufruf mit `bundle install` installiert.
@@ -49,7 +62,9 @@ Vor dem Upload müssen die tatsächlichen Betreiber- und Supportdaten in den
 Rechtsseiten stehen und diese öffentlich erreichbar sein. Die URLs in den
 Store-Texten müssen zu den veröffentlichten Seiten führen. Die Rechte und
 Datenschutzangaben müssen den verwendeten SDKs und dem fertigen Build
-entsprechen. Die bisherige Aussage „keine Werbung“ gilt mit AdMob nicht mehr.
+entsprechen. Der Start ist werbefrei, die eingebettete Funktion bleibt
+serverseitig aktivierbar; deshalb bleiben `Contains ads` und die
+Werbe-Datenoffenlegungen erhalten. Eine dauerhafte Werbefreiheit wird nicht zugesagt.
 
 ## 2. App Store Connect
 
@@ -57,16 +72,14 @@ entsprechen. Die bisherige Aussage „keine Werbung“ gilt mit AdMob nicht mehr
 `tools/fastlane.sh ios store_metadata` hat den Entwurf 1.4.1 hochgeladen.
 Der anschließende API-Abgleich bestätigt:
 
-- Status `PREPARE_FOR_SUBMISSION`, Release-Typ `MANUAL`, Build 25 zugeordnet;
-  nach dem gezielten Update ausschließlich dieser Build-Beziehung per API
-  zurückgelesen. Keine Einreichung oder Veröffentlichung.
-- Der neueste TestFlight-Build 1.4.1 (25) ist erfolgreich hochgeladen und
-  per API als `VALID` bestätigt, intern `IN_BETA_TESTING`, extern
-  `READY_FOR_BETA_SUBMISSION`. Er entfernt die ungenutzte ATT-Deklaration
-  aus Haupt-Plist und beiden Sprachdateien; die finale IPA ist darauf geprüft.
-  Es wurde nichts extern zur Beta-Prüfung oder
-  zur App-Store-Prüfung eingereicht. IPA-Pfad, SHA-256 und die lokalen
-  Prüfergebnisse stehen in [RELEASE.md](RELEASE.md).
+- Status **`WAITING_FOR_REVIEW`**, Release-Typ **`MANUAL`**, Build **26**
+  ausgewählt. Per offizieller ReviewSubmissions-API eingereicht am
+  21. Oktober 2026, 18:15:25 CEST; Submission-ID
+  `04ba9efd-76a8-423d-911f-e3abc54178a7`. Version und Submission wurden
+  anschließend als `WAITING_FOR_REVIEW` zurückgelesen. Keine Veröffentlichung.
+- Build 1.4.1 (26) ist `VALID`, intern `IN_BETA_TESTING`, extern
+  `READY_FOR_BETA_SUBMISSION`. Die neue Gate-Fassung ist eingebaut. IPA-Pfad,
+  SHA-256 und Prüfergebnisse stehen in [RELEASE.md](RELEASE.md).
 - `de-DE` und `en-GB`: Name, Untertitel, Beschreibung, Keywords, Werbetext,
   Support-/Marketing-/Datenschutz-URL und Copyright stimmen mit den lokalen
   Metadaten überein.
@@ -128,8 +141,8 @@ Ein kompletter Build mit Store-Unterlagen ist möglich mit:
 bundle exec fastlane release
 ```
 
-In [App Store Connect](https://appstoreconnect.apple.com/) ist Build 25
-zugeordnet. App Privacy ist mit allen 15 Datentypen nach ausdrücklicher
+In [App Store Connect](https://appstoreconnect.apple.com/) ist Build 26
+zugeordnet und zur Prüfung eingereicht. App Privacy ist mit allen 15 Datentypen nach ausdrücklicher
 Nutzerzustimmung veröffentlicht; der UI-Readback bestätigt 13 verknüpfte,
 zwei nicht verknüpfte Datentypen, keine Tracking-Daten und die korrekte
 Datenschutz-URL. Altersfreigabe 16+ (berechnet 13+, Override wegen der
@@ -146,9 +159,11 @@ Die aktualisierte Apple Developer Program License Agreement wurde nach
 ausdrücklicher kontoweiter Nutzerzustimmung akzeptiert. Neuladen bestätigt
 Ausgabe 14. Oktober 2026 und Annahme 21. Oktober 2026; das Warnbanner ist entfernt.
 Konkrete Datenschutzantworten stehen in
-[STORE_PRIVACY_ANSWERS.md](STORE_PRIVACY_ANSWERS.md). Anschließend zur Prüfung
-einreichen. Der aktuelle Entwurf wurde noch nicht eingereicht; die
-Veröffentlichung bleibt manuell.
+[STORE_PRIVACY_ANSWERS.md](STORE_PRIVACY_ANSWERS.md). Die Einreichung ist
+bestätigt; Veröffentlichung bleibt manuell. Die Metadaten-Lane selbst
+reicht nicht ein. Bei `metadata_only:true` blieb trotz `build_number:26`
+zunächst Build 25 ausgewählt; deshalb wurde die Build-Beziehung gezielt
+per API auf 26 gesetzt und vor der getrennten ReviewSubmission geprüft.
 
 ## 3. Google Play
 
@@ -167,14 +182,18 @@ steht auf „Bereit für Überprüfung“. Je Sprache sind vier echte Android-
 Screenshots, dazu Icon und lokalisierte Feature-Grafik hinterlegt. Alle elf
 Assets tragen in der Console die KI-Kennzeichnung, da auch die realen
 App-Aufnahmen KI-erstellte Avatare/Maskottchen zeigen. Alle elf
-Einrichtungsschritte sind abgeschlossen. Das finale AAB (1.4.1, Version Code 1,
-SHA-256 `5745afb5…`) ist hochgeladen; die Console zeigt ein App Bundle und
-`1 (1.4.1)`. Der interne Entwurf **1.4.1 – Initial internal test** ist mit
-Neuerungen in Deutsch und Englisch (2/2) gespeichert. Kein Rollout und keine
+Einrichtungsschritte sind abgeschlossen. Das neue AAB (1.4.1, Version Code 2,
+SHA-256 `4773dcdf…`) ist hochgeladen; der interne Entwurf
+**1.4.1 – Werbefreier Start** ist gespeichert. Kein Rollout und keine
 Testerbenachrichtigung.
 Die Produktionsländer sind auf Deutschland, Österreich und Schweiz begrenzt;
-UI-Readback „Ausgerichtet (3)“. Der Produktionstrack ist inaktiv, kein
-Produktionsrelease erstellt oder veröffentlicht.
+UI-Readback „Ausgerichtet (3)“. Produktion 2 ist mit elf Änderungen über die
+Console zur Prüfung gesendet; der abschließende Dialog ist bestätigt.
+Die UI zeigt „Änderungen, die überprüft werden“, Review läuft.
+Managed Publishing wurde in dieser Console erfolgreich aktiviert und nach
+Neuladen bestätigt. Keine automatische Veröffentlichung nach Freigabe,
+keine Tester-Verteilung und kein öffentlicher Release. Beleg:
+`.local/qa/google-submission-vcode2-20261021/status.json`.
 
 Der separate Play-API-Zugang im Cloudprojekt `benny-joni-fastlane` ist
 eingerichtet und die API als aktiviert bestätigt. Das Servicekonto hat
@@ -188,7 +207,7 @@ Play-Rechte, Cloud-IAM-Rollen und Impersonators sind nicht vergeben.
 Der lokale JSON-Schlüssel liegt ausschließlich ignoriert unter
 `.local/release/google-play/service-account.json` (`0600`, Ordner `0700`);
 sein Pfad ist in der privaten `.env` gesetzt. `tools/fastlane.sh android
-verify_auth` ist erfolgreich und liest Version Code 1 im internen Track.
+verify_auth` war beim Einrichten mit Version Code 1 erfolgreich.
 Nach dieser Berechtigung besteht die vollständige DE-/EN-Textvalidierung
 mit `android store_metadata screenshots:false validate:true`, einschließlich
 echter Änderungen der längeren lokalen Titel. Das frühere 403 bei echten
@@ -197,7 +216,8 @@ wurde jedoch beim Commit sicher abgebrochen: Google antwortet
 „Changes are sent for review automatically. The query parameter
 changesNotSentForReview must not be set.“ Der Schutz
 `rescue_changes_not_sent_for_review: false` ist unverändert. Es gibt keinen
-bestätigten API-Commit und keine dadurch bestätigte Review-Einreichung.
+bestätigten Metadaten-API-Commit. Die Produktion-2-Einreichung erfolgte
+später getrennt über die Console.
 Die längeren Titel wurden anschließend in Play Console als Entwurf
 gespeichert und nach Neuladen sowie Sprachwechsel bestätigt:
 Deutsch **Benny & Joni: Fitness-Duell**, Englisch **Benny & Joni: Fitness Duel**.
@@ -218,13 +238,15 @@ ein Android-Projekt, ein dauerhaft gesicherter Upload-Keystore und ein
 signiertes Android App Bundle (`.aab`) benötigt. Das Android-Projekt im Repo
 enthält Icons sowie die Signierungs-Konfiguration. JDK 21 und Android SDK
 sind auf diesem Mac eingerichtet; am 21. Oktober 2026 wurde die Debug-APK
-mit Version 1.4.1 (Code 1, Ziel-API 36) erfolgreich gebaut und ihre Signatur
+mit Version 1.4.1 (Code 2, Ziel-API 36) erfolgreich gebaut und ihre Signatur
 geprüft. Auch Upload-Keystore und signiertes Release-AAB sind lokal erstellt
 und geprüft. Der Kaltstart der aktuellen APK im API-36-Pixel-2-Emulator ist
 bestanden, ebenso die Feed-Reproduktion nach Live-Updates und Wischen.
 Der Export von acht echten Android-Screenshots ist abgeschlossen.
 Vor einer Einführung fehlen das externe Schlüssel-Backup,
-vollständige Funktionstests und die AdMob-/UMP-Geräteprüfung.
+der Abschluss der vollständigen Funktionstests. Der originale Code-2-
+Gate-Smoke und die erneute Prüfung nach Wiederherstellung sind bestanden. Die
+EWR-/Anzeigenprüfung bleibt Voraussetzung einer späteren Aktivierung.
 Build-Befehle, Hashes und den konkreten
 AAB-Pfad beschreibt [ANDROID.md](ANDROID.md). Die Upload-Lanes erzeugen
 keinen Keystore. Android-Server-Push benötigt zusätzlich eine
@@ -268,9 +290,10 @@ deshalb gehört die vollständige gewünschte Auswahl in diese Ordner.
 
 In der Play Console ist das finale AAB hochgeladen und als interner Entwurf
 mit DE-/EN-Neuerungen gespeichert. Die elf Einrichtungsschritte, einschließlich IARC und beider
-Store-Listings, sind abgeschlossen. Gespeicherte App-Inhalte und der Status
-„Bereit für Überprüfung“ sind keine Einreichung zur Prüfung. Die öffentlich
-erreichbare Supportseite ermöglicht die Kontolöschanfrage.
+Store-Listings, sind abgeschlossen. Zusätzlich wurde Produktion 2 mit elf
+Änderungen zur Prüfung gesendet; Review läuft. Managed
+Publishing ist aktiviert. Die öffentlich erreichbare Supportseite
+ermöglicht die Kontolöschanfrage.
 
 Für persönliche Entwicklerkonten, die nach dem 13. November 2023 angelegt
 wurden, kann der Produktionszugang erst nach dem vorgeschriebenen
