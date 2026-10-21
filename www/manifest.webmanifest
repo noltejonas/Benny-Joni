@@ -1,7 +1,7 @@
 {
-  "name": "Projekt Terminator",
-  "short_name": "Terminator",
-  "description": "Wöchentliche Workout-Challenge für Benny & Jonas",
+  "name": "Benny & Joni",
+  "short_name": "Benny & Joni",
+  "description": "Wöchentliche Workout-Challenge mit Freunden",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",

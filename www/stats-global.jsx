@@ -32,7 +32,11 @@ function fmtWeekRange(weekStart) {
     : `${weekDayFmt.format(a)}–${weekDayFmt.format(b)}`;
 }
 
-function StatsTab({ api, me, profile, competition, sides, members, challenges, categories, allSets }) {
+function StatsTab({ api, me, profile, competition, sides, members, challenges: rawChallenges, categories: rawCategories, allSets: rawSets }) {
+  // Include cached competition props in the same release filter as fresh API data.
+  const { challenges, categories, sets: allSets } = React.useMemo(() => PTData.sportsOnlyBundle({
+    challenges: rawChallenges, categories: rawCategories, sets: rawSets,
+  }), [rawChallenges, rawCategories, rawSets]);
   const [view, setView] = React.useState(() => {
     try { return sessionStorage.getItem('pt_stats_view') || 'challenge'; } catch (e) { return 'challenge'; }
   });
@@ -47,7 +51,7 @@ function StatsTab({ api, me, profile, competition, sides, members, challenges, c
     try {
       // Freies Training zählt in „Ich“ mit, ist aber keine eigene Challenge.
       const list = await api.listMyCompetitions({ includeSolo: true });
-      const b = await api.getStatsBundle(list.map(c => c.id));
+      const b = PTData.sportsOnlyBundle(await api.getStatsBundle(list.map(c => c.id)));
       PTData.annotateWorkouts(b.sets, b.challenges, b.categories);
       PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
       setComps(list.filter(c => c.mode !== 'solo'));

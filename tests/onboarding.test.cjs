@@ -5,14 +5,28 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function load() {
+// `config` setzt Konstanten der Launch-Konfiguration (z. B. APP_STORE_ID), so
+// wie die Gründer sie morgens in onboarding-model.js eintragen.
+function readWww(f, config = {}) {
+  let src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+  if (f === 'onboarding-model.js') {
+    for (const [key, value] of Object.entries(config)) {
+      const re = new RegExp(`const ${key} = '[^']*';`);
+      assert.match(src, re, `${key} steht als Konstante in onboarding-model.js`);
+      src = src.replace(re, `const ${key} = ${JSON.stringify(value)};`);
+    }
+  }
+  return src;
+}
+
+function load(config = {}, platform) {
   const ctx = { window: {}, console };
+  if (platform) ctx.window.Capacitor = { getPlatform: () => platform, isNativePlatform: () => true };
   vm.createContext(ctx);
   for (const f of ['i18n.js', 'data.js', 'onboarding-model.js']) {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
-    vm.runInContext(src, ctx, { filename: f });
+    vm.runInContext(readWww(f, config), ctx, { filename: f });
   }
-  return { O: ctx.window.PTOnboarding, D: ctx.window.PTData };
+  return { O: ctx.window.PTOnboarding, D: ctx.window.PTData, window: ctx.window };
 }
 const { O } = load();
 
@@ -34,7 +48,7 @@ test('normalizeCode lehnt falsche Länge und Sonderzeichen ab', () => {
 });
 
 test('normalizeCode holt den Code aus einer ganzen Einladung', () => {
-  const msg = 'Komm in meine Challenge „Büro-Battle“ bei Projekt Terminator 💪\nCode: 3a9uqm\n';
+  const msg = 'Komm in meine Challenge „Büro-Battle“ bei Benny & Joni 💪\nCode: 3a9uqm\n';
   assert.equal(O.normalizeCode(msg), '3A9UQM');
   // Wörter mit sechs Buchstaben („BATTLE“) sind kein Code
   assert.equal(O.normalizeCode('Büro-Battle ist super'), null);
@@ -65,18 +79,148 @@ test('inviteLink und inviteText enthalten Code, Name und Link', () => {
   assert.equal(O.normalizeCode(text), 'BJ4K7X', 'die eigene Einladung lässt sich wieder einlesen');
 });
 
-// Wie auf einem englischen Gerät. Die Einladungstexte stehen hier selbst, damit
-// der Test nicht vom Stand von i18n/en.js abhängt.
-function loadEnglish() {
+// ── Launch-Konfiguration ────────────────────────────────────────────────────
+
+// Die Tests setzen die Konstanten selbst, damit sie nach dem Eintragen von
+// Store-ID und Support-Adresse am Morgen grün bleiben.
+test('App-Name steht im Einladungstext, „Projekt Terminator“ nicht mehr', () => {
+  assert.ok(O.APP_NAME);
+  assert.doesNotMatch(O.APP_NAME, /Terminator/);
+  const text = O.inviteText({ name: 'Duell', invite_code: 'gtb34l' });
+  assert.ok(text.includes(O.APP_NAME), text);
+  assert.doesNotMatch(text, /Terminator/, 'nur das technische Schema darf „terminator“ enthalten');
+});
+
+test('inviteText ohne App-Store-ID: Name statt Link, keine leere Zeile', () => {
+  const { O: o } = load({ APP_STORE_ID: '' });
+  assert.equal(o.APP_STORE_URL, '');
+  const text = o.inviteText({ name: 'Duell', invite_code: 'GTB34L' });
+  assert.deepEqual(text.split('\n'), [
+    `Komm in meine Challenge „Duell“ bei ${o.APP_NAME} 💪`,
+    `Im App Store: ${o.APP_NAME}`,
+    'Code: GTB34L',
+    'Schon installiert? projektterminator://join/GTB34L',
+  ]);
+  assert.doesNotMatch(text, /App laden:|undefined|https?:/);
+  assert.equal(o.normalizeCode(text), 'GTB34L');
+});
+
+test('inviteText mit App-Store-ID: Link zum Laden', () => {
+  const { O: o } = load({ APP_STORE_ID: '6741234567' });
+  assert.equal(o.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
+  const text = o.inviteText({ name: 'Büro-Battle', invite_code: 'bj4k7x' });
+  const lines = text.split('\n');
+  assert.equal(lines[1], 'App laden: https://apps.apple.com/de/app/id6741234567');
+  assert.equal(lines[2], 'Code: BJ4K7X');
+  assert.equal(o.normalizeCode(text), 'BJ4K7X', 'Store-Link stört das Einlesen nicht');
+  // Ohne die letzte Zeile (z. B. abgeschnitten) findet „Code:“ den Code.
+  assert.equal(o.normalizeCode(lines.slice(0, 3).join('\n')), 'BJ4K7X');
+  // Versehentlich mit „id“ oder Leerzeichen eingetragen
+  assert.equal(load({ APP_STORE_ID: ' id6741234567 ' }).O.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
+});
+
+test('Android-Einladung nutzt trotz Apple-ID die Landingpage und bietet keine Apple-Bewertung', () => {
+  const { O: o } = load({}, 'android');
+  assert.equal(o.APP_STORE_URL, 'https://apps.apple.com/de/app/id6768353714');
+  assert.equal(o.DOWNLOAD_URL, 'https://noltejonas.github.io/Benny-Joni/');
+  assert.equal(o.APP_REVIEW_URL, '');
+  const text = o.inviteText({ name: 'Duell', invite_code: 'GTB34L' });
+  assert.ok(text.includes(`App laden: ${o.DOWNLOAD_URL}`));
+  assert.doesNotMatch(text, /apps\.apple\.com|itms-apps:|play\.google\.com/);
+  assert.equal(o.normalizeCode(text), 'GTB34L');
+});
+
+test('LEGAL: alle Rechtstexte per https', () => {
+  const keys = Object.keys(O.LEGAL).sort();
+  assert.deepEqual(keys, ['imprint', 'privacy', 'support', 'terms']);
+  for (const k of keys) assert.match(O.LEGAL[k], /^https:\/\/\S+\.html$/, k);
+});
+
+test('supportMailto: leer ohne Adresse, sonst mailto mit Betreff und Text', () => {
+  const { O: none } = load({ SUPPORT_EMAIL: '' });
+  assert.equal(none.supportMailto('Hilfe', 'Text'), '');
+  const { O: o } = load({ SUPPORT_EMAIL: 'hallo@example.com' });
+  assert.equal(o.supportMailto(), 'mailto:hallo@example.com');
+  assert.equal(o.supportMailto('Frage & Idee', 'Zeile 1\nZeile 2'),
+    'mailto:hallo@example.com?subject=Frage%20%26%20Idee&body=Zeile%201%0AZeile%202');
+});
+
+// Fängt window.open und location.href ab.
+function spyWindow(w, { opened = {}, native = false } = {}) {
+  const calls = [];
+  w.open = (url, target) => { calls.push(['open', url, target]); return opened; };
+  w.location = {
+    get href() { return ''; },
+    set href(v) { calls.push(['href', v]); },
+  };
+  w.Capacitor = native ? { isNativePlatform: () => true } : undefined;
+  return calls;
+}
+
+test('openExternal: Webseiten per window.open, Mail per location, leer = nichts', () => {
+  const { O: o, window: w } = load();
+  let calls = spyWindow(w);
+  o.openExternal('');
+  o.openExternal(null);
+  assert.deepEqual(calls, []);
+  o.openExternal(o.LEGAL.privacy);
+  assert.deepEqual(calls, [['open', o.LEGAL.privacy, '_blank']]);
+
+  calls = spyWindow(w);
+  o.openExternal('mailto:hallo@example.com');
+  assert.deepEqual(calls, [['href', 'mailto:hallo@example.com']]);
+
+  calls = spyWindow(w, { opened: null });
+  o.openExternal(o.LEGAL.terms);
+  assert.deepEqual(calls, [['open', o.LEGAL.terms, '_blank'], ['href', o.LEGAL.terms]], 'Browser: Pop-up blockiert');
+
+  calls = spyWindow(w, { opened: null, native: true });
+  o.openExternal(o.LEGAL.terms);
+  assert.deepEqual(calls, [['open', o.LEGAL.terms, '_blank']], 'nativ öffnet Safari, kein zweites Öffnen');
+});
+
+test('reportContent: ohne Support-Adresse die Support-Seite, sonst Mail mit IDs', () => {
+  const { O: o, window: w } = load({ SUPPORT_EMAIL: '' });
+  let calls = spyWindow(w);
+  const url = o.reportContent({ kind: 'set', setId: 's-1', userId: 'u-2', challengeId: 'c-3' });
+  assert.equal(url, o.LEGAL.support);
+  assert.deepEqual(calls, [['open', o.LEGAL.support, '_blank']]);
+
+  const { O: m, window: mw } = load({ SUPPORT_EMAIL: 'hallo@example.com' });
+  calls = spyWindow(mw);
+  const mail = m.reportContent({ kind: 'set', setId: 's-1', userId: 'u-2', challengeId: 'c-3', note: 'Blöder Spruch' });
+  assert.match(mail, /^mailto:hallo@example\.com\?subject=Meldung%3A%20Satz&body=/);
+  const body = decodeURIComponent(mail.split('body=')[1]);
+  for (const part of ['Satz-ID: s-1', 'Nutzer-ID: u-2', 'Challenge-ID: c-3', 'Notiz: „Blöder Spruch“', `App: ${m.APP_NAME}`]) {
+    assert.ok(body.includes(part), part);
+  }
+  assert.deepEqual(calls, [['href', mail]]);
+
+  const { subject, body: plain } = m.reportText({ kind: 'member', userId: 'u-9' });
+  assert.equal(subject, 'Meldung: Person');
+  assert.doesNotMatch(plain, /Satz-ID|Challenge-ID|Notiz|undefined/);
+  assert.equal(m.reportText({}).subject, 'Meldung: Inhalt');
+});
+
+// Wie auf einem englischen Gerät. Die Texte stehen hier selbst, damit der Test
+// nicht vom Stand von i18n/en.js abhängt.
+function loadEnglish(config = {}) {
   const ctx = { window: {}, console, navigator: { languages: ['en-US'], language: 'en-US' } };
   vm.createContext(ctx);
   for (const f of ['i18n.js', 'i18n/en.js', 'data.js', 'onboarding-model.js']) {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
-    vm.runInContext(src, ctx, { filename: f });
+    vm.runInContext(readWww(f, config), ctx, { filename: f });
   }
   ctx.PTi18n.add('en', {
-    'Komm in meine Challenge „{name}“ bei Projekt Terminator 💪': 'Join my challenge “{name}” on Projekt Terminator 💪',
-    'Direkt öffnen: {link}': 'Open in the app: {link}',
+    'Komm in meine Challenge „{name}“ bei {app} 💪': 'Join my challenge “{name}” on {app} 💪',
+    'App laden: {url}': 'Get the app: {url}',
+    'Im App Store: {app}': 'On the App Store: {app}',
+    'Schon installiert? {link}': 'Already installed? {link}',
+    'Satz': 'Set',
+    'Art: {label}': 'Type: {label}',
+    'Satz-ID: {id}': 'Set ID: {id}',
+    'Nutzer-ID: {id}': 'User ID: {id}',
+    'Was ist passiert? Beschreib es kurz:': 'What happened? Tell us briefly:',
+    'Meldung: {label}': 'Report: {label}',
   });
   return { O: ctx.window.PTOnboarding, I: ctx.PTi18n };
 }
@@ -85,23 +229,49 @@ test('englische Einladung lässt sich wieder einlesen, auch ohne Link', () => {
   const { O: E, I } = loadEnglish();
   assert.equal(I.lang, 'en');
   const text = E.inviteText({ name: 'Office Battle', invite_code: 'bj4k7x' });
-  assert.match(text, /^Join my challenge “Office Battle”/);
+  assert.match(text, /^Join my challenge “Office Battle” on /);
+  assert.ok(text.includes(E.APP_NAME), text);
+  assert.doesNotMatch(text, /Terminator/);
   assert.match(text, /Code: BJ4K7X/);
   assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
   assert.equal(E.normalizeCode(text), 'BJ4K7X');
-  const withoutLink = text.split('\n').slice(0, 2).join('\n');
+  const withoutLink = text.split('\n').slice(0, -1).join('\n');
   assert.equal(E.normalizeCode(withoutLink), 'BJ4K7X', 'nur über „Code:“');
   // englische Wörter mit sechs Buchstaben („Office“, „Battle“) sind kein Code
   assert.equal(E.normalizeCode('Office Battle is great'), null);
-  assert.equal(E.normalizeCode('Join my challenge “Office” on Projekt Terminator 💪'), null);
+  assert.equal(E.normalizeCode(`Join my challenge “Office” on ${E.APP_NAME} 💪`), null);
   // Einladungen in der jeweils anderen Sprache gehen auch
   assert.equal(O.normalizeCode(text), 'BJ4K7X');
   assert.equal(E.normalizeCode(O.inviteText({ name: 'Büro-Battle', invite_code: '3A9UQM' })), '3A9UQM');
 });
 
+test('englische Einladung mit und ohne App-Store-ID', () => {
+  const { O: none } = loadEnglish({ APP_STORE_ID: '' });
+  assert.deepEqual(none.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n'), [
+    `Join my challenge “Duel” on ${none.APP_NAME} 💪`,
+    `On the App Store: ${none.APP_NAME}`,
+    'Code: GTB34L',
+    'Already installed? projektterminator://join/GTB34L',
+  ]);
+  const { O: store } = loadEnglish({ APP_STORE_ID: '6741234567' });
+  const lines = store.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n');
+  assert.equal(lines[1], 'Get the app: https://apps.apple.com/de/app/id6741234567');
+  assert.equal(store.normalizeCode(lines.join('\n')), 'GTB34L');
+});
+
+test('Meldung auf Englisch: Texte übersetzt, IDs unverändert', () => {
+  const { O: E } = loadEnglish();
+  const { subject, body } = E.reportText({ kind: 'set', setId: 's-1', userId: 'u-2' });
+  assert.equal(subject, 'Report: Set');
+  for (const part of ['What happened?', 'Type: Set', 'Set ID: s-1', 'User ID: u-2', `App: ${E.APP_NAME}`]) {
+    assert.ok(body.includes(part), part);
+  }
+  assert.doesNotMatch(body, /Satz|Nutzer|Was ist passiert/);
+});
+
 test('„Code“ im Challenge-Namen verdrängt nicht den echten Code', () => {
   const { O: E } = loadEnglish();
-  const cut = (text) => text.split('\n').slice(0, 2).join('\n'); // ohne Link-Zeile
+  const cut = (text) => text.split('\n').slice(0, -1).join('\n'); // ohne Link-Zeile
   for (const M of [O, E]) {
     for (const name of ['Code Sprint', 'Promo Code: SOMMER', 'code=HALLO1']) {
       const text = M.inviteText({ name, invite_code: 'BJ4K7X' });

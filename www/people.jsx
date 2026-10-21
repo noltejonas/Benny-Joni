@@ -34,10 +34,13 @@ function initialOf(name) {
 // Avatar mit Foto, sonst Initiale auf Profilfarbe.
 function Avatar({ userId, profile, size = 32, className = '' }) {
   const p = profile || PTPeople.get(userId);
+  // Blockierte Personen (nur auf diesem Gerät): überall nur die Initiale.
+  let blocked = false;
+  try { blocked = !!window.PTFeed?.isBlocked?.(userId || p?.id); } catch (e) {}
   const name = p?.display_name || '?';
   const [broken, setBroken] = React.useState(false);
   React.useEffect(() => { setBroken(false); }, [p?.avatar_url]);
-  if (p?.avatar_url && !broken) {
+  if (p?.avatar_url && !broken && !blocked) {
     return <img src={p.avatar_url} alt={name} className={`pt-avatar ${className}`}
       style={{ width: size, height: size }} onError={() => setBroken(true)} />;
   }

@@ -1,4 +1,4 @@
-// Projekt Terminator — Rechenmodell für den Stats-Tab (rein, ohne React).
+// Benny & Joni — Rechenmodell für den Stats-Tab (rein, ohne React).
 //
 // Stats zeigen nur Sport: Work-Kategorien fließen nicht ein. Pflicht-Workouts
 // (s.workout / ch.workout, siehe PTData.annotateWorkouts) zählen nie als Reps;
@@ -308,7 +308,62 @@
     };
   }
 
+  // ── Anteil-Regel ─────────────────────────────────────────────────────
+  // Durch wie viele Personen wird das Wochenziel geteilt? Entscheidung der
+  // Gründer, hier an einer Stelle umschaltbar:
+  //   'actual'   – tatsächliche Teilnehmer, sobald mindestens 2 aktiv sind,
+  //                sonst die volle Besetzung (expected). So rechnen Home, Stats
+  //                und Strafe gleich.
+  //   'expected' – immer die volle Besetzung (alter Stand von Home).
+  const SHARE_BASIS = 'actual';
+  function sharePeople({ active = 0, expected = 0, basis = SHARE_BASIS } = {}) {
+    if (basis === 'actual' && active >= 2) return active;
+    return Math.max(1, active || 0, expected || 0);
+  }
+
+  // ── Woche 2: Ziele der Vorwoche als Vorlage ──────────────────────────
+  // Lokaler Kalendertag aus 'YYYY-MM-DD' oder einem Zeitstempel.
+  const dayKey = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? String(v) : dayOf(v));
+
+  // Faktor auf die volle Woche, wenn die Challenge erst in dieser Woche nach
+  // Montag gestartet ist (angebrochene erste Woche). Ein Ziel, das noch später
+  // angelegt wurde, lief entsprechend kürzer. Sonst 1.
+  function fullWeekFactor({ weekStart, startDate, createdAt } = {}) {
+    if (!weekStart || !startDate) return 1;
+    const start = dayKey(startDate);
+    const offset = daysBetween(weekStart, start);
+    if (!(offset >= 1 && offset <= 6)) return 1;
+    let from = offset;
+    if (createdAt) {
+      const created = daysBetween(weekStart, dayKey(createdAt));
+      if (created > from && created <= 6) from = created;
+    }
+    return 7 / (7 - from);
+  }
+
+  // „Wie letzte Woche starten“: dieselben Übungen mit denselben Gruppenzielen,
+  // im Format der Wochenplan-Vorlage (WeekFixCard). fullWeekFactor ist eine Zahl
+  // oder eine Funktion (ch) → Zahl; hochgerechnet wird ab 20 auf 5 gerundet,
+  // nie weniger als vorher. Pflicht-Workouts (ch.workout) bleiben unverändert.
+  function weekTemplateFromPrevious(prevChallenges, { fullWeekFactor: factorOf = 1 } = {}) {
+    const seen = new Set();
+    const out = [];
+    for (const ch of prevChallenges || []) {
+      if (!ch?.category_id || seen.has(ch.category_id)) continue;
+      seen.add(ch.category_id);
+      const target = Math.max(1, Math.round(Number(ch.target_reps) || 0));
+      const raw = typeof factorOf === 'function' ? factorOf(ch) : factorOf;
+      const factor = Number.isFinite(raw) && raw > 1 ? Math.min(raw, 7) : 1;
+      const scaled = target * factor;
+      const nice = scaled >= 20 ? Math.round(scaled / 5) * 5 : Math.round(scaled);
+      const base = ch.workout || factor === 1 ? target : Math.max(target, nice);
+      out.push({ category_id: ch.category_id, base_reps: base, bonus_max: 0, slot_id: `prev-${ch.category_id}` });
+    }
+    return out;
+  }
+
   window.PTStats = {
     leaderIndex, streaks, challengeStats, cumulative, gapSeries, personalStats, intensityLevels,
+    SHARE_BASIS, sharePeople, fullWeekFactor, weekTemplateFromPrevious,
   };
 })();

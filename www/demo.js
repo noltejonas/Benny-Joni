@@ -1,4 +1,4 @@
-// Projekt Terminator — lokaler Demo-Modus
+// Benny & Joni — lokaler Demo-Modus
 //
 // Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt) oder
 // über „Demo ansehen“ auf dem Willkommen-Bildschirm.
@@ -35,14 +35,17 @@
     if (localStorage.getItem('pt_demo') !== '1') return;
   } catch (e) { return; }
 
-  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts, friendlyError, localizeCategory } = window.PTData;
+  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts, friendlyError, appError, localizeCategory } = window.PTData;
   const DB_KEY = 'pt_demo_db_v1';
   const USER_KEY = 'pt_demo_user';
   const ME = 'u-benny';
   const SEED_IDS = ['u-benny', 'u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim'];
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
-  // 3: Monatsrangliste (Welt-Leute, Freies Training, Monatsergebnisse, log_id)
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
+  // Neutrale Namen statt Marken und Personen (catType bleibt 'tom_holland').
+  // i18n-ignore: Datenbank-Namen (Kategorie, Projekt-Tag)
+  const TH_NAME = '20-Min-AMRAP';
+  const PROJECT_NAME = 'Side Project'; // i18n-ignore: Datenbank-Name
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -91,7 +94,7 @@
       cat('cat-hspu', 'HSPU', '🤸', 'sports', 'standard', ['volume', 300, 'Kopf berührt Boden oder Matte, oben ganz gestreckt.']), // i18n-ignore
       cat('cat-sit', 'Sit-ups', '🧘', 'sports', 'standard', ['volume', 1000, 'Schultern ganz ab, Brust bis zu den Knien.']), // i18n-ignore
       cat('cat-squat', 'Kniebeugen', '🍑', 'sports', 'standard', ['volume', 1000, 'Hüfte mindestens auf Kniehöhe, oben ganz aufrichten.']), // i18n-ignore
-      cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']), // i18n-ignore
+      cat('cat-th', TH_NAME, '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']), // i18n-ignore
       cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up', ['best', 204, 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.']), // i18n-ignore
       cat('cat-vibe', 'Vibe Coding', '💻', 'work'), // i18n-ignore: Übungsname
     ];
@@ -99,7 +102,7 @@
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
     const comp = (cid, name, emoji, mode, code, mods, weeksBack, owner) => ({
       id: cid, name, emoji, mode, invite_code: code,
-      rotation_enabled: !!mods.rotation, penalties_enabled: !!mods.penalties, work_enabled: !!mods.work,
+      rotation_enabled: !!mods.rotation, penalties_enabled: !!mods.penalties, work_enabled: false,
       start_date: startOf(weeksBack), end_date: null, archived_at: null,
       created_by: owner, created_at: startOf(weeksBack) + 'T08:00:00Z',
     });
@@ -274,8 +277,7 @@
     return {
       profiles, categories, competitions, members, weekly_challenges, sets, reactions,
       penalty_config, penalties, week_closures, payouts, rotation_config, plan_slots,
-      // i18n-ignore: Projekt- und Tool-Namen
-      project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: 'Terminator', emoji: '📁', created_at: monday }],
+      project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: PROJECT_NAME, emoji: '📁', created_at: monday }],
       tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }], // i18n-ignore: Tool-Name
       ranking_settings, monthly_results, month_closures, ranking_reports,
       user_blocks: [], ranking_admins: [ME],
@@ -287,17 +289,20 @@
 
   // Ältere Demo-Daten ergänzen statt verwerfen (v1 → v2: Konten, Onboarding-Spalte,
   // Seed-Profile älter als 14 Tage, damit Benny nicht als „neu“ gilt).
-  // v2 → v3: Die Rangliste braucht neue Personen, Sätze und Ergebnisse; diese
-  // Demo-Daten werden neu erzeugt.
+  // v4 vereint Ranglisten-Daten (v3) und die neutralen Namen für Übung und Tag.
   function upgrade(d) {
     if ((d.v || 1) >= DB_VERSION) return d;
-    if ((d.v || 1) < 3) return seed();
+    if ((d.v || 1) < 3 || !d.ranking_settings || !Array.isArray(d.monthly_results)) return seed();
     d.accounts = d.accounts || [{ email: 'benny@demo.local', user_id: ME }];
     const old = addDays(isoDate(mondayOf(new Date())), -60) + 'T08:00:00Z';
     for (const p of d.profiles) {
       if (!p.onboarding) p.onboarding = {};
       if (SEED_IDS.includes(p.id)) p.created_at = old;
     }
+    const th = (d.categories || []).find(c => c.id === 'cat-th' && c.name === 'Tom Holland');
+    if (th) th.name = TH_NAME;
+    const tag = (d.project_tags || []).find(t => t.id === 'pt-1' && t.name === 'Terminator');
+    if (tag) tag.name = PROJECT_NAME;
     d.v = DB_VERSION;
     return d;
   }
@@ -306,7 +311,10 @@
   let db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch (e) { db = null; }
   db = db ? upgrade(db) : seed();
-  const save = () => { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} };
+  for (const competition of db.competitions) competition.work_enabled = false;
+  // Nach „Konto löschen“ nichts mehr zurückschreiben (Timer laufen bis zum Neuladen).
+  let wiped = false;
+  const save = () => { if (wiped) return; try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} };
   save();
   const newId = (p) => `${p}-${++db.seq}`;
   const clone = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
@@ -346,6 +354,26 @@
     authListeners.forEach(fn => fn(s, evt));
   };
   const me = () => session?.user?.id || ME;
+
+  // Demo verlassen und die Startseite laden. pt:returning stammt aus der Demo-Session
+  // und würde sonst „Willkommen zurück“ statt „Willkommen“ zeigen. `wipe`: wie ein
+  // gelöschtes Konto – Demo-Daten und alle Gerätedaten der App (außer Erscheinungsbild
+  // und Sprache) weg.
+  function leaveDemo({ wipe = false } = {}) {
+    try {
+      if (wipe) {
+        wiped = true;
+        localStorage.removeItem(DB_KEY);
+        clearDemoState();
+        window.PTData.clearLocalData?.();
+      }
+      localStorage.removeItem('pt_demo');
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem('pt:returning');
+      sessionStorage.removeItem('pt_demo_signed_out');
+    } catch (e) {}
+    location.replace(location.pathname);
+  }
 
   const blobToDataUrl = (blob) => new Promise((res, rej) => {
     const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob);
@@ -388,6 +416,13 @@
         return clone(session);
       },
       async signOut() { setSession(null, 'SIGNED_OUT'); },
+      // Attrappe für „Konto löschen“: Demo zurücksetzen und beenden, Startseite laden.
+      async deleteAccount() {
+        await later(null);
+        uid();
+        session = null;
+        leaveDemo({ wipe: true });
+      },
       async resendSignup() { return later(null); },
       async requestPasswordReset() { return later(null); },
       // Wie Supabase (verifyOtp mit type 'recovery'): Der Code meldet die Person an.
@@ -412,11 +447,11 @@
           .filter(c => c.id && (includeSolo || c.mode !== 'solo')).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
       },
       async getMembers(cid) { return later(membersOf(cid)); },
-      async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+      async createCompetition({ name, emoji, mode, rotation, penalties, startDate, endDate }) {
         await later(null);
         const start = startDate || isoDate(new Date());
         const c = { id: newId('c'), name, emoji, mode, invite_code: code6(), rotation_enabled: !!rotation, penalties_enabled: !!penalties,
-          work_enabled: !!work, start_date: start, end_date: endDate || null, archived_at: null,
+          work_enabled: false, start_date: start, end_date: endDate || null, archived_at: null,
           created_by: uid(), created_at: new Date().toISOString() };
         db.competitions.push(c);
         db.members.push({ competition_id: c.id, user_id: uid(), role: 'owner', team: mode === '2v2' ? 'A' : null, joined_at: c.created_at, left_at: null });
@@ -459,7 +494,7 @@
         return c.id;
       },
       async updateCompetition(cid, patch) {
-        const c = db.competitions.find(x => x.id === cid); Object.assign(c, patch);
+        const c = db.competitions.find(x => x.id === cid); Object.assign(c, patch, { work_enabled: false });
         if ('penalties_enabled' in patch) { const pc = db.penalty_config.find(x => x.competition_id === cid); if (pc) pc.enabled = patch.penalties_enabled; }
         save(); emitAll(); return later(c);
       },
@@ -470,12 +505,12 @@
 
       async getStatsBundle(ids) {
         const set = new Set(ids);
-        return later({
+        return later(window.PTData.sportsOnlyBundle({
           members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
           challenges: db.weekly_challenges.filter(c => set.has(c.competition_id)).map(normCh),
           sets: db.sets.filter(s => set.has(s.competition_id)).map(withAthlete),
           categories: db.categories.map(localizeCategory),
-        });
+        }));
       },
       async upsertDeviceToken() { return null; },
       async deleteDeviceToken() {},
@@ -697,8 +732,8 @@
       async getMembers() { return later(membersOf(cid)); },
 
       async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid).map(localizeCategory)); },
-      async addCategory(name, emoji = '💪', kind = 'sports') {
-        const c = { id: newId('cat'), name, emoji, kind, challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
+      async addCategory(name, emoji = '💪') {
+        const c = { id: newId('cat'), name, emoji, kind: 'sports', challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
         db.categories.push(c); emit(); return later(c);
       },
       async updateCategory(id, patch) {
@@ -727,13 +762,17 @@
         const row = { category_id: payload.category_id, target_reps: payload.target_reps, chosen_by_user: payload.chosen_by || uid() };
         let c = payload.id ? db.weekly_challenges.find(x => x.id === payload.id)
           : mine('weekly_challenges').find(x => x.week_start === payload.week_start && x.category_id === payload.category_id);
+        // Wie data.js: Übung nicht mehr wechseln, sobald es Sätze gibt.
+        if (payload.id && c && row.category_id != null && c.category_id !== row.category_id
+          && db.sets.some(s => s.challenge_id === c.id)) throw appError('category_locked');
         if (c) Object.assign(c, row);
         else { c = { id: newId('ch'), competition_id: cid, week_start: payload.week_start, created_at: new Date().toISOString(), ...row }; db.weekly_challenges.push(c); }
         emit(); return later(normCh(c));
       },
+      // Wie data.js: mit Sätzen nicht löschen (in Supabase nähme die Kaskade sie mit).
       async deleteChallenge(id) {
-        db.weekly_challenges = db.weekly_challenges.filter(x => x.id !== id);
-        db.sets = db.sets.filter(s => s.challenge_id !== id); emit();
+        if (db.sets.some(s => s.challenge_id === id)) throw appError('has_sets');
+        db.weekly_challenges = db.weekly_challenges.filter(x => x.id !== id); emit();
       },
       async listChallenges() { return later(mine('weekly_challenges').sort(byWeek).map(normCh)); },
 
@@ -808,10 +847,11 @@
         if (!cfg.enabled) return { penalties: [], cfg };
         const chs = mine('weekly_challenges').filter(c => c.week_start === ws);
         const ss = db.sets.filter(s => chs.some(c => c.id === s.challenge_id)).map(withAthlete);
-        annotateWorkouts(ss, chs, db.categories);
+        const sports = window.PTData.sportsOnlyBundle({ categories: db.categories, challenges: chs, sets: ss });
+        annotateWorkouts(sports.sets, sports.challenges, sports.categories);
         const parts = participantsFor(membersOf(cid), ws);
         const pens = [];
-        for (const m of parts) pens.push(...computePenalties(chs, ss, m.user_id, cfg, parts.length));
+        for (const m of parts) pens.push(...computePenalties(sports.challenges, sports.sets, m.user_id, cfg, parts.length));
         return { penalties: pens, cfg };
       },
       async closeWeek(ws) {
@@ -943,20 +983,31 @@
     live(on = true) { try { localStorage.setItem(LIVE_KEY, on ? '1' : '0'); } catch (e) {} },
     simulateJoin,
     shiftWeek(weeks = 1) { shiftWeek(weeks); location.reload(); },
-    exit() {
-      try { localStorage.removeItem('pt_demo'); localStorage.removeItem(USER_KEY); sessionStorage.removeItem('pt_demo_signed_out'); } catch (e) {}
-      location.reload();
-    },
+    exit() { leaveDemo(); },
   };
 
-  // Kleiner Hinweis, damit niemand Demo und echte Daten verwechselt.
+  // Knopf über der Tab-Leiste: zeigt, dass das Demo-Daten sind, und führt zur eigenen
+  // Registrierung. Nur mit Tab-Leiste sichtbar (in Onboarding-Screens liegt unten der
+  // Hauptknopf); unter Sheets (z-index 100). Für App-Store-Screenshots ausblenden:
+  // localStorage pt:shots = '1'.
   const showBadge = () => {
-    const el = document.createElement('a');
-    el.href = '?demo=off';
-    el.textContent = tr('Demo-Daten · beenden');
-    el.setAttribute('style', 'position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);z-index:9999;' +
-      'padding:4px 10px;border-radius:999px;background:#1C1B2E;color:#fff;font:600 11px/1.4 system-ui,sans-serif;text-decoration:none;opacity:.78');
+    try { if (localStorage.getItem('pt:shots') === '1') return; } catch (e) {}
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'pt-demo-badge';
+    el.textContent = tr('Demo · Eigene Challenge starten →');
+    // Liegt nah an ‚Workout starten‘: ein Fehltipp soll die Demo nicht beenden.
+    el.addEventListener('click', () => { if (confirm(tr('Demo beenden und eigene Challenge starten?'))) leaveDemo(); });
+    el.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);z-index:60;' +
+      // Tab-Leiste endet 84 px über dem Rand, .app-main hat 120 px Luft: dazwischen passt der Knopf.
+      // --pt-ad-h: Höhe eines AdMob-Banners über der Tab-Leiste (www/ads.js), sonst 0.
+      'bottom:calc(env(safe-area-inset-bottom,0px) + 88px + var(--pt-ad-h,0px));height:28px;padding:0 14px;border:none;border-radius:999px;' +
+      'background:var(--grad,#1C1B2E);color:#fff;font:700 13px/28px system-ui,sans-serif;white-space:nowrap;' +
+      'box-shadow:0 8px 24px rgba(28,27,46,.28);cursor:pointer;-webkit-tap-highlight-color:transparent');
     document.body.appendChild(el);
+    const sync = () => { el.style.display = document.querySelector('.tabbar') ? '' : 'none'; };
+    sync();
+    setInterval(sync, 700);
   };
   if (document.body) showBadge(); else document.addEventListener('DOMContentLoaded', showBadge);
 })();

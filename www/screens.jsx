@@ -14,6 +14,50 @@ function setQuickSets(athlete, catId, arr) {
   localStorage.setItem('quickSets', JSON.stringify(all));
 }
 
+// Plausibilität pro Satz (PTFeed.repsCheck): über 500 ablehnen, ab 200
+// nachfragen. true = speichern. Nur für Wiederholungen, nicht für Workouts
+// (Sekunden, Runden) und Work-Minuten. Auch von feed.jsx und onboarding-intro.jsx genutzt.
+const REPS_MAX = window.PTFeed?.REPS_MAX || 500;
+function confirmReps(n) {
+  const r = window.PTFeed?.repsCheck?.(n) || 'ok';
+  if (r === 'too_many') {
+    alert(tr('Höchstens {max} Wiederholungen pro Satz. Mehr bitte auf mehrere Sätze aufteilen.', { max: REPS_MAX }));
+    return false;
+  }
+  if (r === 'ask') return confirm(tr('Wirklich {n} Wiederholungen in einem Satz?', { n }));
+  return r !== 'invalid';
+}
+
+// Text teilen wie shareInvite (competitions.jsx): Teilen-Sheet, sonst
+// Zwischenablage. Liefert 'shared' | 'copied' | 'cancelled' | 'failed'.
+async function shareResultText(text, title) {
+  if (navigator.share) {
+    try { await navigator.share({ title, text }); return 'shared'; }
+    catch (e) { if (e?.name === 'AbortError') return 'cancelled'; }
+  }
+  try { await navigator.clipboard.writeText(text); return 'copied'; } catch (e) { return 'failed'; }
+}
+
+// Knopf „Ergebnis teilen“. getText liefert den Text erst beim Tippen.
+function ShareResultButton({ getText, title = tr('Ergebnis'), className = 'btn btn-secondary share-result-btn' }) {
+  const [info, setInfo] = useState('');
+  async function share() {
+    let text = '';
+    try { text = getText(); } catch (e) { console.warn('Teilen', e); }
+    if (!text) { setInfo(tr('Teilen ging nicht.')); return; }
+    const r = await shareResultText(text, title);
+    setInfo(r === 'copied' ? tr('Kopiert. Füg es in den Chat ein.') : r === 'failed' ? tr('Teilen ging nicht.') : '');
+  }
+  return (
+    <>
+      <button type="button" className={className} onClick={share}>
+        <Icon name="share" size={18} /> {tr('Ergebnis teilen')}
+      </button>
+      {info && <div className="share-result-info" role="status">{info}</div>}
+    </>
+  );
+}
+
 // `coach`: Tipp für den allerersten Satz (Onboarding), bis er geloggt ist.
 function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
   const [values, setValues] = useState(() => getQuickSets(me, catId));
@@ -33,7 +77,8 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
   useEffect(() => { setValues(getQuickSets(me, catId)); setEditing(false); }, [me, catId]);
 
   function commit(next) {
-    const clean = next.filter(n => Number.isFinite(n) && n > 0).slice(0, 6);
+    // Schnellsätze loggen ohne Rückfrage, darum hier schon auf das Maximum begrenzen.
+    const clean = next.filter(n => Number.isFinite(n) && n > 0).map(n => Math.min(REPS_MAX, n)).slice(0, 6);
     setQuickSets(me, catId, clean);
     setValues(clean);
     setDraft(clean);
@@ -250,22 +295,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   openClosures = [], onCloseWeek,
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false, celebrate = true }) {
-  const [timerRunning, setTimerRunning] = React.useState(() => {
-    const v = localStorage.getItem('pt_work_timer_start');
-    const parsed = v ? parseInt(v) : null;
-    return Number.isFinite(parsed) && parsed > 0 && Date.now() - parsed < 86_400_000;
-  });
-  // Re-check on focus (user may have started/stopped timer elsewhere)
-  React.useEffect(() => {
-    const check = () => {
-      const v = localStorage.getItem('pt_work_timer_start');
-      const parsed = v ? parseInt(v) : null;
-      setTimerRunning(Number.isFinite(parsed) && parsed > 0 && Date.now() - parsed < 86_400_000);
-    };
-    window.addEventListener('focus', check);
-    window.addEventListener('pt:timer-changed', check);
-    return () => { window.removeEventListener('focus', check); window.removeEventListener('pt:timer-changed', check); };
-  }, []);
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const tabChallenges = challenges.filter(ch => {
     const cat = catById[ch.category_id];
@@ -339,7 +368,22 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     ? sides.map(s => ({ key: s.key, label: s.isMine && s.userIds.length === 1 ? tr('Du') : s.label, style: sideStyle(s) }))
     : [{ key: 'me', label: tr('Du'), style: sideStyle(sides[0]) }, { key: 'avg', label: tr('Ø andere'), style: { '--sc': 'var(--text-4)' } }];
   const weekMax = Math.max(1, ...week.flatMap(d => d.vals));
-  const daysLeft = week.filter(d => d.isFuture).length;
+  // Resttage zählen heute mit, wie die Startkarte (PTOnboarding.weekProgress).
+  const daysLeft = week.filter(d => d.isFuture || d.isToday).length;
+
+  // Serie: Tage in Folge mit eigenem Sport-Satz in dieser Challenge, ohne
+  // Workouts und Work. Ohne Satz heute zählt sie ab gestern (PTStats.streaks)
+  // und hält bis Mitternacht.
+  const streak = React.useMemo(() => {
+    if (!me || typeof window.PTStats?.streaks !== 'function') return null;
+    const days = allSets
+      .filter(s => s.athlete === me && !s.workout && s.duration_minutes == null && s.created_at)
+      .map(s => PTData.isoDate(new Date(s.created_at)));
+    const today = PTData.isoDate(new Date());
+    const { current } = PTStats.streaks(days, today);
+    return { days: current, today: days.includes(today) };
+  }, [allSets, me]);
+
   const finishedCount = rows.filter(r => r.meFinished).length;
   const chosenByLabel = (id) => id === me ? tr('gewählt von dir') : tr('gewählt von {name}', { name: PTPeople.firstNameOf(id) });
 
@@ -353,7 +397,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     return (
       <div className="rd-empty">
         <div className="rd-empty-title">{tr('Diese Woche ist noch offen')}</div>
-        <div className="rd-empty-text">{tr('Legt euer erstes Wochenziel fest.')}</div>
+        <div className="rd-empty-text">{tr('Legt die Ziele für diese Woche fest.')}</div>
         <button className="btn" onClick={onAddGoal}>{tr('Ziel anlegen')}</button>
       </div>
     );
@@ -363,19 +407,12 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
 
   return (
     <>
-      {timerRunning && (
-        <button type="button" className="timer-banner" onClick={onAddGoal}>
-          <span className="timer-banner-dot" />
-          <span>{tr('Timer läuft · tippe zum Loggen')}</span>
-        </button>
-      )}
-
       {sides.length >= 2 && (
         <DuelCard entries={duelEntries}
           title={twoSided
             ? tr('KW {week} · Duell', { week: weekNumber(tabChallenges[0].week_start) })
             : tr('KW {week} · Rangliste', { week: weekNumber(tabChallenges[0].week_start) })}
-          meta={daysLeft === 0 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')} />
+          meta={daysLeft <= 1 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')} />
       )}
 
       {focus && (
@@ -391,12 +428,18 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
             </MiniRing>
           </div>
           <div className="rd-focus-chips">
+            {streak?.days >= 2 && (
+              <span className={`rd-chip-glass rd-chip-streak${streak.today ? '' : ' is-open'}`}>
+                <span aria-hidden="true">🔥</span> {trn(streak.days, '{n} Tag in Folge', '{n} Tage in Folge')}
+                {!streak.today && <span className="rd-chip-streak-note"> · {tr('Serie hält bis Mitternacht')}</span>}
+              </span>
+            )}
             <span className="rd-chip-glass">
               {focus.isObligatory
                 ? tr('{done} von {total} erledigt', { done: focus.total, total: focus.goal })
                 : focus.isWork
-                  ? <>{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}</>
-                  : tr('{done} / {target} Reps', { done: focus.fmt(focus.total), target: focus.fmt(focus.ch.target_reps) })}
+                  ? tr('gemeinsam {done} / {target}', { done: focus.fmt(focus.total), target: focus.fmt(focus.ch.target_reps) })
+                  : tr('gemeinsam {done} / {target} Reps', { done: focus.fmt(focus.total), target: focus.fmt(focus.ch.target_reps) })}
             </span>
             <span className="rd-chip-glass">
               {focus.isObligatory ? (focus.meFinished ? tr('du: {summary}', { summary: focus.mySummary }) : tr('einmal diese Woche'))
@@ -455,6 +498,14 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
               </li>
             );
           })}
+          {onAddGoal && (
+            <li>
+              <button type="button" className="rd-row rd-row-add" onClick={onAddGoal}>
+                <span className="rd-tile"><Icon name="plus" size={20} /></span>
+                <span className="rd-row-text"><span className="rd-row-name">{tr('Übung hinzufügen')}</span></span>
+              </button>
+            </li>
+          )}
         </ul>
       </section>
 
@@ -541,14 +592,21 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   );
 }
 
-function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing, onClose, onSaved, onDeleted, onAddCategory }) {
-  const [catId, setCatId] = useState(existing?.category_id || categories[0]?.id || '');
+// usedCategoryIds: Übungen, die diese Woche schon ein Ziel haben (ohne das
+// gerade bearbeitete). Sie sind nicht wählbar; vorausgewählt ist die erste freie.
+function SetupSheet({ api, me, categories, weekStart, existing, usedCategoryIds = [], onClose, onSaved, onDeleted, onAddCategory }) {
+  const used = new Set(usedCategoryIds);
+  const isUsed = (id) => used.has(id) && id !== existing?.category_id;
+  const firstFree = (skipId) => [
+    ...categories.filter(c => (c.kind || 'sports') === 'sports'),
+    ...categories.filter(c => c.kind === 'work'),
+  ].find(c => c.id !== skipId && !isUsed(c.id))?.id || '';
+  const [catId, setCatId] = useState(() => existing?.category_id || firstFree());
   const [target, setTarget] = useState(existing?.target_reps || 100);
   const chosenBy = existing?.chosen_by || me;
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatEmoji, setNewCatEmoji] = useState('💪');
-  const [newCatKind, setNewCatKind] = useState('sports');
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -568,7 +626,8 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   async function deleteChallenge() {
     if (!existing?.id) return;
     const cat = categories.find(c => c.id === existing.category_id);
-    if (!confirm(tr('„{name}“ wirklich aus dieser Woche entfernen? Bisher geloggte Sätze bleiben erhalten.', { name: cat?.name || tr('Challenge') }))) return;
+    // Ziele mit Sätzen lehnt api.deleteChallenge mit eigener Meldung ab.
+    if (!confirm(tr('„{name}“ aus dieser Woche entfernen?', { name: cat?.name || tr('Ziel') }))) return;
     setDeleting(true);
     try {
       await api.deleteChallenge(existing.id);
@@ -582,6 +641,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
 
   async function save() {
     if (!catId) return;
+    if (isUsed(catId)) { alert(tr('Diese Übung hat diese Woche schon ein Ziel. Wähl eine andere.')); return; }
     setSaving(true);
     try {
       await api.upsertChallenge({
@@ -601,12 +661,11 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   async function addNewCat() {
     if (!newCatName.trim()) return;
     try {
-      const cat = await api.addCategory(newCatName.trim(), newCatEmoji, newCatKind);
+      const cat = await api.addCategory(newCatName.trim(), newCatEmoji);
       onAddCategory();
       setCatId(cat.id);
       setShowNewCat(false);
       setNewCatName('');
-      setNewCatKind('sports');
       setNewCatEmoji('💪');
     } catch (e) {
       alert(e.message);
@@ -626,7 +685,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
     if (!confirm(tr('Kategorie „{name}“ wirklich löschen?', { name: editingCat.name }))) return;
     try {
       await api.deleteCategory(editingCat.id);
-      if (catId === editingCat.id) setCatId(categories.find((c) => c.id !== editingCat.id)?.id || '');
+      if (catId === editingCat.id) setCatId(firstFree(editingCat.id));
       setEditingCat(null);
       onAddCategory();
     } catch (e) {alert(e.message);}
@@ -642,43 +701,30 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
       <div className="cat-grid">
         {(() => {
           const sports = categories.filter(c => (c.kind || 'sports') === 'sports');
-          const work   = categories.filter(c => c.kind === 'work');
+          const card = (c) => {
+            const taken = isUsed(c.id);
+            return (
+              <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
+                <button className={`cat-card ${catId === c.id ? 'selected' : ''}${taken ? ' disabled' : ''}`}
+                  disabled={taken} aria-label={taken ? tr('{name}, hat diese Woche schon ein Ziel', { name: c.name }) : undefined}
+                  onClick={() => setCatId(c.id)}>
+                  <div className="emoji">{c.emoji}</div>
+                  <div className="name">{c.name}</div>
+                  {c.competition_id && <div className="cat-note">{tr('zählt nicht für die Rangliste')}</div>}
+                  {taken && <div className="cat-card-note">{tr('schon dabei')}</div>}
+                </button>
+                {c.competition_id && (
+                  <button className="cat-edit" aria-label={tr('Bearbeiten')}
+                    onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
+                    ✎
+                  </button>
+                )}
+              </div>
+            );
+          };
           return (
             <>
-              {sports.map((c) => (
-                <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
-                  <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
-                    <div className="emoji">{c.emoji}</div>
-                    <div className="name">{c.name}</div>
-                    {c.competition_id && <div className="cat-note">{tr('zählt nicht für die Rangliste')}</div>}
-                  </button>
-                  {c.competition_id && (
-                    <button className="cat-edit" aria-label={tr('Bearbeiten')}
-                      onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-                      ✎
-                    </button>
-                  )}
-                </div>
-              ))}
-              {work.length > 0 && (
-                <>
-                  <div className="cat-grid-divider">{tr('💻 Work')}</div>
-                  {work.map((c) => (
-                    <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
-                      <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
-                        <div className="emoji">{c.emoji}</div>
-                        <div className="name">{c.name}</div>
-                      </button>
-                      {c.competition_id && (
-                        <button className="cat-edit" aria-label={tr('Bearbeiten')}
-                          onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-                          ✎
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
+              {sports.map(card)}
               <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
                 onClick={() => {setShowNewCat((s) => !s);setEditingCat(null);}}>
                 <div className="emoji">＋</div>
@@ -711,12 +757,6 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
           <input className="input" placeholder={tr('Name (z.B. Dips)')} autoFocus
             value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
-          {allowWork && (
-            <div className="segmented" style={{ flexShrink: 0 }}>
-              <button className={newCatKind === 'sports' ? 'active' : ''} onClick={() => setNewCatKind('sports')}>🏋️</button>
-              <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
-            </div>
-          )}
           <button className="new-cat-add" onClick={addNewCat} aria-label={tr('Hinzufügen')}>✓</button>
         </div>
       }
@@ -854,6 +894,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
       }
     } else {
       if (reps <= 0) return;
+      if (!confirmReps(reps)) return;
       setSaving(true);
       try {
         await api.addSet({
@@ -1072,7 +1113,8 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
   }
 
   async function saveSession() {
-    if (rounds <= 0 && !timerStart) { onClose(); return; }
+    // 0 Runden lehnt die Datenbank ab (reps > 0); dann ist der Knopf ohnehin aus.
+    if (rounds <= 0) return;
     setSaving(true);
     try {
       await api.addSet({
@@ -1093,12 +1135,11 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
   }
 
   const timerRunning = !!timerStart && !timeUp;
-  const canSave = rounds > 0 || timeUp;
+  const canSave = rounds > 0;
 
   return (
     <>
-      {/* i18n-ignore: Name des Workouts */}
-      <h2 className="title" style={{ marginBottom: 4 }}>Tom Holland Workout</h2>
+      <h2 className="title" style={{ marginBottom: 4 }}>{tr('20-Min-AMRAP')}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
         {tr('🦸 5 Klimmzüge · 10 Liegestütze · 15 Squats · {name}', { name: PTPeople.firstNameOf(me) })}
       </div>
@@ -1276,7 +1317,8 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
 }
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
-function WeekRecap({ recap, me, sides = [] }) {
+// getShareText: nur auf der neuesten Karte (FeedScreen), liefert den Text für „Ergebnis teilen“.
+function WeekRecap({ recap, me, sides = [], getShareText }) {
   const { week_start, challStats, totals = [], winnerIdx, sumAll, hitCount, totalChallenges, analysis,
     perSide = [], penCentsBySide = [], weekNumber } = recap;
   const isWorkWeek = challStats.length > 0 && challStats.every(c => c.cat?.kind === 'work');
@@ -1434,6 +1476,11 @@ function WeekRecap({ recap, me, sides = [] }) {
           {trn(totalChallenges, '{done} von {n} Ziel erreicht', '{done} von {n} Zielen erreicht', { done: hitCount })}
         </div>
       )}
+      {getShareText && (
+        <div className="recap-share">
+          <ShareResultButton getText={getShareText} title={tr('Wochenergebnis')} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1496,7 +1543,9 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
   const labelIdx = days <= 7
     ? axis.map((_, i) => i)
     : Array.from({ length: labelCount }, (_, k) => Math.round((k * (days - 1)) / (labelCount - 1)));
-  const fmt = (s) => PTi18n.day(s, { day: 'numeric', month: 'numeric' });
+  // Ohne führende Null (en-GB „07/09“ → „7/9“), sonst stoßen bei „All“ die
+  // Beschriftungen auf schmalen Geräten aneinander.
+  const fmt = (s) => PTi18n.day(s, { day: 'numeric', month: 'numeric' }).replace(/\b0(?=\d)/g, '');
 
   // Y labels — 5 ticks
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * maxV));
@@ -1549,7 +1598,7 @@ function FullscreenChart({ series, days, activeIdx, vw, vh }) {
           {series.map(s => (
             <circle key={s.key}
               className="chart-scrubber-dot"
-              cx={xPos(activeIdx)} cy={yScale(s.data[activeIdx].reps)}
+              cx={xPos(activeIdx)} cy={yScale(s.data[activeIdx]?.reps ?? 0)}
               r="5" fill={s.color}
             />
           ))}
@@ -1590,10 +1639,15 @@ function ChartFullscreen({
 
   // Reset scrubber when range changes (series length changes -> activeIdx may be out of bounds).
   useEffect(() => { setActiveIdx(null); }, [totalDays]);
+  // Der Effect läuft erst nach dem Render. Darum den Index beim Wechsel sofort
+  // zurücksetzen und unten zusätzlich auf die aktuelle Länge begrenzen –
+  // sonst greift die Leiste auf einen Tag zu, den es im kürzeren Zeitraum nicht gibt.
+  const pickRange = (r) => { setActiveIdx(null); setRange(r); };
 
   // Resolve which series to render based on cumulative flag.
   const shown = cumulative ? cumSeries : series;
   const axis = shown[0]?.data || [];
+  const idx = activeIdx != null && activeIdx >= 0 && activeIdx < axis.length ? activeIdx : null;
 
   // Scrubber pointer handlers.
   const handlePointer = (e) => {
@@ -1618,9 +1672,9 @@ function ChartFullscreen({
         <div className="chart-fs-title">{title}</div>
         <div className="chart-fs-controls">
           <div className="segmented segmented-sm">
-            <button className={range==='7'?'active':''} onClick={()=>setRange('7')}>{tr('{n}T', { n: 7 })}</button>
-            <button className={range==='30'?'active':''} onClick={()=>setRange('30')}>{tr('{n}T', { n: 30 })}</button>
-            <button className={range==='all'?'active':''} onClick={()=>setRange('all')}>{tr('All')}</button>
+            <button className={range==='7'?'active':''} onClick={()=>pickRange('7')}>{tr('{n}T', { n: 7 })}</button>
+            <button className={range==='30'?'active':''} onClick={()=>pickRange('30')}>{tr('{n}T', { n: 30 })}</button>
+            <button className={range==='all'?'active':''} onClick={()=>pickRange('all')}>{tr('All')}</button>
           </div>
           <div className="segmented segmented-sm">
             <button className={cumulative?'active':''} onClick={()=>setCumulative(true)} aria-label={tr('Kumuliert')}>Σ</button>
@@ -1641,20 +1695,20 @@ function ChartFullscreen({
         <FullscreenChart
           series={shown}
           days={totalDays}
-          activeIdx={activeIdx}
+          activeIdx={idx}
           vw={bodySize.w}
           vh={bodySize.h}
         />
       </div>
 
       <div className="chart-fs-bottom">
-        {activeIdx === null ? (
+        {idx === null ? (
           <div className="chart-fs-hint">{tr('Tippe in das Diagramm für Tageswerte')}</div>
         ) : (
           <div className="chart-fs-values">
-            <span className="chart-fs-date">{fmtDate(axis[activeIdx].date)}</span>
+            <span className="chart-fs-date">{fmtDate(axis[idx].date)}</span>
             {shown.map(s => (
-              <span key={s.key} className="chart-fs-val side-n" style={{ '--sc': s.color }}>{s.label}: <b>{s.data[activeIdx].reps}</b></span>
+              <span key={s.key} className="chart-fs-val side-n" style={{ '--sc': s.color }}>{s.label}: <b>{s.data[idx]?.reps ?? 0}</b></span>
             ))}
           </div>
         )}
@@ -1685,16 +1739,20 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
   const selectedChallenge = challenges.find(c => c.id === challengeId);
   const selectedCat = catById[selectedChallenge?.category_id];
   const isWork = selectedCat?.kind === 'work';
+  // Pflicht-Workouts zählen Sekunden bzw. Runden: keine Wiederholungs-Rückfrage.
+  const isWorkout = PTData.isWorkoutType(selectedCat?.challenge_type);
 
   async function save() {
     if (!challengeId) return;
     if (isWork ? durationMinutes <= 0 : reps <= 0) return;
+    if (!isWork && !isWorkout && !confirmReps(reps)) return;
     setSaving(true);
     try {
       const [y, m, d] = dateIso.split('-').map(Number);
-      // Pick midday of the chosen date so it sorts predictably relative to
-      // any other entries that day without leaking real-time-of-day info.
-      const created = new Date(y, m - 1, d, 12, 0, 0);
+      // Vergangene Tage: 12:00 Uhr, damit der Satz berechenbar einsortiert wird.
+      // Heute: jetzt – 12:00 läge am Vormittag in der Zukunft und stünde im Feed
+      // über neueren Sätzen.
+      const created = dateIso === todayIso ? new Date() : new Date(y, m - 1, d, 12, 0, 0);
       const payload = isWork
         ? {
             challenge_id: challengeId,
@@ -1838,4 +1896,6 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
   );
 }
 
-Object.assign(window, { HomeScreen, SetupSheet, LogSheet, WeekRecap, bsuFmt, BSU_MAX_SEC, BackfillSheet, FullscreenChart, ChartFullscreen, EmojiPickerSheet, TomHollandSheet, BringSallySheet });
+// WeekFixCard kommt aus settings.jsx (die Kopie hier ist entfernt).
+Object.assign(window, { HomeScreen, SetupSheet, LogSheet, WeekRecap, bsuFmt, BSU_MAX_SEC, BackfillSheet, FullscreenChart, ChartFullscreen, EmojiPickerSheet, TomHollandSheet, BringSallySheet,
+  confirmReps, shareResultText, ShareResultButton });

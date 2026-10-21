@@ -20,9 +20,23 @@ function reasonText(p) {
     case 'per_challenge':      return tr('einzelne Challenge verfehlt');
     case 'per_week_any':       return tr('min. 1 Challenge verfehlt');
     case 'per_week_all':       return tr('alle Challenges verfehlt');
-    case 'per_week_aggregate': return tr('aggregiert verfehlt');
+    case 'per_week_aggregate': return tr('Wochensumme verfehlt');
     default:                   return p.rule_mode;
   }
+}
+
+// Kontostand: Strafen minus Einzahlungen, gesamt und pro Person (Cent).
+// openPeople = Personen mit offenem Saldo; 0, wenn insgesamt nichts offen ist.
+// Gemeinsame Rechnung für den Strafkonto-Screen und den Badge am Tab (app.jsx).
+function penaltySummary(penalties = [], payouts = []) {
+  const totalPenalties = penalties.reduce((a, p) => a + (p.amount_cents || 0), 0);
+  const totalPayouts = payouts.reduce((a, p) => a + (p.amount_cents || 0), 0);
+  const potOpen = totalPenalties - totalPayouts;
+  const saldo = {};
+  for (const p of penalties) saldo[p.athlete] = (saldo[p.athlete] || 0) + (p.amount_cents || 0);
+  for (const p of payouts) saldo[p.athlete] = (saldo[p.athlete] || 0) - (p.amount_cents || 0);
+  const openPeople = potOpen > 0 ? Object.values(saldo).filter(v => v > 0).length : 0;
+  return { totalPenalties, totalPayouts, potOpen, saldo, openPeople };
 }
 
 // Strafregel als ein Satz für Neue (Regelnamen wie in den Einstellungen).
@@ -52,9 +66,7 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
     return () => { alive = false; };
   }, [api, isEmpty]);
 
-  const totalPenalties = penalties.reduce((a, p) => a + p.amount_cents, 0);
-  const totalPayouts   = payouts.reduce((a, p) => a + p.amount_cents, 0);
-  const potOpen        = totalPenalties - totalPayouts;
+  const { totalPayouts, potOpen } = penaltySummary(penalties, payouts);
 
   // Pro Person (auch Ausgetretene, solange sie Strafen/Einzahlungen haben); ich zuerst.
   const people = [...new Set([me, ...members.map(m => m.user_id), ...penalties.map(p => p.athlete), ...payouts.map(p => p.athlete)])]
@@ -262,7 +274,7 @@ function ReopenSheet({ weekStart, api, penalties, onClose, onDone }) {
     <Sheet open={true} onClose={onClose}>
       <h2 className="title" style={{marginBottom:8}}>{tr('{week} neu öffnen?', { week: weekLabel(weekStart) })}</h2>
       <div className="subtitle" style={{marginBottom:18}}>
-        {tr('Closure wird gelöscht — danach kannst du nachloggen und neu abschließen.')}
+        {tr('Der Wochenabschluss wird zurückgenommen. Danach kannst du nachloggen und neu abschließen.')}
       </div>
       {weekPenalties.length > 0 && (
         <div style={{marginBottom:16,padding:'10px 12px',background:'var(--surface-2)',borderRadius:8,fontSize:14}}>
@@ -360,9 +372,17 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
   const [preview, setPreview] = React.useState(null);
   const [busy, setBusy] = useState(false);
 
+  // Vorschau scheitert (z. B. offline): Meldung zeigen und schließen statt endlos „Lade Vorschau…“.
   React.useEffect(() => {
     let alive = true;
-    api.previewWeekClose(weekStart).then(r => { if (alive) setPreview(r); });
+    api.previewWeekClose(weekStart)
+      .then(r => { if (alive) setPreview(r); })
+      .catch(e => {
+        if (!alive) return;
+        console.error('previewWeekClose failed', e);
+        alert(e?.message || tr('Die Vorschau konnte nicht geladen werden. Versuch es gleich nochmal.'));
+        onClose();
+      });
     return () => { alive = false; };
   }, [api, weekStart]);
 
@@ -405,4 +425,5 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
 
 window.StrafkontoScreen = StrafkontoScreen;
 window.formatEuro = formatEuro;
+window.penaltySummary = penaltySummary;
 window.WeekCloseSheet = WeekCloseSheet;
