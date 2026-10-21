@@ -177,6 +177,10 @@ button, input, select, textarea { font-family: inherit; }
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   box-shadow: var(--shadow-float);
 }
+.app:has(.rd-feed.lf) .tabbar-inner {
+  background: var(--surface);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
 .tab-btn {
   position: relative;
   min-width: 0; height: 52px; padding: 0;
@@ -592,8 +596,7 @@ button, input, select, textarea { font-family: inherit; }
   position: sticky; top: calc(var(--safe-top) + 8px); z-index: 6;
   align-self: flex-start; margin: 10px 0 2px 4px; padding: 5px 10px;
   border-radius: 999px; background: var(--bg);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 
 .lf-row { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }

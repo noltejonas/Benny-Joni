@@ -242,12 +242,47 @@ test('deleteAccount: Fehler → deutscher Text, Sitzung und Daten bleiben', asyn
   await assert.rejects(viaFunction.api.deleteAccount(), /Konto konnte nicht gelöscht werden/);
 });
 
-test('deleteAccount: Fehler beim Bilder-Löschen hält das Löschen nicht auf', async () => {
+test('deleteAccount: bei Storagefehlern bleiben Konto, Sitzung und Aufräumzugriff erhalten', async () => {
+  const localStorage = memoryStorage({ 'pt:returning': '1' });
   const { api, calls } = await signedInApi({
     list: () => ({ data: null, error: { message: 'Bucket not found' } }),
-  }, { localStorage: memoryStorage(), sessionStorage: memoryStorage() });
+  }, { localStorage, sessionStorage: memoryStorage() });
+  await assert.rejects(api.deleteAccount(), /Konto konnte nicht gelöscht werden/);
+  assert.ok(!calls.find(c => c.rpc || c.invoke || c.signOut));
+  assert.deepEqual(localStorage.keys(), ['pt:returning']);
+});
+
+test('deleteAccount: fehlgeschlagene oder unbestätigte Dateilöschung löscht das Konto nicht', async () => {
+  for (const result of [{ data: null, error: { message: 'Storage unavailable' } }, { data: [], error: null }]) {
+    const { api, calls } = await signedInApi({
+      list: () => ({ data: [{ id: 'f1', name: 'avatar.jpg' }], error: null }),
+      remove: () => result,
+    });
+    await assert.rejects(api.deleteAccount(), /Konto konnte nicht gelöscht werden/);
+    assert.ok(!calls.find(c => c.rpc || c.invoke || c.signOut));
+  }
+});
+
+test('deleteAccount: teilweise entfernte Profilbilder werden vor dem Konto vollständig aufgeräumt', async () => {
+  const remaining = ['avatar-1.jpg', 'avatar-2.jpg'];
+  const { api, calls } = await signedInApi({
+    list: () => ({ data: remaining.map(name => ({ id: name, name })), error: null }),
+    remove: () => ({ data: [{ name: remaining.shift() }], error: null }),
+  });
   await api.deleteAccount();
-  assert.ok(calls.find(c => c.rpc === 'delete_my_account'));
+  assert.equal(remaining.length, 0);
+  assert.equal(calls.filter(c => c.remove).length, 2);
+  const rpcIndex = calls.findIndex(c => c.rpc === 'delete_my_account');
+  assert.ok(rpcIndex > calls.map(c => !!c.list).lastIndexOf(true));
+});
+
+test('deleteAccount: ein nicht leer werdender Storageordner beendet den Versuch sicher', async () => {
+  const { api, calls } = await signedInApi({
+    list: () => ({ data: [{ id: 'f1', name: 'avatar.jpg' }], error: null }),
+  });
+  await assert.rejects(api.deleteAccount(), /Konto konnte nicht gelöscht werden/);
+  assert.equal(calls.filter(c => c.remove).length, 20);
+  assert.ok(!calls.find(c => c.rpc || c.invoke || c.signOut));
 });
 
 // ── Wochenziele mit Sätzen ──────────────────────────────────────────────────

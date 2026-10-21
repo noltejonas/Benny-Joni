@@ -10,15 +10,19 @@
   // ── Launch-Konfiguration ────────────────────────────────────────────
   // Einzige Stelle für Name, Store-Link, Support und Rechtstexte.
   const APP_NAME = 'Benny & Joni';
-  // Numerische Apple-ID der App: morgens aus App Store Connect eintragen
-  // (App-Informationen → Apple-ID). Leer = Einladung ohne Store-Link.
-  const APP_STORE_ID = '';
+  // Bestätigte Apple-ID aus App Store Connect für com.bennyjoni.terminator.
+  const APP_STORE_ID = '6768353714';
   const STORE_DIGITS = APP_STORE_ID.replace(/\D/g, ''); // verzeiht „id…“ und Leerzeichen
   const APP_STORE_URL = STORE_DIGITS ? `https://apps.apple.com/de/app/id${STORE_DIGITS}` : '';
   // Support und Meldungen öffnen eine vorausgefüllte E-Mail an diese Adresse.
   const SUPPORT_EMAIL = 'bennyundjoni@gmail.com';
   // Rechtstexte auf GitHub Pages (docs/launch/site).
   const LEGAL_BASE = 'https://noltejonas.github.io/Benny-Joni/';
+  const IS_ANDROID = window.Capacitor?.getPlatform?.() === 'android';
+  // Bis der Play-Eintrag angelegt ist, führt Android zur Landingpage.
+  const DOWNLOAD_URL = IS_ANDROID ? LEGAL_BASE : APP_STORE_URL;
+  const APP_REVIEW_URL = !IS_ANDROID && STORE_DIGITS
+    ? `itms-apps://apps.apple.com/app/id${STORE_DIGITS}?action=write-review` : '';
   const LEGAL = Object.freeze({
     privacy: `${LEGAL_BASE}datenschutz.html`,
     imprint: `${LEGAL_BASE}impressum.html`,
@@ -142,7 +146,7 @@
   function inviteText(competition) {
     const code = String(competition.invite_code || '').toUpperCase();
     return tr('Komm in meine Challenge „{name}“ bei {app} 💪', { name: competition.name, app: APP_NAME }) + '\n'
-      + (APP_STORE_URL ? tr('App laden: {url}', { url: APP_STORE_URL }) : tr('Im App Store: {app}', { app: APP_NAME })) + '\n'
+      + (DOWNLOAD_URL ? tr('App laden: {url}', { url: DOWNLOAD_URL }) : tr('Im App Store: {app}', { app: APP_NAME })) + '\n'
       + `Code: ${code}\n`
       + tr('Schon installiert? {link}', { link: inviteLink(code) });
   }
@@ -444,7 +448,7 @@
   }
 
   window.PTOnboarding = {
-    APP_NAME, APP_STORE_ID, APP_STORE_URL, SUPPORT_EMAIL, LEGAL,
+    APP_NAME, APP_STORE_ID, APP_STORE_URL, DOWNLOAD_URL, APP_REVIEW_URL, SUPPORT_EMAIL, LEGAL,
     openExternal, supportMailto, reportText, reportContent,
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,

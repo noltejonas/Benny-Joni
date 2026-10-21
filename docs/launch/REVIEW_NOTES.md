@@ -3,8 +3,8 @@
 Anbieter sind Jonas Nolte und Benjamin Frey, beide unter Furtbachstraße 16A,
 70178 Stuttgart, Deutschland. Support und Review-Ansprechpartner: Jonas Nolte,
 `bennyundjoni@gmail.com`, `+491781479821`. Die Support-Adresse ist in der App
-hinterlegt. Die folgenden Notizen benötigen weiterhin einen funktionierenden
-Review-Login und den echten Einladungscode; diese Zugangsdaten werden nur lokal konfiguriert.
+hinterlegt. Ein funktionierendes Review-Setup ist vorbereitet; Login und
+Einladungscode sind ausschließlich lokal konfiguriert.
 
 Die englischen Notizen zwischen den Markierungen werden von Fastlane
 übernommen. Der Einladungscode wird ausschließlich aus `REVIEW_CODE` in der
@@ -12,10 +12,14 @@ ignorierten `.env` eingesetzt. Die tatsächlichen Kontaktdaten und der echte
 Login kommen aus `REVIEW_FIRST_NAME`, `REVIEW_LAST_NAME`, `REVIEW_EMAIL`,
 `REVIEW_PHONE`, `REVIEW_USER` und `REVIEW_PASSWORD`.
 
-Vor der Einreichung ein Review-Konto in der Produktions-App bereitstellen,
-das zu einer Challenge mit zweitem Mitglied, Wochenzielen, Sätzen und
-Reaktionen gehört. Ein Reservekonto erleichtert spätere Prüfungen, falls
-Apple die Kontolöschung am ersten Konto testet. Prüfen, dass Anmeldung,
+Die kontrollierten Profile „Benny Demo“ und „Joni Demo“ gehören zu einer eigenen
+Demo-Challenge mit aktuellen Wochenzielen, synthetischen Sätzen und Reaktionen.
+Beide Logins wurden geprüft; die Profile haben normale Nutzerrechte und die
+globale Ranglistenteilnahme ist deaktiviert. Die Challenge lässt zusätzliche
+Prüfer per Einladung zu. Der zweite Zugang liegt geschützt unter
+`.local/review/rival.env`; er gehört nicht in öffentliche Notizen. Ein Reservekonto
+erleichtert spätere Prüfungen, falls Apple die Kontolöschung am ersten Konto
+testet. Vor der Einreichung weiterhin prüfen, dass Anmeldung,
 Einladung, Melden/Blockieren und Kontolöschung im hochgeladenen Build
 funktionieren. Bei AdMob die echte Einwilligungsnachricht veröffentlichen;
 Testanzeigen sind ausschließlich für TestFlight vorgesehen.

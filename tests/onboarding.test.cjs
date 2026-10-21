@@ -19,8 +19,9 @@ function readWww(f, config = {}) {
   return src;
 }
 
-function load(config = {}) {
+function load(config = {}, platform) {
   const ctx = { window: {}, console };
+  if (platform) ctx.window.Capacitor = { getPlatform: () => platform, isNativePlatform: () => true };
   vm.createContext(ctx);
   for (const f of ['i18n.js', 'data.js', 'onboarding-model.js']) {
     vm.runInContext(readWww(f, config), ctx, { filename: f });
@@ -116,6 +117,17 @@ test('inviteText mit App-Store-ID: Link zum Laden', () => {
   assert.equal(o.normalizeCode(lines.slice(0, 3).join('\n')), 'BJ4K7X');
   // Versehentlich mit „id“ oder Leerzeichen eingetragen
   assert.equal(load({ APP_STORE_ID: ' id6741234567 ' }).O.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
+});
+
+test('Android-Einladung nutzt trotz Apple-ID die Landingpage und bietet keine Apple-Bewertung', () => {
+  const { O: o } = load({}, 'android');
+  assert.equal(o.APP_STORE_URL, 'https://apps.apple.com/de/app/id6768353714');
+  assert.equal(o.DOWNLOAD_URL, 'https://noltejonas.github.io/Benny-Joni/');
+  assert.equal(o.APP_REVIEW_URL, '');
+  const text = o.inviteText({ name: 'Duell', invite_code: 'GTB34L' });
+  assert.ok(text.includes(`App laden: ${o.DOWNLOAD_URL}`));
+  assert.doesNotMatch(text, /apps\.apple\.com|itms-apps:|play\.google\.com/);
+  assert.equal(o.normalizeCode(text), 'GTB34L');
 });
 
 test('LEGAL: alle Rechtstexte per https', () => {

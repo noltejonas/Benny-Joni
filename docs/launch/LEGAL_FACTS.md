@@ -21,9 +21,10 @@ nur `docs/launch/site/`; diese Notiz gehört nicht zur öffentlichen Website.
   Fehlerberichte. Maximal fünf Versuche für Fehlerberichte pro Sitzung;
   Konto-Löschung kaskadiert auf `client_errors`, wenn diese optionale Tabelle
   produktiv eingerichtet ist. Keine automatische 90-Tage-Löschung vorhanden.
-- Profilbilder werden vor der Konto-Löschung über die Storage-API entfernt;
-  ein Fehler dabei verhindert die übrige Kontolöschung nicht. Daher keine
-  Zusage einer ausnahmslos sofortigen Dateilöschung.
+- Profilbilder werden vor der Konto-Löschung über die Storage-API entfernt.
+  Der Client prüft durch erneutes Listen, dass keine eigenen Dateien mehr
+  übrig sind; bei Fehlern bleiben Konto und Sitzung zum Wiederholen erhalten.
+  Keine Zusage einer ausnahmslos sofortigen Dateilöschung bei Netzwerkfehlern.
 - Freiwillig öffentliche Ranglistenwerte; Challenge-Inhalte nur für Mitglieder.
   Profilbilder sind bei Kenntnis ihrer URL öffentlich abrufbar.
 - iOS-Push über APNs; Android-FCM ist noch nicht eingerichtet.

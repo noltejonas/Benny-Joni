@@ -39,7 +39,7 @@ function stEuroInput(cents) {
 
 // ─── Rechtliches, Support, Melden ───────────────────────────────────────────
 // Adressen und Links stehen zentral in PTOnboarding (APP_NAME, LEGAL, SUPPORT_EMAIL,
-// APP_STORE_ID). Fehlt etwas davon, bleibt die jeweilige Zeile weg.
+// APP_REVIEW_URL). Fehlt etwas davon, bleibt die jeweilige Zeile weg.
 const stLaunch = () => window.PTOnboarding || {};
 
 // Öffnet Links in Safari bzw. der Mail-App.
@@ -329,9 +329,7 @@ function SettingsInfoGroup({ me, competition }) {
   const appName = O.APP_NAME || 'Benny & Joni';
   const ids = stIds(me, competition?.id);
   const supportUrl = stSupportUrl(tr('{app}: Support & Feedback', { app: appName }), `\n\n\n${ids}`);
-  // Wie STORE_DIGITS im Onboarding-Modell: verzeiht „id…“ und Leerzeichen.
-  const storeDigits = String(O.APP_STORE_ID || '').replace(/\D/g, '');
-  const rateUrl = storeDigits ? `itms-apps://apps.apple.com/app/id${storeDigits}?action=write-review` : '';
+  const rateUrl = O.APP_REVIEW_URL || '';
   const canReport = stCanReport();
   if (!legal && !supportUrl && !rateUrl) return null;
 

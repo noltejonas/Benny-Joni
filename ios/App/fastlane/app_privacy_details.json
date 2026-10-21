@@ -1,0 +1,77 @@
+[
+  {
+    "category": "ADVERTISING_DATA",
+    "purposes": ["ANALYTICS", "THIRD_PARTY_ADVERTISING"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "COARSE_LOCATION",
+    "purposes": ["ANALYTICS", "APP_FUNCTIONALITY", "THIRD_PARTY_ADVERTISING"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "CRASH_DATA",
+    "purposes": ["ANALYTICS"],
+    "data_protections": ["DATA_NOT_LINKED_TO_YOU"]
+  },
+  {
+    "category": "CUSTOMER_SUPPORT",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "DEVICE_ID",
+    "purposes": ["ANALYTICS", "APP_FUNCTIONALITY", "THIRD_PARTY_ADVERTISING"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "EMAIL_ADDRESS",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "FITNESS",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "NAME",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "OTHER_DIAGNOSTIC_DATA",
+    "purposes": ["ANALYTICS", "APP_FUNCTIONALITY", "THIRD_PARTY_ADVERTISING"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "OTHER_FINANCIAL_INFO",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "OTHER_USER_CONTENT",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "PERFORMANCE_DATA",
+    "purposes": ["ANALYTICS", "APP_FUNCTIONALITY", "THIRD_PARTY_ADVERTISING"],
+    "data_protections": ["DATA_NOT_LINKED_TO_YOU"]
+  },
+  {
+    "category": "PHOTOS_OR_VIDEOS",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "PRODUCT_INTERACTION",
+    "purposes": ["ANALYTICS", "APP_FUNCTIONALITY", "THIRD_PARTY_ADVERTISING"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  },
+  {
+    "category": "USER_ID",
+    "purposes": ["APP_FUNCTIONALITY"],
+    "data_protections": ["DATA_LINKED_TO_YOU"]
+  }
+]

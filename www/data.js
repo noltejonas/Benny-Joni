@@ -413,20 +413,23 @@
     // ── Konto löschen: Hilfen ──────────────────────────────────────────
     // Profilbilder liegen unter avatars/<uid>/ (jeder Upload eine neue Datei). Die
     // Datenbank-Kaskade erreicht den Storage nicht, deshalb vorher hier löschen.
-    // Fehler nur loggen: Das Konto soll trotzdem gelöscht werden können.
+    // Das Konto erst löschen, wenn die Dateien entfernt sind: Danach würde
+    // der Nutzer seinen Storage-Zugriff und damit die Möglichkeit zum Aufräumen verlieren.
     async function removeOwnAvatars(id) {
       const bucket = client.storage.from('avatars');
-      try {
-        for (let round = 0; round < 20; round++) {
-          const { data, error } = await bucket.list(id, { limit: 100 });
-          if (error) throw error;
-          const paths = (data || []).filter(f => f.id && f.name).map(f => `${id}/${f.name}`);
-          if (!paths.length) return;
-          const { data: removed, error: rmError } = await bucket.remove(paths);
-          if (rmError) throw rmError;
-          if (!removed?.length || paths.length < 100) return;
-        }
-      } catch (e) { console.warn('Profilbilder nicht gelöscht', e); }
+      for (let round = 0; round <= 20; round++) {
+        const { data, error } = await bucket.list(id, { limit: 100 });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw appError('delete_failed');
+        const paths = data.filter(f => f.id && f.name).map(f => `${id}/${f.name}`);
+        if (!paths.length) return;
+        if (round === 20) throw appError('delete_failed');
+        const { data: removed, error: rmError } = await bucket.remove(paths);
+        if (rmError) throw rmError;
+        if (!removed?.length) throw appError('delete_failed');
+        // Auch nach einer kleinen oder nur teilweise bestätigten Antwort
+        // erneut listen, bis der eigene Ordner nachweislich leer ist.
+      }
     }
     // Darf delete_my_account() auth.users nicht anfassen, übernimmt die Edge Function.
     const needsAdminDelete = (error) =>
@@ -492,8 +495,8 @@
       // lädt danach die Startseite neu.
       async deleteAccount() {
         const id = uid();
-        await removeOwnAvatars(id);
         try {
+          await removeOwnAvatars(id);
           const { error } = await client.rpc('delete_my_account');
           if (error) {
             if (!needsAdminDelete(error)) throw error;

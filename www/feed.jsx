@@ -428,7 +428,7 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
     return PTFeed.recapShareText({
       recap: r, sides, kw: weekNumber(r.week_start), name: competition?.name || '',
       unit: work ? '' : trc('Einheit', 'Reps'), fmt: work ? formatDuration : PTi18n.number,
-      appName: O?.APP_NAME || 'Benny & Joni', appUrl: O?.APP_STORE_URL || '', code: competition?.invite_code || '',
+      appName: O?.APP_NAME || 'Benny & Joni', appUrl: O?.DOWNLOAD_URL || '', code: competition?.invite_code || '',
     });
   };
 

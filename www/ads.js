@@ -98,7 +98,7 @@
   let formTried = false;   // Formular in dieser Sitzung schon gezeigt
   let consentBusy = false;
   let sdkPromise = null;
-  let ready = false;       // SDK gestartet, Listener stehen
+  let ready = false;       // SDK gestartet, Android-Datenschutz bestätigt, Listener stehen
   let privacyRequired = false;
   let privacyBusy = false;
 
@@ -180,11 +180,23 @@
   function startSdk() {
     if (!sdkPromise) {
       sdkPromise = (async () => {
+        const privacy = platform === 'android' ? C.Plugins.AdPrivacy : null;
+        if (platform === 'android' && typeof privacy?.disablePublisherFirstPartyId !== 'function') {
+          throw new Error('AdPrivacy bridge unavailable'); // i18n-ignore: nur Log
+        }
         await P.initialize({
           testingDevices: TEST_DEVICES,
           initializeForTesting: TEST_DEVICES.length > 0,
           maxAdContentRating: MAX_AD_CONTENT_RATING,
         });
+        // SDK 25.5 verlangt initialize() vor dieser Einstellung. Erst nach
+        // bestätigter Persistierung darf eine Anzeigenanfrage folgen.
+        if (privacy) {
+          const result = await privacy.disablePublisherFirstPartyId();
+          if (result?.disabled !== true) {
+            throw new Error('Publisher first-party ID was not disabled'); // i18n-ignore: nur Log
+          }
+        }
         await listen();
         ready = true;
         watchOverlays();

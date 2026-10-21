@@ -81,7 +81,8 @@ function configProblems({ config, plistAppId }) {
 // ── Nachgebaute Umgebung ────────────────────────────────────────────────────
 // native: false = Browser, null = gar kein window.Capacitor.
 function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, afterForm = {},
-  failInfo = 0, afterPrivacy = {}, source = TEST_SOURCE } = {}) {
+  failInfo = 0, afterPrivacy = {}, initialize = async () => {}, privacyPlugin = true,
+  disablePrivacy = async () => ({ disabled: true }), source = TEST_SOURCE } = {}) {
   const calls = [];
   const listeners = {};
   const present = new Set();
@@ -106,12 +107,18 @@ function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, af
         privacyOptionsRequirementStatus: consent.privacyOptionsRequirementStatus };
     },
     async showPrivacyOptionsForm() { calls.push(['showPrivacyOptionsForm']); Object.assign(consent, afterPrivacy); },
-    async initialize(o) { calls.push(['initialize', o]); },
+    async initialize(o) { calls.push(['initialize', o]); await initialize(); },
     async showBanner(o) { calls.push(['showBanner', o]); },
     async hideBanner() { calls.push(['hideBanner']); },
     async resumeBanner() { calls.push(['resumeBanner']); },
     async removeBanner() { calls.push(['removeBanner']); },
     addListener(ev, cb) { (listeners[ev] = listeners[ev] || []).push(cb); return { remove() {} }; },
+  };
+  const AdPrivacy = {
+    async disablePublisherFirstPartyId() {
+      calls.push(['disablePublisherFirstPartyId']);
+      return disablePrivacy();
+    },
   };
   const document = {
     documentElement: { style: { setProperty(k, v) { style[k] = v; } } },
@@ -128,7 +135,8 @@ function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, af
     addEventListener(t, cb) { (winListeners[t] = winListeners[t] || []).push(cb); },
   };
   if (native !== null) {
-    window.Capacitor = { isNativePlatform: () => native, getPlatform: () => platform, Plugins: plugin ? { AdMob } : {} };
+    window.Capacitor = { isNativePlatform: () => native, getPlatform: () => platform,
+      Plugins: plugin ? { AdMob, ...(privacyPlugin ? { AdPrivacy } : {}) } : {} };
   }
   class CustomEvent { constructor(type) { this.type = type; } }
   class MutationObserver { constructor(cb) { observer = cb; } observe() {} }
@@ -423,17 +431,46 @@ test('Einstellungen → Werbe-Einwilligung öffnet Googles Datenschutzoptionen',
 });
 
 
-test('Android nutzt eigene Test-IDs und denselben UMP-Ablauf', async () => {
-  const env = makeEnv({ platform: 'android' });
+test('Android wartet nach UMP und SDK-Start auf bestätigte Publisher-ID-Deaktivierung', async () => {
+  let finishInitialize, confirmPrivacy;
+  const env = makeEnv({ platform: 'android',
+    initialize: () => new Promise((resolve) => { finishInitialize = resolve; }),
+    disablePrivacy: () => new Promise((resolve) => { confirmPrivacy = resolve; }),
+  });
   assert.equal(env.PTAds.config.active, true);
   assert.equal(env.PTAds.config.platform, 'android');
   assert.equal(env.PTAds.config.testing, true);
   assert.equal(env.PTAds.config.appId, `ca-app-pub-${TEST_PUB}~3347511713`);
   env.PTAds.setBannerWanted(true);
   await settle();
-  assert.deepEqual(env.names(), ['requestConsentInfo', 'showConsentForm', 'initialize', 'showBanner']);
+  // Weder Datenschutzaufruf noch AdRequest vor aufgelöster Initialisierung.
+  assert.deepEqual(env.names(), ['requestConsentInfo', 'showConsentForm', 'initialize']);
+  finishInitialize();
+  await settle();
+  assert.deepEqual(env.names(), ['requestConsentInfo', 'showConsentForm', 'initialize', 'disablePublisherFirstPartyId']);
+  assert.equal(env.count('showBanner'), 0);
+  confirmPrivacy({ disabled: true });
+  await settle();
+  assert.deepEqual(env.names(), ['requestConsentInfo', 'showConsentForm', 'initialize', 'disablePublisherFirstPartyId', 'showBanner']);
   assert.equal(env.arg('showBanner').adId, `ca-app-pub-${TEST_PUB}/9214589741`);
   assert.equal(env.arg('showBanner').npa, true);
+});
+
+test('Android fordert bei fehlender Bridge oder gescheiterter Publisher-ID-Deaktivierung keine Anzeigen an', async () => {
+  for (const failure of [
+    { privacyPlugin: false },
+    { disablePrivacy: async () => { throw new Error('persist failed'); } },
+    { disablePrivacy: async () => ({ disabled: false }) },
+  ]) {
+    const env = makeEnv({ platform: 'android', info: { status: 'OBTAINED', canRequestAds: true }, ...failure });
+    assert.equal(await env.PTAds.checkConsent(), false);
+    env.PTAds.setBannerWanted(true);
+    await settle();
+    assert.equal(env.count('showBanner'), 0);
+    assert.equal(await env.PTAds.showRewarded(), false);
+    assert.equal(env.inset(), '0px');
+    if (failure.privacyPlugin === false) assert.equal(env.count('initialize'), 0);
+  }
 });
 
 test('Produktive iOS-IDs aktivieren keine Android-Anzeigen mit fremden IDs', () => {
@@ -490,7 +527,13 @@ test('Android-Manifest hat eine zur Anzeigenkonfiguration passende App-ID', () =
   assert.deepEqual(configProblems({ config, plistAppId: androidAppId() }), []);
 });
 
-test('Android deaktiviert Googles Publisher first-party ID vor dem SDK-Start', () => {
+test('Android registriert die Datenschutz-Bridge vor Erstellung der WebView ohne SDK-Start in onCreate', () => {
   const activity = fs.readFileSync(path.join(ROOT, 'android/app/src/main/java/com/bennyjoni/terminator/MainActivity.java'), 'utf8');
-  assert.match(activity, /putPublisherFirstPartyIdEnabled\(false\)/);
+  assert.doesNotMatch(activity, /MobileAds|putPublisherFirstPartyIdEnabled/);
+  assert.match(activity, /registerPlugin\(AdPrivacyPlugin\.class\)/);
+  assert.ok(activity.indexOf('registerPlugin(AdPrivacyPlugin.class)') < activity.indexOf('super.onCreate('));
+  const plugin = fs.readFileSync(path.join(ROOT, 'android/app/src/main/java/com/bennyjoni/terminator/AdPrivacyPlugin.java'), 'utf8');
+  assert.match(plugin, /@CapacitorPlugin\(name = "AdPrivacy"\)/);
+  assert.match(plugin, /boolean persisted = MobileAds\.putPublisherFirstPartyIdEnabled\(false\)/);
+  assert.doesNotMatch(plugin, /MobileAds\.initialize\(/);
 });

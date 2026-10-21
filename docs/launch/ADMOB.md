@@ -12,7 +12,8 @@ Publisher: `pub-8393455800337394`.
 Die Werte stimmen zwischen `www/ads.js` und der jeweiligen nativen
 App-Konfiguration (`Info.plist` bzw. `AndroidManifest.xml`) überein.
 Das Zahlungsprofil bleibt auf Wunsch des Betreibers vorerst offen.
-Store-Verknüpfung, Googles app-ads.txt-Verifizierung und echte Gerätetests
+Store-Verknüpfung, Googles app-ads.txt-Verifizierung und Tests von
+Anzeigen und Einwilligung auf einem Gerät
 stehen noch aus. Die eingetragenen IDs allein bestätigen keine Anzeigenfreigabe.
 Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
 
@@ -39,8 +40,11 @@ Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
   diesen Einstieg verlangt. Ein vorhandenes Banner wird dabei entfernt. Nach
   einer Änderung wird es nur mit erneuter UMP-Freigabe neu angefordert.
 - Alle Anfragen setzen `npa: true`. Die App übergibt keine Trainingsdaten oder
-  Nutzer-ID an AdMob. iOS und Android deaktivieren zusätzlich Googles Publisher
-  first-party ID vor der Initialisierung.
+  Nutzer-ID an AdMob. iOS deaktiviert zusätzlich Googles Publisher first-party
+  ID vor der Initialisierung. Android wartet nach dem von UMP freigegebenen
+  SDK-Start auf die erfolgreiche, persistierte Deaktivierung über die lokale
+  `AdPrivacy`-Bridge; erst dann sind Anzeigenanfragen erlaubt. Das entspricht
+  [Googles Android-API-Reihenfolge](https://developers.google.com/admob/android/reference/com/google/android/gms/ads/MobileAds#putPublisherFirstPartyIdEnabled(boolean)).
 - iOS: Google-App-ID, SKAdNetwork-Liste und Privacy-Manifeste vorhanden.
   Der Code fordert keine ATT-Berechtigung an. Keine IDFA-Nachricht in AdMob
   konfigurieren, solange das Anzeigenmodell ohne ATT vorgesehen ist.
@@ -48,6 +52,8 @@ Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
   Anzeigenmessung und Release-Sperre vorhanden. JDK 21 und Android SDK sind
   eingerichtet; die Debug-APK wurde am 21. Oktober 2026 erfolgreich gebaut.
   Die produktive App-ID und Banner-ID wurden im APK-Inhalt geprüft.
+  Der Kaltstart im API-36-Pixel-2-Emulator ist ohne nativen Absturz oder
+  JavaScript-/WebView-Fehler bestanden; `AdPrivacy` ist nativ registriert.
   Anzeigen- und Einwilligungstests auf einem Android-Gerät stehen noch aus;
   Build-Details stehen in [ANDROID.md](ANDROID.md).
   Android-Push bleibt bis zur separaten FCM-Einrichtung deaktiviert.

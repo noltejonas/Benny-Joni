@@ -2,7 +2,8 @@
 
 > Historischer Ablaufplan. Die aktuellen Upload-Befehle, Store-Unterlagen
 > und noch offenen Einrichtungen stehen in [FASTLANE_STORES.md](FASTLANE_STORES.md),
-> [ADMOB.md](ADMOB.md) und [ANDROID.md](ANDROID.md). Zeitangaben unten sind
+> [ADMOB.md](ADMOB.md), [ANDROID.md](ANDROID.md) und
+> [DATABASE_STATUS.md](DATABASE_STATUS.md). Zeitangaben unten sind
 > keine aktuelle Freigabe- oder Veröffentlichungsschätzung.
 
 Ziel: **bis 09:00 eingereicht**, um 12:00 veröffentlichen, **falls** Apple
