@@ -29,6 +29,10 @@ Platzhalter übrig ist (siehe `docs/launch/RELEASE.md`).
 5. Konto 1 kommt als Login in App Store Connect. Den Einladungscode der
    Challenge notieren (Einstellungen → „Teilnehmer & Einladen“).
 6. Nach dem Launch die Konten stehen lassen; Apple prüft auch Updates damit.
+7. Ein drittes Konto `review3@<eure Domain>` als Reserve anlegen und der
+   Review-Challenge beitreten lassen. Nicht in App Store Connect eintragen.
+   Löscht der Prüfer Konto 1 trotzdem, in App Store Connect die Login-Daten
+   auf Konto 3 umstellen.
 
 ## Notizen für Apple (Englisch, zum Kopieren)
 
@@ -44,10 +48,10 @@ PENALTY BOX ("Strafkonto")
 Optional per challenge. It only records amounts that friends agreed to pay into their own group kitty when they miss their weekly share. The app does not process, hold or transfer money. There are no payments, no in-app purchases and no prizes. It is not gambling.
 
 ACCOUNT DELETION (Guideline 5.1.1(v))
-Settings (tap your avatar at the top right) > "Konto löschen", confirm twice. Also in the profile sheet (tap the challenge name at the top > your profile > "Konto löschen"). Profile, sets, reactions, penalty entries and the profile photo are deleted immediately.
+Settings (tap your avatar at the top right) > "Konto löschen", confirm twice. Also in the profile sheet (tap the challenge name at the top > your profile > "Konto löschen"). Profile, sets, reactions, penalty entries and the profile photo are deleted immediately. To test deletion, please register a new account first (no email confirmation needed) and delete that one, so the demo account stays available for future reviews.
 
 USER-GENERATED CONTENT (Guideline 1.2)
-Users can report content and people ("Melden" on a feed entry, in Settings > "Teilnehmer & Einladen" and in Settings > "Problem oder Inhalt melden") and block people ("Blockieren" on a feed entry). Reports go to our support address and are reviewed within 24 hours; offending content is removed and accounts are banned. The terms of use include a zero-tolerance policy: https://noltejonas.github.io/Benny-Joni/nutzungsbedingungen.html
+Report/block: open the "Feed" tab and tap an entry of the other member to expand it, then "Melden" (report) or "Blockieren" (block). People can also be reported in Settings (avatar top right) > "Teilnehmer & Einladen" > "Melden", anything else via Settings > "Problem oder Inhalt melden". Reports open a pre-filled email to our support address with the IDs; we review within 24 hours, remove offending content and ban the account. Blocking hides that person's notes and photo on this device; leaving the challenge in Settings removes all contact. Content is only visible inside invite-only groups; there is no public feed, search or discovery. Zero-tolerance terms: https://noltejonas.github.io/Benny-Joni/nutzungsbedingungen.html
 
 SIGN-IN
 Email and password only. There is no third-party or social login, so Sign in with Apple is not required (Guideline 4.8).
@@ -83,12 +87,20 @@ Kein Glücksspiel.
 **Konto löschen (5.1.1(v)):** Einstellungen (Profilbild oben rechts) →
 „Konto löschen“, zweimal bestätigen. Außerdem im Profil (oben auf den
 Challenge-Namen → Profil → „Konto löschen“). Profil, Sätze, Reaktionen,
-Strafkonto-Einträge und Foto werden sofort gelöscht.
+Strafkonto-Einträge und Foto werden sofort gelöscht. Zum Testen bitte ein
+neues Konto anlegen und dieses löschen, nicht das Review-Konto.
 
-**Nutzerinhalte (1.2):** Melden an einem Feed-Eintrag, bei den Teilnehmern
-und unter „Problem oder Inhalt melden“; Blockieren am Feed-Eintrag. Meldungen
-landen in der Support-Mail und werden binnen 24 h geprüft. Die
-Nutzungsbedingungen enthalten eine Null-Toleranz-Regel.
+**Nutzerinhalte (1.2):** Tab „Feed“ → fremden Eintrag antippen (klappt auf)
+→ „Melden“ oder „Blockieren“. Personen außerdem unter Einstellungen
+(Profilbild oben rechts) → „Teilnehmer & Einladen“ → „Melden“, alles andere
+unter Einstellungen → „Problem oder Inhalt melden“. Meldungen öffnen eine
+vorausgefüllte Mail an die Support-Adresse mit den IDs und werden binnen 24 h
+geprüft; Inhalte werden entfernt, Konten gesperrt. Blockieren blendet Notizen
+und Foto der Person auf diesem Gerät aus; wer die Challenge in den
+Einstellungen verlässt, hat keinen Kontakt mehr. Inhalte sind nur in
+geschlossenen Gruppen sichtbar, es gibt keinen öffentlichen Feed, keine Suche
+und keine Entdeckung. Die Nutzungsbedingungen enthalten eine
+Null-Toleranz-Regel.
 
 **Login:** nur E-Mail und Passwort, kein Drittanbieter-Login. Deshalb ist
 „Mit Apple anmelden“ nicht nötig (4.8).

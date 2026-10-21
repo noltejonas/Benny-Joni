@@ -82,13 +82,13 @@ Alle Limits eingehalten.
 | App-Informationen → Primäre Sprache | **Deutsch**. Steht hier Englisch, verlangt App Store Connect zusätzlich englische Texte. |
 | App-Informationen → Kategorie | Primär **Gesundheit und Fitness** (`primary_category.txt`). Sekundär: leer lassen oder „Sport“. |
 | App-Informationen → Inhaltsrechte | „Enthält die App Inhalte Dritter?“ **Ja** (Fotos und Texte der Nutzer). „Hast du die Rechte?“ **Ja**. |
-| App-Informationen → Altersfreigabe | Fragebogen nach Abschnitt 3. |
+| App-Informationen → Altersfreigabe | Fragebogen nach Abschnitt 3, am Ende auf **16+** überschreiben. |
 | App-Datenschutz | Nach Abschnitt 4. Datenschutz-URL siehe oben. |
 | Preise und Verfügbarkeit | Preis **0 € (Kostenlos)**. Länder: nur **Deutschland, Österreich, Schweiz**. |
 | Version | **1.4** anlegen bzw. die vorbereitete „1.0“ umbenennen. Muss zu `MARKETING_VERSION = 1.4` passen, nicht auf 1.0 zurückgehen. |
 | Version → Build | Den neuen Build wählen (Build-Nummer ab 20). |
 | Version → Verschlüsselung | Beantwortet die Info.plist (`ITSAppUsesNonExemptEncryption = false`), keine Frage mehr. |
-| Version → Screenshots | `docs/launch/screenshots/iphone-6.3/` (1206×2622) bzw. `iphone-6.9/` (1320×2868), je nachdem, welche Größe App Store Connect als Pflicht anzeigt. Keine iPad-Screenshots: die App ist nur fürs iPhone. |
+| Version → Screenshots | Aus Schritt 11a in `MORGEN.md` (am Gerät bzw. in Chrome aufgenommen, als JPG ohne Alphakanal). Pflicht ist „iPhone mit Dynamic Island (mittel)“: 1206×2622 oder 1179×2556, 1 bis 10 Bilder. Größere Formate sind optional. Keine iPad-Screenshots: die App ist nur fürs iPhone. |
 | Version → App-Prüfung | Login und Notizen aus `docs/launch/REVIEW_NOTES.md`. Zugangsdaten nur dort, nie im Repo. |
 | Version → Veröffentlichung | **„Diese Version manuell veröffentlichen“**. |
 
@@ -103,21 +103,24 @@ Fragen heißen je nach Stand leicht anders; maßgeblich ist, was die App kann.
 | Funktionen | Altersprüfung (Age Assurance) | Nein | Gibt es nicht; Mindestalter 16 steht in den Nutzungsbedingungen. |
 | Funktionen | Uneingeschränkter Webzugriff | Nein | Die App öffnet nur unsere Rechtsseiten in Safari, keinen eigenen Browser. |
 | Funktionen | Von Nutzern erstellte Inhalte | **Ja** | Anzeigenamen, Profilfotos, Challenge-Namen, Notizen, Reaktionen. Nur in geschlossenen Gruppen per Code, mit Melden und Blockieren. |
-| Funktionen | Nachrichten und Chat | Nein | Es gibt keinen Chat. Notizen hängen nur an Sätzen. |
+| Funktionen | Nachrichten und Chat | **Ja** | Es gibt keinen Chat, aber Notizen an Sätzen sind für die Gruppe sichtbar. „Ja“ ergibt 4+ und ist unschädlich. |
+| Funktionen | Social Media | Nein | Nur geschlossene Gruppen per Einladungscode, keine Entdeckung, keine öffentliche Verbreitung (sonst 13+, wegen 16+ ohne Folgen). |
 | Funktionen | Werbung | Nein | Kein Werbe-SDK in V1. **Ab 1.4.1 mit AdMob: Ja.** |
 | Reife Themen | Vulgäre Sprache, Horror, Alkohol/Tabak/Drogen | Keine | |
 | Medizin/Wellness | Medizinische oder Behandlungsinformationen | Keine | Keine medizinischen Inhalte. |
-| Medizin/Wellness | Gesundheits- oder Wellness-Themen | Keine | Die App zeigt keine Gesundheitsinhalte, nur selbst eingetragene Übungszahlen. Nennt App Store Connect Fitness-Tracking ausdrücklich als Beispiel: ehrlich „Ja/Selten“ wählen. |
+| Medizin/Wellness | Gesundheits- oder Wellness-Themen | **Ja** | Wochenziele und Übungsmengen. Apple zählt Übungsempfehlungen ausdrücklich dazu (9+). |
 | Sexualität/Nacktheit | alle Fragen | Keine | |
 | Gewalt | alle Fragen, auch Waffen | Keine | |
 | Zufall | Simuliertes Glücksspiel | Keine | |
 | Zufall | Glücksspiel mit echtem Geld | Nein | Das Strafkonto ist nur eine Liste, die App bewegt kein Geld. |
-| Zufall | Wettbewerbe (Contests) | Keine | Es gibt keine Preise; Duelle unter Freunden ohne Gewinn. |
+| Zufall | Wettbewerbe (Contests) | **Häufig** | Duelle, Rangliste und Wochenziele sind der Kern der App. Apple zählt Sport- und Fitness-Wettbewerbe um Ranglisten und persönliche Ziele ausdrücklich dazu, auch ohne Preise. |
 | Zufall | Lootboxen | Nein | |
 
-Erwartete Stufe: 4+. Optional könnt ihr eine höhere Stufe wählen (z. B. passend
-zum Mindestalter 16). Empfehlung: die errechnete Stufe übernehmen, das
-Mindestalter regeln die Nutzungsbedingungen.
+Errechnet: 13+ (Wettbewerbe häufig). **Unter „Altersgruppen und
+Überschreibung“ → „Auf höhere Altersfreigabe überschreiben“ → 16+ wählen.**
+Das ist Pflicht, weil die Nutzungsbedingungen 16 Jahre verlangen (Apple: „you
+must override“, wenn eine Altersgrenze in den Nutzungsbedingungen über der
+errechneten Stufe liegt). Ab 1.4.1 mit AdMob: Werbung Ja.
 
 ## 4. App-Datenschutz („Datenschutzetiketten“)
 
