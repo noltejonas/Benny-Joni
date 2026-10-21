@@ -61,7 +61,18 @@ Store-Bereitschaftschecks einschließlich Screenshots sind bestanden.
   `.local/qa/android-final-vcode2-gate-off/restored/summary.json`.
 - Android-Funktionstest im isolierten Wegwerfkonto bestanden: Satz 10
   anlegen, auf 15 ändern, Kaltstart zeigt weiterhin 15, Satz löschen;
-  Feed und Stats zeigen danach null. Keine Reviewfixture verändert.
+  Feed und Stats zeigen danach null. Lokale Demo-Moderationskontrollen
+  bestanden: Melden öffnet den E-Mail-Handler ohne Versand; Blockieren zeigt
+  den richtigen Bestätigungsdialog und lässt sich abbrechen. Ein temporäres
+  DNS-Problem nach Standortwechsel ist durch einen verlustfreien
+  Emulatorneustart behoben. Nach ausdrücklicher Nutzerfreigabe wurde das
+  eigene QA-Konto über den letzten App-Dialog gelöscht; die App zeigt
+  anschließend den normalen Anmeldestart. Unabhängiger lesender
+  Backend-Nachweis: Authuser, Profil, Mitgliedschaften, vorher gesicherte
+  eigene Challenge, Sätze und Challenge-Wochenziele vollständig entfernt
+  (alle geprüften Zähler null). Werbeschalter weiterhin aus. Beleg:
+  `.local/qa/device-functional-20261021/android-deletion-readback-20261021T174841Z.private.json`.
+  Keine Reviewfixture verändert und keine API-Ersatzlöschung.
 - Echtes iPhone 11/iOS 26.2.1, getrenntes QA-Bundle: Review-Login,
   Heute, Feed/Scroll, Stats, Hintergrund/Vordergrund und Kaltstart bestanden
   (XCTest 61 Sekunden). Die 35-sekündige Kaltstartkonsole enthält 39 normale
@@ -72,10 +83,34 @@ Store-Bereitschaftschecks einschließlich Screenshots sind bestanden.
   ebenfalls (41,6 Sekunden): Satz von 5 auf 7 bearbeiten, Stats öffnen,
   Kaltstart mit weiterhin +7 im Feed, Satz über die bestätigte UI löschen
   und Stats erneut öffnen. Keine Authentifizierungs- oder Appfehler im
-  erfolgreichen Fortsetzungstest. Rechts-/Supportlinks,
-  Demo-Moderationskontrollen und der letzte Kontolöschdialog bleiben offen;
-  keine vollständige Abnahme der Store-IPA.
-  Beleg: `.local/qa/ios-device/status-summary.json`.
+  erfolgreichen Fortsetzungstest. Datenschutz, Impressum und
+  Nutzungsbedingungen wurden über die App in Safari mit den richtigen
+  Überschriften geöffnet. Die Demo-Meldeauswahl ist visuell geprüft, ohne
+  eine Meldung zu versenden; Blockieren auf iOS bleibt ungeprüft.
+  Der erste reale Kontolöschversuch zeigte nach beiden Bestätigungen einen
+  Fehleralert; der damalige Backend-Readback bestätigte unveränderte Daten.
+  Die Ursache ist nicht gesichert. Nach genau einem gezielten Console-/
+  Kaltstart-Repro bestand die erneute autorisierte UI-Löschung: beide
+  Bestätigungen, anschließend Welcome/Login. Ein unabhängiger SELECT gegen
+  die vorher gesicherte Fixture- und Challenge-ID bestätigt alle neun
+  geprüften Zähler null: Authuser, Profil, Mitgliedschaften, eigene und
+  konkrete Challenge, Sätze und Challenge-Wochenziele entfernt. Keine
+  API-Ersatzlöschung, keine belegte Codekorrektur oder Netzwerkursache;
+  der zwischenzeitliche Diagnoseaufruf wurde vollständig zurückgerollt.
+  Der Werbeschalter bleibt aus. Beleg:
+  `.local/qa/device-functional-20261021/ios-deletion-readback-20261021T180657Z.private.json`.
+  System-Auto-Lock blieb unverändert; nur die getrennte QA-App hatte einen
+  Wachhalteschalter und ist nach Testende beendet. Die Original-App blieb
+  unberührt. Dies ist keine vollständige Abnahme der Store-IPA.
+  Weitere Belege: `.local/qa/ios-device/status-summary.json`.
+
+Beide neuen Wegwerfkonten sind damit über die App gelöscht und unabhängig
+im Backend geprüft. Nach Abschluss aller UI-Eingaben sind nur ihre beiden
+privaten Fixture-Passwörter genullt; IDs und Belegreferenzen bleiben mit
+Dateimodus 0600 erhalten. Dauerhafte Review-, Fastlane- und SMTP-Zugänge
+bleiben unverändert. Beide Store-Versionen bleiben in Prüfung mit
+zurückgehaltener Veröffentlichung; für diesen Testabschluss wurde keine
+Appquellen- oder Storeänderung vorgenommen.
 - Separat geladene Google-Demo-Testbanner: `npa: true`, bestätigte
   Publisher-ID-Deaktivierung und Banner-Lifecycle bestanden; Heute/Overlay
   verbergen Banner, Abbruch/Rückkehr zeigen es wieder. Nur lokale QA-Kopie,
