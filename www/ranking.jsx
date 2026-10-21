@@ -1,10 +1,10 @@
-/* global React, PTData, PTRanking, PTPeople, Avatar, Icon, Sheet */
+/* global React, PTData, PTRanking, PTPeople, Avatar, Icon, Sheet, tr, trn, PTi18n */
 // Rangliste-Tab: Monat (live) · Saison · Ewig, pro Grundübung oder gesamt.
 // Daten über die RPCs der Migration monthly_ranking (bzw. den Demo-Modus),
 // Rechenhilfen in www/ranking-model.js (PTRanking).
 // Spec: docs/superpowers/specs/2026-10-20-monatsrangliste-design.md
 
-const RK_VIEWS = [['month', 'Monat'], ['season', 'Saison'], ['all', 'Ewig']];
+const RK_VIEWS = [['month', tr('Monat')], ['season', tr('Saison')], ['all', tr('Ewig')]];
 const RK_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 function useSessionPref(key, fallback) {
@@ -13,10 +13,10 @@ function useSessionPref(key, fallback) {
   return [v, set];
 }
 
-const rkName = (row) => (row.blocked ? 'Ausgeblendet' : row.display_name || 'Unbekannt');
+const rkName = (row) => (row.blocked ? tr('Ausgeblendet') : row.display_name || tr('Unbekannt'));
 const rkProfile = (row) => ({ id: row.user_id, display_name: row.display_name, avatar_url: row.avatar_url, color: row.color });
-const rkPts = (n) => `${(n || 0).toLocaleString('de-DE')} P.`;
-const rkDate = (d) => `${d.getDate()}.${d.getMonth() + 1}.`;
+const rkPts = (n) => tr('{n} P.', { n: PTi18n.number(n || 0) });
+const rkDate = (d) => PTi18n.date(d, { day: 'numeric', month: 'numeric' });
 
 function RankingAvatar({ row, size = 36 }) {
   if (row.blocked) {
@@ -104,14 +104,14 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   if (error && !cats) {
     return (
       <div className="rd-empty">
-        <div className="rd-empty-title">Rangliste nicht verfügbar</div>
+        <div className="rd-empty-title">{tr('Rangliste nicht verfügbar')}</div>
         <div className="rd-empty-text">{error}</div>
-        <button className="btn" onClick={() => location.reload()}>Erneut versuchen</button>
+        <button className="btn" onClick={() => location.reload()}>{tr('Erneut versuchen')}</button>
       </div>
     );
   }
   if (!cats || !settings) {
-    return <div className="app-loader"><div className="app-loader-spinner" /><div className="app-loader-text">Lade Rangliste…</div></div>;
+    return <div className="app-loader"><div className="app-loader-spinner" /><div className="app-loader-text">{tr('Lade Rangliste…')}</div></div>;
   }
 
   const cat = cats.find(c => c.id === catKey) || null;
@@ -145,14 +145,16 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   // ── Kopf: Zeitraum ──
   let periodNote = '';
   if (view === 'month') {
-    if (isLive && month < startMonth) periodNote = `Probelauf · gewertet wird ab ${R.monthLabel(startMonth)}`;
+    if (isLive && month < startMonth) periodNote = tr('Probelauf · gewertet wird ab {month}', { month: R.monthLabel(startMonth) });
     else if (isLive) {
       const d = R.daysLeft(month);
-      periodNote = d === 1 ? 'Letzter Tag' : `noch ${d} Tage`;
-    } else if (new Date() < R.closeDeadline(month)) periodNote = `Nachtragen bis ${rkDate(R.closeDeadline(month))}, 12 Uhr`;
-    else periodNote = month < startMonth ? 'Nicht gewertet' : 'Abgeschlossen';
-  } else if (view === 'season') periodNote = `Punkte ${new Date().getFullYear()}`;
-  else periodNote = 'Alle Punkte seit dem Start';
+      periodNote = d === 1 ? tr('Letzter Tag') : trn(d, 'noch {n} Tag', 'noch {n} Tage');
+    } else if (new Date() < R.closeDeadline(month)) {
+      const due = R.closeDeadline(month);
+      periodNote = tr('Nachtragen bis {date}, {time}', { date: rkDate(due), time: PTi18n.time(due) });
+    } else periodNote = month < startMonth ? tr('Nicht gewertet') : tr('Abgeschlossen');
+  } else if (view === 'season') periodNote = tr('Punkte {year}', { year: new Date().getFullYear() });
+  else periodNote = tr('Alle Punkte seit dem Start');
 
   // ── Eigene Lage (Monat, eine Übung) ──
   let myLine = null;
@@ -162,24 +164,24 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
     if (ref) {
       const gap = R.gapAbove(rows.filter(r => !r.is_me), ref.value);
       const tied = rows.some(r => !r.is_me && r.value === ref.value);
-      myLine = !me1 ? `Du wärst Platz ${ref.rank}`
-        : ref.rank === 1 ? (tied ? 'Geteilter erster Platz' : 'Du führst')
-        : gap ? `noch ${R.formatNeed(cat, gap.need)} bis Platz ${gap.rank}` : null;
+      myLine = !me1 ? tr('Du wärst Platz {rank}', { rank: ref.rank })
+        : ref.rank === 1 ? (tied ? tr('Geteilter erster Platz') : tr('Du führst'))
+        : gap ? tr('noch {need} bis Platz {rank}', { need: R.formatNeed(cat, gap.need), rank: gap.rank }) : null;
     }
   }
 
   const emptyText = view === 'month'
-    ? (cat ? `Diesen Monat hat noch niemand ${cat.name} eingetragen.` : 'Diesen Monat gibt es noch keine Punkte.')
-    : `Punkte gibt es, sobald ein Monat abgeschlossen ist (am 2. des Folgemonats, erstmals am ${rkDate(R.closeDeadline(startMonth))}).`;
+    ? (cat ? tr('Diesen Monat hat noch niemand {name} eingetragen.', { name: cat.name }) : tr('Diesen Monat gibt es noch keine Punkte.'))
+    : tr('Punkte gibt es, sobald ein Monat abgeschlossen ist (am 2. des Folgemonats, erstmals am {date}).', { date: rkDate(R.closeDeadline(startMonth)) });
 
   const onOpenRow = (r) => setCard({ ...r, category_id: cat?.id || null });
 
   return (
     <div className="rk">
       <div className="rd-section-head rk-head">
-        <h2>Rangliste</h2>
+        <h2>{tr('Rangliste')}</h2>
         <button className="btn-link" onClick={() => setCard({ user_id: me, display_name: profile.display_name,
-          avatar_url: profile.avatar_url, color: profile.color, is_me: true })}>Meine Medaillen</button>
+          avatar_url: profile.avatar_url, color: profile.color, is_me: true })}>{tr('Meine Medaillen')}</button>
       </div>
 
       <div className="segmented rk-views">
@@ -188,8 +190,8 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         ))}
       </div>
 
-      <div className="rk-chips" role="tablist" aria-label="Übung">
-        <button className={`rk-chip ${!cat ? 'active' : ''}`} onClick={() => setCatKey('all')}>🏆 Gesamt</button>
+      <div className="rk-chips" role="tablist" aria-label={tr('Übung')}>
+        <button className={`rk-chip ${!cat ? 'active' : ''}`} onClick={() => setCatKey('all')}>🏆 {tr('Gesamt')}</button>
         {cats.map(c => (
           <button key={c.id} className={`rk-chip ${cat?.id === c.id ? 'active' : ''}`} onClick={() => setCatKey(c.id)}>
             {c.emoji} {c.name}
@@ -200,47 +202,47 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
       <div className="rk-bar">
         {view === 'month' ? (
           <div className="rk-month">
-            <button className="rk-nav" aria-label="Vormonat" disabled={month <= minMonth}
+            <button className="rk-nav" aria-label={tr('Vormonat')} disabled={month <= minMonth}
               onClick={() => setMonth(R.addMonths(month, -1))}><span className="rk-flip"><Icon name="chevron" size={18} /></span></button>
             <div className="rk-month-text">
               <b>{R.monthLabel(month)}</b>
               <span>{periodNote}</span>
             </div>
-            <button className="rk-nav" aria-label="Nächster Monat" disabled={month >= nowMonth}
+            <button className="rk-nav" aria-label={tr('Nächster Monat')} disabled={month >= nowMonth}
               onClick={() => setMonth(R.addMonths(month, 1))}><Icon name="chevron" size={18} /></button>
           </div>
         ) : (
-          <div className="rk-month-text rk-period"><b>{view === 'season' ? `Saison ${new Date().getFullYear()}` : 'Ewige Tabelle'}</b><span>{periodNote}</span></div>
+          <div className="rk-month-text rk-period"><b>{view === 'season' ? tr('Saison {year}', { year: new Date().getFullYear() }) : tr('Ewige Tabelle')}</b><span>{periodNote}</span></div>
         )}
         <div className="segmented rk-filter">
-          <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Alle</button>
-          <button className={filter === 'mine' ? 'active' : ''} onClick={() => setFilter('mine')}>Meine Leute</button>
+          <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>{tr('Alle')}</button>
+          <button className={filter === 'mine' ? 'active' : ''} onClick={() => setFilter('mine')}>{tr('Meine Leute')}</button>
         </div>
       </div>
 
       {view === 'all' && (
         <div className="segmented rk-sort">
-          <button className={sortBy === 'points' ? 'active' : ''} onClick={() => setSortBy('points')}>Punkte</button>
-          <button className={sortBy === 'medals' ? 'active' : ''} onClick={() => setSortBy('medals')}>Medaillenspiegel</button>
+          <button className={sortBy === 'points' ? 'active' : ''} onClick={() => setSortBy('points')}>{tr('Punkte')}</button>
+          <button className={sortBy === 'medals' ? 'active' : ''} onClick={() => setSortBy('medals')}>{tr('Medaillenspiegel')}</button>
         </div>
       )}
 
       {optIn !== true && (
         <div className="banner rk-optin">
           <div className="banner-text">
-            <strong>{optIn === false ? 'Du bist nicht in der Rangliste.' : 'Noch nicht entschieden.'}</strong>{' '}
+            <strong>{optIn === false ? tr('Du bist nicht in der Rangliste.') : tr('Noch nicht entschieden.')}</strong>{' '}
             {myLine && !rows.some(r => r.is_me) ? `${myLine}. ` : ''}
-            Andere sehen dich erst, wenn du mitmachst.
-            <button className="btn-link" onClick={() => setOptInOpen(true)}>Mitmachen</button>
+            {tr('Andere sehen dich erst, wenn du mitmachst.')}
+            <button className="btn-link" onClick={() => setOptInOpen(true)}>{tr('Mitmachen')}</button>
           </div>
         </div>
       )}
 
       {cat && view === 'month' && (
         <div className="rk-rule">
-          <span className="label">So zählt’s</span>
-          <span>{cat.rule || 'Saubere Wiederholungen.'}{cat.metric === 'volume' && cat.max_per_day
-            ? ` Pro Tag zählen höchstens ${cat.max_per_day.toLocaleString('de-DE')}.` : ''}{cat.metric === 'best' ? ' Es zählt dein bester Durchgang.' : ''}</span>
+          <span className="label">{tr('So zählt’s')}</span>
+          <span>{cat.rule || tr('Saubere Wiederholungen.')}{cat.metric === 'volume' && cat.max_per_day
+            ? ` ${tr('Pro Tag zählen höchstens {n}.', { n: PTi18n.number(cat.max_per_day) })}` : ''}{cat.metric === 'best' ? ` ${tr('Es zählt dein bester Durchgang.')}` : ''}</span>
         </div>
       )}
 
@@ -248,11 +250,11 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         <div className="rk-me-line"><Icon name="trophy" size={16} /> {myLine}</div>
       )}
 
-      <section className="card rk-list" aria-label="Rangliste" aria-busy={loading}>
+      <section className="card rk-list" aria-label={tr('Rangliste')} aria-busy={loading}>
         {loading ? (
           <div className="app-loader rk-loader"><div className="app-loader-spinner" /></div>
         ) : ranked.length === 0 ? (
-          <div className="rk-empty">{filter === 'mine' && rows.length ? 'Von deinen Leuten ist hier noch niemand.' : emptyText}</div>
+          <div className="rk-empty">{filter === 'mine' && rows.length ? tr('Von deinen Leuten ist hier noch niemand.') : emptyText}</div>
         ) : (
           <ol className="rk-rows">
             {ranked.map(r => (
@@ -268,18 +270,18 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
 
       {view === 'month' && isLive && cat && (
         <button className="btn rk-log" onClick={() => setLogCat(cat)}>
-          <Icon name="plus" size={20} /> {cat.name} eintragen
+          <Icon name="plus" size={20} /> {tr('{name} eintragen', { name: cat.name })}
         </button>
       )}
 
       <RankingOptInSheet open={optInOpen} api={api} current={optIn}
         onClose={() => setOptInOpen(false)}
         onSaved={(p, on) => { setOptInOpen(false); onProfileSaved?.(p); reload();
-          onToast?.(on ? 'Du bist jetzt in der Rangliste' : 'Du bleibst aus der Rangliste raus'); }} />
+          onToast?.(on ? tr('Du bist jetzt in der Rangliste') : tr('Du bleibst aus der Rangliste raus')); }} />
 
       <Sheet open={!!logCat} onClose={() => setLogCat(null)}>
         {logCat && <RankingLogSheet api={api} cat={logCat} onClose={() => setLogCat(null)}
-          onLogged={(label) => { setLogCat(null); reload(); onToast?.(`${label} eingetragen`); }} />}
+          onLogged={(label) => { setLogCat(null); reload(); onToast?.(tr('{what} eingetragen', { what: label })); }} />}
       </Sheet>
 
       <Sheet open={!!card} onClose={() => setCard(null)}>
@@ -302,10 +304,10 @@ function RankingRow({ r, cat, view, globalRank, onOpen }) {
         <span className={`rk-rank ${r.rank <= 3 ? `top top-${r.rank}` : ''}`}>{(byValue && RK_MEDAL[r.rank]) || r.rank}</span>
         <RankingAvatar row={r} size={36} />
         <span className="rk-who">
-          <span className="rk-name">{r.is_me ? 'Du' : rkName(r)}</span>
+          <span className="rk-name">{r.is_me ? tr('Du') : rkName(r)}</span>
           {(globalRank || !byValue) && (
             <span className="rk-sub">
-              {globalRank ? <span>#{globalRank} gesamt</span> : null}
+              {globalRank ? <span>{tr('#{rank} gesamt', { rank: globalRank })}</span> : null}
               {!byValue && <RankingMedals row={r} />}
             </span>
           )}
@@ -339,7 +341,7 @@ function RankingStickyMe({ r, cat, view, line }) {
   return (
     <div className="rk-sticky" aria-hidden="true">
       <span className="rk-rank">{r.rank}</span>
-      <span className="rk-who"><span className="rk-name">Du</span>{line && <span className="rk-sub">{line}</span>}</span>
+      <span className="rk-who"><span className="rk-name">{tr('Du')}</span>{line && <span className="rk-sub">{line}</span>}</span>
       <b className="mono">{main}</b>
     </div>
   );
@@ -358,14 +360,14 @@ function RankingOptInSheet({ open, api, current, onClose, onSaved }) {
     <Sheet open={open} onClose={onClose}>
       <div className="rk-optin-sheet">
         <div className="rk-optin-icon">🏆</div>
-        <h2 className="title">In der Rangliste erscheinen?</h2>
-        <p className="subtitle">Alle, die die App nutzen, sehen dann deinen Namen, dein Profilbild und deine Werte bei den Grundübungen. Sonst nichts: keine E-Mail, keine Challenges.</p>
-        <p className="subtitle">Wer nicht mitmacht, wird nicht gewertet und sieht nur, auf welchem Platz er stünde. Ändern kannst du das jederzeit in den Einstellungen.</p>
+        <h2 className="title">{tr('In der Rangliste erscheinen?')}</h2>
+        <p className="subtitle">{tr('Alle, die die App nutzen, sehen dann deinen Namen, dein Profilbild und deine Werte bei den Grundübungen. Sonst nichts: keine E-Mail, keine Challenges.')}</p>
+        <p className="subtitle">{tr('Wer nicht mitmacht, wird nicht gewertet und sieht nur, auf welchem Platz er stünde. Ändern kannst du das jederzeit in den Einstellungen.')}</p>
         <div className="btn-row">
           <button className="btn btn-secondary" disabled={busy} onClick={() => choose(false)}>
-            {current === false ? 'Weiter nicht' : 'Nein danke'}
+            {current === false ? tr('Weiter nicht') : tr('Nein danke')}
           </button>
-          <button className="btn" disabled={busy} onClick={() => choose(true)}>Ja, mitmachen</button>
+          <button className="btn" disabled={busy} onClick={() => choose(true)}>{tr('Ja, mitmachen')}</button>
         </div>
       </div>
     </Sheet>
@@ -403,13 +405,13 @@ function RankingLogSheet({ api, cat, onClose, onLogged }) {
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>{cat.emoji} {cat.name}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        {type === 'bring_sally_up' ? 'Zeit bis zum ersten Absetzen' : type === 'tom_holland' ? 'Volle Runden in 20 Minuten' : 'Wiederholungen'}
+        {type === 'bring_sally_up' ? tr('Zeit bis zum ersten Absetzen') : type === 'tom_holland' ? tr('Volle Runden in 20 Minuten') : tr('Wiederholungen')}
       </div>
       {type === 'bring_sally_up' ? (
         <div className="rk-time">
-          <button className="icon-btn" aria-label="5 Sekunden weniger" onClick={() => setValue(v => clamp(v - step))}>−</button>
+          <button className="icon-btn" aria-label={tr('5 Sekunden weniger')} onClick={() => setValue(v => clamp(v - step))}>−</button>
           <b className="mono">{PTRanking.formatValue(cat, value)}</b>
-          <button className="icon-btn" aria-label="5 Sekunden mehr" onClick={() => setValue(v => clamp(v + step))}>＋</button>
+          <button className="icon-btn" aria-label={tr('5 Sekunden mehr')} onClick={() => setValue(v => clamp(v + step))}>＋</button>
         </div>
       ) : (
         <input className="input input-lg mono" type="number" inputMode="numeric" value={value}
@@ -420,12 +422,12 @@ function RankingLogSheet({ api, cat, onClose, onLogged }) {
       </div>
       <div className="rk-targets">
         {targets === null ? '…'
-          : targets.length ? <>Zählt für: {targets.map(t => `${t.emoji} ${t.name}`).join(' · ')}</>
-          : 'Diese Woche hat keine deiner Challenges diese Übung. Der Eintrag landet im Freien Training und zählt für die Rangliste und deine Stats.'}
+          : targets.length ? tr('Zählt für: {list}', { list: targets.map(t => `${t.emoji} ${t.name}`).join(' · ') })
+          : tr('Diese Woche hat keine deiner Challenges diese Übung. Der Eintrag landet im Freien Training und zählt für die Rangliste und deine Stats.')}
       </div>
       <div className="btn-row" style={{ marginTop: 20 }}>
-        <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
-        <button className="btn" onClick={save} disabled={busy || value <= 0}>{busy ? '…' : 'Eintragen'}</button>
+        <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
+        <button className="btn" onClick={save} disabled={busy || value <= 0}>{busy ? '…' : tr('Eintragen')}</button>
       </div>
     </>
   );
@@ -455,17 +457,17 @@ function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, 
       await api.reportRankingEntry({ userId: row.user_id, reason,
         categoryId: reason === 'values' ? cat?.id : null, month: reason === 'values' ? month : null });
       setReportOpen(false);
-      onToast?.('Danke, wir schauen uns das an.');
+      onToast?.(tr('Danke, wir schauen uns das an.'));
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }
   }
   async function toggleBlock() {
-    const name = row.display_name || 'Diese Person';
-    if (!row.blocked && !confirm(`${name} blockieren? Name und Bild siehst du dann in der Rangliste nicht mehr.`)) return;
+    const name = row.display_name || tr('Diese Person');
+    if (!row.blocked && !confirm(tr('{name} blockieren? Name und Bild siehst du dann in der Rangliste nicht mehr.', { name }))) return;
     setBusy(true);
     try {
       await api.setBlock(row.user_id, !row.blocked);
-      onChanged?.(row.blocked ? 'Blockierung aufgehoben' : 'Blockiert');
+      onChanged?.(row.blocked ? tr('Blockierung aufgehoben') : tr('Blockiert'));
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }
   }
@@ -475,30 +477,30 @@ function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, 
       <div className="rk-card-head">
         <RankingAvatar row={row} size={64} />
         <div>
-          <div className="rk-card-name">{isMe ? `${row.display_name} (du)` : rkName(row)}</div>
-          <div className="rk-card-sub">{medals ? `${rkPts(total)} gesamt` : '…'}</div>
+          <div className="rk-card-name">{isMe ? tr('{name} (du)', { name: row.display_name }) : rkName(row)}</div>
+          <div className="rk-card-sub">{medals ? tr('{points} gesamt', { points: rkPts(total) }) : '…'}</div>
         </div>
       </div>
 
       {medals && (
         <div className="rk-card-kpis">
-          <div><b>🥇 {count('gold')}</b><span>Gold</span></div>
-          <div><b>🥈 {count('silver')}</b><span>Silber</span></div>
-          <div><b>🥉 {count('bronze')}</b><span>Bronze</span></div>
+          <div><b>🥇 {count('gold')}</b><span>{tr('Gold')}</span></div>
+          <div><b>🥈 {count('silver')}</b><span>{tr('Silber')}</span></div>
+          <div><b>🥉 {count('bronze')}</b><span>{tr('Bronze')}</span></div>
         </div>
       )}
 
       {cups.length > 0 && (
         <ul className="rk-cups">
           {cups.map((c, i) => (
-            <li key={i}>🏆 Champion {c.year} · {c.category_id ? catById[c.category_id]?.name || 'Übung' : 'Gesamt'}</li>
+            <li key={i}>🏆 {tr('Champion {year} · {what}', { year: c.year, what: c.category_id ? catById[c.category_id]?.name || tr('Übung') : tr('Gesamt') })}</li>
           ))}
         </ul>
       )}
 
-      <div className="label rk-card-label">Trophäenschrank</div>
+      <div className="label rk-card-label">{tr('Trophäenschrank')}</div>
       {medals === null ? <div className="rk-empty">…</div>
-        : medals.length === 0 ? <div className="rk-empty">{isMe ? 'Noch keine Punkte. Der erste abgeschlossene Monat bringt welche.' : 'Noch keine Punkte.'}</div>
+        : medals.length === 0 ? <div className="rk-empty">{isMe ? tr('Noch keine Punkte. Der erste abgeschlossene Monat bringt welche.') : tr('Noch keine Punkte.')}</div>
         : (
           <ul className="rk-trophies">
             {medals.map((m, i) => {
@@ -507,7 +509,7 @@ function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, 
                 <li key={`${m.month}-${m.category_id}-${i}`}>
                   <span className="rk-trophy-medal">{RK_MEDAL[m.rank] || `${m.rank}.`}</span>
                   <span className="rk-trophy-text">
-                    <b>{c ? `${c.emoji} ${c.name}` : 'Übung'}</b>
+                    <b>{c ? `${c.emoji} ${c.name}` : tr('Übung')}</b>
                     <span>{PTRanking.monthLabel(m.month)} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
                   </span>
                   <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>
@@ -521,24 +523,24 @@ function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, 
         <div className="rk-card-actions">
           {reportOpen ? (
             <div className="rk-report">
-              <div className="label">Was stimmt nicht?</div>
+              <div className="label">{tr('Was stimmt nicht?')}</div>
               {cat && month && (
                 <button className="btn btn-secondary" disabled={busy} onClick={() => report('values')}>
-                  Unrealistische Werte · {cat.name}, {PTRanking.monthLabel(month, false)}
+                  {tr('Unrealistische Werte · {name}, {month}', { name: cat.name, month: PTRanking.monthLabel(month, false) })}
                 </button>
               )}
-              <button className="btn btn-secondary" disabled={busy} onClick={() => report('profile')}>Name oder Bild unangemessen</button>
-              <button className="btn-link" onClick={() => setReportOpen(false)}>Abbrechen</button>
+              <button className="btn btn-secondary" disabled={busy} onClick={() => report('profile')}>{tr('Name oder Bild unangemessen')}</button>
+              <button className="btn-link" onClick={() => setReportOpen(false)}>{tr('Abbrechen')}</button>
             </div>
           ) : (
             <div className="btn-row">
-              <button className="btn btn-secondary" disabled={busy} onClick={() => setReportOpen(true)}>Melden</button>
-              <button className="btn btn-secondary" disabled={busy} onClick={toggleBlock}>{row.blocked ? 'Entblocken' : 'Blockieren'}</button>
+              <button className="btn btn-secondary" disabled={busy} onClick={() => setReportOpen(true)}>{tr('Melden')}</button>
+              <button className="btn btn-secondary" disabled={busy} onClick={toggleBlock}>{row.blocked ? tr('Entblocken') : tr('Blockieren')}</button>
             </div>
           )}
         </div>
       )}
-      <button className="btn-link rk-card-close" onClick={onClose}>Schließen</button>
+      <button className="btn-link rk-card-close" onClick={onClose}>{tr('Schließen')}</button>
     </div>
   );
 }
@@ -561,14 +563,14 @@ function MonthRecapCard({ item, me }) {
   for (const u of Object.values(byUser)) u.points = u.items.reduce((a, r) => a + r.points, 0);
   const people = Object.values(byUser).sort((a, b) => b.points - a.points);
   return (
-    <section className="card rk-recap" aria-label={`Rangliste ${PTRanking.monthLabel(month)}`}>
-      <div className="stats-head"><span className="label">Rangliste · {PTRanking.monthLabel(month)}</span><span className="rk-recap-icon">🏆</span></div>
+    <section className="card rk-recap" aria-label={tr('Rangliste · {month}', { month: PTRanking.monthLabel(month) })}>
+      <div className="stats-head"><span className="label">{tr('Rangliste · {month}', { month: PTRanking.monthLabel(month) })}</span><span className="rk-recap-icon">🏆</span></div>
       <ul className="rk-recap-list">
         {people.map(u => (
           <li key={u.user_id}>
             <RankingAvatar row={u} size={32} />
             <span className="rk-recap-text">
-              <b>{u.user_id === me ? 'Du' : u.display_name}</b>
+              <b>{u.user_id === me ? tr('Du') : u.display_name}</b>
               <span>{u.items.sort((a, b) => a.rank - b.rank).slice(0, 3)
                 .map(r => `${RK_MEDAL[r.rank] || `${r.rank}.`} ${catById[r.category_id]?.name || ''}`).join(' · ')}</span>
             </span>

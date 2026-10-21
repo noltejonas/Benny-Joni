@@ -649,7 +649,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
                   <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
                     <div className="emoji">{c.emoji}</div>
                     <div className="name">{c.name}</div>
-                    {c.competition_id && <div className="cat-note">zählt nicht für die Rangliste</div>}
+                    {c.competition_id && <div className="cat-note">{tr('zählt nicht für die Rangliste')}</div>}
                   </button>
                   {c.competition_id && (
                     <button className="cat-edit" aria-label={tr('Bearbeiten')}
@@ -975,7 +975,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         style={{ marginTop: 16 }} />
       {others.length > 0 && (
         <div className="log-also">
-          <div className="label">Zählt auch für</div>
+          <div className="label">{tr('Zählt auch für')}</div>
           <div className="chip-row">
             {others.map(o => (
               <button key={o.competition_id} className={`chip ${skip.includes(o.competition_id) ? '' : 'chip-active'}`}

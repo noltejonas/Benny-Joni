@@ -8,8 +8,9 @@ const vm = require('node:vm');
 function load() {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
-  const src = fs.readFileSync(path.join(__dirname, '..', 'www', 'ranking-model.js'), 'utf8');
-  vm.runInContext(src, ctx, { filename: 'ranking-model.js' });
+  for (const f of ['i18n.js', 'ranking-model.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8'), ctx, { filename: f });
+  }
   return ctx.window.PTRanking;
 }
 const R = load();

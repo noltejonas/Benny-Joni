@@ -191,14 +191,33 @@
   // Eigene Kategorien einer Challenge bleiben, wie sie sind.
   function localizeCategory(row) {
     if (!row || row.competition_id != null) return row;
-    let name = null;
+    let name = row.name;
     switch (row.name) {
       case 'Liegestütze': name = tr('Liegestütze'); break;
       case 'Klimmzüge': name = tr('Klimmzüge'); break;
       case 'Kniebeugen': name = tr('Kniebeugen'); break;
-      default: return row;
     }
-    return name === row.name ? row : { ...row, name };
+    const rule = localizeRule(row.rule);
+    return name === row.name && rule === row.rule ? row : { ...row, name, rule };
+  }
+
+  // Ausführungsregeln der Rangliste (categories.rule, Migrationen monthly_ranking
+  // und rank_crunches), ebenfalls deutsch in der Datenbank.
+  function localizeRule(rule) {
+    switch (rule) {
+      case 'Brust fast am Boden, oben Arme ganz gestreckt.': return tr('Brust fast am Boden, oben Arme ganz gestreckt.');
+      case 'Aus dem toten Hang, Kinn über die Stange.': return tr('Aus dem toten Hang, Kinn über die Stange.');
+      case 'Oberarme mindestens parallel zum Boden, oben ganz gestreckt.': return tr('Oberarme mindestens parallel zum Boden, oben ganz gestreckt.');
+      case 'Gestreckte Beine bis mindestens 90 Grad anheben.': return tr('Gestreckte Beine bis mindestens 90 Grad anheben.');
+      case 'Kopf berührt Boden oder Matte, oben ganz gestreckt.': return tr('Kopf berührt Boden oder Matte, oben ganz gestreckt.');
+      case 'Schultern ganz ab, Brust bis zu den Knien.': return tr('Schultern ganz ab, Brust bis zu den Knien.');
+      case 'Hüfte mindestens auf Kniehöhe, oben ganz aufrichten.': return tr('Hüfte mindestens auf Kniehöhe, oben ganz aufrichten.');
+      case 'Brust am Boden, oben Sprung mit den Händen über dem Kopf.': return tr('Brust am Boden, oben Sprung mit den Händen über dem Kopf.');
+      case 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.': return tr('Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.');
+      case 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.': return tr('Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.');
+      case 'Schulterblätter vom Boden, Hände nicht am Kopf ziehen.': return tr('Schulterblätter vom Boden, Hände nicht am Kopf ziehen.');
+      default: return rule;
+    }
   }
 
   // ── Row normalisation ───────────────────────────────────────────────
@@ -485,8 +504,8 @@
         return data;
       },
       async getRankedCategories() {
-        return check(await client.from('categories').select('*')
-          .is('competition_id', null).eq('ranked', true).order('created_at')) || [];
+        return (check(await client.from('categories').select('*')
+          .is('competition_id', null).eq('ranked', true).order('created_at')) || []).map(localizeCategory);
       },
       async rankingMonth(month) {
         return check(await client.rpc('ranking_month', { p_month: month })) || [];

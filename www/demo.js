@@ -185,7 +185,7 @@
     WORLD.forEach((_, i) => {
       const uidW = `u-w${i + 1}`, cidW = `c-solo-${uidW}`;
       const level = 0.4 + r() * 1.5;
-      competitions.push({ id: cidW, name: 'Freies Training', emoji: '🏋️', mode: 'solo', invite_code: `SOLO-${uidW}`,
+      competitions.push({ id: cidW, name: 'Freies Training', emoji: '🏋️', mode: 'solo', invite_code: `SOLO-${uidW}`, // i18n-ignore: Datenbank-Name
         rotation_enabled: false, penalties_enabled: false, work_enabled: false, start_date: startOf(7), end_date: null,
         archived_at: null, created_by: uidW, created_at: startOf(7) + 'T08:00:00Z' });
       members.push({ competition_id: cidW, user_id: uidW, role: 'owner', team: null, joined_at: startOf(7) + 'T08:00:00Z', left_at: null });
@@ -478,7 +478,7 @@
 
       // ── Rangliste (wie die RPCs der Migration monthly_ranking) ─────
       async getRankingSettings() { return later(db.ranking_settings); },
-      async getRankedCategories() { return later(db.categories.filter(c => c.ranked && !c.competition_id)); },
+      async getRankedCategories() { return later(db.categories.filter(c => c.ranked && !c.competition_id).map(localizeCategory)); },
       async rankingMonth(month) { return later(rankingMonth(uid(), month)); },
       async rankingTotals({ from = null, to = null } = {}) {
         const me = uid();
@@ -507,8 +507,8 @@
       async logFreeSet({ categoryId, reps, note = null, createdAt = null }) {
         const me = uid();
         const cat = db.categories.find(c => c.id === categoryId);
-        if (!cat?.ranked) throw new Error('Diese Übung zählt nicht für die Rangliste.');
-        if (!(reps > 0)) throw new Error('Bitte einen Wert größer als 0 eingeben.');
+        if (!cat?.ranked) throw fail('not_ranked');
+        if (!(reps > 0)) throw fail('invalid_value');
         const at = createdAt || new Date().toISOString();
         const ws = isoDate(mondayOf(new Date(at)));
         let ch = logTargets(me, categoryId, ws)[0];
@@ -516,7 +516,7 @@
         if (!chId) {
           let solo = db.competitions.find(c => c.mode === 'solo' && c.created_by === me);
           if (!solo) {
-            solo = { id: newId('c'), name: 'Freies Training', emoji: '🏋️', mode: 'solo', invite_code: `SOLO-${newId('x')}`,
+            solo = { id: newId('c'), name: 'Freies Training', emoji: '🏋️', mode: 'solo', invite_code: `SOLO-${newId('x')}`, // i18n-ignore: Datenbank-Name
               rotation_enabled: false, penalties_enabled: false, work_enabled: false, start_date: ws, end_date: null,
               archived_at: null, created_by: me, created_at: new Date().toISOString() };
             db.competitions.push(solo);
@@ -537,7 +537,7 @@
       async setRankingOptIn(on) { return base.updateProfile({ ranking_opt_in: !!on }); },
       async reportRankingEntry({ userId, reason, categoryId = null, month = null }) {
         const me = uid();
-        if (userId === me) throw new Error('Das darf nur der Ersteller der Challenge.');
+        if (userId === me) throw fail('forbidden');
         const cat = reason === 'values' ? categoryId : null, mon = reason === 'values' ? month : null;
         if (!db.ranking_reports.some(r => r.reporter === me && r.user_id === userId && r.reason === reason
           && r.category_id === cat && r.month === mon && !r.resolved_at)) {
@@ -560,7 +560,7 @@
       },
       async isRankingAdmin() { return later(db.ranking_admins.includes(uid())); },
       async rankingReportsOpen() {
-        if (!db.ranking_admins.includes(uid())) throw new Error('Das darf nur der Ersteller der Challenge.');
+        if (!db.ranking_admins.includes(uid())) throw fail('forbidden');
         const groups = {};
         for (const r of db.ranking_reports.filter(x => !x.resolved_at)) {
           const k = [r.user_id, r.reason, r.category_id, r.month].join('|');

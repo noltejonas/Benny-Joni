@@ -12,7 +12,6 @@
   const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
   const MEDALS = { 1: 'gold', 2: 'silver', 3: 'bronze' };
   const MEDAL_EMOJI = { gold: '🥇', silver: '🥈', bronze: '🥉' };
-  const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
   const pointsFor = (rank) => POINTS[rank - 1] || 0;
   const medalFor = (rank) => MEDALS[rank] || null;
@@ -28,9 +27,10 @@
     const d = new Date(y, m - 1 + n, 1);
     return monthOf(d);
   }
+  // „Oktober 2026“ bzw. „October 2026“ je App-Sprache
   function monthLabel(month, withYear = true) {
     const [y, m] = month.split('-').map(Number);
-    return withYear ? `${MONTHS[m - 1]} ${y}` : MONTHS[m - 1];
+    return PTi18n.date(new Date(y, m - 1, 1), withYear ? { month: 'long', year: 'numeric' } : { month: 'long' });
   }
   // Abschluss: 2. des Folgemonats, 12:00 (Gerätezeit, in Deutschland = Berlin)
   function closeDeadline(month) {
@@ -195,14 +195,13 @@
   function formatValue(cat, value) {
     const v = value ?? 0;
     if (cat?.challenge_type === 'bring_sally_up') return `${Math.floor(v / 60)}:${pad(v % 60)}`;
-    if (cat?.challenge_type === 'tom_holland') return `${v} ${v === 1 ? 'Runde' : 'Runden'}`;
-    return v.toLocaleString('de-DE');
+    if (cat?.challenge_type === 'tom_holland') return trn(v, '{n} Runde', '{n} Runden', { n: PTi18n.number(v) });
+    return PTi18n.number(v);
   }
-  // „noch 42 Liegestütze“, „noch 0:12“, „noch 2 Runden“
+  // „42 Liegestütze“, „0:12“, „2 Runden“ (für „noch … bis Platz 3“)
   function formatNeed(cat, need) {
-    if (cat?.challenge_type === 'bring_sally_up') return formatValue(cat, need);
-    if (cat?.challenge_type === 'tom_holland') return formatValue(cat, need);
-    return `${need.toLocaleString('de-DE')} ${cat?.name || 'Reps'}`;
+    if (cat?.challenge_type === 'bring_sally_up' || cat?.challenge_type === 'tom_holland') return formatValue(cat, need);
+    return `${PTi18n.number(need)} ${cat?.name || tr('Reps')}`;
   }
 
   window.PTRanking = {

@@ -303,20 +303,20 @@ function SettingsBlocksPage({ baseApi, onBack, onToast }) {
   const load = React.useCallback(() => baseApi.myBlocks().then(setRows).catch(() => setRows([])), [baseApi]);
   useEffect(() => { load(); }, [load]);
   async function unblock(r) {
-    try { await baseApi.setBlock(r.user_id, false); onToast?.(`${r.display_name} entblockt`); load(); }
+    try { await baseApi.setBlock(r.user_id, false); onToast?.(tr('{name} entblockt', { name: r.display_name })); load(); }
     catch (e) { alert(e.message); }
   }
   return (
     <div className="st-screen">
-      <SettingsPageHeader title="Blockiert" onBack={onBack} />
-      <SettingsGroup footer="Blockierte erscheinen für dich in der Rangliste ohne Name und Bild.">
+      <SettingsPageHeader title={tr('Blockiert')} onBack={onBack} />
+      <SettingsGroup footer={tr('Blockierte erscheinen für dich in der Rangliste ohne Name und Bild.')}>
         {rows === null ? <SettingsRow title="…" />
-          : !rows.length ? <SettingsRow title="Niemand blockiert" />
+          : !rows.length ? <SettingsRow title={tr('Niemand blockiert')} />
           : rows.map(r => (
             <div key={r.user_id} className="st-row">
               <Avatar profile={{ id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url, color: r.color }} size={36} />
               <span className="st-row-text"><span className="st-row-title">{r.display_name}</span></span>
-              <button className="st-link" onClick={() => unblock(r)}>Entblocken</button>
+              <button className="st-link" onClick={() => unblock(r)}>{tr('Entblocken')}</button>
             </div>
           ))}
       </SettingsGroup>
@@ -340,32 +340,34 @@ function SettingsReportsPage({ baseApi, onBack, onToast }) {
     setBusy(true);
     try {
       await baseApi.resolveRankingReports({ userId: r.user_id, reason: r.reason, categoryId: r.category_id, month: r.month, resolution });
-      onToast?.(resolution === 'ok' ? 'Freigegeben' : 'Entfernt');
+      onToast?.(resolution === 'ok' ? tr('Freigegeben') : tr('Entfernt'));
       load();
     } catch (e) { alert(e.message); }
     finally { setBusy(false); }
   }
   const what = (r) => {
-    if (r.reason === 'profile') return 'Name oder Bild';
+    if (r.reason === 'profile') return tr('Name oder Bild');
     const c = cats.find(x => x.id === r.category_id);
-    return `Werte · ${c?.name || 'Übung'}, ${r.month ? PTRanking.monthLabel(r.month) : ''}`;
+    return tr('Werte · {name}, {month}', { name: c?.name || tr('Übung'), month: r.month ? PTRanking.monthLabel(r.month) : '' });
   };
   return (
     <div className="st-screen">
-      <SettingsPageHeader title="Meldungen" onBack={onBack} />
-      <SettingsGroup footer="Ab drei Meldungen ist ein Eintrag ausgeblendet, bis ihr entscheidet. „Entfernen“ nimmt den Eintrag bzw. bei Profil-Meldungen die Person ganz aus der Rangliste und löscht das Profilbild.">
+      <SettingsPageHeader title={tr('Meldungen')} onBack={onBack} />
+      <SettingsGroup footer={tr('Ab drei Meldungen ist ein Eintrag ausgeblendet, bis ihr entscheidet. „Entfernen“ nimmt den Eintrag bzw. bei Profil-Meldungen die Person ganz aus der Rangliste und löscht das Profilbild.')}>
         {rows === null ? <SettingsRow title="…" />
-          : !rows.length ? <SettingsRow title="Keine offenen Meldungen" />
+          : !rows.length ? <SettingsRow title={tr('Keine offenen Meldungen')} />
           : rows.map(r => (
             <div key={`${r.user_id}-${r.reason}-${r.category_id}-${r.month}`} className="st-row st-report">
               <Avatar profile={{ id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url, color: r.color }} size={36} />
               <span className="st-row-text">
                 <span className="st-row-title">{r.display_name}</span>
-                <span className="st-row-sub">{what(r)} · {r.reporters}× gemeldet{r.hidden ? ' · ausgeblendet' : ''}</span>
+                <span className="st-row-sub">{r.hidden
+                  ? tr('{what} · {n}× gemeldet · ausgeblendet', { what: what(r), n: r.reporters })
+                  : tr('{what} · {n}× gemeldet', { what: what(r), n: r.reporters })}</span>
               </span>
               <span className="st-report-actions">
-                <button className="st-link" disabled={busy} onClick={() => resolve(r, 'ok')}>In Ordnung</button>
-                <button className="st-link is-danger" disabled={busy} onClick={() => resolve(r, 'removed')}>Entfernen</button>
+                <button className="st-link" disabled={busy} onClick={() => resolve(r, 'ok')}>{tr('In Ordnung')}</button>
+                <button className="st-link is-danger" disabled={busy} onClick={() => resolve(r, 'removed')}>{tr('Entfernen')}</button>
               </span>
             </div>
           ))}

@@ -18,8 +18,35 @@ const APNS_PRIVATE_KEY = Deno.env.get("APNS_PRIVATE_KEY") ?? "";
 const APNS_ENV = (Deno.env.get("APNS_ENV") ?? "production") as "production" | "development";
 const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
-const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const MEDAL: Record<string, string> = { gold: "🥇", silver: "🥈", bronze: "🥉" };
+
+// Texte je App-Sprache (profiles.language, Migration 20261021000000); ohne
+// Eintrag oder ohne Spalte Deutsch. Standard-Übungen heißen in der Datenbank
+// deutsch, die drei mit eigenem englischen Namen werden übersetzt.
+const TEXT = {
+  de: {
+    locale: "de-DE",
+    category: (name: string) => name,
+    rounds: (n: number) => `${n} ${n === 1 ? "Runde" : "Runden"}`,
+    points: (n: number) => `${n} ${n === 1 ? "Punkt" : "Punkte"}`,
+    closedTitle: (month: string) => `🏆 ${month} ist abgeschlossen`,
+    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} in der Rangliste`,
+    lastDayTitle: "⏳ Letzter Tag im Monat",
+    lastDayBody: (need: string, rank: number) => `Dir fehlen ${need} bis Platz ${rank}.`,
+  },
+  en: {
+    locale: "en-GB",
+    category: (name: string) => ({ "Liegestütze": "Push-ups", "Klimmzüge": "Pull-ups", "Kniebeugen": "Squats" } as Record<string, string>)[name] ?? name,
+    rounds: (n: number) => `${n} ${n === 1 ? "round" : "rounds"}`,
+    points: (n: number) => `${n} ${n === 1 ? "point" : "points"}`,
+    closedTitle: (month: string) => `🏆 ${month} is closed`,
+    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} on the leaderboard`,
+    lastDayTitle: "⏳ Last day of the month",
+    lastDayBody: (need: string, rank: number) => `${need} to go for #${rank}.`,
+  },
+};
+type Lang = keyof typeof TEXT;
+const textFor = (lang: string | null | undefined) => TEXT[(lang ?? "de") as Lang] ?? TEXT.de;
 const LAST_DAY_HOUR = 18;
 const LAST_DAY_MAX_GAP = 0.2;
 
@@ -41,11 +68,22 @@ function berlinNow() {
   };
 }
 
-const monthName = (month: string) => MONTHS[Number(month.slice(5, 7)) - 1];
-const fmtValue = (cat: Category, v: number) =>
+type Text = (typeof TEXT)[Lang];
+const monthName = (t: Text, month: string) =>
+  new Date(`${month}T12:00:00Z`).toLocaleDateString(t.locale, { month: "long", timeZone: "UTC" });
+const fmtValue = (t: Text, cat: Category, v: number) =>
   cat.challenge_type === "bring_sally_up" ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`
-  : cat.challenge_type === "tom_holland" ? `${v} ${v === 1 ? "Runde" : "Runden"}`
-  : `${v.toLocaleString("de-DE")} ${cat.name}`;
+  : cat.challenge_type === "tom_holland" ? t.rounds(v)
+  : `${v.toLocaleString(t.locale)} ${t.category(cat.name)}`;
+
+// Sprache pro User; ohne Spalte profiles.language (Migration fehlt) Deutsch
+async function languagesOf(supabase: SupabaseClient, userIds: string[]) {
+  const out: Record<string, string | null> = {};
+  if (!userIds.length) return out;
+  const { data, error } = await supabase.from("profiles").select("id, language").in("id", userIds);
+  if (!error) for (const r of data ?? []) out[r.id] = r.language;
+  return out;
+}
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
@@ -110,16 +148,18 @@ async function monthClosedPush(supabase: SupabaseClient, push: Pusher, catById: 
       .eq("month", month).gt("points", 0);
     const byUser: Record<string, ResultRow[]> = {};
     for (const r of (data ?? []) as ResultRow[]) (byUser[r.user_id] ||= []).push(r);
+    const langs = await languagesOf(supabase, Object.keys(byUser));
     for (const [userId, rows] of Object.entries(byUser)) {
+      const t = textFor(langs[userId]);
       rows.sort((a, b) => a.rank - b.rank);
       const points = rows.reduce((a, r) => a + r.points, 0);
       const medals = rows.filter((r) => r.medal).slice(0, 3)
-        .map((r) => `${MEDAL[r.medal!]} ${catById[r.category_id]?.name ?? ""}`);
-      const body = medals.length
-        ? `${medals.join(" · ")} · ${points} Punkte`
-        : `${points} ${points === 1 ? "Punkt" : "Punkte"} in der Rangliste`;
+        .map((r) => `${MEDAL[r.medal!]} ${t.category(catById[r.category_id]?.name ?? "")}`);
       out.push(await push.once(userId, "month_closed", month, {
-        aps: { alert: { title: `🏆 ${monthName(month)} ist abgeschlossen`, body }, sound: "default" },
+        aps: {
+          alert: { title: t.closedTitle(monthName(t, month)), body: t.closedBody(medals.join(" · "), t.points(points)) },
+          sound: "default",
+        },
         kind: "month_closed", month,
       }));
     }
@@ -147,10 +187,12 @@ async function lastDayPush(
     if (!best[r.user_id] || ratio < best[r.user_id].ratio) best[r.user_id] = { cat, need, rank, ratio };
   }
   const out: Record<string, unknown>[] = [];
+  const langs = await languagesOf(supabase, Object.keys(best));
   for (const [userId, b] of Object.entries(best)) {
+    const t = textFor(langs[userId]);
     out.push(await push.once(userId, "month_last_day", now.today, {
       aps: {
-        alert: { title: "⏳ Letzter Tag im Monat", body: `Dir fehlen ${fmtValue(b.cat, b.need)} bis Platz ${b.rank}.` },
+        alert: { title: t.lastDayTitle, body: t.lastDayBody(fmtValue(t, b.cat, b.need), b.rank) },
         sound: "default",
       },
       kind: "month_last_day", category_id: b.cat.id,
