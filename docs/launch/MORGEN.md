@@ -16,6 +16,32 @@ App freigegeben ist (realistisch 21.10. nachmittags bis 22.10.).
 - `[INTEGRATOR: …]` sind Stellen, die Claude nach dem nächtlichen Merge füllt.
   Steht da morgens noch so ein Platzhalter, fragt Claude.
 
+## Stand 21.10., ca. 09:15 – zuerst lesen
+
+Die Uhrzeiten unten stammen aus der Nacht und sind überholt. Die Reihenfolge
+gilt weiter. Seitdem hat Claude erledigt:
+
+- PR #11 ist mit `main` zusammengeführt (Mehrsprachigkeit aus PR #12). Alle
+  neuen Texte gibt es auf Deutsch und Englisch. Die Migration „Konto löschen“
+  heißt jetzt `20261021000010_delete_account.sql`. Stand: 158/158 Tests grün,
+  i18n-Prüfung vollständig, iOS-Release-Build für den Simulator ok.
+- Die Screenshots (Schritt 11a) liegen auf Deutsch **und** Englisch vor.
+
+Offen und nur durch euch möglich, weil Claude dafür keinen Zugang bzw. keine
+Freigabe hat:
+
+1. **PR #11 mergen** (Schritt 3): https://github.com/noltejonas/Benny-Joni/pull/11
+2. **DSA-Händlerstatus** (Schritt 2, Account Holder)
+3. **Angaben für Impressum/Datenschutz sowie Support-Adresse und Apple-ID an
+   Claude geben**: Claude füllt dann Schritt 5 und 6 und committet.
+4. **GitHub Pages einschalten** (Schritt 7.1: Settings → Pages → Source
+   „GitHub Actions“)
+5. **Supabase** (Schritt 8): die vier SQL-Dateien und die Reset-Vorlage. Das
+   Supabase-MCP von Claude sieht euer Projekt nicht.
+6. **Archive + Upload in Xcode** (Schritt 9). Signieren und Hochladen sind für
+   Claude gesperrt.
+7. Prüfkonten, App Store Connect, Gerätetest, Einreichen (Schritte 10–13).
+
 ## Zeitplan auf einen Blick
 
 | Zeit | A (Account Holder) | B | Schritt |
@@ -314,25 +340,24 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
 
 ## 11a. Screenshots (B, 5 min) – erledigt, nur hochladen
 
-Fertig im Repo: `docs/launch/screenshots/iphone-6.3/` mit 5 Bildern in
-**1206×2622**, JPEG ohne Alphakanal. Das ist die Pflichtgröße „iPhone mit
-Dynamic Island (mittel)“. Aufgenommen um 08:40 auf einem iPhone-17-Pro-Simulator
-(iOS 27.0) mit dem Release-Build dieses Branches, im Demo-Modus, Statusleiste
-9:41, ohne Demo-Knopf:
+Fertig im Repo, je 5 Bilder in **1206×2622**, JPEG ohne Alphakanal. Das ist die
+Pflichtgröße „iPhone mit Dynamic Island (mittel)“. Aufgenommen am 21.10. auf
+einem iPhone-17-Pro-Simulator (iOS 27.0) mit dem Release-Build nach dem Merge
+der Mehrsprachigkeit: Demo-Modus, Statusleiste 9:41, ohne Demo-Knopf.
 
-1. `01-willkommen.jpg`: „Trainier gegen deine Freunde.“
-2. `02-home.jpg`: Duell, Pflicht-Challenge, Serie
-3. `03-feed.jpg`: Live-Feed mit Reaktionen
-4. `04-stats.jpg`: Bilanz und Vorsprung-Verlauf
-5. `05-strafkonto.jpg`: Strafkasse
+- Deutsch (Store-Seite Deutsch): `docs/launch/screenshots/iphone-6.3-de/`
+- Englisch (Store-Seite Englisch UK, falls angelegt): `docs/launch/screenshots/iphone-6.3-en/`
 
-In App Store Connect unter „iPhone mit Dynamic Island (mittel)“ in dieser
-Reihenfolge hochladen. Die großen Größen (6,9″) sind optional.
+Reihenfolge: `01` Willkommen („Trainier gegen deine Freunde.“), `02` Heute
+mit Duell, Pflicht-Challenge und Serie, `03` Live-Feed mit Reaktionen,
+`04` Stats mit Bilanz und Vorsprung, `05` Strafkasse. In App Store Connect
+unter „iPhone mit Dynamic Island (mittel)“ in dieser Reihenfolge hochladen,
+die großen Größen (6,9″) sind optional.
 
-Selbst neu aufnehmen (z. B. nach einer Namensänderung): auf einem echten iPhone
-17/17 Pro „Demo ansehen“ öffnen und mit Seitentaste + Lauter fotografieren.
-Achtung: Die iOS-26.3-Simulatoren auf diesem Mac zeigen Emojis als Kästchen,
-für Screenshots nur iOS 27.0 nehmen.
+Selbst neu aufnehmen (z. B. nach einer Namensänderung): auf einem echten
+iPhone 17/17 Pro „Demo ansehen“ öffnen und mit Seitentaste + Lauter
+fotografieren. Achtung: Die iOS-26.3-Simulatoren auf diesem Mac zeigen Emojis
+als Kästchen, für Screenshots nur iOS 27.0 nehmen.
 
 ## 12. Gerätetest auf einem echten iPhone (07:45, B, 25 min) – P0
 
