@@ -1,10 +1,13 @@
-/* global React, ReactDOM, PTData, PTPeople, PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, AuthScreen, OnboardingScreen, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjenl5dXB4eHFyZGdiZWlmY3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDYyMjgsImV4cCI6MjA5NDA4MjIyOH0.2Bz6R3N3p3evHXB7j5cKamq2egHrE1zYfgLcV2R8awg";
 
 const ACTIVE_KEY = 'pt_active_competition';
+const RETURNING_KEY = 'pt:returning';
+const INVITE_KEY = 'pt:invite'; // offene Einladung { code, at }, 7 Tage gültig
+const INVITE_TTL = 7 * 86400000;
 const THEME_KEY = 'pt:theme2';
 const PUSH_KEY = 'pt:notifications';
 
@@ -13,6 +16,19 @@ function readPref(key, fallback) {
 }
 function writePref(key, value) {
   try { localStorage.setItem(key, value); } catch (e) {}
+}
+function readInvite() {
+  try {
+    const v = JSON.parse(localStorage.getItem(INVITE_KEY) || 'null');
+    if (v?.code && Date.now() - v.at < INVITE_TTL) return v.code;
+  } catch (e) {}
+  return null;
+}
+function writeInvite(code) {
+  try {
+    if (code) localStorage.setItem(INVITE_KEY, JSON.stringify({ code, at: Date.now() }));
+    else localStorage.removeItem(INVITE_KEY);
+  } catch (e) {}
 }
 
 // Folgt dem Hell/Dunkel-Modus des Systems (iOS-Kontrollzentrum, macOS).
@@ -36,13 +52,18 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "notifications": true
 } /*EDITMODE-END*/;
 
-function Loader({ text = 'Lade Daten…' }) {
+function Loader({ text = tr('Lade Daten…') }) {
   return (
     <div className="app-loader" role="status" aria-live="polite">
       <div className="app-loader-spinner" aria-hidden="true" />
       <div className="app-loader-text">{text}</div>
     </div>
   );
+}
+
+// Toast nach dem Loggen; value ist schon formatiert („+12“, „+30 min“, „1h 30m“).
+function loggedToast(value, name) {
+  return name ? tr('{value} {name} geloggt', { value, name }) : tr('{value} geloggt', { value });
 }
 
 // ─── Hülle: Session, Profil, Challenge-Auswahl ──────────────────────────────
@@ -78,9 +99,47 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [competitions, setCompetitions] = useState(null);
   const [activeId, setActiveId] = useState(null);
-  const [accountError, setAccountError] = useState('');
+  const [accountError, setAccountError] = useState(null); // { text, offline } nach einem Ladefehler
   const [sheet, setSheet] = useState(null); // 'switcher' | 'create' | 'join' | 'profile'
   const [toast, setToast] = useState('');
+  const [invite, setInviteState] = useState(readInvite);
+  const setInvite = useCallback((code) => { writeInvite(code); setInviteState(code || null); }, []);
+  const [startView, setStartView] = useState(null); // Start-Bildschirm: null | 'create' | 'join'
+  const [intro, setIntro] = useState(null); // { kind: 'created' | 'joined', id } → Ebenen in der Challenge
+  const [joinCode, setJoinCode] = useState(''); // Code fürs Beitreten-Sheet (Einladungslink in der App)
+
+  // Einladungslinks: im Browser ?join=CODE, in der App projektterminator://join/CODE
+  // (Kaltstart über getLaunchUrl, sonst appUrlOpen). Der Code wird als offene
+  // Einladung gemerkt; entryRoute bzw. der Effekt unten führen in die Vorschau.
+  useEffect(() => {
+    const take = (url) => {
+      const code = PTOnboarding.parseInviteUrl(url);
+      if (code) setInvite(code);
+      return code;
+    };
+    if (take(location.href)) {
+      const u = new URL(location.href);
+      u.searchParams.delete('join');
+      if (/^#join=/i.test(u.hash)) u.hash = '';
+      history.replaceState(null, '', u.toString());
+    }
+    let alive = true, handle = null;
+    (window.PTAppReady || Promise.resolve(null)).then(async (mod) => {
+      const AppPlugin = mod?.App;
+      if (!AppPlugin || !alive) return;
+      try {
+        // Der Startlink bleibt die ganze Laufzeit gleich; nach einem Neuladen nicht erneut öffnen.
+        const launch = await AppPlugin.getLaunchUrl();
+        if (launch?.url && sessionStorage.getItem('pt:launch-url') !== launch.url) {
+          sessionStorage.setItem('pt:launch-url', launch.url);
+          take(launch.url);
+        }
+        handle = await AppPlugin.addListener('appUrlOpen', (e) => take(e?.url));
+        if (!alive) handle.remove();
+      } catch (e) { console.warn('App-Plugin nicht verfügbar', e); }
+    });
+    return () => { alive = false; handle?.remove(); };
+  }, [setInvite]);
 
   useEffect(() => {
     if (!api) return;
@@ -89,6 +148,31 @@ function App() {
   }, [api]);
 
   const userId = session?.user?.id || null;
+  useEffect(() => { if (userId) writePref(RETURNING_KEY, '1'); }, [userId]);
+
+  // Onboarding-Stand: Gerät (localStorage) + Konto (profiles.onboarding, nur
+  // wenn die Spalte existiert — Migration 20261020000000).
+  const [obLocal, setObLocal] = useState({});
+  useEffect(() => {
+    if (!userId) { setObLocal({}); return; }
+    try { setObLocal(JSON.parse(localStorage.getItem(PTOnboarding.stateKey(userId)) || '{}')); }
+    catch (e) { setObLocal({}); }
+  }, [userId]);
+  const obState = useMemo(() => PTOnboarding.mergeState(obLocal, profile?.onboarding), [obLocal, profile]);
+  const obStateRef = React.useRef(obState);
+  obStateRef.current = obState;
+  const patchOb = useCallback((patch) => {
+    if (!userId) return;
+    const next = PTOnboarding.mergeState(patch, obStateRef.current); // neue Werte gewinnen
+    obStateRef.current = next;
+    try { localStorage.setItem(PTOnboarding.stateKey(userId), JSON.stringify(next)); } catch (e) {}
+    setObLocal(next);
+    if (profile && 'onboarding' in profile) {
+      api.saveOnboarding(next)
+        .then(p => { PTPeople.set([p]); setProfile(p); })
+        .catch(e => console.warn('saveOnboarding failed', e));
+    }
+  }, [userId, profile, api]);
 
   // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
   const pickActive = useCallback((p, list, current) => {
@@ -110,10 +194,10 @@ function App() {
       setProfile(p);
       setCompetitions(list);
       setActiveId(cur => pickActive(p, list, preferId ?? cur));
-      setAccountError('');
+      setAccountError(null);
     } catch (e) {
       console.error('loadAccount failed', e);
-      setAccountError(e.message || String(e));
+      setAccountError({ text: e.message || String(e), offline: e?.code === 'offline' });
     }
   }, [api, userId, pickActive]);
 
@@ -122,9 +206,51 @@ function App() {
     else { setProfile(null); setCompetitions(null); setActiveId(null); }
   }, [userId, loadAccount]);
 
+  // App-Sprache ins Profil, damit Push-Mitteilungen in dieser Sprache kommen
+  // (Spalte profiles.language, Migration 20261021000000; ohne Spalte nichts tun).
+  useEffect(() => {
+    if (!profile || !('language' in profile) || profile.language === PTi18n.lang) return;
+    api.updateProfile({ language: PTi18n.lang })
+      .then(p => { PTPeople.set([p]); setProfile(p); })
+      .catch(e => console.warn('save language failed', e));
+  }, [profile, api]);
+
+  // Ladefehler (meist offline): automatisch neu versuchen, sobald das Netz zurück ist.
+  useEffect(() => {
+    if (!accountError) return;
+    const retry = () => loadAccount();
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [accountError, loadAccount]);
+  useEffect(() => {
+    if (api) return;
+    const reload = () => location.reload();
+    window.addEventListener('online', reload);
+    return () => window.removeEventListener('online', reload);
+  }, [api]);
+
   useEffect(() => {
     if (activeId) { try { localStorage.setItem(ACTIVE_KEY, activeId); } catch (e) {} }
   }, [activeId]);
+
+  // Einladung, während man schon in der App ist: eigene Challenge → öffnen,
+  // sonst das Beitreten-Sheet mit Vorschau.
+  useEffect(() => {
+    if (!invite || !competitions?.some(c => !c.archived_at)) return;
+    const mine = competitions.find(c => c.invite_code === invite && !c.archived_at);
+    setInvite(null);
+    if (mine) { setActiveId(mine.id); setSheet(null); setToast(tr('Du bist schon dabei.')); }
+    else { setJoinCode(invite); setSheet('join'); }
+  }, [invite, competitions, setInvite]);
+
+  // Welcher Bildschirm vor der App (onboarding-model.js). Wer im Onboarding
+  // landet, gilt ab jetzt als neu (Startkarte, Tipps, Feiern).
+  const route = PTOnboarding.entryRoute({ session, profile: userId ? profile : null, competitions, invite, state: obState });
+  useEffect(() => {
+    if (['profile', 'start', 'join'].includes(route) && !obState.started && PTOnboarding.youngProfile(profile)) {
+      patchOb({ started: new Date().toISOString() });
+    }
+  }, [route, obState.started, patchOb, profile]);
 
   // Push-Tap mit competition_id → passende Challenge öffnen
   useEffect(() => {
@@ -137,7 +263,7 @@ function App() {
   }, [competitions]);
 
   async function signOut() {
-    if (!confirm('Abmelden?')) return;
+    if (!confirm(tr('Abmelden?'))) return;
     try {
       const saved = localStorage.getItem('pt_apns_token');
       if (saved) { await api.deleteDeviceToken(saved).catch(() => {}); localStorage.removeItem('pt_apns_token'); }
@@ -146,38 +272,72 @@ function App() {
     await api.signOut();
   }
 
+  const newcomer = PTOnboarding.isNewcomer({ state: obState, profile });
+
+  // Start-Ansicht und Einladung erst nach dem Laden zurücksetzen, sonst blitzt
+  // „Wie startest du?“ auf und ließe sich ein zweites Mal antippen.
+  async function handleCreated(c) {
+    setSheet(null);
+    setIntro({ kind: 'created', id: c.id });
+    await loadAccount(c.id);
+    setActiveId(c.id);
+    setStartView(null);
+  }
+
+  async function handleJoined(id) {
+    setSheet(null); setJoinCode('');
+    setIntro({ kind: 'joined', id });
+    await loadAccount(id);
+    setActiveId(id);
+    setInvite(null); setStartView(null);
+    if (!newcomer) setToast(tr('Willkommen in der Challenge 💪'));
+  }
+
   async function setMain(id) {
     try {
       const p = await api.updateProfile({ main_competition_id: id });
       setProfile(p);
-      setToast(id ? 'Haupt-Challenge gesetzt ★' : 'Haupt-Challenge entfernt');
+      setToast(id ? tr('Haupt-Challenge gesetzt ★') : tr('Haupt-Challenge entfernt'));
     } catch (e) { alert(e.message); }
   }
 
   if (!api) {
     return (
-      <div className="name-picker">
-        <div className="brand">Projekt Terminator</div>
-        <h1>Keine Verbindung</h1>
-        <p className="sub">Die App braucht Internet, um deine Challenges zu laden.</p>
-        <button className="btn" onClick={() => location.reload()}>Erneut versuchen</button>
-      </div>
+      <ObScreen center foot={<button className="btn" onClick={() => location.reload()}>{tr('Erneut versuchen')}</button>}>
+        <div className="ob-trophy" aria-hidden="true">📡</div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Keine Verbindung')}</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>{tr('Die App braucht Internet, um deine Challenges zu laden. Sobald du online bist, geht’s weiter.')}</p>
+      </ObScreen>
     );
   }
-  if (session === undefined) return <Loader text="Starte…" />;
-  if (!session) return <AuthScreen api={api} />;
+  if (session === undefined) return <Loader text={tr('Starte…')} />;
+  if (!session) {
+    return <ObAuthFlow api={api} invite={invite} onInvite={setInvite}
+      returning={readPref(RETURNING_KEY, '') === '1'} />;
+  }
   if (accountError && !profile) {
+    const offline = navigator.onLine === false || accountError.offline;
     return (
-      <div className="name-picker">
-        <div className="brand">Projekt Terminator</div>
-        <h1>Laden fehlgeschlagen</h1>
-        <p className="sub">{accountError}</p>
-        <button className="btn" onClick={() => loadAccount()}>Erneut versuchen</button>
-        <button className="btn-link" style={{ marginTop: 16 }} onClick={() => api.signOut()}>Abmelden</button>
-      </div>
+      <ObScreen center foot={<>
+        <button className="btn" onClick={() => loadAccount()}>{tr('Erneut versuchen')}</button>
+        <button className="btn-link" onClick={() => api.signOut()}>{tr('Abmelden')}</button>
+      </>}>
+        <div className="ob-trophy" aria-hidden="true">{offline ? '📡' : '😵'}</div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{offline ? tr('Keine Verbindung') : tr('Laden fehlgeschlagen')}</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>{offline ? tr('Sobald du wieder online bist, geht’s weiter.') : accountError.text}</p>
+      </ObScreen>
     );
   }
-  if (!profile || !competitions) return <Loader text="Lade Profil…" />;
+  if (!profile || !competitions) return <Loader text={tr('Lade Profil…')} />;
+
+  if (route === 'profile') {
+    return (
+      <ObProfile api={api} profile={profile} email={session.user?.email}
+        onSaved={(p) => { PTPeople.set([p]); setProfile(p); }}
+        onDone={() => patchOb({ profileDone: new Date().toISOString() })}
+        onSignOut={signOut} />
+    );
+  }
 
   const active = competitions.find(c => c.id === activeId) || null;
 
@@ -192,26 +352,34 @@ function App() {
         onProfile={() => setSheet('profile')}
         onSignOut={signOut} />
       <CreateCompetitionSheet open={sheet === 'create'} api={api} onClose={() => setSheet(null)}
-        onCreated={async (c) => { setSheet(null); await loadAccount(c.id); setActiveId(c.id); }} />
-      <JoinCompetitionSheet open={sheet === 'join'} api={api} onClose={() => setSheet(null)}
-        onJoined={async (id) => { setSheet(null); await loadAccount(id); setActiveId(id); setToast('Willkommen in der Challenge 💪'); }} />
+        onCreated={handleCreated} />
+      <JoinCompetitionSheet open={sheet === 'join'} api={api} initialCode={joinCode}
+        onClose={() => { setSheet(null); setJoinCode(''); }} onJoined={handleJoined} />
       <ProfileSheet open={sheet === 'profile'} api={api} profile={profile} onClose={() => setSheet(null)}
         onSignOut={signOut}
-        onSaved={(p, opts) => { PTPeople.set([p]); setProfile(p); if (!opts?.keepOpen) { setSheet(null); setToast('Profil gespeichert'); } }} />
+        onSaved={(p, opts) => { PTPeople.set([p]); setProfile(p); if (!opts?.keepOpen) { setSheet(null); setToast(tr('Profil gespeichert')); } }} />
       <Toast message={toast} onDone={() => setToast('')} />
     </>
   );
 
-  if (!active) {
-    return (
-      <>
-        <OnboardingScreen profile={profile}
-          onCreate={() => setSheet('create')} onJoin={() => setSheet('join')}
-          onProfile={() => setSheet('profile')} onSignOut={signOut} />
-        {sheets}
-      </>
-    );
+  // Konto ohne aktive Challenge: offene Einladung → Vorschau, sonst Start.
+  if (route === 'join' || route === 'start') {
+    let screen;
+    if (route === 'join') {
+      screen = <JoinPanel key={invite} api={api} initialCode={invite} onJoined={handleJoined}
+        onCancel={() => setInvite(null)} onSkip={() => setInvite(null)} />;
+    } else if (startView === 'create') {
+      screen = <CreatePanel api={api} onCancel={() => setStartView(null)} onCreated={handleCreated} />;
+    } else if (startView === 'join') {
+      screen = <JoinPanel api={api} onCancel={() => setStartView(null)} onJoined={handleJoined} />;
+    } else {
+      screen = <ObStart profile={profile} onCreate={() => setStartView('create')} onJoin={() => setStartView('join')}
+        onProfile={() => setSheet('profile')} onDemo={() => obSetDemo(true)}
+        onArchived={competitions.length ? () => setSheet('switcher') : null} />;
+    }
+    return <>{screen}{sheets}</>;
   }
+  if (!active) return <Loader text={tr('Lade Challenge…')} />;
 
   return (
     <>
@@ -228,7 +396,9 @@ function App() {
         onSetMain={setMain}
         onSignOut={signOut}
         onCompetitionChanged={() => loadAccount()}
-        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }} />
+        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast(trc('Meldung', 'Challenge verlassen')); }}
+        intro={intro?.id === active.id ? intro.kind : null} onIntroDone={() => setIntro(null)}
+        newcomer={newcomer} obState={obState} onObPatch={patchOb} />
       {sheets}
     </>
   );
@@ -273,15 +443,16 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
     const ranked = totals.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
     const diff = ranked.length > 1 ? ranked[0].v - ranked[1].v : ranked[0]?.v || 0;
     const hitCount = challStats.filter(c => c.hit).length;
+    // Einheit min (nur Work) oder Reps; je eigener Satz für die Übersetzung.
     const allWork = challStats.length > 0 && challStats.every(c => c.isWorkCh);
-    const unit = allWork ? 'min' : 'Reps';
     const winnerLabel = winnerIdx != null ? sides[winnerIdx].label : null;
+    const v = { name: winnerLabel, n: diff };
     let analysis;
-    if (sumAll === 0) analysis = 'Stille Woche. Auf in die nächste!';
-    else if (winnerIdx == null) analysis = 'Unentschieden an der Spitze — perfekt ausbalanciert.';
-    else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winnerLabel} dominiert mit ${diff} ${unit} Vorsprung.`;
-    else if (diff / sumAll > 0.15) analysis = `${winnerLabel} setzt sich durch — ${diff} ${unit} Vorsprung.`;
-    else analysis = `Knapper Sieg für ${winnerLabel} — nur ${diff} ${unit} Unterschied.`;
+    if (sumAll === 0) analysis = tr('Stille Woche. Auf in die nächste!');
+    else if (winnerIdx == null) analysis = tr('Unentschieden an der Spitze — perfekt ausbalanciert.');
+    else if (diff / sumAll > 0.4) analysis = allWork ? tr('Klare Sache: {name} dominiert mit {n} min Vorsprung.', v) : trn(v.n, 'Klare Sache: {name} dominiert mit {n} Rep Vorsprung.', 'Klare Sache: {name} dominiert mit {n} Reps Vorsprung.', v);
+    else if (diff / sumAll > 0.15) analysis = allWork ? tr('{name} setzt sich durch — {n} min Vorsprung.', v) : trn(v.n, '{name} setzt sich durch — {n} Rep Vorsprung.', '{name} setzt sich durch — {n} Reps Vorsprung.', v);
+    else analysis = allWork ? tr('Knapper Sieg für {name} — nur {n} min Unterschied.', v) : trn(v.n, 'Knapper Sieg für {name} — nur {n} Rep Unterschied.', 'Knapper Sieg für {name} — nur {n} Reps Unterschied.', v);
 
     const weekSets = allSets.filter(s => challs.some(ch => ch.id === s.challenge_id));
     const sideIdx = window.sideIndexByUser(sides);
@@ -311,9 +482,21 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
 }
 
 // ─── App pro Challenge ──────────────────────────────────────────────────────
+// Schon gesehene Ziel-Feiern (celebration.jsx, pt_celebrated_v1) — beim
+// Beitritt für bereits geknackte Gruppenziele setzen.
+function markCelebrated(me, challengeIds) {
+  try {
+    const flags = JSON.parse(localStorage.getItem('pt_celebrated_v1') || '{}');
+    flags[me] = flags[me] || {};
+    for (const id of challengeIds) flags[me][id] = true;
+    localStorage.setItem('pt_celebrated_v1', JSON.stringify(flags));
+  } catch (e) {}
+}
+
 function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
   themePref, onSetThemePref, notificationsOn, onSetNotifications,
-  onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft }) {
+  onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft,
+  intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
 
   const [competition, setCompetition] = useState(initialCompetition);
@@ -321,6 +504,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Tabs
   const [tab, setTab] = useState(() => {
+    if (intro) return 'home'; // frisch erstellt oder beigetreten: immer „Heute“
     try { return sessionStorage.getItem('pt:tab') || 'home'; } catch { return 'home'; }
   });
   useEffect(() => {
@@ -332,8 +516,16 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
   }, [tab, competition.penalties_enabled]);
-  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'work')
-  const [settingsPage, setSettingsPage] = useState('root');
+  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'work', 'language').
+  // Nach einem Sprachwechsel lädt die App neu und öffnet wieder die Sprachseite.
+  const [settingsPage, setSettingsPage] = useState(() => {
+    try {
+      const page = sessionStorage.getItem('pt:reopen-settings');
+      sessionStorage.removeItem('pt:reopen-settings');
+      if (page) return page;
+    } catch (e) {}
+    return 'root';
+  });
   const openSettings = (page = 'root') => { setSettingsPage(page); setTab('settings'); };
 
   // Data
@@ -361,6 +553,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [toast, setToast] = useState('');
   const lastFeedRef = React.useRef(null);
+  // Onboarding-Ebenen über Home (onboarding-intro.jsx): { kind, … } oder null.
+  const [layer, setLayer] = useState(null);
+  const layerQueue = React.useRef([]);
+  const introStarted = React.useRef(false);
+  const introRef = React.useRef(intro);
+  const firstLoadRef = React.useRef(true);
+  const celebratedRef = React.useRef(false);
 
   const sides = useMemo(() => buildSides(competition, members, me), [competition, members, me]);
   const allowWork = !!competition.work_enabled;
@@ -375,6 +574,137 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return allSets.filter((s) => ids.has(s.challenge_id));
   }, [allSets, currentChallenges]);
   const participantsNow = useMemo(() => PTData.participantsFor(members, weekStart), [members, weekStart]);
+
+  // ── Push-Erlaubnis und Vorab-Bildschirm ─────────────────────────────────
+  const [pushPerm, setPushPerm] = useState('unsupported');
+  const [primer, setPrimer] = useState(() => PTPush.readPrimer());
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const check = () => PTPush.permission().then(p => { if (alive) setPushPerm(p); });
+    check();
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    const onChange = (e) => setPushPerm(e.detail);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pt:push-permission', onChange);
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('pt:push-permission', onChange); };
+  }, []);
+  const pushDue = PTOnboarding.pushPrimerDue({ permission: pushPerm, enabled: notificationsOn, primer });
+
+  // ── Onboarding in der Challenge ──────────────────────────────────────────
+  const activeMembers = useMemo(() => members.filter(m => !m.left_at), [members]);
+  const catTypeOf = useCallback((ch) => {
+    const c = categories.find(x => x.id === ch.category_id);
+    return (c?.kind || 'sports') === 'sports' && (c?.challenge_type || 'standard') === 'standard';
+  }, [categories]);
+  const sportsGoalsNow = useMemo(() => currentChallenges.filter(catTypeOf), [currentChallenges, catTypeOf]);
+  const mySetCount = useMemo(() => allSets.filter(s => s.athlete === me).length, [allSets, me]);
+  // Solange Plätze frei sind, rechnet der Anteil mit der vollen Besetzung (Spec, Entscheidung 10).
+  const peopleForShare = PTOnboarding.expectedPeople(competition.mode, participantsNow.length);
+  const live = React.useRef({});
+  live.current = { goals: sportsGoalsNow.length, sets: mySetCount, pushDue, pushPerm };
+
+  // Nächste Ebene aus der Warteschlange; überspringt, was die Daten schon erledigen.
+  const advance = useCallback((ctx = {}) => {
+    const goals = ctx.goals ?? live.current.goals;
+    const sets = ctx.sets ?? live.current.sets;
+    while (layerQueue.current.length) {
+      const kind = layerQueue.current.shift();
+      if (kind === 'goal' && goals > 0) continue;
+      if (kind === 'log' && (sets > 0 || goals === 0)) continue;
+      if (kind === 'push' && !(ctx.manual ? live.current.pushPerm === 'prompt' : live.current.pushDue)) continue;
+      setLayer({ kind, ...(ctx.data || {}) });
+      return;
+    }
+    setLayer(null);
+    onIntroDone?.();
+  }, [onIntroDone]);
+
+  const openLayer = useCallback((kinds, ctx) => {
+    layerQueue.current = [...kinds];
+    advance(ctx);
+  }, [advance]);
+
+  async function allowPush() {
+    setPushBusy(true);
+    const result = await PTPush.request();
+    setPushBusy(false);
+    const next = PTOnboarding.nextPrimerState(primer, result);
+    PTPush.writePrimer(next); setPrimer(next); setPushPerm(result);
+    if (result === 'granted') { onSetNotifications(true); setToast(tr('Mitteilungen sind an 🔔')); }
+    else if (result === 'denied') setToast(tr('Alles klar. Geht auch später in den Einstellungen.'));
+    advance();
+  }
+  function laterPush() {
+    const next = PTOnboarding.nextPrimerState(primer, 'later');
+    PTPush.writePrimer(next); setPrimer(next);
+    advance();
+  }
+  // Nach einem Satz: Vorab-Bildschirm, wenn er dran ist (pushPrimerDue).
+  const maybePushPrimer = () => { if (live.current.pushDue) openLayer(['push']); };
+
+  // Nach Erstellen bzw. Beitreten: Ebenen einmal starten, sobald die Daten da sind.
+  useEffect(() => {
+    if (loading || !intro || introStarted.current) return;
+    introStarted.current = true;
+    // Erster Satz mit Feier gibt es einmal pro Konto (obState.firstLog).
+    const firstLog = obState.firstLog ? [] : ['log'];
+    const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', ...firstLog] : ['invite'])
+      : newcomer ? ['goal', ...firstLog] : [];
+    openLayer(kinds);
+  }, [loading, intro, newcomer, openLayer, obState.firstLog]);
+
+  // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
+  const celebrateFirst = useCallback((value, ch, cat) => {
+    if (celebratedRef.current) return; // zwei schnelle Tipps feiern nur einmal
+    celebratedRef.current = true;
+    const share = PTData.fairShareOf(ch.target_reps, peopleForShare);
+    const before = allSets.filter(x => x.challenge_id === ch.id && x.athlete === me).reduce((a, x) => a + (x.reps || 0), 0);
+    onObPatch?.({ firstLog: new Date().toISOString() });
+    layerQueue.current = ['push']; // nach der Feier ist der richtige Moment für den Push-Vorab-Bildschirm
+    setLayer({ kind: 'cele', value, cat, share, myDone: before + value });
+  }, [peopleForShare, allSets, me, onObPatch]);
+  const isFirstLog = newcomer && !obState.firstLog && mySetCount === 0 && !celebratedRef.current;
+
+  // Startkarte (nur neue Leute, erste 14 Tage, nicht weggetippt).
+  const myMembership = members.find(m => m.user_id === me);
+  const starterItems = PTOnboarding.starterItems({
+    activeMembers: activeMembers.length, weekGoals: sportsGoalsNow.length, mySets: mySetCount, push: pushPerm,
+  });
+  const starterVisible = !loading && PTOnboarding.showStarter({
+    newcomer, items: starterItems, dismissedAt: obState.dismissed?.[competition.id], joinedAt: myMembership?.joined_at,
+  });
+  function openStarter(id) {
+    if (id === 'invite') openLayer(['invite']);
+    else if (id === 'goal') openLayer(['goal', 'log']);
+    else if (id === 'log') openLayer(sportsGoalsNow.length ? ['log'] : ['goal', 'log']);
+    else if (id === 'push') openLayer(['push'], { manual: true });
+  }
+  // Rückblick beim ersten Öffnen in Woche 2 einer Mitgliedschaft (nur neue Leute, einmal).
+  const weekOneChecked = React.useRef(false);
+  useEffect(() => {
+    if (loading || intro || !newcomer || weekOneChecked.current || !myMembership) return;
+    weekOneChecked.current = true;
+    const first = PTOnboarding.weekOneDue({ joinedAt: myMembership.joined_at, startDate: competition.start_date,
+      seen: obState.weekOne?.[competition.id] });
+    if (!first) return;
+    const people = PTOnboarding.expectedPeople(competition.mode, PTData.participantsFor(members, first).length);
+    const summary = PTOnboarding.weekOneSummary({ weekStart: first, me, sides, sets: allSets,
+      challenges: allChallenges, categories, participantCount: people });
+    setTab('home');
+    setLayer({ kind: 'week1', summary, first });
+  }, [loading, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories]);
+
+  // „Ersten Satz loggen“ aus leeren Zuständen: Ziel fehlt → Ziel, sonst Satz.
+  function startFirstLog() {
+    setTab('home');
+    if (!sportsGoalsNow.length) { if (newcomer) openLayer(['goal', 'log']); else setSetupForChallenge({}); return; }
+    if (newcomer && mySetCount === 0) openLayer(['log']);
+    else setLogForChallenge(sportsGoalsNow[0]);
+  }
+  const layerRef = React.useRef(null);
+  layerRef.current = layer;
+  const memberIdsRef = React.useRef(null);
 
   const weekTemplate = useMemo(() => {
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
@@ -425,9 +755,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           const emoji = { 1: '🥇', 2: '🥈', 3: '🥉' };
           setMedalCelebration({
             key,
-            heroLines: medals[0].rank === 1 ? ['MONATS', 'SIEG'] : ['PODIUM'],
+            hero: medals[0].rank === 1 ? tr('MONATS{br}SIEG', { br: <br/> }) : tr('PODIUM'),
             points: rows.filter(r => r.user_id === me && r.counted).reduce((a, r) => a + r.points, 0),
-            counterLabel: `Punkte im ${PTRanking.monthLabel(month, false)}`,
+            counterLabel: tr('Punkte im {month}', { month: PTRanking.monthLabel(month, false) }),
             subtext: medals.slice(0, 3).map(r => `${emoji[r.rank]} ${catById[r.category_id]?.name || ''}`).join(' · ')
               + (medals.length > 3 ? ` · +${medals.length - 3}` : ''),
           });
@@ -460,7 +790,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           target_reps: p.target_reps,
         });
       }
-      setToast(`Woche fixiert – los geht's, ${profile.display_name.split(/\s+/)[0]}!`);
+      setToast(tr("Woche fixiert – los geht's, {name}!", { name: profile.display_name.split(/\s+/)[0] }));
       reload();
     } catch (e) { alert(e.message); }
   }
@@ -486,7 +816,25 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       // Pflicht-Workouts markieren, damit Summen sie erkennen (PTData.setValue).
       PTData.annotateWorkouts(allSetsData, challs, cats);
       PTData.annotateWorkouts(feedData, challs, cats);
+      // Frisch beigetreten: Gruppenziele, die vorher geknackt wurden, nicht als
+      // Vollbild feiern. Vor dem ersten Rendern von Home setzen (useCelebration).
+      if (firstLoadRef.current && introRef.current === 'joined') {
+        const reached = challs.filter(ch => ch.target_reps > 0 && !ch.workout
+          && allSetsData.filter(x => x.challenge_id === ch.id).reduce((a, x) => a + (x.reps || 0), 0) >= ch.target_reps);
+        markCelebrated(me, reached.map(ch => ch.id));
+      }
+      firstLoadRef.current = false;
       PTPeople.set(mems.map(m => m.profile).filter(Boolean));
+      // Neue Mitglieder ankündigen (nicht beim ersten Laden; die Einladen-Ebene zeigt es selbst).
+      const activeIds = mems.filter(m => !m.left_at).map(m => m.user_id);
+      if (memberIdsRef.current) {
+        const fresh = mems.find(m => !m.left_at && m.user_id !== me && !memberIdsRef.current.includes(m.user_id));
+        if (fresh && layerRef.current?.kind !== 'invite') {
+          setToast(tr('{name} ist dabei 🎉', { name: (fresh.profile?.display_name || tr('Jemand')).split(/\s+/)[0] }));
+          PTHaptics.success();
+        }
+      }
+      memberIdsRef.current = activeIds;
       setCompetition(comp);
       setMembers(mems);
       setCategories(cats);
@@ -527,8 +875,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     // Im offenen Feed erscheint der Satz ohnehin live; dort keinen Toast doppelt.
     if (tabRef.current !== 'feed') setToast(`${who}: ${valStr} ${set.category?.name || ''}`);
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`${isWork ? '💻' : '💪'} ${who} hat geliefert`, {
-        body: `${valStr} ${set.category?.name || (isWork ? 'min' : 'Reps')} · ${competition.name}`,
+      new Notification(`${isWork ? '💻' : '💪'} ${tr('{name} hat geliefert', { name: who })}`, {
+        body: `${valStr} ${set.category?.name || (isWork ? 'min' : tr('Reps'))} · ${competition.name}`,
         icon: '/favicon.ico'
       });
     }
@@ -539,16 +887,6 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     const off = capi.onChange(reload);
     return off;
   }, [capi, reload]);
-
-  // Ask for notification permission on first interaction
-  useEffect(() => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default' && notificationsOn) {
-      // Defer to first user gesture to avoid blocking
-      const ask = () => {Notification.requestPermission();document.removeEventListener('click', ask);};
-      document.addEventListener('click', ask, { once: true });
-    }
-  }, [notificationsOn]);
 
   // Native APNs registration (Capacitor only — web uses the Notification API above)
   useEffect(() => {
@@ -571,16 +909,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
     (async () => {
       try {
+        // Nie automatisch fragen: die Erlaubnis holt der Vorab-Bildschirm
+        // (ObPushPrimer) bzw. der Schalter in den Einstellungen.
         const perm = await Push.checkPermissions();
-        if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
-          const req = await Push.requestPermissions();
-          if (req.receive !== 'granted') return;
-        } else if (perm.receive !== 'granted') {
-          return;
-        }
-        if (cancelled) return;
-        await Push.register();
+        if (perm.receive !== 'granted' || cancelled) return;
 
+        // Listener vor register(), sonst kann das Token-Ereignis verloren gehen.
         const onReg = await Push.addListener('registration', async (info) => {
           try {
             await api.upsertDeviceToken({ token: info.value, platform: 'ios' });
@@ -602,11 +936,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         // the banner automatically while the app is in the foreground.
 
         cleanup = () => { onReg.remove(); onErr.remove(); onTap.remove(); };
+        if (cancelled) { cleanup(); return; }
+        await Push.register();
       } catch (e) { console.warn('Push setup failed', e); }
     })();
 
     return () => { cancelled = true; cleanup(); };
-  }, [me, notificationsOn, api]);
+  }, [me, notificationsOn, api, pushPerm]);
 
   // Tap on push → switch to Feed tab (Rangliste-Pushes → Rangliste)
   useEffect(() => {
@@ -626,9 +962,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   return (
     <div className="app">
       <header className="app-header">
-        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={`Challenge wechseln, aktuell ${competition.name}`}>
+        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={tr('Challenge wechseln, aktuell {name}', { name: competition.name })}>
           <span className="date">
-            {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {new Date().toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}
+            {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {PTi18n.date(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
           <span className="greeting">
             <span className="app-header-name">{competition.name}</span>
@@ -637,21 +973,22 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         </button>
         <button className={`avatar-btn${tab === 'settings' ? ' is-active' : ''}`}
           onClick={() => tab === 'settings' ? setTab('home') : openSettings()}
-          aria-label="Profil und Einstellungen">
+          aria-label={tr('Profil und Einstellungen')}>
           <Avatar userId={me} profile={profile} size={44} />
         </button>
       </header>
 
       <main className="app-main">
         {loading ? <Loader /> : (<>
-        {tab === 'home' && sides.length < 2 && (
-          <div className="banner mu-invite-banner">
-            <div className="banner-icon">👋</div>
-            <div className="banner-text">
-              <strong>Noch allein hier.</strong> Lade Freunde mit dem Code <span className="mono">{competition.invite_code}</span> ein.
-              <button className="btn-link" onClick={() => window.shareInvite(competition)}>Einladen</button>
-            </div>
-          </div>
+        {tab === 'home' && starterVisible && (
+          <ObStarterCard items={starterItems} daysLeft={PTOnboarding.weekProgress().daysLeft}
+            midWeek={PTOnboarding.joinedMidWeek({ joinedAt: myMembership?.joined_at })}
+            onOpen={openStarter}
+            onDismiss={() => onObPatch?.({ dismissed: { [competition.id]: new Date().toISOString() } })} />
+        )}
+        {tab === 'home' && !starterVisible
+          && (activeMembers.length < 2 || (competition.mode === '2v2' && sides.some(x => !x.userIds.length))) && (
+          <ObInviteCard competition={competition} members={members} onInvite={() => openLayer(['invite'])} />
         )}
 
         {tab === 'home' && !currentChallenges.length && !proposalDismissed && weekTemplate.length > 0 &&
@@ -665,7 +1002,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           api={capi}
           me={me}
           sides={sides}
-          participantCount={participantsNow.length}
+          participantCount={peopleForShare}
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
@@ -676,21 +1013,27 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           nextWeekProposals={nextWeekProposals}
           openClosures={usePenalties ? openClosures : []}
           onCloseWeek={(w) => setClosingWeek(w)}
-          onAddGoal={() => setSetupForChallenge({})}
+          onAddGoal={() => (newcomer && !sportsGoalsNow.length ? openLayer(['goal', 'log']) : setSetupForChallenge({}))}
           onEditChallenge={(ch) => setSetupForChallenge(ch)}
           onLogChallenge={(ch) => setLogForChallenge(ch)}
+          coach={newcomer && mySetCount === 0 && !layer}
           onQuickLog={async (ch, val) => {
             try {
               const cat = categories.find(c => c.id === ch.category_id);
               const isWork = cat?.kind === 'work';
+              const first = isFirstLog && !isWork;
               const payload = isWork
                 ? { challenge_id: ch.id, reps: null, duration_minutes: parseInt(val), note: null }
                 : { challenge_id: ch.id, reps: parseInt(val), note: null };
               await capi.addSet(payload);
-              const what = cat?.name ? ` ${cat.name}` : '';
-              setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt`);
+              PTHaptics.tap();
+              if (first) celebrateFirst(parseInt(val), ch, cat);
+              else { setToast(loggedToast(`+${val}${isWork ? ' min' : ''}`, cat?.name)); maybePushPrimer(); }
               reload();
-            } catch (e) { alert(e.message); }
+            } catch (e) {
+              if (e?.code === 'offline') setToast(tr('Keine Verbindung. Satz nicht gespeichert.'));
+              else alert(e.message);
+            }
           }} />
         }
 
@@ -706,11 +1049,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}
-          challenges={currentChallenges} weekSets={currentWeekSets} participantCount={participantsNow.length}
+          challenges={currentChallenges} weekSets={currentWeekSets} participantCount={peopleForShare}
           loading={loading}
           projectTags={projectTags} toolTags={toolTags}
-          onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
-          onDeleteSet={async (s) => { try { await capi.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
+          onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast(tr('Satz aktualisiert')); reload(); } catch (e) { alert(e.message); } }}
+          onDeleteSet={async (s) => { try { await capi.deleteSet(s.id); setToast(tr('Gelöscht')); reload(); } catch (e) { alert(e.message); } }}
           onToggleReaction={async (s, emoji) => {
             const mineHas = (s.reactions || []).some(r => r.athlete === me && r.emoji === emoji);
             try {
@@ -720,7 +1063,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             } catch (e) { alert(e.message); }
           }}
           onPickEmoji={(s) => setPickerForSet(s)}
-          onBackfill={() => setBackfillOpen(true)} />}
+          onBackfill={() => setBackfillOpen(true)}
+          alone={activeMembers.length < 2}
+          onFirstLog={startFirstLog}
+          onInvite={() => { setTab('home'); openLayer(['invite']); }} />}
 
         {tab === 'ranking' &&
         <RankingScreen api={api} me={me} profile={profile}
@@ -757,21 +1103,21 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         </>)}
       </main>
 
-      <nav className="tabbar" aria-label="Hauptnavigation">
+      <nav className="tabbar" aria-label={tr('Hauptnavigation')}>
         <div className="tabbar-inner">
           {[
-            { id: 'home', icon: 'home', label: 'Heute' },
-            { id: 'feed', icon: 'feed', label: 'Feed' },
-            { id: 'ranking', icon: 'trophy', label: 'Rangliste' },
-            { id: 'history', icon: 'stats', label: 'Stats' },
-            ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: 'Strafkonto', badge: openPenaltyCount }] : []),
+            { id: 'home', icon: 'home', label: tr('Heute') },
+            { id: 'feed', icon: 'feed', label: tr('Feed') },
+            { id: 'ranking', icon: 'trophy', label: tr('Rangliste') },
+            { id: 'history', icon: 'stats', label: tr('Stats') },
+            ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: tr('Strafkonto'), badge: openPenaltyCount }] : []),
           ].map(t => (
             <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`}
               aria-current={tab === t.id ? 'page' : undefined}
               onClick={() => setTab(t.id)}>
               <span className="tab-icon">
                 <Icon name={t.icon} size={22} />
-                {t.badge > 0 && <span className="tab-badge" aria-label={`${t.badge} offene Strafen`}>{t.badge}</span>}
+                {t.badge > 0 && <span className="tab-badge" aria-label={trn(t.badge, '{n} offene Strafe', '{n} offene Strafen')}>{t.badge}</span>}
               </span>
               {t.label}
             </button>
@@ -782,7 +1128,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {closingWeek && (
         <WeekCloseSheet weekStart={closingWeek} api={capi} me={me}
           onClose={() => setClosingWeek(null)}
-          onDone={() => { setClosingWeek(null); setToast('Woche abgeschlossen'); reload(); }} />
+          onDone={() => { setClosingWeek(null); setToast(tr('Woche abgeschlossen')); reload(); }} />
       )}
 
       <Sheet open={!!setupForChallenge} onClose={() => setSetupForChallenge(null)}>
@@ -797,8 +1143,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags}
           toolTags={toolTags}
           onClose={() => setSetupForChallenge(null)}
-          onSaved={() => {setSetupForChallenge(null);setToast('Ziel gespeichert');reload();}}
-          onDeleted={() => {setSetupForChallenge(null);setToast('Ziel gelöscht');reload();}}
+          onSaved={() => {setSetupForChallenge(null);setToast(tr('Ziel gespeichert'));reload();}}
+          onDeleted={() => {setSetupForChallenge(null);setToast(tr('Ziel gelöscht'));reload();}}
           onAddCategory={reload} />
       </Sheet>
 
@@ -807,7 +1153,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           if (!logForChallenge) return null;
           const logCat = categories.find(c => c.id === logForChallenge.category_id);
           const ctype = logCat?.challenge_type || 'standard';
-          const what = logCat?.name ? ` ${logCat.name}` : '';
+          const catName = logCat?.name || '';
           if (ctype === 'tom_holland') {
             return (
               <TomHollandSheet
@@ -818,7 +1164,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 onClose={() => setLogForChallenge(null)}
                 onLogged={(rounds) => {
                   setLogForChallenge(null);
-                  setToast(`${rounds} Runden${what} geloggt`);
+                  setToast(catName
+                    ? trn(rounds, '{n} Runde {name} geloggt', '{n} Runden {name} geloggt', { name: catName })
+                    : trn(rounds, '{n} Runde geloggt', '{n} Runden geloggt'));
                   reload();
                 }} />
             );
@@ -834,7 +1182,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 onLogged={(val) => {
                   setLogForChallenge(null);
                   const m = Math.floor(val/60), s = val%60;
-                  setToast(val >= 204 ? 'Bring Sally Up geschafft!' : `${m}:${String(s).padStart(2,'0')}${what} geloggt`);
+                  setToast(val >= 204 ? tr('Bring Sally Up geschafft!') : loggedToast(`${m}:${String(s).padStart(2,'0')}`, catName));
                   reload();
                 }} />
             );
@@ -849,9 +1197,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               toolTags={toolTags}
               onClose={() => setLogForChallenge(null)}
               onLogged={(r, isWork) => {
+                const ch = logForChallenge;
                 setLogForChallenge(null);
+                PTHaptics.tap();
                 const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
-                setToast(`${valStr}${what} geloggt`);
+                if (isFirstLog && !isWork) celebrateFirst(r, ch, logCat);
+                else { setToast(loggedToast(valStr, catName)); maybePushPrimer(); }
                 reload();
               }} />
           );
@@ -867,7 +1218,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags}
           toolTags={toolTags}
           onClose={() => setBackfillOpen(false)}
-          onSaved={(r) => {setBackfillOpen(false);setToast(`+${r} nachgetragen`);reload();}} />
+          onSaved={(r) => {setBackfillOpen(false);setToast(tr('+{n} nachgetragen', { n: r }));reload();}} />
       </Sheet>
 
       <Sheet open={!!pickerForSet} onClose={() => setPickerForSet(null)}>
@@ -883,26 +1234,65 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           }} />
       </Sheet>
 
+      {layer?.kind === 'invite' && (
+        <ObInviteLayer competition={competition} members={members} me={me} fresh={intro === 'created'}
+          onDone={() => advance()} />
+      )}
+      {layer?.kind === 'goal' && (
+        <ObGoalLayer api={capi} competition={competition} categories={categories} me={me}
+          activeCount={participantsNow.length} weekStart={weekStart} title={layer.title}
+          onDone={(ch) => { reload(); advance({ goals: 1, data: { extra: [ch] } }); }}
+          onSkip={() => advance({ goals: live.current.goals })} />
+      )}
+      {layer?.kind === 'log' && (
+        <ObFirstLogLayer api={capi} categories={categories} people={peopleForShare}
+          challenges={[...currentChallenges, ...(layer.extra || []).filter(x => !currentChallenges.some(c => c.id === x.id))]}
+          onLogged={(reps, ch, cat) => {
+            PTHaptics.tap();
+            if (!obState.firstLog) celebrateFirst(reps, ch, cat);
+            else { setToast(loggedToast(`+${reps}`, cat?.name)); advance({ sets: 1 }); maybePushPrimer(); }
+            reload();
+          }}
+          onSkip={() => advance()} />
+      )}
+      {layer?.kind === 'cele' && (
+        <ObCelebrate value={layer.value} category={layer.cat} myDone={layer.myDone} share={layer.share}
+          onDone={() => advance({ sets: 1 })} />
+      )}
+      {layer?.kind === 'week1' && (
+        <ObWeekOne summary={layer.summary} onDone={() => {
+          onObPatch?.({ weekOne: { [competition.id]: layer.first } });
+          if (!sportsGoalsNow.length) openLayer(['goal'], { data: { title: tr('Ziel für Woche 2') } });
+          else setLayer(null);
+        }} />
+      )}
+      {layer?.kind === 'push' && (
+        <ObPushPrimer competition={competition} busy={pushBusy}
+          rival={activeMembers.filter(m => m.user_id !== me).map(m => m.profile?.display_name?.split(/\s+/)[0]).find(Boolean)}
+          onAllow={allowPush} onLater={laterPush} />
+      )}
+
       <Toast message={toast} onDone={() => setToast('')} />
 
       {medalCelebration && (
         <CelebrationOverlay targetReps={medalCelebration.points}
-          heroLines={medalCelebration.heroLines} counterLabel={medalCelebration.counterLabel}
+          hero={medalCelebration.hero} counterLabel={medalCelebration.counterLabel}
           subtext={medalCelebration.subtext}
           onDone={() => { try { localStorage.setItem(medalCelebration.key, '1'); } catch (e) {} setMedalCelebration(null); }} />
       )}
 
+      {/* i18n-ignore: Entwickler-Panel (nur im Bearbeiten-Modus des Design-Hosts), bleibt deutsch */}
       <TweaksPanel title="Tweaks">
-        <TweakSection label="Theme" />
+        <TweakSection label="Theme" />{/* i18n-ignore */}
         <TweakRadio label="Modus" value={t.theme} options={['dark', 'light']}
-        onChange={(v) => setTweak('theme', v)} />
+        onChange={(v) => setTweak('theme', v)} />{/* i18n-ignore */}
         <TweakColor label="Akzent" value={t.accent} onChange={(v) => setTweak('accent', v)}
         options={['#32d74b', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2']} />
-        <TweakSection label="Layout" />
-        <TweakRadio label="Heute-Screen" value={t.layout}
+        <TweakSection label="Layout" />{/* i18n-ignore */}
+        <TweakRadio label="Heute-Screen" value={t.layout} /* i18n-ignore */
         options={[{ label: 'Ring', value: 'rings' }, { label: 'Balken', value: 'bar' }, { label: 'Zahl', value: 'numeric' }]}
         onChange={(v) => setTweak('layout', v)} />
-        <TweakSection label="Sonstiges" />
+        <TweakSection label="Sonstiges" />{/* i18n-ignore */}
         <TweakToggle label="Benachrichtigungen" value={notificationsOn}
         onChange={onSetNotifications} />
       </TweaksPanel>

@@ -1,4 +1,4 @@
-/* global React */
+/* global React, tr, PTi18n */
 /* eslint-disable no-unused-vars */
 
 // Hook: detect unseen goal crossings + provide persistent style.
@@ -92,9 +92,9 @@ function SparkleLayer({ active }) {
 
 // Component: 5-second fullscreen celebration overlay.
 // Implementation grows over Tasks 4–7.
-// heroLines / counterLabel / subtext ersetzen die Texte fürs Wochenziel
+// hero / counterLabel / subtext ersetzen die Texte fürs Wochenziel
 // (z.B. Medaille im Monatsabschluss der Rangliste).
-function CelebrationOverlay({ category, targetReps, onDone, heroLines, counterLabel, subtext }) {
+function CelebrationOverlay({ category, targetReps, onDone, hero, counterLabel, subtext }) {
   const { useEffect, useState } = React;
   const [skipping, setSkipping] = useState(false);
 
@@ -219,7 +219,7 @@ function CelebrationOverlay({ category, targetReps, onDone, heroLines, counterLa
         const eased = 1 - Math.pow(1 - p, 3);
         v = Math.round(eased * target);
       } else v = target;
-      counterEl.textContent = v.toLocaleString('de-DE');
+      counterEl.textContent = PTi18n.number(v);
       if (elapsed < COUNT_DELAY + COUNT_DURATION) {
         rafId = requestAnimationFrame(tickCounter);
       }
@@ -234,7 +234,7 @@ function CelebrationOverlay({ category, targetReps, onDone, heroLines, counterLa
   }, []);
 
   useEffect(() => {
-    const audio = new Audio('sounds/goal-reached.mp3');
+    const audio = new Audio('sounds/goal-reached.wav');
     audio.volume = 0.85;
     audio.play().catch(() => {
       // Audio asset missing or autoplay blocked — synthesize a fallback beep
@@ -284,7 +284,8 @@ function CelebrationOverlay({ category, targetReps, onDone, heroLines, counterLa
     }
   }, [skipping, onDone]);
 
-  const targetFormatted = (targetReps || 0).toLocaleString('de-DE');
+  const targetFormatted = PTi18n.number(targetReps || 0);
+  const unit = category?.name || tr('Reps');
 
   return (
     <div
@@ -310,18 +311,16 @@ function CelebrationOverlay({ category, targetReps, onDone, heroLines, counterLa
           <div className="cel-halo cel-halo-2">🔥</div>
           <div className="cel-halo cel-halo-3">⚡</div>
           <div className="cel-halo cel-halo-4">🏆</div>
-          <div className="cel-hero-text">
-            {(heroLines || ['ZIEL', 'ERREICHT']).map((l, i) => <React.Fragment key={i}>{i > 0 && <br/>}{l}</React.Fragment>)}
-          </div>
+          <div className="cel-hero-text">{hero ?? tr('ZIEL{br}ERREICHT', { br: <br/> })}</div>
         </div>
         <div className="cel-counter-row">
           <span className="cel-counter-num" data-target={targetReps}>0</span>
-          <span className="cel-counter-of">{counterLabel ?? `/ ${targetFormatted} ${category?.name || 'Reps'}`}</span>
+          <span className="cel-counter-of">{counterLabel ?? <>/ {targetFormatted} {unit}</>}</span>
         </div>
-        <div className="cel-subtext">{subtext ?? `${category?.emoji || '🏆'} ${targetFormatted} ${category?.name || 'Reps'} geknackt`}</div>
+        <div className="cel-subtext">{subtext ?? <>{category?.emoji || '🏆'} {tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</>}</div>
       </div>
 
-      <div className="cel-skip-hint">tap zum Überspringen</div>
+      <div className="cel-skip-hint">{tr('tap zum Überspringen')}</div>
     </div>
   );
 }

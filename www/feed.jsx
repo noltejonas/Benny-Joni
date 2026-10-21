@@ -1,4 +1,4 @@
-/* global React, PTData, PTFeed, PTPeople, Icon, Avatar, sideStyle, sideIndexByUser, formatRelative, formatDuration, WeekRecap, bsuFmt, BSU_MAX_SEC */
+/* global React, PTData, PTFeed, PTPeople, Icon, Avatar, sideStyle, sideIndexByUser, formatRelative, formatDuration, WeekRecap, bsuFmt, BSU_MAX_SEC, tr, trn, PTi18n */
 // Live-Feed der Challenge. Das Rechenmodell (Serien, Meilensteine, Anteile)
 // steckt in feed-model.js; hier geht es um die Darstellung:
 // - Neue Einträge rutschen oben hinein. Wer weiter unten liest, wird nicht
@@ -43,7 +43,7 @@ const isWorkSet = (s) => s.duration_minutes != null;
 function setValueLabel(s) {
   if (isWorkSet(s)) return formatDuration(s.duration_minutes);
   const type = s.category?.challenge_type;
-  if (type === 'tom_holland') return `${s.reps} Rd.`;
+  if (type === 'tom_holland') return trn(s.reps, '{n} Rd.', '{n} Rd.');
   if (type === 'bring_sally_up') return s.reps >= BSU_MAX_SEC ? '3:24' : bsuFmt(s.reps);
   return `+${s.reps}`;
 }
@@ -53,8 +53,8 @@ function burstValueLabel(b) {
   return isWorkSet(b.sets[0]) ? formatDuration(b.total) : `+${b.total}`;
 }
 
-const clockOf = (ts) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-const personName = (id, me) => (id === me ? 'Du' : PTPeople.firstNameOf(id));
+const clockOf = (ts) => PTi18n.time(ts, { hour: '2-digit', minute: '2-digit' });
+const personName = (id, me) => (id === me ? tr('Du') : PTPeople.firstNameOf(id));
 
 // Reaktionen aller Sätze einer Serie, mit sofortiger Rückmeldung aus `opt`
 // ({ emoji: 'on' | 'off' }), bis der Server den Stand bestätigt.
@@ -79,43 +79,51 @@ function groupReactions(sets, me, opt = {}) {
 }
 
 // Text eines Meilensteins, einmal mit Hervorhebung, einmal als reiner Text für Screenreader.
+// `milestoneText` baut beide aus demselben Satz: `b` hebt hervor bzw. lässt den Text, wie er ist.
+const milestoneText = (fn) => ({ text: fn((x) => <strong>{x}</strong>), plain: fn((x) => x) });
+
 function milestoneParts(e, { me, sides, catName, fmt }) {
   const who = personName(e.athlete, me);
   if (e.type === 'share') {
     return {
       icon: 'check',
-      text: e.athlete === me
-        ? <>Du hast deinen Anteil bei <strong>{catName}</strong> erledigt</>
-        : <><strong>{who}</strong> hat den Anteil bei <strong>{catName}</strong> erledigt</>,
-      plain: e.athlete === me ? `Du hast deinen Anteil bei ${catName} erledigt` : `${who} hat den Anteil bei ${catName} erledigt`,
-      sub: `${fmt(e.value)} von ${fmt(e.target)}`,
+      ...milestoneText((b) => (e.athlete === me
+        ? tr('Du hast deinen Anteil bei {exercise} erledigt', { exercise: b(catName) })
+        : tr('{name} hat den Anteil bei {exercise} erledigt', { name: b(who), exercise: b(catName) }))),
+      sub: tr('{value} von {target}', { value: fmt(e.value), target: fmt(e.target) }),
     };
   }
   if (e.type === 'goal') {
+    const nums = { value: fmt(e.value), target: fmt(e.target) };
     return {
       icon: 'trophy',
-      text: <>Wochenziel <strong>{catName}</strong> geschafft</>,
-      plain: `Wochenziel ${catName} geschafft`,
-      sub: `${fmt(e.value)} von ${fmt(e.target)} · letzter Satz: ${e.athlete === me ? 'du' : who}`,
+      ...milestoneText((b) => tr('Wochenziel {exercise} geschafft', { exercise: b(catName) })),
+      sub: e.athlete === me
+        ? tr('{value} von {target} · letzter Satz: du', nums)
+        : tr('{value} von {target} · letzter Satz: {name}', { ...nums, name: who }),
     };
   }
   const side = sides[e.sideIndex];
   const plural = (side?.userIds?.length || 0) > 1;
-  const subject = side?.isMine ? (plural ? 'Ihr übernehmt' : 'Du übernimmst')
-    : `${side?.label || who} ${plural ? 'übernehmen' : 'übernimmt'}`;
+  const name = side?.label || who;
   // Stand aus Sicht der neuen Führung: ihr Wert zuerst, dann der nächstbeste.
   const sorted = [...(e.values || [])].sort((a, b) => b - a);
   return {
     icon: 'flame',
-    text: <><strong>{subject}</strong> die Führung bei <strong>{catName}</strong></>,
-    plain: `${subject} die Führung bei ${catName}`,
+    ...milestoneText((b) => (side?.isMine
+      ? (plural
+        ? tr('Ihr übernehmt die Führung bei {exercise}', { exercise: b(catName) })
+        : tr('Du übernimmst die Führung bei {exercise}', { exercise: b(catName) }))
+      : (plural
+        ? tr('{name} übernehmen die Führung bei {exercise}', { name: b(name), exercise: b(catName) })
+        : tr('{name} übernimmt die Führung bei {exercise}', { name: b(name), exercise: b(catName) })))),
     sub: `${fmt(sorted[0] || 0)} : ${fmt(sorted[1] || 0)}`,
   };
 }
 
 function FeedSkeleton() {
   return (
-    <div className="rd-feed lf" aria-busy="true" aria-label="Aktivität wird geladen">
+    <div className="rd-feed lf" aria-busy="true" aria-label={tr('Aktivität wird geladen')}>
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="lf-row lf-skel">
           <span className="lf-skel-avatar" />
@@ -141,7 +149,7 @@ function FeedMilestone({ e, parts, side, arriving }) {
 function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions, onReact, onMore,
   progressLabel, tags, editId, editVal, setEditVal, startEdit, commitEdit, cancelEdit, onDeleteSet }) {
   const mine = b.athlete === me;
-  const note = b.sets[0].note;
+  const note = PTData.noteText(b.sets[0].note);
   const showSets = mine || b.count > 1;
   return (
     <div className={`lf-row ${side ? side.cls : 'side-n'}${arriving ? ' is-arriving' : ''}${open ? ' is-open' : ''}`}
@@ -149,16 +157,16 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
       <button className="lf-main" onClick={onToggleOpen} aria-expanded={open}>
         <span className="lf-avatar">
           <Avatar userId={b.athlete} size={36} className="avatar-img" />
-          {isNew && <span className="lf-dot" aria-label="neu" />}
+          {isNew && <span className="lf-dot" aria-label={tr('neu')} />}
         </span>
         <span className="lf-body">
           <span className="lf-title"><strong>{personName(b.athlete, me)}</strong> · {b.category?.name || '—'}</span>
           <span className="lf-meta">
             {formatRelative(b.created_at)}
-            {b.count > 1 && ` · ${b.count} Sätze`}
+            {b.count > 1 && ` · ${trn(b.count, '{n} Satz', '{n} Sätze')}`}
             {progressLabel && ` · ${progressLabel}`}
           </span>
-          {note && <span className="lf-note">„{note}“</span>}
+          {note && <span className="lf-note">{tr('„{note}“', { note })}</span>}
         </span>
         <span className="lf-value mono">{burstValueLabel(b)}</span>
       </button>
@@ -177,14 +185,14 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
 
       {open && (
         <div className="lf-tray">
-          <div className="lf-quick" role="group" aria-label="Schnell reagieren">
+          <div className="lf-quick" role="group" aria-label={tr('Schnell reagieren')}>
             {QUICK_REACTIONS.map((emoji) => {
               const on = reactions.some((p) => p.emoji === emoji && p.byMe);
               return (
                 <button key={emoji} className={on ? 'on' : ''} aria-pressed={on} onClick={() => onReact(emoji)}>{emoji}</button>
               );
             })}
-            <button className="lf-more" aria-label="Andere Reaktion" onClick={onMore}><Icon name="plus" size={18} /></button>
+            <button className="lf-more" aria-label={tr('Andere Reaktion')} onClick={onMore}><Icon name="plus" size={18} /></button>
           </div>
           {showSets && (
             <div className="lf-sets">
@@ -193,7 +201,7 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
                   <span className="lf-set-time mono">{clockOf(s.created_at)}</span>
                   {editId === s.id ? (
                     <input className="input mono lf-set-input" type="number" inputMode="numeric" value={editVal} autoFocus
-                      aria-label="Neuer Wert"
+                      aria-label={tr('Neuer Wert')}
                       onChange={(ev) => setEditVal(ev.target.value)}
                       onFocus={(ev) => ev.target.select()}
                       onKeyDown={(ev) => { if (ev.key === 'Enter') commitEdit(s); if (ev.key === 'Escape') cancelEdit(); }}
@@ -203,11 +211,11 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
                   )}
                   {mine && editId !== s.id && (
                     <>
-                      <button className="icon-btn feed-action-btn" aria-label="Bearbeiten" onClick={() => startEdit(s)}>
+                      <button className="icon-btn feed-action-btn" aria-label={tr('Bearbeiten')} onClick={() => startEdit(s)}>
                         <Icon name="edit" size={14} strokeWidth={2.2} />
                       </button>
-                      <button className="icon-btn icon-btn-danger feed-action-btn" aria-label="Löschen"
-                        onClick={() => { if (confirm(`${setValueLabel(s)} löschen?`)) onDeleteSet?.(s); }}>
+                      <button className="icon-btn icon-btn-danger feed-action-btn" aria-label={tr('Löschen')}
+                        onClick={() => { if (confirm(tr('{value} löschen?', { value: setValueLabel(s) }))) onDeleteSet?.(s); }}>
                         <Icon name="trash" size={14} strokeWidth={2.2} />
                       </button>
                     </>
@@ -222,9 +230,10 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
   );
 }
 
+// `alone`, `onFirstLog`, `onInvite`: leerer Zustand und Hinweis für neue Challenges.
 function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], weekSets = [], participantCount = 2,
-  projectTags = [], toolTags = [], loading = false,
-  onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill }) {
+  projectTags = [], toolTags = [], loading = false, alone = false,
+  onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill, onFirstLog, onInvite }) {
   useTicker(30000);
   const online = useOnline();
 
@@ -344,32 +353,36 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
   if (!entries.length) {
     return (
       <div className="rd-empty">
-        <div className="rd-empty-title">Noch keine Aktivität</div>
-        <div className="rd-empty-text">Logge den ersten Satz, dann geht es hier los.</div>
+        <div className="rd-empty-title">{tr('Noch keine Aktivität')}</div>
+        <div className="rd-empty-text">{alone ? tr('Hier siehst du live jeden Satz, sobald jemand dabei ist.') : tr('Hier siehst du live jeden Satz.')}</div>
+        <div className="ob-empty-actions">
+          {onFirstLog && <button className="btn" onClick={onFirstLog}>{tr('Ersten Satz loggen')}</button>}
+          {alone && onInvite && <button className="btn btn-secondary" onClick={onInvite}>{tr('Einladen')}</button>}
+        </div>
       </div>
     );
   }
 
   const todayIso = PTData.isoDate(new Date());
   const yesterdayIso = PTData.isoDate(new Date(Date.now() - 86400000));
-  const dayLabel = (iso) => (iso === todayIso ? 'Heute' : iso === yesterdayIso ? 'Gestern'
-    : new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }));
+  const dayLabel = (iso) => (iso === todayIso ? tr('Heute') : iso === yesterdayIso ? tr('Gestern')
+    : PTi18n.day(iso, { weekday: 'long', day: 'numeric', month: 'long' }));
   let lastDay = null;
 
   return (
     <div className="rd-feed lf">
       <div className="rd-section-head lf-head">
-        <h2>Aktivität</h2>
-        <span className={`lf-live${online ? '' : ' off'}`} title={online ? 'Aktualisiert sich automatisch' : 'Keine Verbindung'}>
-          <span className="lf-live-dot" />{online ? 'Live' : 'Offline'}
+        <h2>{tr('Aktivität')}</h2>
+        <span className={`lf-live${online ? '' : ' off'}`} title={online ? tr('Aktualisiert sich automatisch') : tr('Keine Verbindung')}>
+          <span className="lf-live-dot" />{online ? tr('Live') : tr('Offline')}
         </span>
         <span className="lf-spacer" />
-        {onBackfill && me && <button className="btn-link" onClick={onBackfill}>Nachtrag</button>}
+        {onBackfill && me && <button className="btn-link" onClick={onBackfill}>{tr('Nachtrag')}</button>}
       </div>
 
       {pending > 0 && (
         <button className="lf-pill" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setPending(0); }}>
-          ↑ {pending} {pending === 1 ? 'neue Aktivität' : 'neue Aktivitäten'}
+          ↑ {trn(pending, '{n} neue Aktivität', '{n} neue Aktivitäten')}
         </button>
       )}
       <div className="lf-sr" role="status" aria-live="polite">{announce}</div>
@@ -397,7 +410,7 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
 
         const fmt = fmtFor(e.challenge_id);
         const progressLabel = e.progress && !e.workout
-          ? `Anteil ${fmt(e.progress.value)}/${fmt(e.progress.share)}${e.progress.value >= e.progress.share ? ' ✓' : ''}`
+          ? tr('Anteil {value}/{share}', { value: fmt(e.progress.value), share: fmt(e.progress.share) }) + (e.progress.value >= e.progress.share ? ' ✓' : '')
           : null;
         const first = e.sets[0];
         const tags = [
@@ -421,6 +434,12 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
           </React.Fragment>
         );
       })}
+      {alone && onInvite && (
+        <div className="ob-note" style={{ marginTop: 8 }}>
+          <span className="ob-note-emoji" aria-hidden="true">👋</span>
+          <span>{tr('Sobald jemand dabei ist, siehst du hier jeden Satz live.')} <button className="btn-link" onClick={onInvite}>{tr('Einladen')}</button></span>
+        </div>
+      )}
     </div>
   );
 }

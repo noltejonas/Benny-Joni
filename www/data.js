@@ -88,8 +88,20 @@
     if (type === 'bring_sally_up') {
       return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}${v >= SALLY_FULL_SECONDS ? ' ✓' : ''}`;
     }
-    if (type === 'tom_holland') return `${v} Runden`;
+    if (type === 'tom_holland') return trn(v, '{n} Runde', '{n} Runden');
     return String(v);
+  }
+
+  // Pflicht-Workouts speichern eine deutsche Notiz für alle Mitglieder
+  // („Zeit: 12:34“ bei Tom Holland, „3:10 von 3:24“ bei Bring Sally Up).
+  // Angezeigt wird sie in der App-Sprache; eigene Notizen bleiben, wie sie sind.
+  function noteText(note) {
+    if (!note) return note;
+    let m = /^Zeit: (\d+:\d{2})$/.exec(note);
+    if (m) return tr('Zeit: {time}', { time: m[1] });
+    m = /^(\d+:\d{2}) von (\d+:\d{2})$/.exec(note);
+    if (m) return tr('{time} von {total}', { time: m[1], total: m[2] });
+    return note;
   }
 
   // „2× · 3:00, 3:24 ✓“ für die Durchgänge einer Person, älteste zuerst.
@@ -136,6 +148,7 @@
         const share = shareOn(ch, participantCount);
         if (reps < share) out.push({
           athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
+          // i18n-ignore: `reason` ist nur intern, angezeigt wird aus rule_mode
           reason: ch.workout ? 'Pflicht-Workout fehlt' : `${share - reps} unter fairShare`,
         });
       }
@@ -151,23 +164,41 @@
     let failed = false, reason = '';
     if (mode === 'per_week_any') {
       failed = perCh.some(x => x.missed);
-      reason = failed ? `${perCh.filter(x => x.missed).length} Challenge(s) verfehlt` : '';
+      reason = failed ? `${perCh.filter(x => x.missed).length} Challenge(s) verfehlt` : ''; // i18n-ignore: nur intern
     } else if (mode === 'per_week_all') {
       failed = perCh.every(x => x.missed);
-      reason = failed ? 'alle Challenges verfehlt' : '';
+      reason = failed ? 'alle Challenges verfehlt' : ''; // i18n-ignore: nur intern
     } else { // per_week_aggregate — ein fehlendes Pflicht-Workout gleichen Wiederholungen nicht aus
       const repCh = perCh.filter(x => !x.ch.workout);
       const totalReps  = repCh.reduce((a, x) => a + x.reps, 0);
       const totalShare = repCh.reduce((a, x) => a + x.share, 0);
       const workoutMissed = perCh.some(x => x.ch.workout && x.missed);
       failed = totalReps < totalShare || workoutMissed;
+      // i18n-ignore: `reason` ist nur intern, angezeigt wird aus rule_mode
       reason = totalReps < totalShare ? `aggregiert ${totalShare - totalReps} unter fairShare`
-        : workoutMissed ? 'Pflicht-Workout fehlt' : '';
+        : workoutMissed ? 'Pflicht-Workout fehlt' : ''; // i18n-ignore: nur intern
     }
 
     return failed
       ? [{ athlete, challenge_id: null, amount_cents: amount, rule_mode: mode, reason }]
       : [];
+  }
+
+  // ── Standard-Übungen ────────────────────────────────────────────────
+  // Die globalen Standard-Kategorien (competition_id null) heißen in der
+  // Datenbank deutsch. Beim Laden bekommt die Zeile den Namen in der
+  // App-Sprache; in die Datenbank geht nie ein übersetzter Name zurück.
+  // Eigene Kategorien einer Challenge bleiben, wie sie sind.
+  function localizeCategory(row) {
+    if (!row || row.competition_id != null) return row;
+    let name = null;
+    switch (row.name) {
+      case 'Liegestütze': name = tr('Liegestütze'); break;
+      case 'Klimmzüge': name = tr('Klimmzüge'); break;
+      case 'Kniebeugen': name = tr('Kniebeugen'); break;
+      default: return row;
+    }
+    return name === row.name ? row : { ...row, name };
   }
 
   // ── Row normalisation ───────────────────────────────────────────────
@@ -191,31 +222,67 @@
     return row;
   }
 
+  const TEXT = {
+    exists: tr('Für diese E-Mail gibt es schon einen Account.'),
+    badEmail: tr('Diese E-Mail-Adresse sieht nicht richtig aus.'),
+    shortPassword: tr('Passwort muss mindestens 6 Zeichen haben.'),
+    weakPassword: tr('Passwort zu schwach. Nimm ein anderes.'),
+    rateLimit: tr('Zu viele Versuche. Warte kurz und probier es dann nochmal.'),
+    signupOff: tr('Neue Konten sind gerade gesperrt.'),
+    unconfirmed: tr('E-Mail ist noch nicht bestätigt.'),
+    credentials: tr('E-Mail oder Passwort falsch.'),
+    otp: tr('Code ungültig oder abgelaufen.'),
+    offline: tr('Keine Verbindung. Prüf dein Internet.'),
+  };
+
+  // Supabase-Fehler (Text oder `code`) → Text in der App-Sprache, `code` bleibt erhalten.
+  // Netzfehler bekommen `code = 'offline'`.
   function friendlyError(error) {
     const msg = error?.message || String(error);
+    const code = error?.code || '';
+    const wrap = (text, c = code) => { const e = new Error(text); e.code = c; return e; };
     const map = {
-      invalid_code: 'Code nicht gefunden.',
-      competition_full: 'Diese Challenge ist schon voll.',
-      team_full: 'Dieses Team ist schon voll.',
-      invalid_team: 'Ungültiges Team.',
-      catalog_name: 'Diese Übung gibt es schon im Katalog. Nimm die, dann zählt sie für die Rangliste.',
-      not_ranked: 'Diese Übung zählt nicht für die Rangliste.',
-      invalid_value: 'Bitte einen Wert größer als 0 eingeben.',
-      forbidden: 'Das darf nur der Ersteller der Challenge.',
-      not_authenticated: 'Bitte zuerst anmelden.',
-      'Invalid login credentials': 'E-Mail oder Passwort falsch.',
-      'User already registered': 'Für diese E-Mail gibt es schon einen Account.',
-      'Email not confirmed': 'E-Mail ist noch nicht bestätigt.',
+      invalid_code: tr('Code nicht gefunden.'),
+      competition_full: tr('Diese Challenge ist schon voll.'),
+      team_full: tr('Dieses Team ist schon voll.'),
+      invalid_team: tr('Ungültiges Team.'),
+      catalog_name: tr('Diese Übung gibt es schon im Katalog. Nimm die, dann zählt sie für die Rangliste.'),
+      not_ranked: tr('Diese Übung zählt nicht für die Rangliste.'),
+      invalid_value: tr('Bitte einen Wert größer als 0 eingeben.'),
+      forbidden: tr('Das darf nur der Ersteller der Challenge.'),
+      not_authenticated: tr('Bitte zuerst anmelden.'),
+      'Invalid login credentials': TEXT.credentials,
+      'User already registered': TEXT.exists,
+      'Email not confirmed': TEXT.unconfirmed,
     };
-    const wrap = (text) => { const e = new Error(text); e.code = error?.code; return e; };
     for (const [k, v] of Object.entries(map)) if (msg.includes(k)) return wrap(v);
-    if (/Password should be at least/i.test(msg)) return wrap('Passwort muss mindestens 6 Zeichen haben.');
-    if (/Token has expired or is invalid/i.test(msg)) return wrap('Code ungültig oder abgelaufen.');
+    if (/Failed to fetch|Load failed|NetworkError|Network request failed|fetch failed/i.test(msg)
+      || error?.name === 'AuthRetryableFetchError') return wrap(TEXT.offline, 'offline');
+    if (/Password should be at least/i.test(msg)) return wrap(TEXT.shortPassword);
+    const byCode = {
+      user_already_exists: TEXT.exists, email_exists: TEXT.exists,
+      email_address_invalid: TEXT.badEmail, weak_password: TEXT.weakPassword,
+      over_email_send_rate_limit: TEXT.rateLimit, over_request_rate_limit: TEXT.rateLimit,
+      signup_disabled: TEXT.signupOff, email_not_confirmed: TEXT.unconfirmed,
+      invalid_credentials: TEXT.credentials, otp_expired: TEXT.otp,
+    };
+    if (byCode[code]) return wrap(byCode[code]);
+    if (/already been registered/i.test(msg)) return wrap(TEXT.exists);
+    if (/validate email address|email address .* is invalid/i.test(msg)) return wrap(TEXT.badEmail);
+    if (/rate limit|For security purposes/i.test(msg)) return wrap(TEXT.rateLimit);
+    if (/Signups not allowed/i.test(msg)) return wrap(TEXT.signupOff);
+    if (/Token has expired or is invalid/i.test(msg)) return wrap(TEXT.otp);
     return error instanceof Error ? error : wrap(msg);
   }
   function check({ data, error }) {
     if (error) throw friendlyError(error);
     return data;
+  }
+  // Wie check, fängt aber auch geworfene Netzfehler (fetch) ab.
+  async function guard(run) {
+    let res;
+    try { res = await run(); } catch (e) { throw friendlyError(e); }
+    return check(res);
   }
   // RPC fehlt (Migration noch nicht eingespielt)
   const missingRpc = (error) => error?.code === 'PGRST202' || /Could not find the function/i.test(error?.message || '');
@@ -256,7 +323,7 @@
     let currentUserId = null;
     client.auth.onAuthStateChange((_evt, session) => { currentUserId = session?.user?.id || null; });
     const uid = () => {
-      if (!currentUserId) throw new Error('Bitte zuerst anmelden.');
+      if (!currentUserId) throw new Error(tr('Bitte zuerst anmelden.'));
       return currentUserId;
     };
 
@@ -278,18 +345,26 @@
         });
         return () => data.subscription.unsubscribe();
       },
+      // Ohne Session (E-Mail-Bestätigung im Dashboard an) zeigt die App
+      // „Check deine Mails“. Bei aktiver Bestätigung meldet Supabase eine schon
+      // registrierte Adresse nicht als Fehler, sondern mit leeren identities.
       async signUp({ email, password, displayName }) {
-        const data = check(await client.auth.signUp({
+        const name = (displayName || '').trim();
+        const data = await guard(() => client.auth.signUp({
           email: email.trim(), password,
-          options: { data: { display_name: displayName.trim() } },
+          options: { data: name ? { display_name: name } : {} },
         }));
-        if (!data.session) {
-          throw new Error('Account angelegt, aber E-Mail-Bestätigung ist aktiv. Bitte im Supabase-Dashboard unter Auth → Providers → Email „Confirm email“ ausschalten oder den Link in der Mail bestätigen.');
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          // i18n-ignore: Supabase-Fehlertext, wird oben in friendlyError übersetzt
+          throw friendlyError({ message: 'User already registered', code: 'user_already_exists' });
         }
-        return data.session;
+        return { session: data.session, user: data.user, needsConfirm: !data.session };
       },
       async signIn({ email, password }) {
-        return check(await client.auth.signInWithPassword({ email: email.trim(), password })).session;
+        return (await guard(() => client.auth.signInWithPassword({ email: email.trim(), password }))).session;
+      },
+      async resendSignup(email) {
+        await guard(() => client.auth.resend({ type: 'signup', email: email.trim() }));
       },
       async signOut() {
         await client.auth.signOut();
@@ -298,11 +373,11 @@
       // Passwort vergessen: Mail enthält einen 6-stelligen Code ({{ .Token }}),
       // der in der App eingegeben wird — kein Deep Link nötig.
       async requestPasswordReset(email) {
-        check(await client.auth.resetPasswordForEmail(email.trim()));
+        await guard(() => client.auth.resetPasswordForEmail(email.trim()));
       },
       async resetPasswordWithCode({ email, code, password }) {
-        check(await client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' }));
-        check(await client.auth.updateUser({ password }));
+        await guard(() => client.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' }));
+        await guard(() => client.auth.updateUser({ password }));
       },
 
       // ── Profile ──────────────────────────────────────────────────────
@@ -315,10 +390,15 @@
           // Trigger on_auth_user_created läuft async zur Session — kurz warten.
           await new Promise(r => setTimeout(r, 400));
         }
-        throw new Error('Profil nicht gefunden. Ist Migration A eingespielt?');
+        throw new Error(tr('Profil nicht gefunden. Ist Migration A eingespielt?'));
       },
       async updateProfile(patch) {
         return check(await client.from('profiles').update(patch).eq('id', uid()).select().single());
+      },
+      // Onboarding-Stand fürs Konto (Spalte profiles.onboarding, Migration
+      // 20261020000000). Aufrufen nur, wenn das geladene Profil die Spalte hat.
+      async saveOnboarding(state) {
+        return base.updateProfile({ onboarding: state });
       },
       async uploadAvatar(blob) {
         const path = `${uid()}/avatar-${Date.now()}.jpg`;
@@ -394,7 +474,7 @@
           members,
           challenges: challenges.map(normChallenge),
           sets: sets.map(withAthlete),
-          categories,
+          categories: categories.map(localizeCategory),
         };
       },
 
@@ -541,9 +621,10 @@
       },
 
       async getCategories() {
-        return check(await client.from('categories').select('*')
+        const rows = check(await client.from('categories').select('*')
           .or(`competition_id.is.null,competition_id.eq.${cid}`)
           .order('created_at'));
+        return (rows || []).map(localizeCategory);
       },
       async addCategory(name, emoji='💪', kind='sports') {
         const data = check(await client.from('categories')
@@ -554,14 +635,14 @@
       async updateCategory(id, patch) {
         const { data, error } = await client.from('categories').update(patch).eq('id', id).select();
         if (error) throw friendlyError(error);
-        if (!data?.length) throw new Error('Standard-Kategorien können nicht bearbeitet werden.');
+        if (!data?.length) throw new Error(tr('Standard-Kategorien können nicht bearbeitet werden.'));
         emit();
         return data[0];
       },
       async deleteCategory(id) {
         const { data, error } = await client.from('categories').delete().eq('id', id).select('id');
-        if (error) throw new Error(error.message.includes('foreign') ? 'Kategorie wird genutzt – nicht löschbar' : error.message);
-        if (!data?.length) throw new Error('Standard-Kategorien können nicht gelöscht werden.');
+        if (error) throw new Error(error.message.includes('foreign') ? tr('Kategorie wird genutzt – nicht löschbar') : error.message);
+        if (!data?.length) throw new Error(tr('Standard-Kategorien können nicht gelöscht werden.'));
         emit();
       },
 
@@ -679,7 +760,7 @@
           .limit(limit));
         return (data || []).map(s => {
           normSet(s);
-          return { ...s, category: s.challenge?.category, challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
+          return { ...s, category: localizeCategory(s.challenge?.category), challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
         });
       },
       // Andere eigene Challenges, in denen ein Satz dieser Übung mitzählt
@@ -800,7 +881,7 @@
         const { error: clErr } = await client.from('week_closures')
           .insert({ week_start: weekStart, competition_id: cid, closed_by_user: uid() });
         if (clErr) {
-          if (clErr.code === '23505') throw new Error('Woche bereits abgeschlossen');
+          if (clErr.code === '23505') throw new Error(tr('Woche bereits abgeschlossen'));
           throw friendlyError(clErr);
         }
         const { penalties } = await api.previewWeekClose(weekStart);
@@ -936,6 +1017,7 @@
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
-    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, workoutSummary, workoutPeopleDone,
+    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, workoutPeopleDone,
+    friendlyError, localizeCategory,
   };
 })();

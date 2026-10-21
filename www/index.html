@@ -22,6 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="redesign.css" />
+  <link rel="stylesheet" href="onboarding.css" />
 </head>
 <body>
   <div id="root"></div>
@@ -33,6 +34,20 @@
     // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
     // @capacitor/preferences, im Browser localStorage (Wert null).
     window.PTPreferencesReady = new Promise(function (resolve) { window.__ptResolvePreferences = resolve; });
+    // App-Plugin für Einladungslinks (projektterminator://join/<CODE>), nur nativ.
+    window.PTAppReady = new Promise(function (resolve) { window.__ptResolveApp = resolve; });
+  </script>
+  <script type="module">
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/app@8/+esm');
+        window.__ptResolveApp(mod);
+      } else {
+        window.__ptResolveApp(null);
+      }
+    } catch (e) {
+      window.__ptResolveApp(null);
+    }
   </script>
   <script type="module">
     try {
@@ -77,12 +92,17 @@
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
+  <!-- Sprachen: vor allem anderen, damit tr() überall bereitsteht -->
+  <script src="i18n.js"></script>
+  <script src="i18n/en.js"></script>
+
   <!-- Data layer -->
   <script src="data.js"></script>
   <script src="ranking-model.js"></script>
   <script src="demo.js"></script>
   <script src="stats-model.js"></script>
   <script src="feed-model.js"></script>
+  <script src="onboarding-model.js"></script>
 
   <!-- Tweaks shell -->
   <script type="text/babel" src="tweaks-panel.jsx"></script>
@@ -100,11 +120,13 @@
   <!-- Settings / rotation plan -->
   <script type="text/babel" src="settings.jsx"></script>
 
-  <!-- Login, Challenges, Stats über alle Challenges -->
+  <!-- Onboarding, Login, Challenges, Stats über alle Challenges -->
+  <script type="text/babel" src="onboarding.jsx"></script>
   <script type="text/babel" src="competitions.jsx"></script>
   <script type="text/babel" src="stats-charts.jsx"></script>
   <script type="text/babel" src="stats-global.jsx"></script>
   <script type="text/babel" src="ranking.jsx"></script>
+  <script type="text/babel" src="onboarding-intro.jsx"></script>
 
   <!-- App -->
   <script type="text/babel" src="app.jsx"></script>

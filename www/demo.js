@@ -1,25 +1,48 @@
 // Projekt Terminator — lokaler Demo-Modus
 //
-// Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt).
-// `?demo=reset` erzeugt die Beispieldaten neu, `?demo=off` schaltet zurück auf Supabase.
+// Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt) oder
+// über „Demo ansehen“ auf dem Willkommen-Bildschirm.
+//   ?demo=reset  Beispieldaten neu erzeugen
+//   ?demo=new    Demo abgemeldet starten (Onboarding als neue Person durchspielen)
+//   ?demo=off    zurück auf Supabase
 // Ersetzt PTData.init durch eine In-Memory-API mit denselben Methoden wie data.js.
-// Es gibt keinen Netzwerkzugriff; alles liegt in localStorage (`pt_demo_db_v2`).
+// Es gibt keinen Netzwerkzugriff; alles liegt in localStorage (`pt_demo_db_v1`).
+// Ohne Netz (navigator.onLine === false) scheitern Aufrufe wie bei Supabase.
+//
+// Zum Testen: localStorage.pt_demo_confirm = '1' → Registrieren verlangt die
+// Mail-Bestätigung; localStorage.pt_demo_offline = '1' → alle Aufrufe scheitern
+// wie ohne Netz; PTDemo.shiftWeek() spult eine Woche vor.
 
 (function () {
+  // Onboarding-Stände (pt:onboarding:<id>) gehören zu Demo-Personen, die es nach
+  // einem Zurücksetzen nicht mehr gibt.
+  function clearDemoState() {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('pt:onboarding:u-')) localStorage.removeItem(k);
+  }
   const params = new URLSearchParams(location.search);
   const flag = params.get('demo');
   try {
-    if (flag === 'off') localStorage.removeItem('pt_demo');
+    if (flag === 'off') { localStorage.removeItem('pt_demo'); localStorage.removeItem('pt_demo_user'); }
     else if (flag !== null) localStorage.setItem('pt_demo', '1');
-    if (flag === 'reset') localStorage.removeItem('pt_demo_db_v2');
-    localStorage.removeItem('pt_demo_db_v1');
+    if (flag === 'reset') { localStorage.removeItem('pt_demo_db_v1'); localStorage.removeItem('pt_demo_user'); clearDemoState(); }
+    if (flag === 'new') { sessionStorage.setItem('pt_demo_signed_out', '1'); localStorage.removeItem('pt_demo_user'); }
+    if (flag !== null) {
+      // Einmalige Schalter nicht beim Neuladen wiederholen; ?join= & Co. bleiben.
+      params.delete('demo');
+      const q = params.toString();
+      history.replaceState(null, '', location.pathname + (q ? `?${q}` : '') + location.hash);
+    }
     if (localStorage.getItem('pt_demo') !== '1') return;
   } catch (e) { return; }
 
-  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts } = window.PTData;
-  const DB_KEY = 'pt_demo_db_v2';
+  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts, friendlyError, localizeCategory } = window.PTData;
+  const DB_KEY = 'pt_demo_db_v1';
+  const USER_KEY = 'pt_demo_user';
   const ME = 'u-benny';
+  const SEED_IDS = ['u-benny', 'u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim'];
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
+  // 3: Monatsrangliste (Welt-Leute, Freies Training, Monatsergebnisse, log_id)
+  const DB_VERSION = 3;
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -37,35 +60,40 @@
 
     // Rangliste: Benny wird beim ersten Öffnen gefragt (null), Sara hat abgelehnt.
     // Die „Welt“-Leute trainieren nur im Freien Training und füllen die Liste.
+    // i18n-ignore: Namen
     const WORLD = ['Mia', 'Paul', 'Emma', 'Noah', 'Hannah', 'Elias', 'Lina', 'Finn', 'Clara', 'Luis', 'Ida', 'Ben'];
     const profiles = [
-      ['u-benny', 'Benny', 'uploads/benny.jpg', COLORS[0], null],
-      ['u-jonas', 'Jonas', 'uploads/jonas.jpg', COLORS[1], true],
-      ['u-lea', 'Lea', null, COLORS[2], true],
-      ['u-max', 'Max', null, COLORS[3], true],
-      ['u-sara', 'Sara', null, COLORS[4], false],
-      ['u-tim', 'Tim', null, COLORS[5], true],
+      ['u-benny', 'Benny', 'uploads/benny.jpg', COLORS[0], null], // i18n-ignore: Namen
+      ['u-jonas', 'Jonas', 'uploads/jonas.jpg', COLORS[1], true], // i18n-ignore: Namen
+      ['u-lea', 'Lea', null, COLORS[2], true], // i18n-ignore: Namen
+      ['u-max', 'Max', null, COLORS[3], true], // i18n-ignore: Namen
+      ['u-sara', 'Sara', null, COLORS[4], false], // i18n-ignore: Namen
+      ['u-tim', 'Tim', null, COLORS[5], true], // i18n-ignore: Namen
       ...WORLD.map((name, i) => [`u-w${i + 1}`, name, null, COLORS[i % COLORS.length], true]),
     ].map(([pid, name, avatar, color, optIn]) => ({
       id: pid, display_name: name, avatar_url: avatar, color, ranking_opt_in: optIn,
-      main_competition_id: pid === ME ? 'c-bj' : null, created_at: now.toISOString(),
+      main_competition_id: pid === ME ? 'c-bj' : null, created_at: addDays(monday, -60) + 'T08:00:00Z',
+      onboarding: {},
     }));
 
-    // Katalog wie nach der Migration monthly_ranking: Grundübungen gewertet
+    // Standard-Übungen wie in der Datenbank (deutsche Namen und Regeln); übersetzt
+    // wird beim Laden über PTData.localizeCategory. Gewertet wie nach der
+    // Migration monthly_ranking: [metric, max_per_day, rule].
     const cat = (cid, name, emoji, kind = 'sports', type = 'standard', rank = null) =>
       ({ id: cid, name, emoji, kind, challenge_type: type, competition_id: null, created_at: '2026-01-01T00:00:00Z',
          ranked: !!rank, metric: rank?.[0] || null, max_per_day: rank?.[1] || null, rule: rank?.[2] || null });
+    // Datenbank-Namen und -Regeln (je Zeile i18n-ignore)
     const categories = [
-      cat('cat-push', 'Liegestütze', '🤜', 'sports', 'standard', ['volume', 1000, 'Brust fast am Boden, oben Arme ganz gestreckt.']),
-      cat('cat-pull', 'Klimmzüge', '🆙', 'sports', 'standard', ['volume', 400, 'Aus dem toten Hang, Kinn über die Stange.']),
-      cat('cat-dips', 'Dips', '🔽', 'sports', 'standard', ['volume', 600, 'Oberarme mindestens parallel zum Boden, oben ganz gestreckt.']),
-      cat('cat-legs', 'Leg Raises', '🦵', 'sports', 'standard', ['volume', 600, 'Gestreckte Beine bis mindestens 90 Grad anheben.']),
-      cat('cat-hspu', 'HSPU', '🤸', 'sports', 'standard', ['volume', 300, 'Kopf berührt Boden oder Matte, oben ganz gestreckt.']),
-      cat('cat-sit', 'Sit-ups', '🧘', 'sports', 'standard', ['volume', 1000, 'Schultern ganz ab, Brust bis zu den Knien.']),
-      cat('cat-squat', 'Kniebeugen', '🍑', 'sports', 'standard', ['volume', 1000, 'Hüfte mindestens auf Kniehöhe, oben ganz aufrichten.']),
-      cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']),
-      cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up', ['best', 204, 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.']),
-      cat('cat-vibe', 'Vibe Coding', '💻', 'work'),
+      cat('cat-push', 'Liegestütze', '🤜', 'sports', 'standard', ['volume', 1000, 'Brust fast am Boden, oben Arme ganz gestreckt.']), // i18n-ignore
+      cat('cat-pull', 'Klimmzüge', '🆙', 'sports', 'standard', ['volume', 400, 'Aus dem toten Hang, Kinn über die Stange.']), // i18n-ignore
+      cat('cat-dips', 'Dips', '🔽', 'sports', 'standard', ['volume', 600, 'Oberarme mindestens parallel zum Boden, oben ganz gestreckt.']), // i18n-ignore
+      cat('cat-legs', 'Leg Raises', '🦵', 'sports', 'standard', ['volume', 600, 'Gestreckte Beine bis mindestens 90 Grad anheben.']), // i18n-ignore
+      cat('cat-hspu', 'HSPU', '🤸', 'sports', 'standard', ['volume', 300, 'Kopf berührt Boden oder Matte, oben ganz gestreckt.']), // i18n-ignore
+      cat('cat-sit', 'Sit-ups', '🧘', 'sports', 'standard', ['volume', 1000, 'Schultern ganz ab, Brust bis zu den Knien.']), // i18n-ignore
+      cat('cat-squat', 'Kniebeugen', '🍑', 'sports', 'standard', ['volume', 1000, 'Hüfte mindestens auf Kniehöhe, oben ganz aufrichten.']), // i18n-ignore
+      cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']), // i18n-ignore
+      cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up', ['best', 204, 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.']), // i18n-ignore
+      cat('cat-vibe', 'Vibe Coding', '💻', 'work'), // i18n-ignore: Übungsname
     ];
 
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
@@ -76,10 +104,10 @@
       created_by: owner, created_at: startOf(weeksBack) + 'T08:00:00Z',
     });
     const competitions = [
-      comp('c-bj', 'Benny vs Jonas', '💪', '1v1', 'BJ4K7X', { rotation: 1, penalties: 1, work: 1 }, 6, 'u-benny'),
-      comp('c-team', 'Büro-Duell', '🏢', '2v2', 'TEAM42', {}, 3, 'u-lea'),
-      comp('c-ffa', 'Freundeskreis', '🔥', 'ffa', 'FFA777', { penalties: 1 }, 3, 'u-benny'),
-      comp('c-run', 'Laufgruppe', '🏃', 'ffa', 'RUN555', {}, 2, 'u-tim'),
+      comp('c-bj', 'Benny vs Jonas', '💪', '1v1', 'BJ4K7X', { rotation: 1, penalties: 1, work: 1 }, 6, 'u-benny'), // i18n-ignore: Namen
+      comp('c-team', tr('Büro-Duell'), '🏢', '2v2', 'TEAM42', {}, 3, 'u-lea'),
+      comp('c-ffa', tr('Freundeskreis'), '🔥', 'ffa', 'FFA777', { penalties: 1 }, 3, 'u-benny'),
+      comp('c-run', tr('Laufgruppe'), '🏃', 'ffa', 'RUN555', {}, 2, 'u-tim'),
     ];
     const mem = (cid, uid, role, team, weeksBack) =>
       ({ competition_id: cid, user_id: uid, role, team, joined_at: startOf(weeksBack) + 'T08:00:00Z', left_at: null });
@@ -233,7 +261,7 @@
         }
       }
     }
-    const payouts = [{ id: id('po'), competition_id: 'c-bj', user_id: 'u-jonas', amount_cents: 500, note: 'Bar beim Training',
+    const payouts = [{ id: id('po'), competition_id: 'c-bj', user_id: 'u-jonas', amount_cents: 500, note: tr('Bar beim Training'),
       paid_at: addDays(monday, -10) + 'T18:00:00Z' }];
 
     const rotation_config = competitions.map(c => ({ competition_id: c.id, enabled: c.rotation_enabled, start_date: c.start_date }));
@@ -246,56 +274,132 @@
     return {
       profiles, categories, competitions, members, weekly_challenges, sets, reactions,
       penalty_config, penalties, week_closures, payouts, rotation_config, plan_slots,
+      // i18n-ignore: Projekt- und Tool-Namen
       project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: 'Terminator', emoji: '📁', created_at: monday }],
-      tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }],
+      tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }], // i18n-ignore: Tool-Name
       ranking_settings, monthly_results, month_closures, ranking_reports,
       user_blocks: [], ranking_admins: [ME],
+      accounts: [{ email: 'benny@demo.local', user_id: ME }],
+      v: DB_VERSION,
       seq: n,
     };
+  }
+
+  // Ältere Demo-Daten ergänzen statt verwerfen (v1 → v2: Konten, Onboarding-Spalte,
+  // Seed-Profile älter als 14 Tage, damit Benny nicht als „neu“ gilt).
+  // v2 → v3: Die Rangliste braucht neue Personen, Sätze und Ergebnisse; diese
+  // Demo-Daten werden neu erzeugt.
+  function upgrade(d) {
+    if ((d.v || 1) >= DB_VERSION) return d;
+    if ((d.v || 1) < 3) return seed();
+    d.accounts = d.accounts || [{ email: 'benny@demo.local', user_id: ME }];
+    const old = addDays(isoDate(mondayOf(new Date())), -60) + 'T08:00:00Z';
+    for (const p of d.profiles) {
+      if (!p.onboarding) p.onboarding = {};
+      if (SEED_IDS.includes(p.id)) p.created_at = old;
+    }
+    d.v = DB_VERSION;
+    return d;
   }
 
   // ── Store ──────────────────────────────────────────────────────────
   let db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch (e) { db = null; }
-  if (!db) db = seed();
+  db = db ? upgrade(db) : seed();
   const save = () => { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} };
   save();
   const newId = (p) => `${p}-${++db.seq}`;
-  const clone = (x) => JSON.parse(JSON.stringify(x));
-  const later = (v) => new Promise(res => setTimeout(() => res(clone(v)), 60));
+  const clone = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
+  const offline = () => (typeof navigator !== 'undefined' && navigator.onLine === false)
+    || (() => { try { return localStorage.getItem('pt_demo_offline') === '1'; } catch (e) { return false; } })();
+  // Wie ein Netzaufruf: kurz warten, ohne Netz mit demselben Fehler wie Supabase scheitern.
+  const later = (v) => new Promise((res, rej) => setTimeout(() => (
+    offline() ? rej(friendlyError(new TypeError('Failed to fetch'))) : res(clone(v)) // i18n-ignore: Netzfehler-Text des Browsers
+  ), 60));
+  const local = (v) => Promise.resolve(clone(v));
+  const fail = (message, code) => friendlyError(Object.assign(new Error(message), code ? { code } : {}));
   const profileOf = (uid) => { const p = db.profiles.find(x => x.id === uid); return p && { id: p.id, display_name: p.display_name, avatar_url: p.avatar_url, color: p.color }; };
   const withAthlete = (row) => (row && 'user_id' in row ? { ...row, athlete: row.user_id } : row);
   const normCh = (row) => ({ ...row, chosen_by: row.chosen_by_user });
   const capacity = (mode) => (mode === '1v1' ? 2 : mode === '2v2' ? 4 : 12);
   const code6 = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+  const activeMembers = (cid) => db.members.filter(m => m.competition_id === cid && !m.left_at);
 
+  // Session: wer angemeldet ist, merkt sich pt_demo_user; Abmelden gilt pro Tab.
+  const sessionFor = (userId) => {
+    const acc = db.accounts.find(a => a.user_id === userId);
+    return { user: { id: userId, email: acc?.email || null }, demo: true };
+  };
   let session = null;
-  try { if (sessionStorage.getItem('pt_demo_signed_out') !== '1') session = { user: { id: ME }, demo: true }; } catch (e) { session = { user: { id: ME }, demo: true }; }
+  try {
+    const stored = localStorage.getItem(USER_KEY);
+    const userId = stored && db.profiles.some(p => p.id === stored) ? stored : ME;
+    if (sessionStorage.getItem('pt_demo_signed_out') !== '1') session = sessionFor(userId);
+  } catch (e) { session = sessionFor(ME); }
   const authListeners = new Set();
   const setSession = (s, evt) => {
     session = s;
-    try { s ? sessionStorage.removeItem('pt_demo_signed_out') : sessionStorage.setItem('pt_demo_signed_out', '1'); } catch (e) {}
+    try {
+      if (s) { sessionStorage.removeItem('pt_demo_signed_out'); localStorage.setItem(USER_KEY, s.user.id); }
+      else sessionStorage.setItem('pt_demo_signed_out', '1');
+    } catch (e) {}
     authListeners.forEach(fn => fn(s, evt));
   };
+  const me = () => session?.user?.id || ME;
+
+  const blobToDataUrl = (blob) => new Promise((res, rej) => {
+    const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob);
+  });
 
   function createDemoAPI() {
-    const uid = () => { if (!session) throw new Error('Bitte zuerst anmelden.'); return session.user.id; };
+    const uid = () => { if (!session) throw new Error(tr('Bitte zuerst anmelden.')); return session.user.id; };
     const base = {
       mode: 'demo', client: null, mondayOf, isoDate,
 
-      async getSession() { return later(session); },
+      async getSession() { return local(session); },
       onAuthChange(fn) { authListeners.add(fn); return () => authListeners.delete(fn); },
-      async signUp() { setSession({ user: { id: ME }, demo: true }, 'SIGNED_IN'); return later(session); },
-      async signIn() { setSession({ user: { id: ME }, demo: true }, 'SIGNED_IN'); return later(session); },
+      // Neue Adresse = neue Person mit leerem Profil; bekannte Adresse = Fehler wie bei Supabase.
+      async signUp({ email, password, displayName } = {}) {
+        await later(null);
+        const mail = String(email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw fail('Unable to validate email address: invalid format', 'validation_failed');
+        if (String(password || '').length < 6) throw fail('Password should be at least 6 characters.', 'weak_password');
+        if (db.accounts.some(a => a.email === mail)) throw fail('User already registered', 'user_already_exists'); // i18n-ignore: Supabase-Fehlertext
+        // Eindeutig über Zurücksetzen hinweg (seq beginnt dann neu).
+        const userId = `u-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+        db.profiles.push({
+          id: userId, display_name: (String(displayName || '').trim() || mail.split('@')[0]).slice(0, 30),
+          avatar_url: null, color: COLORS[db.profiles.length % COLORS.length], main_competition_id: null,
+          created_at: new Date().toISOString(), onboarding: {},
+        });
+        let needsConfirm = false;
+        try { needsConfirm = localStorage.getItem('pt_demo_confirm') === '1'; } catch (e) {}
+        db.accounts.push({ email: mail, user_id: userId });
+        save();
+        if (needsConfirm) return { session: null, user: { id: userId, email: mail }, needsConfirm: true };
+        setSession(sessionFor(userId), 'SIGNED_IN');
+        return { session: clone(session), user: clone(session.user), needsConfirm: false };
+      },
+      // Bekannte Adresse → diese Person (gilt auch als bestätigt); sonst Bennys Showcase.
+      async signIn({ email } = {}) {
+        await later(null);
+        const acc = db.accounts.find(a => a.email === String(email || '').trim().toLowerCase());
+        setSession(sessionFor(acc ? acc.user_id : ME), 'SIGNED_IN');
+        return clone(session);
+      },
       async signOut() { setSession(null, 'SIGNED_OUT'); },
-      async requestPasswordReset() {},
-      async resetPasswordWithCode() {},
+      async resendSignup() { return later(null); },
+      async requestPasswordReset() { return later(null); },
+      async resetPasswordWithCode() { return later(null); },
 
       async getMyProfile() { return later(db.profiles.find(p => p.id === uid())); },
       async updateProfile(patch) {
-        const p = db.profiles.find(x => x.id === uid()); Object.assign(p, patch); save(); emitAll(); return later(p);
+        await later(null);
+        const p = db.profiles.find(x => x.id === uid()); Object.assign(p, patch); save(); emitAll(); return clone(p);
       },
-      async uploadAvatar(blob) { return base.updateProfile({ avatar_url: URL.createObjectURL(blob) }); },
+      async saveOnboarding(state) { return base.updateProfile({ onboarding: state }); },
+      // Data-URL statt blob:, damit das Bild ein Neuladen übersteht.
+      async uploadAvatar(blob) { return base.updateProfile({ avatar_url: await blobToDataUrl(blob) }); },
 
       async listMyCompetitions({ includeSolo = false } = {}) {
         const mine = db.members.filter(m => m.user_id === uid() && !m.left_at);
@@ -304,34 +408,50 @@
       },
       async getMembers(cid) { return later(membersOf(cid)); },
       async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+        await later(null);
+        const start = startDate || isoDate(new Date());
         const c = { id: newId('c'), name, emoji, mode, invite_code: code6(), rotation_enabled: !!rotation, penalties_enabled: !!penalties,
-          work_enabled: !!work, start_date: startDate || isoDate(new Date()), end_date: endDate || null, archived_at: null,
+          work_enabled: !!work, start_date: start, end_date: endDate || null, archived_at: null,
           created_by: uid(), created_at: new Date().toISOString() };
         db.competitions.push(c);
         db.members.push({ competition_id: c.id, user_id: uid(), role: 'owner', team: mode === '2v2' ? 'A' : null, joined_at: c.created_at, left_at: null });
         db.penalty_config.push({ competition_id: c.id, enabled: !!penalties, amount_cents: 500, rule_mode: 'per_week_aggregate' });
-        db.rotation_config.push({ competition_id: c.id, enabled: !!rotation, start_date: isoDate(mondayOf(new Date())) });
-        save(); return later(c);
+        db.rotation_config.push({ competition_id: c.id, enabled: !!rotation, start_date: isoDate(mondayOf(new Date(start + 'T00:00:00'))) });
+        const p = db.profiles.find(x => x.id === uid());
+        if (p && !p.main_competition_id) p.main_competition_id = c.id;
+        save(); return clone(c);
       },
       async previewCompetition(code) {
         const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && !x.archived_at && x.mode !== 'solo');
         if (!c) return later(null);
-        const ms = db.members.filter(m => m.competition_id === c.id && !m.left_at);
+        const ms = activeMembers(c.id);
         return later({ id: c.id, name: c.name, emoji: c.emoji, mode: c.mode, capacity: capacity(c.mode),
           already_member: ms.some(m => m.user_id === uid()),
           members: ms.map(m => { const p = profileOf(m.user_id); return { display_name: p.display_name, team: m.team, avatar_url: p.avatar_url, color: p.color }; }) });
       },
+      // Wie join_competition: voll/Team voll/ungültiges Team, 2 vs 2 ohne Wahl
+      // ins kleinere Team, Wiedereintritt reaktiviert die alte Zeile.
       async joinCompetition(code, team = null) {
-        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && x.mode !== 'solo');
-        if (!c) throw new Error('Code nicht gefunden.');
-        const ms = db.members.filter(m => m.competition_id === c.id && !m.left_at);
-        if (!ms.some(m => m.user_id === uid())) {
-          if (ms.length >= capacity(c.mode)) throw new Error('Diese Challenge ist schon voll.');
-          db.members.push({ competition_id: c.id, user_id: uid(), role: 'member', team: c.mode === '2v2' ? (team || 'A') : null,
-            joined_at: new Date().toISOString(), left_at: null });
-          save(); emitAll();
+        await later(null);
+        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && !x.archived_at && x.mode !== 'solo');
+        if (!c) throw fail('invalid_code');
+        const ms = activeMembers(c.id);
+        if (ms.some(m => m.user_id === uid())) return c.id;
+        if (ms.length >= capacity(c.mode)) throw fail('competition_full');
+        let t = null;
+        if (c.mode === '2v2') {
+          if (team && !['A', 'B'].includes(team)) throw fail('invalid_team');
+          const count = (x) => ms.filter(m => m.team === x).length;
+          t = team || (count('A') <= count('B') ? 'A' : 'B');
+          if (count(t) >= 2) throw fail('team_full');
         }
-        return later(c.id);
+        const row = { competition_id: c.id, user_id: uid(), role: 'member', team: t, joined_at: new Date().toISOString(), left_at: null };
+        const old = db.members.find(m => m.competition_id === c.id && m.user_id === uid());
+        if (old) Object.assign(old, row); else db.members.push(row);
+        const p = db.profiles.find(x => x.id === uid());
+        if (p && !p.main_competition_id) p.main_competition_id = c.id;
+        save(); emitAll();
+        return c.id;
       },
       async updateCompetition(cid, patch) {
         const c = db.competitions.find(x => x.id === cid); Object.assign(c, patch);
@@ -349,7 +469,7 @@
           members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
           challenges: db.weekly_challenges.filter(c => set.has(c.competition_id)).map(normCh),
           sets: db.sets.filter(s => set.has(s.competition_id)).map(withAthlete),
-          categories: db.categories,
+          categories: db.categories.map(localizeCategory),
         });
       },
       async upsertDeviceToken() { return null; },
@@ -571,20 +691,20 @@
       async getCompetition() { return later(db.competitions.find(c => c.id === cid)); },
       async getMembers() { return later(membersOf(cid)); },
 
-      async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid)); },
+      async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid).map(localizeCategory)); },
       async addCategory(name, emoji = '💪', kind = 'sports') {
         const c = { id: newId('cat'), name, emoji, kind, challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
         db.categories.push(c); emit(); return later(c);
       },
       async updateCategory(id, patch) {
         const c = db.categories.find(x => x.id === id && x.competition_id === cid);
-        if (!c) throw new Error('Standard-Kategorien können nicht bearbeitet werden.');
+        if (!c) throw new Error(tr('Standard-Kategorien können nicht bearbeitet werden.'));
         Object.assign(c, patch); emit(); return later(c);
       },
       async deleteCategory(id) {
         const c = db.categories.find(x => x.id === id && x.competition_id === cid);
-        if (!c) throw new Error('Standard-Kategorien können nicht gelöscht werden.');
-        if (db.weekly_challenges.some(w => w.category_id === id)) throw new Error('Kategorie wird genutzt – nicht löschbar');
+        if (!c) throw new Error(tr('Standard-Kategorien können nicht gelöscht werden.'));
+        if (db.weekly_challenges.some(w => w.category_id === id)) throw new Error(tr('Kategorie wird genutzt – nicht löschbar'));
         db.categories = db.categories.filter(x => x.id !== id); emit();
       },
 
@@ -636,7 +756,7 @@
         const rows = mine('sets').sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
         return later(rows.map(s => {
           const ch = db.weekly_challenges.find(c => c.id === s.challenge_id);
-          const category = ch && db.categories.find(c => c.id === ch.category_id);
+          const category = ch && localizeCategory(db.categories.find(c => c.id === ch.category_id));
           return { ...withAthlete(s), challenge: ch ? { ...normCh(ch), category } : null, category,
             reactions: db.reactions.filter(r => r.set_id === s.id).map(withAthlete) };
         }));
@@ -690,7 +810,7 @@
         return { penalties: pens, cfg };
       },
       async closeWeek(ws) {
-        if (mine('week_closures').some(x => x.week_start === ws)) throw new Error('Woche bereits abgeschlossen');
+        if (mine('week_closures').some(x => x.week_start === ws)) throw new Error(tr('Woche bereits abgeschlossen'));
         db.week_closures.push({ competition_id: cid, week_start: ws, closed_by_user: uid(), created_at: new Date().toISOString() });
         const { penalties } = await api.previewWeekClose(ws);
         for (const p of penalties) db.penalties.push({ id: newId('p'), competition_id: cid, week_start: ws, user_id: p.athlete, challenge_id: p.challenge_id,
@@ -744,12 +864,12 @@
     if (!open.length) return;
     const cid = pick(open);
     const monday = isoDate(mondayOf(new Date()));
-    const others = db.members.filter(m => m.competition_id === cid && !m.left_at && m.user_id !== ME);
+    const others = db.members.filter(m => m.competition_id === cid && !m.left_at && m.user_id !== me());
     const challs = db.weekly_challenges.filter(c => c.competition_id === cid && c.week_start === monday && db.categories
       .some(cat => cat.id === c.category_id && (cat.challenge_type || 'standard') === 'standard'));
     if (!others.length || !challs.length) return;
     const who = pick(others).user_id;
-    const myLatest = db.sets.filter(s => s.competition_id === cid && s.user_id === ME)
+    const myLatest = db.sets.filter(s => s.competition_id === cid && s.user_id === me())
       .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     if (myLatest && Math.random() < 0.25) {
       const emoji = pick(['🔥', '💪', '👏', '😤']);
@@ -770,17 +890,65 @@
     setTimeout(() => { simulateTick(); schedule(); }, 18000 + Math.random() * 17000);
   })();
 
+  // ── Beitritt simulieren ───────────────────────────────────────────
+  // Nach „Einladung senden“ tritt nach ein paar Sekunden eine freie Seed-Person
+  // bei (in 2 vs 2 ins kleinere Team, bei Gleichstand ins gegnerische).
+  const joinTimers = new Map();
+  function simulateJoin(cid, delay = 6000) {
+    if (joinTimers.has(cid)) return;
+    joinTimers.set(cid, setTimeout(() => {
+      joinTimers.delete(cid);
+      const c = db.competitions.find(x => x.id === cid);
+      if (!c || c.archived_at) return;
+      const ms = activeMembers(cid);
+      if (ms.length >= capacity(c.mode)) return;
+      const order = ['u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim', 'u-benny'];
+      const who = order.find(id => id !== me() && !ms.some(m => m.user_id === id));
+      if (!who) return;
+      const count = (t) => ms.filter(m => m.team === t).length;
+      const team = c.mode === '2v2' ? (count('B') <= count('A') ? 'B' : 'A') : null;
+      const old = db.members.find(m => m.competition_id === cid && m.user_id === who);
+      const row = { competition_id: cid, user_id: who, role: 'member', team, joined_at: new Date().toISOString(), left_at: null };
+      if (old) Object.assign(old, row); else db.members.push(row);
+      save(); emitAll();
+    }, delay));
+  }
+
+  // ── Eine Woche vorspulen ─────────────────────────────────────────
+  // Schiebt alle Datumswerte 7 Tage zurück: die laufende Woche wird zur Vorwoche
+  // (z. B. für den Rückblick nach Woche 1).
+  const DATE_KEYS = ['created_at', 'start_date', 'end_date', 'archived_at', 'joined_at', 'left_at', 'week_start', 'paid_at'];
+  function shiftValue(v, days) {
+    if (typeof v !== 'string' || !v) return v;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return addDays(v, days);
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? new Date(t + days * 86400000).toISOString() : v;
+  }
+  function shiftWeek(weeks = 1) {
+    for (const [table, rows] of Object.entries(db)) {
+      if (!Array.isArray(rows) || table === 'categories') continue;
+      for (const row of rows) for (const k of DATE_KEYS) if (k in row) row[k] = shiftValue(row[k], -7 * weeks);
+    }
+    save();
+  }
+
   window.PTData.init = () => createDemoAPI();
   window.PTDemo = {
-    reset() { localStorage.removeItem(DB_KEY); location.reload(); },
+    reset() { localStorage.removeItem(DB_KEY); localStorage.removeItem(USER_KEY); clearDemoState(); location.reload(); },
     live(on = true) { try { localStorage.setItem(LIVE_KEY, on ? '1' : '0'); } catch (e) {} },
+    simulateJoin,
+    shiftWeek(weeks = 1) { shiftWeek(weeks); location.reload(); },
+    exit() {
+      try { localStorage.removeItem('pt_demo'); localStorage.removeItem(USER_KEY); sessionStorage.removeItem('pt_demo_signed_out'); } catch (e) {}
+      location.reload();
+    },
   };
 
   // Kleiner Hinweis, damit niemand Demo und echte Daten verwechselt.
   const showBadge = () => {
     const el = document.createElement('a');
     el.href = '?demo=off';
-    el.textContent = 'Demo-Daten · beenden';
+    el.textContent = tr('Demo-Daten · beenden');
     el.setAttribute('style', 'position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);z-index:9999;' +
       'padding:4px 10px;border-radius:999px;background:#1C1B2E;color:#fff;font:600 11px/1.4 system-ui,sans-serif;text-decoration:none;opacity:.78');
     document.body.appendChild(el);

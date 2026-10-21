@@ -1,4 +1,4 @@
-/* global React */
+/* global React, tr */
 // Personen & Seiten.
 //
 // `me` ist die User-ID. Namen, Avatare und Farben kommen aus einer globalen
@@ -22,8 +22,8 @@ const PTPeople = (() => {
       for (const p of profiles) if (p?.id) byId[p.id] = p;
     },
     get(id) { return byId[id] || null; },
-    nameOf(id) { return byId[id]?.display_name || 'Unbekannt'; },
-    firstNameOf(id) { return (byId[id]?.display_name || 'Unbekannt').split(/\s+/)[0]; },
+    nameOf(id) { return byId[id]?.display_name || tr('Unbekannt'); },
+    firstNameOf(id) { return (byId[id]?.display_name || tr('Unbekannt')).split(/\s+/)[0]; },
   };
 })();
 
@@ -57,7 +57,11 @@ function SideAvatar({ side, size = 32, className = '' }) {
   return (
     <span className="pt-avatar-stack" style={{ height: size }}>
       {side.userIds.slice(0, 2).map(id => <Avatar key={id} userId={id} size={size} />)}
-      {side.userIds.length === 0 && <span className="pt-avatar pt-avatar-initial" style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}>{side.short}</span>}
+      {side.userIds.length === 0 && (
+        // Leeres Team (noch niemand beigetreten): neutrale Fläche statt weißer Schrift auf nichts
+        <span className="pt-avatar pt-avatar-initial"
+          style={{ width: size, height: size, fontSize: Math.round(size * 0.45), background: 'var(--surface-3)', color: 'var(--text-3)' }}>{side.short}</span>
+      )}
     </span>
   );
 }
@@ -74,7 +78,7 @@ function buildSides(competition, members, me) {
     return [myTeam, otherTeam].map((team, i) => {
       const ms = all.filter(m => m.team === team && !m.left_at);
       const formerIds = all.filter(m => m.team === team && m.left_at).map(m => m.user_id);
-      const label = ms.length ? ms.map(m => PTPeople.firstNameOf(m.user_id)).join(' & ') : `Team ${team}`;
+      const label = ms.length ? ms.map(m => PTPeople.firstNameOf(m.user_id)).join(' & ') : tr('Team {team}', { team });
       return {
         key: `team-${team}`, team, index: i, label, short: team,
         userIds: ms.map(m => m.user_id),
@@ -137,7 +141,7 @@ function uniqueMaxIndex(values, lowerWins = false) {
 }
 
 function modeLabel(mode) {
-  return mode === '1v1' ? '1 vs 1' : mode === '2v2' ? '2 vs 2' : 'Jeder gegen jeden';
+  return mode === '1v1' ? '1 vs 1' : mode === '2v2' ? '2 vs 2' : tr('Jeder gegen jeden');
 }
 
 Object.assign(window, {

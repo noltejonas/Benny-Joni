@@ -35,8 +35,31 @@ interface WebhookPayload {
 interface Member {
   user_id: string;
   team: string | null;
-  profile: { display_name: string } | null;
+  profile: { display_name: string; language?: string | null } | null;
 }
+
+// Texte je App-Sprache (profiles.language, Migration 20261021000000). Ohne
+// Eintrag oder ohne Spalte: Deutsch wie bisher.
+const TEXT = {
+  de: {
+    someone: "Jemand",
+    title: (name: string) => `🔥 ${name} ist los`,
+    body: (reps: number) => `Schon ${reps} Reps heute — du noch bei 0.`,
+    rankTitle: "🏆 Rangliste",
+    rankBody: (name: string, category: string, rank: number) =>
+      `${name} hat dich bei ${category} auf Platz ${rank} verdrängt.`,
+  },
+  en: {
+    someone: "Someone",
+    title: (name: string) => `🔥 ${name} is on a roll`,
+    body: (reps: number) => `Already ${reps} reps today — you’re still at 0.`,
+    rankTitle: "🏆 Leaderboard",
+    rankBody: (name: string, category: string, rank: number) =>
+      `${name} pushed you down to #${rank} in ${category}.`,
+  },
+};
+type Lang = keyof typeof TEXT;
+const textFor = (lang: string | null | undefined) => TEXT[(lang ?? "de") as Lang] ?? TEXT.de;
 
 interface Overtaken {
   user_id: string;
@@ -166,17 +189,22 @@ async function rivalPush(
 
   // 2. Challenge + Mitglieder. Empfänger sind die Gegner: alle anderen aktiven
   //    Mitglieder, bei 2v2 nur das andere Team.
-  const [{ data: competition }, { data: members, error: memErr }] = await Promise.all([
-    supabase.from("competitions").select("id, name, emoji, mode").eq("id", record.competition_id).single(),
+  const fetchMembers = (cols: string) =>
     supabase.from("competition_members")
-      .select("user_id, team, profile:user_id(display_name)")
+      .select(`user_id, team, profile:user_id(${cols})`)
       .eq("competition_id", record.competition_id)
-      .is("left_at", null),
+      .is("left_at", null);
+  const [{ data: competition }, firstTry] = await Promise.all([
+    supabase.from("competitions").select("id, name, emoji, mode").eq("id", record.competition_id).single(),
+    fetchMembers("display_name, language"),
   ]);
+  // Ohne Spalte profiles.language (Migration noch nicht eingespielt) wie bisher laden.
+  let { data: members, error: memErr } = firstTry;
+  if (memErr && /language/.test(memErr.message)) ({ data: members, error: memErr } = await fetchMembers("display_name"));
   if (memErr || !competition) return { error: "members", detail: memErr?.message };
   const all = (members ?? []) as unknown as Member[];
   const me = all.find((m) => m.user_id === record.user_id);
-  const senderName = me?.profile?.display_name ?? "Jemand";
+  const senderName = me?.profile?.display_name;
   const opponents = all.filter((m) =>
     m.user_id !== record.user_id &&
     !(competition.mode === "2v2" && me?.team && m.team === me.team)
@@ -216,12 +244,13 @@ async function rivalPush(
       continue;
     }
 
+    const text = textFor(recipient.profile?.language);
     const result = await sender.send(tokens, {
       aps: {
         alert: {
-          title: `🔥 ${senderName} ist los`,
+          title: text.title(senderName ?? text.someone),
           subtitle: `${competition.emoji} ${competition.name}`,
-          body: `Schon ${senderToday} Reps heute — du noch bei 0.`,
+          body: text.body(senderToday),
         },
         sound: "default",
       },
@@ -250,6 +279,12 @@ async function rankPush(
   const overtaken = (data ?? []) as Overtaken[];
   if (overtaken.length === 0) return { ignored: true, reason: "nobody_overtaken" };
 
+  // Sprache der Empfänger; ohne Spalte profiles.language Deutsch
+  const languages: Record<string, string | null> = {};
+  const { data: langRows, error: langErr } = await supabase.from("profiles")
+    .select("id, language").in("id", overtaken.map((o) => o.user_id));
+  if (!langErr) for (const r of langRows ?? []) languages[r.id] = r.language;
+
   const recipients: Outcome[] = [];
   for (const o of overtaken) {
     const tokens = await sender.tokensOf(o.user_id);
@@ -264,11 +299,12 @@ async function rankPush(
       recipients.push({ user: o.user_id, ignored: logErr.code === "23505" ? "already_sent_today" : logErr.message });
       continue;
     }
+    const text = textFor(languages[o.user_id]);
     const result = await sender.send(tokens, {
       aps: {
         alert: {
-          title: "🏆 Rangliste",
-          body: `${o.sender_name} hat dich bei ${o.category_name} auf Platz ${o.new_rank} verdrängt.`,
+          title: text.rankTitle,
+          body: text.rankBody(o.sender_name, o.category_name, o.new_rank),
         },
         sound: "default",
       },

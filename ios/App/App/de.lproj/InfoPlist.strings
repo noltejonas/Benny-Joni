@@ -1,0 +1,3 @@
+/* Texte der iOS-Rückfragen (Deutsch). Englisch: en.lproj/InfoPlist.strings */
+"NSCameraUsageDescription" = "Damit du ein Foto als Profilbild aufnehmen kannst.";
+"NSPhotoLibraryUsageDescription" = "Damit du ein Foto aus deiner Mediathek als Profilbild wählen kannst.";
