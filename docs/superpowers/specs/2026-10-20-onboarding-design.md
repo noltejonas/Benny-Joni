@@ -96,12 +96,17 @@ Stand 2026-10-20. Neu gebaut wird der Weg vom ersten App-Start bis zu dem Moment
     - „Los geht's“ im Demo-Modus legt eine neue Person an und läuft durch das ganze Onboarding. Nach „Einladung senden“ tritt nach ein paar Sekunden eine Demo-Person bei.
     - Die Einstellungen haben im Demo-Modus „Eine Woche vorspulen“ (für den Wochenrückblick) und „Demo zurücksetzen“.
     - `?demo=new` startet die Demo abgemeldet. `localStorage.pt_demo_confirm = '1'` spielt die Mail-Bestätigung durch, `localStorage.pt_demo_offline = '1'` lässt alle Aufrufe wie ohne Netz scheitern.
+21. **Benny und Joni führen durch.**
+    - Beide sind 3D-Comicfiguren aus den Logo-Porträts, mit fünf Posen: Stehen, Winken, Pumpen, Jubeln, Zeigen. Jede Pose wird auf die echte Größe skaliert (190 und 170 cm).
+    - In den Schritten sagt einer von beiden den Hinweis in einer Sprechblase. Das ersetzt den grauen Untertitel, es kommt also kaum Text dazu. Benny steht links, Joni rechts, so zeigen beide zur Mitte.
+    - Gefeiert wird zu zweit: beim ersten Satz, im Wochenrückblick (Pose je nach Ergebnis) und auf dem Party-Bildschirm „Ziel erreicht“.
+    - Antippen zeigt kurz den Bizeps. Mit „Bewegung reduzieren“ stehen beide still.
 
 ## Aufbau
 Alle Bildschirme haben oben einen Zurück-Knopf, wo es zurück geht, und unten die Aktion in Daumenreichweite. Abstände kommen aus den Safe Areas. Klassen tragen das Präfix `ob-`.
 
 **Ohne Konto**
-- *Willkommen:* „Projekt Terminator“, Mini-Duellkarte („Du 120 : 95 Jonas“, Balken wachsen, darunter „🔥 Jonas · +20 Liegestütze · gerade eben“).
+- *Willkommen:* „Projekt Terminator“, Mini-Duellkarte mit Benny und Joni, die winken („Benny 120 : 95 Joni“, Balken wachsen, darunter „🔥 Joni · +20 Liegestütze · gerade eben“; auf kleinen iPhones ohne diese Zeile).
   - Titel „Trainier gegen deine Freunde.“, darunter „Ein Wochenziel, jeder seinen Teil, und du siehst live, wer liefert.“
   - Knöpfe „Los geht's“, „Code eingeben“ und „Demo ansehen“, Link „Schon dabei? Anmelden“.
   - Mit offener Einladung: Hinweis „Einladung · Code ABC123“ und „Konto erstellen & beitreten“.
@@ -157,6 +162,8 @@ Abbruch an jeder Stelle: Beim nächsten Start führt die Ableitung aus Entscheid
   - Beitritt mitten in der Woche (`weekProgress`) und Zusammenführen des Stands (`mergeState`)
 - `www/onboarding.jsx` (neu): Bausteine (`ObScreen`, `ObCodeField`, `useObOnline`, `PTHaptics`, `PTSound`), Willkommen, Auth inklusive Mail-Bestätigung, Profil, Start, `CreatePanel` und `JoinPanel`. Dazu die Sheets `CreateCompetitionSheet` und `JoinCompetitionSheet` für die zweite Challenge.
 - `www/onboarding-intro.jsx` (neu): die Ebenen in der Challenge (Einladen, Wochenziel, Erster Satz, Feier, Push-Vorab, Woche 1), `ObStarterCard`, `ObInviteCard`, dazu `PTPush`.
+- `www/onboarding-figures.jsx` (neu): `ObFigure`, `ObDuo` und `ObGuide` (Figur mit Sprechblase). Bilder und Maße liegen in `www/figures/`. `tools/cut-figures.py` schneidet sie aus freigestellten Pose-Bildern, `PTOnboarding.figureLayout` skaliert sie, `tools/figuren.html` ist das Labor (Launch-Konfiguration „Figuren-Labor“).
+- `www/celebration.jsx`: Benny und Joni jubeln unter „Ziel erreicht“. Der Titel steht jetzt mittig.
 - `www/onboarding.css` (neu): alle `.ob-*`-Klassen. Sie nutzen nur die Tokens aus `redesign.css` und liegen hinter `redesign.css`.
 - `www/competitions.jsx`: `AuthScreen`, `OnboardingScreen` und die alten Erstellen-/Beitreten-Sheets fallen weg. `shareInvite` nutzt `PTOnboarding.inviteText`.
 - `www/app.jsx`: Einstieg über `entryRoute`, offene Einladungen (URL, `appUrlOpen`, Kaltstart) und die Ebenen-Reihenfolge. Außerdem Push ohne automatische Abfrage, Mitglieder-Toast, erwartete Teilnehmer für den Anteil, Offline-Neustart und Haptik beim Schnellsatz.

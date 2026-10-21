@@ -1623,9 +1623,10 @@ a { color: var(--accent); text-decoration: none; }
   padding: 20px;
   text-align: center;
 }
+/* Bühne so groß wie der Titel: Text mittig, Emojis kreisen um die Mitte */
 .cel-hero-stage {
   position: relative;
-  width: 0; height: 0;
+  text-align: center;
 }
 .cel-hero-text {
   color: #fff;
@@ -1657,7 +1658,8 @@ a { color: var(--accent); text-decoration: none; }
 
 .cel-halo {
   position: absolute;
-  left: 0; top: 0;
+  left: 50%; top: 50%;
+  margin: -22px 0 0 -18px;
   font-size: 36px;
   filter: drop-shadow(0 0 8px #ffbe0b);
   animation: cel-halo-orbit 4s linear infinite;

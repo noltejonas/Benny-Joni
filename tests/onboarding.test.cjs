@@ -414,3 +414,41 @@ test('mergeState: der erste Stand gewinnt (so überschreibt ein Patch alte Werte
     weekOne: { c1: '2026-10-19' }, dismissed: { c1: 'neu', c2: 'x' }, started: 't0',
   });
 });
+
+// ── Figuren ─────────────────────────────────────────────────────────────────
+
+const META = {
+  benny: { w: 357, h: 760, axis: 191.5, top: 4, ground: 754 },
+  joni: { w: 295, h: 694, axis: 136, top: 6, ground: 688 },
+  // Pose mit hochgestreckten Armen, weiter weg aufgenommen: Kappe nicht oben im Bild
+  bennyCheer: { w: 420, h: 640, axis: 210, top: 120, ground: 630 },
+};
+
+test('figureLayout: Körperhöhen im Verhältnis 190 zu 170 cm', () => {
+  const b = O.figureLayout(META.benny, 'benny', 190);
+  const j = O.figureLayout(META.joni, 'joni', 190);
+  assert.equal(b.body, 190);
+  assert.equal(j.body, 170);
+  const k = b.height / META.benny.h;
+  assert.ok(Math.abs((META.benny.ground - META.benny.top) * k - 190) < 1e-9);
+});
+
+test('figureLayout: jede Pose gleich groß, Füße auf der Linie', () => {
+  const idle = O.figureLayout(META.benny, 'benny', 160);
+  const cheer = O.figureLayout(META.bennyCheer, 'benny', 160);
+  assert.equal(cheer.body, idle.body);
+  for (const [l, m] of [[idle, META.benny], [cheer, META.bennyCheer]]) {
+    const k = l.height / m.h;
+    // Boden des Bilds sitzt genau auf der Linie, Fußmitte auf der Achse
+    assert.ok(Math.abs(l.bottom + (m.h - m.ground) * k) < 1e-9);
+    assert.ok(Math.abs(l.left + m.axis * k) < 1e-9);
+  }
+  // Arme über dem Kopf ragen über die Körperhöhe hinaus
+  assert.ok(cheer.height + cheer.bottom > cheer.body);
+});
+
+test('figureLayout ohne Maße oder unbekannte Figur', () => {
+  assert.equal(O.figureLayout(null, 'benny', 160), null);
+  assert.equal(O.figureLayout(META.benny, 'niemand', 160), null);
+  assert.equal(O.figureLayout({ w: 1, h: 1, axis: 0, top: 5, ground: 5 }, 'joni', 160), null);
+});

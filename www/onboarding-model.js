@@ -337,6 +337,31 @@
     return { myReps, myMinutes, activeDays, sharesHit, sharesTotal: week.length, result, leader, diff };
   }
 
+  // ── Benny und Joni als Figuren ──────────────────────────────────────
+  // Bilder und Maße pro Pose kommen aus www/figures/manifest.js
+  // (tools/cut-figures.py): Bildgröße, Fußmitte `axis`, Kappe `top`, Boden
+  // `ground` in Pixeln. figureLayout skaliert jede Pose so, dass der Körper
+  // von Kappe bis Sohle zur echten Größe passt, egal wie weit die Kamera beim
+  // Erzeugen weg war. `tall` ist Bennys Körperhöhe in CSS-Pixeln.
+  const FIGURES = {
+    benny: { name: 'Benny', cm: 190 }, // i18n-ignore: Name der Figur
+    joni: { name: 'Joni', cm: 170 }, // i18n-ignore: Name der Figur
+  };
+
+  function figureLayout(meta, who, tall) {
+    const f = FIGURES[who];
+    if (!meta || !f || !(meta.ground > meta.top)) return null;
+    const body = tall * f.cm / FIGURES.benny.cm;
+    const k = body / (meta.ground - meta.top);
+    return {
+      body,
+      width: meta.w * k,
+      height: meta.h * k,
+      left: -meta.axis * k,                  // links von der Fußmitte
+      bottom: -(meta.h - meta.ground) * k,   // unter der Bodenlinie
+    };
+  }
+
   window.PTOnboarding = {
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
@@ -346,5 +371,6 @@
     starterItems, showStarter,
     pushPrimerDue, nextPrimerState,
     weekOneDue, weekOneSummary,
+    FIGURES, figureLayout,
   };
 })();
