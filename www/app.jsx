@@ -417,6 +417,7 @@ function App() {
         notificationsOn={notificationsOn} onSetNotifications={setNotificationsOn}
         onOpenSwitcher={() => setSheet('switcher')}
         onOpenProfile={() => setSheet('profile')}
+        onProfileChanged={(p) => { PTPeople.set([p]); setProfile(p); }}
         onSetMain={setMain}
         onSignOut={signOut}
         onCompetitionChanged={() => loadAccount()}
@@ -519,7 +520,7 @@ function markCelebrated(me, challengeIds) {
 
 function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
   themePref, onSetThemePref, notificationsOn, onSetNotifications,
-  onOpenSwitcher, onOpenProfile, onSetMain, onSignOut, onCompetitionChanged, onLeft,
+  onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft,
   intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
 
@@ -762,6 +763,47 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     [allChallenges, allSets, categories, penalties, sides, members]
   );
 
+/* global PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay */
+  // Rangliste: Ergebnis des letzten abgeschlossenen Monats für die Feed-Karte
+  // und die Feier, wenn ich eine Medaille geholt habe.
+  const [monthRecap, setMonthRecap] = useState(null);
+  const [medalCelebration, setMedalCelebration] = useState(null);
+  const memberKey = members.filter(m => !m.left_at).map(m => m.user_id).sort().join(',');
+  useEffect(() => {
+    if (!memberKey) return;
+    let off = false;
+    (async () => {
+      try {
+        await api.closeDueMonths().catch(() => 0);
+        const month = lastClosedMonth(await api.getRankingSettings());
+        if (!month) return;
+        const [rows, cats] = await Promise.all([api.rankingMonth(month), api.getRankedCategories()]);
+        if (off) return;
+        const ids = new Set(memberKey.split(','));
+        const mine = rows.filter(r => r.counted && r.points > 0 && ids.has(r.user_id));
+        setMonthRecap(mine.length ? { kind: 'month', id: `month-${month}`, month, rows: mine, cats,
+          created_at: PTRanking.closeDeadline(month).toISOString() } : null);
+        const medals = mine.filter(r => r.user_id === me && r.rank <= 3).sort((a, b) => a.rank - b.rank);
+        const key = `pt_month_celebrated_${month}_${me}`;
+        let seen = false;
+        try { seen = localStorage.getItem(key) === '1'; } catch (e) {}
+        if (medals.length && !seen) {
+          const catById = Object.fromEntries(cats.map(c => [c.id, c]));
+          const emoji = { 1: '🥇', 2: '🥈', 3: '🥉' };
+          setMedalCelebration({
+            key,
+            hero: medals[0].rank === 1 ? tr('MONATS{br}SIEG', { br: <br/> }) : tr('PODIUM'),
+            points: rows.filter(r => r.user_id === me && r.counted).reduce((a, r) => a + r.points, 0),
+            counterLabel: tr('Punkte im {month}', { month: PTRanking.monthLabel(month, false) }),
+            subtext: medals.slice(0, 3).map(r => `${emoji[r.rank]} ${catById[r.category_id]?.name || ''}`).join(' · ')
+              + (medals.length > 3 ? ` · +${medals.length - 3}` : ''),
+          });
+        }
+      } catch (e) { /* Rangliste noch nicht eingerichtet */ }
+    })();
+    return () => { off = true; };
+  }, [api, memberKey, me]);
+
   const feedItems = useMemo(() => {
     // Past-week sets are represented by their WeekRecap card — drop the
     // individual entries so the feed stays bounded.
@@ -769,10 +811,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       if (!s.created_at) return true;
       return PTData.isoDate(new Date(s.created_at)) >= weekStart;
     });
-    const items = [...weekRecaps, ...currentSets.map(s => ({ kind: 'set', ...s }))];
+    const items = [...weekRecaps, ...(monthRecap ? [monthRecap] : []), ...currentSets.map(s => ({ kind: 'set', ...s }))];
     items.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     return items;
-  }, [feed, weekRecaps, weekStart]);
+  }, [feed, weekRecaps, monthRecap, weekStart]);
 
   async function fixWeek(picks) {
     try {
@@ -927,8 +969,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           console.warn('Push registrationError', e);
         });
         const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
-          const competitionId = action?.notification?.data?.competition_id;
-          if (competitionId) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId } }));
+          const data = action?.notification?.data || {};
+          // Rangliste-Pushes (überholt, letzter Tag, Monatsabschluss) öffnen den Rangliste-Tab
+          if (/^(rank_|month_)/.test(data.kind || '')) { window.dispatchEvent(new CustomEvent('pt:nav-ranking')); return; }
+          if (data.competition_id) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId: data.competition_id } }));
           window.dispatchEvent(new CustomEvent('pt:nav-feed'));
         });
         // Foreground deliveries: do nothing here. Supabase Realtime + the
@@ -944,11 +988,16 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return () => { cancelled = true; cleanup(); };
   }, [me, notificationsOn, api, pushPerm]);
 
-  // Tap on push → switch to Feed tab
+  // Tap on push → switch to Feed tab (Rangliste-Pushes → Rangliste)
   useEffect(() => {
     const onNavFeed = () => setTab('feed');
+    const onNavRanking = () => setTab('ranking');
     window.addEventListener('pt:nav-feed', onNavFeed);
-    return () => window.removeEventListener('pt:nav-feed', onNavFeed);
+    window.addEventListener('pt:nav-ranking', onNavRanking);
+    return () => {
+      window.removeEventListener('pt:nav-feed', onNavFeed);
+      window.removeEventListener('pt:nav-ranking', onNavRanking);
+    };
   }, []);
 
   const setupCategories = allowWork ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
@@ -1064,6 +1113,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onFirstLog={startFirstLog}
           onInvite={() => { setTab('home'); openLayer(['invite']); }} />}
 
+        {tab === 'ranking' &&
+        <RankingScreen api={api} me={me} profile={profile}
+          onProfileSaved={onProfileChanged} onToast={setToast} />
+        }
+
         {tab === 'history' &&
         <StatsTab
           api={api}
@@ -1086,7 +1140,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags} toolTags={toolTags}
           themePref={themePref} onSetThemePref={onSetThemePref}
           notificationsEnabled={notificationsOn} onSetNotifications={onSetNotifications}
-          onProfile={onOpenProfile} onSetMain={onSetMain} onSignOut={onSignOut}
+          onProfile={onOpenProfile} onProfileChanged={onProfileChanged} onSetMain={onSetMain} onSignOut={onSignOut}
           onCompetitionChanged={() => { reload(); onCompetitionChanged?.(); }}
           onLeft={onLeft}
           onToast={setToast} />
@@ -1099,6 +1153,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           {[
             { id: 'home', icon: 'home', label: tr('Heute') },
             { id: 'feed', icon: 'feed', label: tr('Feed') },
+            { id: 'ranking', icon: 'trophy', label: tr('Rangliste') },
             { id: 'history', icon: 'stats', label: tr('Stats') },
             ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: tr('Strafkonto'), badge: openPenaltyCount }] : []),
           ].map(t => (
@@ -1263,6 +1318,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       )}
 
       <Toast message={toast} onDone={() => setToast('')} />
+
+      {medalCelebration && (
+        <CelebrationOverlay targetReps={medalCelebration.points}
+          hero={medalCelebration.hero} counterLabel={medalCelebration.counterLabel}
+          subtext={medalCelebration.subtext}
+          onDone={() => { try { localStorage.setItem(medalCelebration.key, '1'); } catch (e) {} setMedalCelebration(null); }} />
+      )}
 
       {/* i18n-ignore: Entwickler-Panel (nur im Bearbeiten-Modus des Design-Hosts), bleibt deutsch */}
       <TweaksPanel title="Tweaks">

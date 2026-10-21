@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { buildApnsJwt, sendApns } from "./apns.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -45,15 +45,31 @@ const TEXT = {
     someone: "Jemand",
     title: (name: string) => `🔥 ${name} ist los`,
     body: (reps: number) => `Schon ${reps} Reps heute — du noch bei 0.`,
+    rankTitle: "🏆 Rangliste",
+    rankBody: (name: string, category: string, rank: number) =>
+      `${name} hat dich bei ${category} auf Platz ${rank} verdrängt.`,
   },
   en: {
     someone: "Someone",
     title: (name: string) => `🔥 ${name} is on a roll`,
     body: (reps: number) => `Already ${reps} reps today — you’re still at 0.`,
+    rankTitle: "🏆 Leaderboard",
+    rankBody: (name: string, category: string, rank: number) =>
+      `${name} pushed you down to #${rank} in ${category}.`,
   },
 };
 type Lang = keyof typeof TEXT;
 const textFor = (lang: string | null | undefined) => TEXT[(lang ?? "de") as Lang] ?? TEXT.de;
+
+interface Overtaken {
+  user_id: string;
+  category_id: string;
+  category_name: string;
+  sender_name: string;
+  new_rank: number;
+}
+
+type Outcome = Record<string, unknown>;
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
@@ -92,22 +108,83 @@ Deno.serve(async (req) => {
   }
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  const { data: today, error: todayErr } = await supabase.rpc("berlin_today");
+  if (todayErr || !today) {
+    return Response.json({ error: "today_rpc", detail: todayErr?.message }, { status: 500 });
+  }
+
+  const sender = new Sender(supabase);
+  const rival = await rivalPush(supabase, sender, record, today);
+  const rank = await rankPush(supabase, sender, record, today);
+  const cleaned = await sender.cleanup();
+
+  return Response.json({ rival, rank, cleaned });
+});
+
+// ─── APNs an alle iOS-Geräte eines Users ────────────────────────────────────
+class Sender {
+  private dead: string[] = [];
+  private jwt: string | null = null;
+  constructor(private supabase: SupabaseClient) {}
+
+  async tokensOf(userId: string): Promise<string[]> {
+    const { data: tokens } = await this.supabase
+      .from("device_tokens")
+      .select("token, platform")
+      .eq("user_id", userId);
+    return (tokens ?? []).filter((t) => t.platform === "ios").map((t) => t.token);
+  }
+
+  async send(tokens: string[], apsPayload: Record<string, unknown>): Promise<Outcome> {
+    this.jwt ??= await buildApnsJwt({
+      keyId: APNS_KEY_ID,
+      teamId: APNS_TEAM_ID,
+      privateKeyPem: APNS_PRIVATE_KEY,
+    });
+    const results = await Promise.all(
+      tokens.map((deviceToken) =>
+        sendApns({
+          deviceToken,
+          jwt: this.jwt!,
+          bundleId: APNS_BUNDLE_ID,
+          env: APNS_ENV,
+          payload: apsPayload,
+        })
+      ),
+    );
+    for (const r of results) {
+      if (r.status === 410 || r.reason === "BadDeviceToken" || r.reason === "Unregistered") this.dead.push(r.deviceToken);
+    }
+    return {
+      sent: results.filter((r) => r.status === 200).length,
+      failures: results.filter((r) => r.status !== 200).map((r) => ({ status: r.status, reason: r.reason })),
+    };
+  }
+
+  async cleanup(): Promise<number> {
+    if (this.dead.length > 0) {
+      await this.supabase.from("device_tokens").delete().in("token", this.dead);
+    }
+    return this.dead.length;
+  }
+}
+
+// ─── Rivalen-Push: Gegner bei 0, Sender heute über der Schwelle ─────────────
+async function rivalPush(
+  supabase: SupabaseClient,
+  sender: Sender,
+  record: SetRecord,
+  today: string,
+): Promise<Outcome> {
   // 1. Sender daily total in this challenge
   const { data: senderToday, error: senderErr } = await supabase.rpc(
     "user_reps_today",
     { p_user: record.user_id, p_competition: record.competition_id },
   );
-  if (senderErr) {
-    return Response.json({ error: "sender_rpc", detail: senderErr.message }, { status: 500 });
-  }
+  if (senderErr) return { error: "sender_rpc", detail: senderErr.message };
   // Strict-greater than threshold — spec says "more than 100", not "at least 100".
   if ((senderToday ?? 0) <= RIVAL_THRESHOLD) {
-    return Response.json({
-      ignored: true,
-      reason: "sender_below_threshold",
-      senderToday,
-      threshold: RIVAL_THRESHOLD,
-    });
+    return { ignored: true, reason: "sender_below_threshold", senderToday, threshold: RIVAL_THRESHOLD };
   }
 
   // 2. Challenge + Mitglieder. Empfänger sind die Gegner: alle anderen aktiven
@@ -124,35 +201,17 @@ Deno.serve(async (req) => {
   // Ohne Spalte profiles.language (Migration noch nicht eingespielt) wie bisher laden.
   let { data: members, error: memErr } = firstTry;
   if (memErr && /language/.test(memErr.message)) ({ data: members, error: memErr } = await fetchMembers("display_name"));
-  if (memErr || !competition) {
-    return Response.json({ error: "members", detail: memErr?.message }, { status: 500 });
-  }
+  if (memErr || !competition) return { error: "members", detail: memErr?.message };
   const all = (members ?? []) as unknown as Member[];
-  const sender = all.find((m) => m.user_id === record.user_id);
-  const senderName = sender?.profile?.display_name;
+  const me = all.find((m) => m.user_id === record.user_id);
+  const senderName = me?.profile?.display_name;
   const opponents = all.filter((m) =>
     m.user_id !== record.user_id &&
-    !(competition.mode === "2v2" && sender?.team && m.team === sender.team)
+    !(competition.mode === "2v2" && me?.team && m.team === me.team)
   );
-  if (opponents.length === 0) {
-    return Response.json({ ignored: true, reason: "no_opponents" });
-  }
+  if (opponents.length === 0) return { ignored: true, reason: "no_opponents" };
 
-  // 3. Today's Berlin date
-  const { data: today, error: todayErr } = await supabase.rpc("berlin_today");
-  if (todayErr || !today) {
-    return Response.json({ error: "today_rpc", detail: todayErr?.message }, { status: 500 });
-  }
-
-  const jwt = await buildApnsJwt({
-    keyId: APNS_KEY_ID,
-    teamId: APNS_TEAM_ID,
-    privateKeyPem: APNS_PRIVATE_KEY,
-  });
-
-  const outcome: Record<string, unknown>[] = [];
-  const dead: string[] = [];
-
+  const recipients: Outcome[] = [];
   for (const recipient of opponents) {
     // Nur wer heute in dieser Challenge noch bei 0 ist
     const { data: recipientToday, error: recipientErr } = await supabase.rpc(
@@ -160,23 +219,19 @@ Deno.serve(async (req) => {
       { p_user: recipient.user_id, p_competition: record.competition_id },
     );
     if (recipientErr) {
-      outcome.push({ user: recipient.user_id, error: recipientErr.message });
+      recipients.push({ user: recipient.user_id, error: recipientErr.message });
       continue;
     }
     if ((recipientToday ?? 0) > 0) {
-      outcome.push({ user: recipient.user_id, ignored: "recipient_active" });
+      recipients.push({ user: recipient.user_id, ignored: "recipient_active" });
       continue;
     }
 
     // Tokens BEFORE claiming the daily slot so we don't burn the slot when the
     // recipient has no device registered yet.
-    const { data: tokens } = await supabase
-      .from("device_tokens")
-      .select("token, platform")
-      .eq("user_id", recipient.user_id);
-    const iosTokens = (tokens ?? []).filter((t) => t.platform === "ios");
-    if (iosTokens.length === 0) {
-      outcome.push({ user: recipient.user_id, ignored: "no_tokens" });
+    const tokens = await sender.tokensOf(recipient.user_id);
+    if (tokens.length === 0) {
+      recipients.push({ user: recipient.user_id, ignored: "no_tokens" });
       continue;
     }
 
@@ -185,12 +240,12 @@ Deno.serve(async (req) => {
       .from("push_log")
       .insert({ user_id: recipient.user_id, competition_id: record.competition_id, kind: "rival", day: today });
     if (logErr) {
-      outcome.push({ user: recipient.user_id, ignored: logErr.code === "23505" ? "already_sent_today" : logErr.message });
+      recipients.push({ user: recipient.user_id, ignored: logErr.code === "23505" ? "already_sent_today" : logErr.message });
       continue;
     }
 
     const text = textFor(recipient.profile?.language);
-    const apsPayload = {
+    const result = await sender.send(tokens, {
       aps: {
         alert: {
           title: text.title(senderName ?? text.someone),
@@ -203,32 +258,60 @@ Deno.serve(async (req) => {
       competition_id: record.competition_id,
       sender_id: record.user_id,
       sender_today: senderToday,
-    };
-
-    const results = await Promise.all(
-      iosTokens.map((t) =>
-        sendApns({
-          deviceToken: t.token,
-          jwt,
-          bundleId: APNS_BUNDLE_ID,
-          env: APNS_ENV,
-          payload: apsPayload,
-        })
-      ),
-    );
-    for (const r of results) {
-      if (r.status === 410 || r.reason === "BadDeviceToken" || r.reason === "Unregistered") dead.push(r.deviceToken);
-    }
-    outcome.push({
-      user: recipient.user_id,
-      sent: results.filter((r) => r.status === 200).length,
-      failures: results.filter((r) => r.status !== 200).map((r) => ({ status: r.status, reason: r.reason })),
     });
+    recipients.push({ user: recipient.user_id, ...result });
   }
+  return { senderToday, recipients };
+}
 
-  if (dead.length > 0) {
-    await supabase.from("device_tokens").delete().in("token", dead);
+// ─── Rangliste: „X hat dich bei Y auf Platz N verdrängt“ ────────────────────
+// ranking_overtaken wertet nur die erste Zeile einer log_id aus; ein Satz, der
+// in mehreren Challenges zählt, löst also höchstens einen Durchlauf aus.
+// Höchstens ein Push pro Empfänger und Tag.
+async function rankPush(
+  supabase: SupabaseClient,
+  sender: Sender,
+  record: SetRecord,
+  today: string,
+): Promise<Outcome> {
+  const { data, error } = await supabase.rpc("ranking_overtaken", { p_set: record.id });
+  if (error) return { error: "overtaken_rpc", detail: error.message };
+  const overtaken = (data ?? []) as Overtaken[];
+  if (overtaken.length === 0) return { ignored: true, reason: "nobody_overtaken" };
+
+  // Sprache der Empfänger; ohne Spalte profiles.language Deutsch
+  const languages: Record<string, string | null> = {};
+  const { data: langRows, error: langErr } = await supabase.from("profiles")
+    .select("id, language").in("id", overtaken.map((o) => o.user_id));
+  if (!langErr) for (const r of langRows ?? []) languages[r.id] = r.language;
+
+  const recipients: Outcome[] = [];
+  for (const o of overtaken) {
+    const tokens = await sender.tokensOf(o.user_id);
+    if (tokens.length === 0) {
+      recipients.push({ user: o.user_id, ignored: "no_tokens" });
+      continue;
+    }
+    const { error: logErr } = await supabase
+      .from("push_log")
+      .insert({ user_id: o.user_id, competition_id: null, kind: "rank_overtaken", day: today });
+    if (logErr) {
+      recipients.push({ user: o.user_id, ignored: logErr.code === "23505" ? "already_sent_today" : logErr.message });
+      continue;
+    }
+    const text = textFor(languages[o.user_id]);
+    const result = await sender.send(tokens, {
+      aps: {
+        alert: {
+          title: text.rankTitle,
+          body: text.rankBody(o.sender_name, o.category_name, o.new_rank),
+        },
+        sound: "default",
+      },
+      kind: "rank_overtaken",
+      category_id: o.category_id,
+    });
+    recipients.push({ user: o.user_id, ...result });
   }
-
-  return Response.json({ senderToday, cleaned: dead.length, recipients: outcome });
-});
+  return { recipients };
+}

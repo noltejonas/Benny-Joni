@@ -7,7 +7,8 @@
 //   unterschiedliche Work-Tags bleiben einzeln.
 // - Meilensteine: eigener Anteil erledigt, Wochenziel geschafft,
 //   Führungswechsel. Sie stehen zum Zeitpunkt des auslösenden Satzes.
-// - Wochenrückblicke vergangener Wochen kommen fertig aus buildWeekRecaps.
+// - Wochenrückblicke vergangener Wochen kommen fertig aus buildWeekRecaps,
+//   Monatskarten der Rangliste (kind 'month') aus CompetitionApp.
 //
 // Werte zählen über PTData.setValue: Workouts tragen nie zu Summen bei.
 
@@ -130,8 +131,8 @@
   // Alles zusammen, neueste zuerst. items: Feed-Einträge der App (Sätze mit
   // kind 'set' der laufenden Woche plus Wochenrückblicke).
   function buildFeed({ items = [], weekSets = [], challenges = [], sides = [], participantCount = 2 }) {
-    const sets = items.filter((x) => x.kind !== 'recap');
-    const recaps = items.filter((x) => x.kind === 'recap').map((r) => ({ ...r, key: r.id }));
+    const sets = items.filter((x) => x.kind !== 'recap' && x.kind !== 'month');
+    const recaps = items.filter((x) => x.kind === 'recap' || x.kind === 'month').map((r) => ({ ...r, key: r.id }));
     const { events, progressBySet } = weekTimeline({ weekSets, challenges, sides, participantCount });
     const runs = bursts(sets).map((b) => ({ ...b, progress: progressBySet[b.sets[0].id] || null }));
     // Bei gleicher Zeit steht der Meilenstein über der Zeile, die ihn ausgelöst hat.
