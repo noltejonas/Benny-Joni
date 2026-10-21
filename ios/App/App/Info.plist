@@ -103,12 +103,6 @@
 	<string>So you can take a photo for your profile picture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>So you can pick a photo from your library as your profile picture.</string>
-	<!-- Absicherung: Die App fragt NICHT nach App-Tracking-Transparenz und zeigt nur
-	     nicht-personalisierte Werbung. Löst doch etwas die Abfrage aus (z. B. eine
-	     versehentlich angelegte IDFA-Nachricht in AdMob), beendet iOS die App ohne
-	     diesen Text. Übersetzt in de.lproj/en.lproj/InfoPlist.strings. -->
-	<key>NSUserTrackingUsageDescription</key>
-	<string>So Google can show you more relevant ads. The app works without your consent too.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

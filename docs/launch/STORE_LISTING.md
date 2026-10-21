@@ -11,8 +11,8 @@ Am 21. Oktober 2026 wurden die Apple-Metadaten für Version **1.4.1** mit
 den lokalen Dateien überein. Je Sprache sind vier Screenshots vollständig
 verarbeitet (`COMPLETE`, keine Fehler/Warnungen). Die Review-Angaben sind
 hinterlegt. Status: `PREPARE_FOR_SUBMISSION`, Veröffentlichung `MANUAL`,
-Build 24 zugeordnet und keine Einreichung zur Prüfung.
-Der neueste TestFlight-Build **1.4.1 (24)** ist erfolgreich hochgeladen und
+Build 25 zugeordnet und keine Einreichung zur Prüfung.
+Der neueste TestFlight-Build **1.4.1 (25)** ist erfolgreich hochgeladen und
 per API als `VALID` bestätigt; die Zuordnung zur Store-Version ist ebenfalls
 per API zurückgelesen, weiterhin im Entwurf mit manueller Veröffentlichung.
 IPA-Pfad, SHA-256 und Tests stehen in [RELEASE.md](RELEASE.md).
@@ -53,11 +53,12 @@ die längere Seite darf höchstens doppelt so lang wie die kürzere sein.
 - Bundle-ID: `com.bennyjoni.terminator`, Name aus dem jeweiligen `name.txt`.
 - Primäre Sprache: Deutsch; zusätzliche Lokalisierung: Englisch (UK).
 - Kategorie: Gesundheit und Fitness; die App erfasst vom Nutzer eingetragene Trainingswerte.
-- Der Store-Entwurf ist auf Version 1.4.1 gesetzt und enthält den passenden Build 24; `MARKETING_VERSION` steht im Xcode-Projekt.
+- Der Store-Entwurf ist auf Version 1.4.1 gesetzt und enthält den passenden Build 25; `MARKETING_VERSION` steht im Xcode-Projekt.
 - Copyright: Jonas Nolte und Benjamin Frey, wie in den veröffentlichten Anbieterangaben.
 - Support-, Marketing- und Datenschutz-URL: Dateien `*_url.txt`; die öffentlich erreichbaren Seiten müssen vollständig und aktuell sein.
 - Review-Zugang und Notizen: `REVIEW_NOTES.md`; `REVIEW_*` nur in der ignorierten `.env`.
-- Preis und Länder: im Konto bewusst festlegen. Die App ist auf Deutsch und Englisch verfügbar; die vorbereiteten Rechtstexte sind deutsch.
+- Preis: kostenlos, Basisland Deutschland 0 € und gleichwertige Storefront-Preise ebenfalls 0; nach Neuladen bestätigt.
+- Länder: ausschließlich Deutschland, Österreich und Schweiz; UI-Readback zeigt drei Länder „Verfügbar bei App-Veröffentlichung“. Verfügbarkeit auf Mac und Apple Vision ist ausgeschaltet und nach Neuladen bestätigt; diese Plattformen wurden nicht getestet.
 - Veröffentlichung: manuell. Fastlane lädt ausschließlich Entwürfe hoch.
 
 Das Feld „Neuerungen“ bleibt für diesen ersten App-Store-Eintrag leer;
@@ -65,12 +66,17 @@ Fastlane überspringt `release_notes.txt` erwartungsgemäß. Das Feld ist erst
 für spätere Versionen verfügbar, kein fehlgeschlagener Textupload.
 [Apple: Versionsinformationen](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information)
 
-Die Altersfreigabe muss die tatsächlichen Funktionen berücksichtigen:
-Nutzerinhalte, öffentliche Ranglistenprofile nach Zustimmung, Fitnessziele,
-Wettbewerbe und AdMob-Werbung. Die Nutzungsbedingungen setzen ein Mindestalter
-von 16 Jahren voraus; eine eventuell nötige höhere Überschreibung im
-Store-Fragebogen entsprechend setzen. Ein Banner-Inhaltsfilter „General“
-ersetzt den Altersfragebogen nicht.
+Der Altersfragebogen ist abgeschlossen: berechnet 13+, wegen des Mindestalters
+in den Nutzungsbedingungen manuell auf **16+** angehoben und gespeichert.
+Nutzerinhalte, Werbung und Wellness sind mit Ja beantwortet, Chat/DM,
+Elternkontrollen, technischer Altersnachweis und Browser mit Nein.
+Wettbewerbe sind häufig, simuliertes Glücksspiel Nie, Glücksspiel/Lootboxen Nein;
+Alkohol ist wegen der vom Nutzer bestätigten „Bier-Runde“ selten.
+Die Inhaltsrechte-Erklärung („erforderliche Rechte vorhanden“) und
+„kein reguliertes Medizinprodukt“ sind gespeichert. Der bestehende
+DSA-Trader-Status bleibt unverändert; eine neue Verifizierung ist nicht belegt.
+Die vollständigen gespeicherten Antworten stehen in
+[STORE_PRIVACY_ANSWERS.md](STORE_PRIVACY_ANSWERS.md).
 
 ## Datenschutzangaben für den tatsächlichen Release
 
@@ -104,14 +110,17 @@ IARC ergibt USK 12, ESRB Teen und PEGI Parental Guidance; die Zielgruppe
 bleibt 16+. Acht reale Android-Screenshots, ein Icon und zwei lokalisierte
 Feature-Grafiken sind hinterlegt. Für alle elf Assets wurde die
 KI-Kennzeichnung gespeichert, weil auch die echten App-Aufnahmen
-KI-erstellte Avatare/Maskottchen enthalten. Apples App-Privacy-Formular
-bleibt offen.
+KI-erstellte Avatare/Maskottchen enthalten. Apples App Privacy ist ebenfalls
+vollständig gesetzt und nach ausdrücklicher Nutzerzustimmung veröffentlicht:
+15 Datentypen, davon 13 verknüpft und zwei nicht verknüpft, keine
+Tracking-Daten; die Datenschutz-URL ist im UI-Readback korrekt. Die
+Veröffentlichung der Datenschutzangaben reicht die App-Version nicht ein.
 
 ## Was aktuell noch fehlt
 
 - AdMob-Zahlungsprofil (auf Wunsch vorerst offen), Store-Verknüpfung und Googles Bestätigung von `app-ads.txt`. Beide Apps/Banner und die UMP-Nachricht sind eingerichtet; die Datei ist am Domain-Stamm erreichbar.
 - Produktions-E-Mail-Versand und verbleibende Betriebsfakten aus `LEGAL_FACTS.md` überprüfen. Anbieter-/Supportdaten sind eingesetzt und die fünf App-/Rechtsseiten öffentlich erreichbar.
-- Apple: App Privacy, Altersfreigabe, Preis/Länder und erforderliche Kontoangaben abschließen. Build 24 ist im Entwurf zugeordnet; API-Zugang und Metadatenupload sind geprüft. Beide isolierten Review-Logins sind gegen Supabase Auth bestätigt. Die Abläufe im hochgeladenen Build vor der Einreichung prüfen.
+- Apple: abschließende Prüfung der Abläufe im hochgeladenen Build sowie gegebenenfalls noch im Konto angezeigte Anforderungen. App Privacy ist mit allen 15 Datentypen veröffentlicht; Build 25 ist zugeordnet. Altersfreigabe 16+, Inhaltsrechte, Medizinprodukt-Antwort Nein, kostenlose Preise und ausschließliche DACH-Verfügbarkeit sind gespeichert. Mac/Apple Vision sind ausgeschlossen. Beide isolierten Review-Logins sind gegen Supabase Auth bestätigt. Der bestehende Trader-Status ist keine hier neu geprüfte DSA-Verifizierung.
 - Google Play: Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist hochgeladen und als interner Entwurf **1.4.1 – Initial internal test** mit DE-/EN-Neuerungen (2/2) gespeichert. Kein Rollout und keine Testerbenachrichtigung. Für Fastlane zusätzlich eigenen API-Zugang einrichten. Alle elf Einrichtungsschritte einschließlich IARC, Data safety und DE-/EN-Listing sind abgeschlossen. Der Apple-Key ist für Play nicht verwendbar.
 - Für Android: externes Backup des lokal erstellten Upload-Keys sowie vollständige Funktionstests und AdMob-/UMP-Geräteprüfung. Kaltstart, Feed-Reproduktion und der Export von acht echten Screenshots sind bestanden.
 

@@ -46,7 +46,12 @@ Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
   `AdPrivacy`-Bridge; erst dann sind Anzeigenanfragen erlaubt. Das entspricht
   [Googles Android-API-Reihenfolge](https://developers.google.com/admob/android/reference/com/google/android/gms/ads/MobileAds#putPublisherFirstPartyIdEnabled(boolean)).
 - iOS: Google-App-ID, SKAdNetwork-Liste und Privacy-Manifeste vorhanden.
-  Der Code fordert keine ATT-Berechtigung an. Keine IDFA-Nachricht in AdMob
+  Der Code fordert keine ATT-Berechtigung an. Plugin 8.2.1 ruft bei
+  `initialize()` nur die Anzeigenkonfiguration und den SDK-Start auf;
+  die separate ATT-Methode wird von der App nicht aufgerufen. Der ungenutzte
+  `NSUserTrackingUsageDescription`-Eintrag wurde aus Haupt-Plist und beiden
+  Übersetzungen entfernt; seine Abwesenheit ist in der finalen IPA 1.4.1 (25)
+  geprüft. Keine IDFA-Nachricht in AdMob
   konfigurieren, solange das Anzeigenmodell ohne ATT vorgesehen ist.
 - Android: natives Capacitor-Projekt, eigene produktive App-ID, verzögerte
   Anzeigenmessung und Release-Sperre vorhanden. JDK 21 und Android SDK sind

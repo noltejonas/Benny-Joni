@@ -1,8 +1,8 @@
 # App Store und Google Play mit Fastlane
 
 Die Store-Texte liegen für Deutsch und Englisch vor. Der Apple-Metadaten-
-Upload für Version 1.4.1 ist abgeschlossen und per API geprüft; Build 24 ist
-dieser Version im Entwurf zugeordnet. TestFlight-Build 1.4.1 (24) ist
+Upload für Version 1.4.1 ist abgeschlossen und per API geprüft; Build 25 ist
+dieser Version im Entwurf zugeordnet. TestFlight-Build 1.4.1 (25) ist
 erfolgreich hochgeladen und per API als `VALID` bestätigt. Apple liest
 `ios/App/fastlane/metadata/`, Google Play liest
 `ios/App/fastlane/play-metadata/`. Zugangsdaten gehören ausschließlich in die
@@ -56,13 +56,13 @@ entsprechen. Die bisherige Aussage „keine Werbung“ gilt mit AdMob nicht mehr
 `tools/fastlane.sh ios store_metadata` hat den Entwurf 1.4.1 hochgeladen.
 Der anschließende API-Abgleich bestätigt:
 
-- Status `PREPARE_FOR_SUBMISSION`, Release-Typ `MANUAL`, Build 24 zugeordnet;
+- Status `PREPARE_FOR_SUBMISSION`, Release-Typ `MANUAL`, Build 25 zugeordnet;
   nach dem gezielten Update ausschließlich dieser Build-Beziehung per API
   zurückgelesen. Keine Einreichung oder Veröffentlichung.
-- Der neueste TestFlight-Build 1.4.1 (24) ist erfolgreich hochgeladen und
-  per API als `VALID` bestätigt. Die zusätzlichen Beta-Statusfelder sind
-  unmittelbar nach der Verarbeitung noch leer. Build 23 ist bereits intern
-  `IN_BETA_TESTING`, extern `READY_FOR_BETA_SUBMISSION`.
+- Der neueste TestFlight-Build 1.4.1 (25) ist erfolgreich hochgeladen und
+  per API als `VALID` bestätigt, intern `IN_BETA_TESTING`, extern
+  `READY_FOR_BETA_SUBMISSION`. Er entfernt die ungenutzte ATT-Deklaration
+  aus Haupt-Plist und beiden Sprachdateien; die finale IPA ist darauf geprüft.
   Es wurde nichts extern zur Beta-Prüfung oder
   zur App-Store-Prüfung eingereicht. IPA-Pfad, SHA-256 und die lokalen
   Prüfergebnisse stehen in [RELEASE.md](RELEASE.md).
@@ -127,9 +127,17 @@ Ein kompletter Build mit Store-Unterlagen ist möglich mit:
 bundle exec fastlane release
 ```
 
-Danach in [App Store Connect](https://appstoreconnect.apple.com/): Build
-auswählen, Altersfreigabe und App-Datenschutz ausfüllen, Preis/Verfügbarkeit
-und Händlerangaben prüfen. Bei einem Build mit AdMob gehören die Daten des
+In [App Store Connect](https://appstoreconnect.apple.com/) ist Build 25
+zugeordnet. App Privacy ist mit allen 15 Datentypen nach ausdrücklicher
+Nutzerzustimmung veröffentlicht; der UI-Readback bestätigt 13 verknüpfte,
+zwei nicht verknüpfte Datentypen, keine Tracking-Daten und die korrekte
+Datenschutz-URL. Altersfreigabe 16+ (berechnet 13+, Override wegen der
+Nutzungsbedingungen), Inhaltsrechte und „kein reguliertes Medizinprodukt“
+sind gespeichert. Preis: kostenlos mit Basisland Deutschland; Verfügbarkeit
+ausschließlich Deutschland, Österreich und Schweiz, im UI-Readback bestätigt.
+Mac und Apple Vision sind ausgeschlossen; beide Kästchen bleiben nach
+Neuladen leer. Der bestehende DSA-Trader-Status wurde nicht geändert;
+eine neue Verifizierung ist nicht belegt. Bei einem Build mit AdMob gehören die Daten des
 Google-SDKs in die Datenschutzangaben und Werbung in die Altersfreigabe.
 Auch die öffentliche Monatsrangliste muss bei Nutzerinhalten berücksichtigt
 werden. Konkrete Datenschutzantworten stehen in

@@ -230,13 +230,18 @@ test('Testmodus hängt nur an PROD.banner und nutzt Googles Test-Blöcke', () =>
   assert.equal(live.banner, 'ca-app-pub-1234567890123456/2222222222');
 });
 
-test('Info.plist: SKAdNetwork-Liste, Tracking-Text als Absicherung', () => {
+test('iOS: SKAdNetwork-Liste, keine ATT-Deklaration oder ATT-Anfrage für NPA', () => {
   const clean = PLIST.replace(/<!--[\s\S]*?-->/g, '');
   const ids = [...clean.matchAll(/<key>SKAdNetworkIdentifier<\/key>\s*<string>([^<]+)<\/string>/g)].map((m) => m[1]);
   assert.ok(ids.includes('cstr6suwn9.skadnetwork'), 'Googles eigene SKAdNetwork-ID fehlt');
   assert.equal(new Set(ids).size, ids.length, 'doppelte SKAdNetwork-IDs');
   assert.ok(ids.every((id) => /^[a-z0-9]+\.skadnetwork$/.test(id)));
-  assert.ok((plistValue('NSUserTrackingUsageDescription') || '').length > 20);
+  assert.equal(plistValue('NSUserTrackingUsageDescription'), null);
+  for (const locale of ['de', 'en']) {
+    const localized = fs.readFileSync(path.join(ROOT, 'ios/App/App', `${locale}.lproj/InfoPlist.strings`), 'utf8');
+    assert.doesNotMatch(localized, /NSUserTrackingUsageDescription/);
+  }
+  assert.doesNotMatch(ADS_SRC, /\.\s*requestTrackingAuthorization\s*\(/);
 });
 
 // ── Einbindung ──────────────────────────────────────────────────────────────

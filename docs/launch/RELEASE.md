@@ -10,22 +10,26 @@ Stand 21. Oktober 2026: Beide Apple-Lokalisierungen (`de-DE`, `en-GB`)
 einschließlich Namen, Untertiteln und URLs stimmen mit den lokalen Metadaten
 überein. Je vier Screenshots sind `COMPLETE`, ohne Fehler oder Warnungen.
 Review-Angaben sind hinterlegt; Status `PREPARE_FOR_SUBMISSION`, Release-Typ
-`MANUAL`, Build 24 zugeordnet und per API zurückgelesen. „Neuerungen“ ist für diese erste
+`MANUAL`, Build 25 zugeordnet und per API zurückgelesen. „Neuerungen“ ist für diese erste
 App-Version nicht verfügbar und wird von Fastlane korrekt übersprungen.
 
-Der neueste TestFlight-Build **1.4.1 (24)** ist erfolgreich hochgeladen
+Der neueste TestFlight-Build **1.4.1 (25)** ist erfolgreich hochgeladen
 und per App-Store-Connect-API als `processingState=VALID` bestätigt.
-Er ist nicht abgelaufen; `usesNonExemptEncryption=false`. Die zusätzlichen
-internen und externen Beta-Statusfelder sind unmittelbar nach der
-Verarbeitung noch leer; Build 23 ist bereits intern `IN_BETA_TESTING`.
-Der Store-Version 1.4.1 ist Build 24 zugeordnet; es wurde nichts zur
+Er ist nicht abgelaufen; `usesNonExemptEncryption=false`, intern
+`IN_BETA_TESTING`, extern `READY_FOR_BETA_SUBMISSION`.
+Der Store-Version 1.4.1 ist Build 25 zugeordnet; es wurde nichts zur
 Store-Prüfung eingereicht oder veröffentlicht.
 
 Die geprüfte IPA liegt unter
-`ios/App/build/fastlane/BennyJoni-1.4.1-24.ipa`.
-SHA-256: `722bc8f84ee1f977879828bd0b08d8237788171b97d4a6cad0a464d88b3f8e50`.
+`ios/App/build/fastlane/BennyJoni-1.4.1-25.ipa`.
+SHA-256: `a31c70025e3465a2a88e6bda8e92895a05d207e9b2caffedd63290cb35b718a8`.
 Sie enthält die aktuellen Store-Links, den Avatarfix und den korrigierten
 AdMob-Ablauf sowie die im Android-Emulator geprüfte Feed-Korrektur.
+Der überflüssige ATT-Purpose-Key ist im Haupt-Plist und in den beiden
+kompilierten Sprachdateien der finalen IPA nachweislich nicht vorhanden;
+die App fordert keine Tracking-Erlaubnis an. Der dazu angepasste
+Ads-Konfigurationscheck besteht mit 27 Tests und einem erwarteten Skip.
+Android wurde dafür nicht neu gebaut; das zuletzt geprüfte AAB ist unverändert.
 Der letzte Gesamtcheck ergab 220 bestandene Tests und einen
 bewusst übersprungenen Release-Check (221 insgesamt). Webbuild, beide
 Capacitor-Syncs, Android-Debug- und Release-Build sowie der iOS-Release-
@@ -94,7 +98,18 @@ Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist hochgeladen;
 die Console bestätigt ein App Bundle und zeigt `1 (1.4.1)`. Der interne
 Entwurf **1.4.1 – Initial internal test** ist mit DE-/EN-Neuerungen (2/2)
 gespeichert. Kein Rollout und keine Testerbenachrichtigung. Apples App Privacy
-bleibt offen. Gespeicherte Formulare sind keine Einreichung oder Veröffentlichung.
+ist mit allen 15 Datentypen nach ausdrücklicher Nutzerzustimmung
+veröffentlicht; der UI-Readback bestätigt 13 verknüpfte und zwei nicht
+verknüpfte Datentypen, keine Tracking-Daten und die korrekte Datenschutz-URL.
+Auch Altersfreigabe und Inhaltsrechte sind gespeichert: berechnet 13+,
+manueller Override 16+ wegen der Nutzungsbedingungen, erforderliche Rechte
+bestätigt, reguliertes Medizinprodukt Nein. Die kostenlosen Preise mit
+Basisland Deutschland und die ausschließliche Verfügbarkeit in Deutschland,
+Österreich und Schweiz sind zurückgelesen; alle drei Länder stehen auf
+„Verfügbar bei App-Veröffentlichung“. Mac und Apple Vision bleiben nach
+Neuladen ausgeschlossen. Der vorhandene Trader-Status bleibt unverändert;
+eine neue DSA-Verifizierung ist nicht belegt. Die App-Version wurde nicht
+eingereicht oder veröffentlicht.
 Die Play-Vorschau zeigt keine Fehler und drei Warnungen: keine internen
 Tester, kein R8-Mapping bei `minifyEnabled=false` und fehlende native
 SDK-Debugsymbole. „Save and publish“ wurde nicht betätigt.

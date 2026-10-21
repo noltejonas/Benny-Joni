@@ -4,9 +4,13 @@ Ausfüllhilfe für Benny & Joni, Stand 21. Oktober 2026. Grundlage sind der
 aktuelle Code und die unten verlinkten Store-/SDK-Definitionen. Dieses Dokument
 ergänzt [STORE_LISTING.md](STORE_LISTING.md) mit konkreten Formularantworten.
 Es enthält keine Zugangsdaten. Die unten dokumentierten Play-Angaben wurden
-am 21. Oktober 2026 in der Console gespeichert; eine Einreichung oder
-Veröffentlichung ist damit nicht erfolgt. Apples App-Privacy-Formular ist
-weiterhin offen.
+am 21. Oktober 2026 in der Console gespeichert; die App-Version wurde damit
+nicht eingereicht oder veröffentlicht. Apples App-Privacy-Angaben sind nach
+ausdrücklicher Nutzerzustimmung vollständig in der Oberfläche gesetzt und
+veröffentlicht: alle 15 Datentypen mit den Zwecken, Verknüpfungen und
+Tracking-Antworten des vorbereiteten JSONs. Der UI-Readback bestätigt
+13 verknüpfte und zwei nicht verknüpfte Datentypen, keine Tracking-Daten
+und die korrekte Datenschutz-URL. Die App-Version bleibt im Entwurf.
 
 ## Tatsächlich in Play Console gespeichert
 
@@ -32,7 +36,25 @@ hochgeladen: Version 1.4.1, Version Code 1, SHA-256 beginnt mit `5745afb5`;
 die Console bestätigt ein App Bundle und zeigt `1 (1.4.1)`. Der interne
 Entwurf **1.4.1 – Initial internal test** ist einschließlich Neuerungen in
 beiden Sprachen gespeichert (2/2). Kein Rollout und keine Testerbenachrichtigung.
-Apples App-Privacy-Formular und das externe Keystore-Backup sind weiterhin offen.
+Das externe Keystore-Backup ist weiterhin offen. Apple App Privacy ist wie
+oben dokumentiert veröffentlicht. Auch die folgenden Apple-Einstellungen
+sind inzwischen gespeichert und in der Oberfläche zurückgelesen.
+
+## Weitere bestätigte Apple-Einstellungen
+
+| Bereich | Gespeicherter Stand |
+|---|---|
+| Inhaltsrechte | Ja: Die erforderlichen Rechte an enthaltenen/angezeigten Inhalten wurden bestätigt. |
+| Altersfreigabe | Fragebogen abgeschlossen, berechnet 13+; wegen der Nutzungsbedingungen manuell auf **16+** angehoben. Die UI zeigt 16+ in 173 Territorien; regionale Abweichungen außerhalb DACH ändern die gewählte Zielgruppe nicht. |
+| Funktionen im Altersfragebogen | Nutzerinhalte und Werbung: Ja. Nachrichten/Chat: Nein, keine Chat-/DM-Funktion. Elternkontrollen, technischer Altersnachweis und uneingeschränkter Browser: Nein. |
+| Inhalt im Altersfragebogen | Erwachsenenthemen, vulgäre Sprache, Horror: Nie. Alkohol: Selten wegen der vom Nutzer bestätigten „Bier-Runde“. Medizinische/Behandlungsinformationen: Nie; Gesundheit/Wellness: Ja. Sexualität und Gewalt: jeweils Nie. Simuliertes Glücksspiel: Nie; Wettbewerbe: Häufig; Glücksspiel und Lootboxen: Nein. |
+| Regulated medical device | Nein, Dialog gespeichert. |
+| Preis | Basisland Deutschland, **0 €**, alle gleichwertigen Storefront-Preise ebenfalls kostenlos; Neuladen bestätigt. |
+| Verfügbarkeit | Ausschließlich **Deutschland, Österreich und Schweiz**, jeweils „Verfügbar bei App-Veröffentlichung“. UI: drei Länder; andere Länder nicht verfügbar. |
+| Weitere Plattformen | Verfügbarkeit auf Mac und Apple Vision ausgeschaltet; beide Auswahlkästchen nach Neuladen nicht gesetzt. Diese Plattformen wurden nicht getestet. |
+| DSA | Bestehende Einstufung dieser App als Trader unverändert. Kein neu geprüfter oder abgeschlossener Verifikationsstatus behauptet. |
+
+Die App-Version ist weiterhin nicht zur Prüfung eingereicht oder veröffentlicht.
 
 ## Gemeinsamer Ausgangspunkt
 
@@ -283,7 +305,7 @@ und ausnahmslos gelöscht“ angeben.
 | Play → Target audience | Zu den bestehenden Bedingungen ab 16 passen **16–17** und **18 and over**. Keine jüngeren Gruppen/„alle Altersgruppen“ auswählen. Das ist die Ableitung aus der bestehenden Zielgruppenvorgabe, keine neu vereinbarte Absenkung. |
 | Designed for children / Families | **No** nach vorhandenem Mindestalter und Auftritt. Keine Families-/Kinder-Zertifizierung behaupten. AdMob-Inhaltsfilter „General“ ist kein Altersnachweis. |
 | Altersprüfung in der App | **Keine eigenständige technische Altersprüfung** nachgewiesen. Nicht „Age assurance vorhanden“ behaupten, nur weil Bedingungen ab 16 gelten. |
-| Apple-Altersfragebogen / Play-IARC | **User-generated content: Yes**; Nutzer können über Namen/Notizen/Reaktionen Inhalte füreinander sichtbar machen. Falls nach Nutzerkommunikation gefragt wird, diese Möglichkeiten berücksichtigen, obwohl kein freier Direktchat existiert. Keine feste resultierende Altersstufe vorhersagen; der jeweilige Fragebogen berechnet sie. |
+| Apple-Altersfragebogen / Play-IARC | **User-generated content: Yes**. Apple: Nachrichten/Chat **No**, da keine Chat-/DM-Funktion vorhanden ist; Werbung und Gesundheit/Wellness Yes. Berechnet 13+, gespeicherter Override **16+** wegen der Nutzungsbedingungen. Play-IARC-Ergebnisse stehen im gespeicherten Status oben; die Zielgruppe bleibt 16+. |
 | Health apps declaration | **Activity and Fitness** auswählen. Die App speichert manuell eingegebene Trainingsaktivität/Workouts. Nicht „no health features“, nur weil sie keine Sensoren liest. |
 | Medical / research features | Keine Diagnosen, Behandlung, klinischen Entscheidungen, Medikamentenverwaltung, Forschung oder Medizinprodukte-Funktion im aktuellen Umfang. Diese zusätzlichen Health-Bereiche nicht auswählen. |
 | Health Connect / HealthKit access | **No**. „Fitness info“ bleibt wegen manueller Trainingseinträge trotzdem Yes. |
