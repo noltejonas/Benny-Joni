@@ -287,51 +287,27 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
    `REVIEW_NOTES.md` mit eingesetztem Einladungscode.
 8. **Veröffentlichung: „Diese Version manuell veröffentlichen“.**
 
-## 11a. Screenshots (B, 08:00–08:30, parallel zum Gerätetest) – P0
+## 11a. Screenshots (B, 5 min) – erledigt, nur hochladen
 
-Es gibt noch keine Screenshots im Repo. Ohne mindestens einen Screenshot für
-**„iPhone mit Dynamic Island (mittel)“** lässt sich nicht einreichen. Erlaubt
-sind 1206×2622 oder 1179×2556, JPG oder PNG ohne Alphakanal, höchstens 10.
+Fertig im Repo: `docs/launch/screenshots/iphone-6.3/` mit 5 Bildern in
+**1206×2622**, JPEG ohne Alphakanal. Das ist die Pflichtgröße „iPhone mit
+Dynamic Island (mittel)“. Aufgenommen um 08:40 auf einem iPhone-17-Pro-Simulator
+(iOS 27.0) mit dem Release-Build dieses Branches, im Demo-Modus, Statusleiste
+9:41, ohne Demo-Knopf:
 
-**Weg 1 (bevorzugt): echtes iPhone**
+1. `01-willkommen.jpg`: „Trainier gegen deine Freunde.“
+2. `02-home.jpg`: Duell, Pflicht-Challenge, Serie
+3. `03-feed.jpg`: Live-Feed mit Reaktionen
+4. `04-stats.jpg`: Bilanz und Vorsprung-Verlauf
+5. `05-strafkonto.jpg`: Strafkasse
 
-1. Xcode → Run (Debug-Build) auf ein iPhone mit Dynamic Island, nicht Max oder
-   Plus. iPhone 15/16 ergibt 1179×2556, iPhone 16 Pro/17/17 Pro ergibt
-   1206×2622. **Nicht** den iOS-27.1-Simulator nehmen, der zeigt Emojis als
-   Kästchen.
-2. Auf dem Willkommen-Bildschirm „Demo ansehen“ wählen.
-3. Am Mac (am iPhone muss unter Einstellungen → Apps → Safari → Erweitert der
-   „Web-Inspektor“ an sein): Safari → Entwickler → `<iPhone>` → `localhost`
-   → Konsole:
-   ```js
-   localStorage.setItem('pt:shots','1'); location.reload()
-   ```
-   Das blendet den Demo-Knopf über der Tab-Leiste aus (`www/demo.js`).
-4. 4–6 Motive aufnehmen (Seitentaste + Lauter): Heute mit Duell und Serie,
-   Feed mit Reaktionen, Stats/Duell, Strafkonto, Einladen. Per AirDrop an den
-   Mac schicken.
+In App Store Connect unter „iPhone mit Dynamic Island (mittel)“ in dieser
+Reihenfolge hochladen. Die großen Größen (6,9″) sind optional.
 
-**Weg 2 (Notlösung ohne passendes iPhone): Chrome am Mac**
-
-1. Im Repo:
-   ```bash
-   python3 -m http.server 8137 -d www
-   ```
-2. In Chrome http://localhost:8137/?demo=reset öffnen, DevTools → Gerätemodus
-   → eigene Größe **402×874** mit **DPR 3**.
-3. In der Konsole denselben Befehl wie oben ausführen
-   (`localStorage.setItem('pt:shots','1'); location.reload()`).
-4. Pro Motiv DevTools → ⋮ → „Capture screenshot“ (ergibt 1206×2622).
-
-**Für beide Wege vor dem Hochladen** den Alphakanal entfernen und die Größe
-prüfen (im Ordner mit den PNGs):
-
-```bash
-mkdir -p jpg && for f in *.png; do sips -s format jpeg "$f" --out "jpg/${f%.png}.jpg"; done
-sips -g pixelWidth -g pixelHeight jpg/*
-```
-
-Die JPGs aus `jpg/` lädt A in Schritt 11.2 hoch.
+Selbst neu aufnehmen (z. B. nach einer Namensänderung): auf einem echten iPhone
+17/17 Pro „Demo ansehen“ öffnen und mit Seitentaste + Lauter fotografieren.
+Achtung: Die iOS-26.3-Simulatoren auf diesem Mac zeigen Emojis als Kästchen,
+für Screenshots nur iOS 27.0 nehmen.
 
 ## 12. Gerätetest auf einem echten iPhone (07:45, B, 25 min) – P0
 
