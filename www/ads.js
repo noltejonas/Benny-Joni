@@ -1,6 +1,7 @@
 // Werbung über Google AdMob (@capacitor-community/admob, exakt gepinnt in
 // package.json), in iOS und Android. Im Browser, ohne natives Plugin und mit
 // ADS_ENABLED = false ist alles ein No-op: kein SDK-Start, keine Anfrage an Google.
+// Zusätzlich bleibt die serverseitige Freigabe bis setEnabled(true) geschlossen.
 //
 // Ablauf (Einrichtung und Freischaltung: docs/launch/ADMOB.md):
 // 1. checkConsent() fragt bei Google UMP den Einwilligungsstand ab, OHNE Formular.
@@ -93,6 +94,10 @@
 
   const P = (ADS_ENABLED && isNative && C.Plugins && C.Plugins.AdMob) || null;
 
+  let runtimeEnabled = false;
+  let generation = 0;      // Antworten einer früheren Freigabe dürfen nichts starten.
+  let listenerHandles = [];
+  const pendingRewards = new Set();
   let infoPromise = null;  // läuft bzw. erledigte Abfrage des Einwilligungsstands
   let lastInfo = null;     // letzte Antwort von requestConsentInfo/showConsentForm
   let formTried = false;   // Formular in dieser Sitzung schon gezeigt
@@ -113,9 +118,44 @@
 
   const warn = (...a) => { try { console.warn('AdMob', ...a); } catch (e) {} };
   const run = (fn) => { queue = queue.then(fn).catch((e) => warn(e)); return queue; };
+  const allowed = (epoch = generation) => !!P && runtimeEnabled && epoch === generation;
+  const runActive = (fn, epoch = generation) => run(() => allowed(epoch) ? fn() : undefined);
   const emit = () => { try { window.dispatchEvent(new CustomEvent('pt:ads-change')); } catch (e) {} };
   const requestOpts = () => ({ isTesting: TESTING, npa: NON_PERSONALIZED });
-  const desired = () => ready && !!lastInfo?.canRequestAds && wanted && !blocked && !privacyBusy;
+  const desired = () => allowed() && ready && !!lastInfo?.canRequestAds && wanted && !blocked && !privacyBusy;
+
+  function setEnabled(value) {
+    const next = value === true && !!P;
+    if (runtimeEnabled === next) return;
+    runtimeEnabled = next;
+    generation++;
+    if (next) { emit(); syncBanner(); return; }
+
+    // Laufende Antworten verwerfen und alte Banner/Auto-Refresh entfernen.
+    // Das SDK kann nicht deinitialisiert werden; neue Aufrufe bleiben gesperrt.
+    infoPromise = null;
+    sdkPromise = null;
+    lastInfo = null;
+    ready = false;
+    formTried = false;
+    consentBusy = false;
+    privacyBusy = false;
+    privacyRequired = false;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    const hadBanner = created;
+    created = false;
+    nativeHidden = false;
+    bannerHeight = 0;
+    setInset();
+    const oldHandles = listenerHandles;
+    listenerHandles = [];
+    oldHandles.forEach(handle => { try { Promise.resolve(handle?.remove?.()).catch(() => {}); } catch (_) {} });
+    pendingRewards.forEach(cancel => cancel());
+    pendingRewards.clear();
+    if (hadBanner) run(() => P.removeBanner());
+    emit();
+  }
 
   function setInset() {
     const h = desired() && created && bannerHeight > 0 ? Math.round(bannerHeight + GAP) : 0;
@@ -140,44 +180,54 @@
     if (next !== privacyRequired) { privacyRequired = next; emit(); }
   }
 
-  function requestInfo() {
-    return P.requestConsentInfo(TESTING
+  async function requestInfo(epoch = generation) {
+    if (!allowed(epoch)) return null;
+    const info = await P.requestConsentInfo(TESTING
       ? { debugGeography: DEBUG_GEOGRAPHY_EEA, testDeviceIdentifiers: TEST_DEVICES }
-      : {}).then((info) => { applyInfo(info); return info; });
+      : {});
+    if (!allowed(epoch)) return null;
+    applyInfo(info);
+    return info;
   }
 
   // Laut Google bei jedem Start abfragen. Zeigt kein Formular.
   function checkConsent() {
-    if (!P) return Promise.resolve(false);
+    if (!allowed()) return Promise.resolve(false);
     watchOverlays();
     if (!infoPromise) {
-      infoPromise = requestInfo()
-        .then((info) => (info?.canRequestAds ? startSdk() : false))
-        .catch((e) => { warn('Einwilligungsstand', e); infoPromise = null; return false; }); // i18n-ignore: nur Log
+      const epoch = generation;
+      infoPromise = requestInfo(epoch)
+        .then((info) => (allowed(epoch) && info?.canRequestAds ? startSdk(epoch) : false))
+        .catch((e) => { if (allowed(epoch)) { warn('Einwilligungsstand', e); infoPromise = null; } return false; }); // i18n-ignore: nur Log
     }
     return infoPromise;
   }
 
   // Formular bei Bedarf (höchstens einmal pro Sitzung), danach SDK starten.
   async function ensureConsent() {
+    const epoch = generation;
+    if (!allowed(epoch)) return false;
     if (ready) return !!lastInfo?.canRequestAds;
-    if (await checkConsent()) return true;
+    if (await checkConsent()) return allowed(epoch);
+    if (!allowed(epoch)) return false;
     const info = lastInfo;
     // Inzwischen entschieden (z. B. über „Werbe-Einwilligung“ in den Einstellungen).
-    if (info?.canRequestAds) return startSdk();
+    if (info?.canRequestAds) return startSdk(epoch);
     if (!info || formTried || info.status !== 'REQUIRED' || !info.isConsentFormAvailable) return false;
     formTried = true;
     try {
       const after = await P.showConsentForm();
+      if (!allowed(epoch)) return false;
       applyInfo({ ...info, ...after });
-      return after?.canRequestAds ? startSdk() : false;
+      return after?.canRequestAds ? startSdk(epoch) : false;
     } catch (e) {
       warn('Einwilligungsformular', e); // i18n-ignore: nur Log
       return false;
     }
   }
 
-  function startSdk() {
+  function startSdk(epoch = generation) {
+    if (!allowed(epoch)) return Promise.resolve(false);
     if (!sdkPromise) {
       sdkPromise = (async () => {
         const privacy = platform === 'android' ? C.Plugins.AdPrivacy : null;
@@ -189,37 +239,43 @@
           initializeForTesting: TEST_DEVICES.length > 0,
           maxAdContentRating: MAX_AD_CONTENT_RATING,
         });
+        if (!allowed(epoch)) return false;
         // SDK 25.5 verlangt initialize() vor dieser Einstellung. Erst nach
         // bestätigter Persistierung darf eine Anzeigenanfrage folgen.
         if (privacy) {
           const result = await privacy.disablePublisherFirstPartyId();
+          if (!allowed(epoch)) return false;
           if (result?.disabled !== true) {
             throw new Error('Publisher first-party ID was not disabled'); // i18n-ignore: nur Log
           }
         }
-        await listen();
+        await listen(epoch);
+        if (!allowed(epoch)) return false;
         ready = true;
         watchOverlays();
         syncBanner();
         return true;
-      })().catch((e) => { warn('Start', e); sdkPromise = null; return false; }); // i18n-ignore: nur Log
+      })().catch((e) => { if (allowed(epoch)) { warn('Start', e); sdkPromise = null; } return false; }); // i18n-ignore: nur Log
     }
     return sdkPromise;
   }
 
   function scheduleRetry() {
     clearTimeout(retryTimer);
-    retryTimer = setTimeout(() => { retryTimer = null; if (desired() && !created) syncBanner(); }, RETRY_MS);
+    if (!allowed()) { retryTimer = null; return; }
+    const epoch = generation;
+    retryTimer = setTimeout(() => { retryTimer = null; if (allowed(epoch) && desired() && !created) syncBanner(); }, RETRY_MS);
   }
 
   function syncBanner() {
     setInset();
-    if (!P || privacyBusy) return;
+    if (!allowed() || privacyBusy) return;
     if (!ready) {
       // Einwilligung erst, wenn ein Screen das Banner will und nichts darüber liegt.
       if (wanted && !blocked && !consentBusy) {
         consentBusy = true;
-        ensureConsent().finally(() => { consentBusy = false; });
+        const epoch = generation;
+        ensureConsent().finally(() => { if (allowed(epoch)) consentBusy = false; });
       }
       return;
     }
@@ -228,20 +284,21 @@
       if (!want) return;
       created = true;
       nativeHidden = false;
-      run(() => P.showBanner({
+      const epoch = generation;
+      runActive(() => P.showBanner({
         adId: IDS.banner,
         adSize: 'ADAPTIVE_BANNER',
         position: 'BOTTOM_CENTER',
         margin: bannerMargin(),
         ...requestOpts(),
-      }).catch((e) => { created = false; scheduleRetry(); throw e; }));
+      }).catch((e) => { if (allowed(epoch)) { created = false; scheduleRetry(); } throw e; }), epoch);
     } else if (want && nativeHidden) {
       nativeHidden = false;
       // Schlägt fehl, solange das Banner noch lädt; dann zeigt es sich beim Laden selbst.
-      run(() => P.resumeBanner().catch(() => {}));
+      runActive(() => P.resumeBanner().catch(() => {}));
     } else if (!want && !nativeHidden) {
       nativeHidden = true;
-      run(() => P.hideBanner());
+      runActive(() => P.hideBanner());
     }
   }
 
@@ -262,19 +319,25 @@
     window.addEventListener('online', () => { if (wanted && !ready) syncBanner(); });
   }
 
-  async function listen() {
-    await P.addListener(EV.sizeChanged, (size) => {
+  async function listen(epoch) {
+    const add = async (event, callback) => {
+      if (!allowed(epoch)) return;
+      const handle = await P.addListener(event, value => { if (allowed(epoch)) callback(value); });
+      if (allowed(epoch)) listenerHandles.push(handle);
+      else await handle?.remove?.();
+    };
+    await add(EV.sizeChanged, (size) => {
       if (size?.height > 0) bannerHeight = size.height;
       setInset();
     });
     // Ein frisch geladenes Banner ist sichtbar, auch wenn inzwischen kein
     // Screen es mehr will. Dann gleich wieder ausblenden.
-    await P.addListener(EV.loaded, () => {
-      if (!desired()) { nativeHidden = true; run(() => P.hideBanner()); }
+    await add(EV.loaded, () => {
+      if (!desired()) { nativeHidden = true; runActive(() => P.hideBanner(), epoch); }
     });
     // Keine Anzeige: Das Plugin entfernt die Ansicht, also keine Lücke lassen
     // und später neu laden.
-    await P.addListener(EV.failedToLoad, (err) => {
+    await add(EV.failedToLoad, (err) => {
       warn('Banner ohne Anzeige', err); // i18n-ignore: nur Log
       created = false;
       nativeHidden = false;
@@ -288,30 +351,37 @@
   // verdient wurde. Das Plugin löst showRewardVideoAd nur bei einer Belohnung
   // auf; wer vorher schließt, landet nur im Dismissed-Event.
   async function showRewarded() {
-    if (!P || !(await ensureConsent())) return false;
+    const epoch = generation;
+    if (!allowed(epoch) || !(await ensureConsent()) || !allowed(epoch)) return false;
     try {
       await P.prepareRewardVideoAd({ adId: IDS.rewarded, ...requestOpts() });
     } catch (e) {
       warn('Belohnungsvideo nicht geladen', e); // i18n-ignore: nur Log
       return false;
     }
+    if (!allowed(epoch)) return false;
     let rewarded = false;
     let finish;
     const result = new Promise((resolve) => { finish = resolve; });
+    const cancel = () => finish(false);
+    pendingRewards.add(cancel);
     const handles = await Promise.all([
       P.addListener(EV.rewarded, () => { rewarded = true; }),
       P.addListener(EV.rewardDismissed, () => finish(rewarded)),
       P.addListener(EV.rewardFailedToShow, () => finish(false)),
     ]);
-    P.showRewardVideoAd().then(() => { rewarded = true; }).catch(() => finish(false));
+    if (allowed(epoch)) P.showRewardVideoAd().then(() => { rewarded = true; }).catch(() => finish(false));
+    else finish(false);
     const value = await result;
+    pendingRewards.delete(cancel);
     handles.forEach((h) => h?.remove?.());
     return value;
   }
 
   // Einstellungen → „Werbe-Einwilligung“ (Pflicht, wenn Google sie verlangt).
   async function showPrivacyOptions() {
-    if (!P || privacyBusy) return;
+    const epoch = generation;
+    if (!allowed(epoch) || privacyBusy) return;
     privacyBusy = true;
     // Ein vorhandenes Banner und dessen automatische Aktualisierung beenden.
     // Nach einer neuen Auswahl darf nur eine neue, von UMP erlaubte Anfrage laufen.
@@ -326,18 +396,22 @@
     setInset();
     try {
       if (hadBanner) await run(() => P.removeBanner());
+      if (!allowed(epoch)) return;
       await P.showPrivacyOptionsForm();
-      const info = await requestInfo();
+      if (!allowed(epoch)) return;
+      const info = await requestInfo(epoch);
+      if (!allowed(epoch)) return;
       infoPromise = Promise.resolve(!!info?.canRequestAds && ready);
-      if (info?.canRequestAds && wanted) await startSdk();
+      if (info?.canRequestAds && wanted) await startSdk(epoch);
     } catch (e) { warn('Datenschutzoptionen', e); } // i18n-ignore: nur Log
     finally {
-      privacyBusy = false;
-      syncBanner();
+      if (allowed(epoch)) { privacyBusy = false; syncBanner(); }
     }
   }
 
   window.PTAds = {
+    setEnabled,
+    isEnabled: () => runtimeEnabled,
     checkConsent,
     setBannerWanted(value) {
       if (wanted === !!value) return;
@@ -346,7 +420,7 @@
       syncBanner();
     },
     showRewarded,
-    privacyOptionsRequired: () => privacyRequired,
+    privacyOptionsRequired: () => runtimeEnabled && privacyRequired,
     showPrivacyOptions,
     // Nur lesen: für tests/ads-config.test.cjs und zum Nachsehen in der Konsole.
     config: Object.freeze({

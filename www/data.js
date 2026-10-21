@@ -451,6 +451,16 @@
       client,
       mondayOf, isoDate,
 
+      // Öffentliche Betriebsfreigabe, ohne Offline-Cache. Fehlende Migration,
+      // keine Zeile oder Netz-/Rechtefehler lassen Werbung ausgeschaltet.
+      async getAdsEnabled() {
+        try {
+          const { data, error } = await client.from('app_release_settings')
+            .select('ads_enabled').eq('id', 1).maybeSingle();
+          return !error && data?.ads_enabled === true;
+        } catch (_) { return false; }
+      },
+
       // ── Auth ─────────────────────────────────────────────────────────
       async getSession() {
         const { data } = await client.auth.getSession();

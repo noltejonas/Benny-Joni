@@ -82,7 +82,9 @@ function configProblems({ config, plistAppId }) {
 // native: false = Browser, null = gar kein window.Capacitor.
 function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, afterForm = {},
   failInfo = 0, afterPrivacy = {}, initialize = async () => {}, privacyPlugin = true,
-  disablePrivacy = async () => ({ disabled: true }), source = TEST_SOURCE } = {}) {
+  disablePrivacy = async () => ({ disabled: true }), requestInfo = null,
+  consentForm = null, privacyForm = null, showBanner = async () => {},
+  enabled = true, source = TEST_SOURCE } = {}) {
   const calls = [];
   const listeners = {};
   const present = new Set();
@@ -98,17 +100,23 @@ function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, af
     async requestConsentInfo(o) {
       calls.push(['requestConsentInfo', o]);
       if (infoFails > 0) { infoFails--; throw new Error('offline'); }
+      if (requestInfo) return requestInfo();
       return { ...consent };
     },
     async showConsentForm() {
       calls.push(['showConsentForm']);
+      if (consentForm) return consentForm();
       Object.assign(consent, { status: 'OBTAINED', canRequestAds: true, ...afterForm });
       return { status: consent.status, canRequestAds: consent.canRequestAds,
         privacyOptionsRequirementStatus: consent.privacyOptionsRequirementStatus };
     },
-    async showPrivacyOptionsForm() { calls.push(['showPrivacyOptionsForm']); Object.assign(consent, afterPrivacy); },
+    async showPrivacyOptionsForm() {
+      calls.push(['showPrivacyOptionsForm']);
+      if (privacyForm) await privacyForm();
+      Object.assign(consent, afterPrivacy);
+    },
     async initialize(o) { calls.push(['initialize', o]); await initialize(); },
-    async showBanner(o) { calls.push(['showBanner', o]); },
+    async showBanner(o) { calls.push(['showBanner', o]); await showBanner(); },
     async hideBanner() { calls.push(['hideBanner']); },
     async resumeBanner() { calls.push(['resumeBanner']); },
     async removeBanner() { calls.push(['removeBanner']); },
@@ -150,6 +158,7 @@ function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, af
     clearTimeout: () => {},
   });
   vm.runInContext(source, ctx, { filename: 'ads.js' });
+  if (enabled) window.PTAds.setEnabled(true);
   return {
     PTAds: window.PTAds,
     calls,
@@ -282,12 +291,140 @@ test('app.jsx: Banner nur in Feed und Stats, erst nach dem Onboarding, nie in de
   const app = fs.readFileSync(path.join(WWW, 'app.jsx'), 'utf8');
   assert.match(app, /const adsOk = api\?\.mode !== 'demo' && !intro && !layer && \(!newcomer \|\| !!obState\.firstLog\);/);
   assert.match(app, /PTAds\?\.setBannerWanted\(adsOk && \(tab === 'feed' \|\| tab === 'history'\)\)/);
-  assert.match(app, /if \(adsOk\) window\.PTAds\?\.checkConsent\(\)/);
+  assert.match(app, /useEffect\(\(\) => watchAdsRelease\(api, adsOk\), \[api, adsOk\]\)/);
   // Kein Aufruf, der das Formular sofort zeigen könnte.
   assert.doesNotMatch(app, /PTAds\?*\.(init|showRewarded)\(/);
 });
 
 // ── Verhalten ───────────────────────────────────────────────────────────────
+
+test('Unbekannte oder ausgeschaltete Serverfreigabe: keinerlei native Werbeaufrufe', async () => {
+  for (const platform of ['ios', 'android']) {
+    const env = makeEnv({ platform, enabled: false, info: { status: 'OBTAINED', canRequestAds: true } });
+    assert.equal(env.PTAds.isEnabled(), false);
+    for (const value of [undefined, null, false, 'true', 1]) {
+      env.PTAds.setEnabled(value);
+      env.PTAds.setBannerWanted(true);
+      assert.equal(await env.PTAds.checkConsent(), false);
+      await env.PTAds.showPrivacyOptions();
+      assert.equal(await env.PTAds.showRewarded(), false);
+      env.online();
+    }
+    await settle();
+    assert.deepEqual(env.calls, []);
+    assert.equal(env.inset(), '0px');
+    assert.equal(env.PTAds.privacyOptionsRequired(), false);
+  }
+});
+
+test('Positive Serverfreigabe startet den normalen UMP-Ablauf erst nach explizitem true', async () => {
+  const env = makeEnv({ enabled: false });
+  env.PTAds.setBannerWanted(true);
+  await settle();
+  assert.deepEqual(env.calls, []);
+  env.PTAds.setEnabled(true);
+  await settle();
+  assert.deepEqual(env.names(), ['requestConsentInfo', 'showConsentForm', 'initialize', 'showBanner']);
+});
+
+test('Serverfreigabe aus: Banner entfernen, Insets null, alte Events/Retry wirkungslos', async () => {
+  const env = makeEnv({ info: { status: 'OBTAINED', canRequestAds: true } });
+  env.PTAds.setBannerWanted(true);
+  await settle();
+  env.fire('bannerAdSizeChanged', { height: 50 });
+  assert.equal(env.inset(), '58px');
+  env.fire('bannerAdFailedToLoad', { code: 3 });
+  const retry = env.timers.at(-1);
+  retry.fn();
+  await settle();
+  const shows = env.count('showBanner');
+  env.PTAds.setEnabled(false);
+  await settle();
+  assert.equal(env.count('removeBanner'), 1);
+  const callsAfterRemoval = env.names();
+  env.fire('bannerAdLoaded', {});
+  env.fire('bannerAdSizeChanged', { height: 50 });
+  env.fire('bannerAdFailedToLoad', { code: 3 });
+  retry.fn();
+  env.online();
+  await env.PTAds.showPrivacyOptions();
+  await settle();
+  assert.deepEqual(env.names(), callsAfterRemoval);
+  assert.equal(env.count('showBanner'), shows);
+  assert.equal(env.inset(), '0px');
+  assert.equal(env.PTAds.privacyOptionsRequired(), false);
+});
+
+test('Widerruf der Serverfreigabe während UMP, Formular oder SDK-Start verwirft späte Antworten', async () => {
+  for (const stage of ['request', 'form', 'initialize', 'androidPrivacy']) {
+    let finish;
+    const wait = () => new Promise(resolve => { finish = resolve; });
+    const env = makeEnv({
+      platform: stage === 'androidPrivacy' ? 'android' : 'ios',
+      ...(stage === 'request' ? { requestInfo: wait } : {}),
+      ...(stage === 'form' ? { consentForm: wait } : {}),
+      ...(stage === 'initialize' ? { initialize: wait } : {}),
+      ...(stage === 'androidPrivacy' ? { disablePrivacy: wait } : {}),
+    });
+    env.PTAds.setBannerWanted(true);
+    await settle();
+    assert.equal(typeof finish, 'function', stage);
+    env.PTAds.setEnabled(false);
+    const before = env.names();
+    finish({ status: 'OBTAINED', canRequestAds: true, disabled: true });
+    await settle();
+    assert.deepEqual(env.names(), before, stage);
+    assert.equal(env.count('showBanner'), 0, stage);
+    assert.equal(env.PTAds.isEnabled(), false);
+  }
+});
+
+test('Schnelles Aus/Ein ignoriert eine alte positive UMP-Antwort und fragt neu', async () => {
+  let finishOld;
+  let requests = 0;
+  const env = makeEnv({ requestInfo: () => {
+    requests++;
+    return requests === 1 ? new Promise(resolve => { finishOld = resolve; })
+      : Promise.resolve({ status: 'REQUIRED', canRequestAds: false, isConsentFormAvailable: false });
+  } });
+  const old = env.PTAds.checkConsent();
+  env.PTAds.setEnabled(false);
+  env.PTAds.setEnabled(true);
+  assert.equal(await env.PTAds.checkConsent(), false);
+  finishOld({ status: 'OBTAINED', canRequestAds: true });
+  assert.equal(await old, false);
+  assert.equal(env.count('requestConsentInfo'), 2);
+  assert.equal(env.count('initialize'), 0);
+});
+
+test('Aus während Privacy-Dialog oder laufender Banneranfrage startet danach nichts neu', async () => {
+  let finishPrivacy;
+  const env = makeEnv({ info: { status: 'OBTAINED', canRequestAds: true },
+    privacyForm: () => new Promise(resolve => { finishPrivacy = resolve; }) });
+  env.PTAds.setBannerWanted(true);
+  await settle();
+  const privacy = env.PTAds.showPrivacyOptions();
+  await settle();
+  env.PTAds.setEnabled(false);
+  const before = env.names();
+  finishPrivacy();
+  await privacy;
+  await settle();
+  assert.deepEqual(env.names(), before);
+  assert.equal(env.inset(), '0px');
+
+  let finishBanner;
+  const pending = makeEnv({ info: { status: 'OBTAINED', canRequestAds: true },
+    showBanner: () => new Promise(resolve => { finishBanner = resolve; }) });
+  pending.PTAds.setBannerWanted(true);
+  await settle();
+  pending.PTAds.setEnabled(false);
+  finishBanner();
+  await settle();
+  assert.equal(pending.names().at(-1), 'removeBanner');
+  assert.equal(pending.inset(), '0px');
+  assert.equal(pending.count('showBanner'), 1);
+});
 
 test('Browser, fremde Plattform oder fehlendes Plugin: alles No-op', async () => {
   for (const opts of [{ native: false }, { native: null }, { platform: 'windows' }, { plugin: false }]) {

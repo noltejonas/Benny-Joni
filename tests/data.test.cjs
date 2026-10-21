@@ -191,6 +191,34 @@ async function signedInApi(opts = {}, windowExtra = {}) {
   return { api, calls: fake.calls, ...loaded };
 }
 
+test('getAdsEnabled: ausschließlich explizites Server-true erlaubt, ohne Session oder Cache', async () => {
+  let response = { data: { ads_enabled: true }, error: null };
+  const fake = fakeClient({ respond: (table, ops) => {
+    assert.equal(table, 'app_release_settings');
+    assert.deepEqual(ops.map(op => op.name), ['select', 'eq', 'maybeSingle']);
+    assert.deepEqual(ops[0].args, ['ads_enabled']);
+    assert.deepEqual(ops[1].args, ['id', 1]);
+    return response;
+  } });
+  const loaded = load({ window: { supabase: { createClient: () => fake.client } } });
+  const api = loaded.D.init({ url: 'u', key: 'k' });
+  assert.equal(await api.getAdsEnabled(), true);
+  for (const data of [null, {}, { ads_enabled: false }, { ads_enabled: 'true' }, { ads_enabled: 1 }]) {
+    response = { data, error: null };
+    assert.equal(await api.getAdsEnabled(), false);
+  }
+  response = { data: { ads_enabled: true }, error: { code: '42P01' } };
+  assert.equal(await api.getAdsEnabled(), false);
+  assert.ok(fake.calls.every(call => call.table === 'app_release_settings'));
+});
+
+test('getAdsEnabled: geworfener Netzfehler bleibt ausgeschaltet', async () => {
+  const fake = fakeClient({ respond: () => { throw new Error('offline'); } });
+  const loaded = load({ window: { supabase: { createClient: () => fake.client } } });
+  const api = loaded.D.init({ url: 'u', key: 'k' });
+  assert.equal(await api.getAdsEnabled(), false);
+});
+
 // ── Konto löschen ───────────────────────────────────────────────────────────
 
 test('deleteAccount: Profilbilder, RPC, lokal abmelden, Gerätedaten weg', async () => {

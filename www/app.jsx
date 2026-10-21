@@ -14,6 +14,51 @@ const TAB_KEY = 'pt:tab'; // zuletzt offener Tab (sessionStorage)
 const RESUME_RELOAD_MS = 20000; // Rückkehr aus dem Hintergrund: ab 20 s neu laden
 const QUICK_LOG_LOCK_MS = 700; // Schnellsatz: Sperre gegen Doppeltipp
 
+// Bei jedem Start und jeder Rückkehr frisch lesen; bis zur positiven Antwort
+// bleiben auch UMP und SDK aus. Weder Demo noch Offline-Cache können freigeben.
+function watchAdsRelease(api, eligible) {
+  let alive = true;
+  let request = 0;
+  const handles = [];
+  const disable = () => {
+    request++;
+    window.PTAds?.setEnabled(false);
+  };
+  const fetchAdsFlag = async () => {
+    disable();
+    const current = request;
+    if (!alive || !eligible || api?.mode === 'demo'
+        || document.visibilityState === 'hidden' || navigator.onLine === false) return;
+    let enabled = false;
+    try { enabled = (await api?.getAdsEnabled?.()) === true; } catch (_) {}
+    if (!alive || current !== request) return;
+    window.PTAds?.setEnabled(enabled);
+    if (enabled) window.PTAds?.checkConsent();
+  };
+  const visible = () => document.visibilityState === 'hidden' ? disable() : fetchAdsFlag();
+  fetchAdsFlag();
+  document.addEventListener('visibilitychange', visible);
+  window.addEventListener('online', fetchAdsFlag);
+  window.addEventListener('offline', disable);
+  (window.PTAppReady || Promise.resolve(null)).then(async (mod) => {
+    if (!alive || !mod?.App) return;
+    for (const [event, fn] of [['pause', disable], ['resume', fetchAdsFlag]]) {
+      try {
+        const handle = await mod.App.addListener(event, fn);
+        if (alive) handles.push(handle); else handle?.remove();
+      } catch (_) {}
+    }
+  });
+  return () => {
+    alive = false;
+    disable();
+    document.removeEventListener('visibilitychange', visible);
+    window.removeEventListener('online', fetchAdsFlag);
+    window.removeEventListener('offline', disable);
+    handles.forEach(handle => handle?.remove());
+  };
+}
+
 function readPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
 }
@@ -831,17 +876,20 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   layerRef.current = layer;
   const memberIdsRef = React.useRef(null);
 
-  // ── Werbung (www/ads.js, nur in der iOS-App) ─────────────────────────────
+  // ── Werbung (www/ads.js, iOS und Android) ────────────────────────────────
   // Erst nach dem Onboarding: nicht in der Demo (dort verlässt nichts das Gerät),
   // nicht während Einstiegs-Ebenen und bei neuen Leuten erst nach dem ersten Satz.
   // checkConsent() fragt dann nur still den Stand ab. Das Einwilligungsformular
   // kommt frühestens, wenn Feed oder Stats das Banner wollen.
   const adsOk = api?.mode !== 'demo' && !intro && !layer && (!newcomer || !!obState.firstLog);
-  useEffect(() => { if (adsOk) window.PTAds?.checkConsent(); }, [adsOk]);
+  useEffect(() => watchAdsRelease(api, adsOk), [api, adsOk]);
   useEffect(() => {
     window.PTAds?.setBannerWanted(adsOk && (tab === 'feed' || tab === 'history'));
   }, [adsOk, tab]);
-  useEffect(() => () => window.PTAds?.setBannerWanted(false), []);
+  useEffect(() => () => {
+    window.PTAds?.setBannerWanted(false);
+    window.PTAds?.setEnabled(false);
+  }, []);
 
   const weekTemplate = useMemo(() => {
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
