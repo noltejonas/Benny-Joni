@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Benny & Joni – Figuren</title>
+  <!-- Labor für die Onboarding-Figuren. Launch-Konfiguration „Figuren-Labor“
+       (serviert die Repo-Wurzel), dann /tools/figuren.html öffnen. -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../www/styles.css" />
+  <link rel="stylesheet" href="../www/redesign.css" />
+  <link rel="stylesheet" href="../www/onboarding.css" />
+  <style>
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+    .lab { max-width: 420px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+    .lab h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+    .lab-top { display: flex; justify-content: space-between; align-items: center; }
+    .lab-stage { position: relative; padding: 70px 0 22px; border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+    .lab-ruler { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--text-4); }
+    .lab-ruler span { position: absolute; right: 10px; top: -17px; font-size: 11px; font-weight: 700; color: var(--text-3); }
+    .lab-h { font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 -6px; }
+    .lab .ob-chip { background: var(--surface); box-shadow: var(--shadow); }
+    .lab .ob-chip.is-on { background: var(--primary); }
+    .lab .ob-chip:disabled { opacity: .4; }
+    .lab-small { display: flex; flex-direction: column; gap: 12px; padding: 28px 16px 16px; border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+  <script src="../www/onboarding-model.js"></script>
+  <script src="../www/figures/manifest.js"></script>
+  <script type="text/babel" src="../www/onboarding-figures.jsx"></script>
+  <script type="text/babel">
+    const POSES = [['idle', 'Stehen'], ['wave', 'Winken'], ['flex', 'Pumpen'], ['cheer', 'Jubeln'], ['point', 'Zeigen']];
+    const TALL = Number(new URLSearchParams(location.search).get('tall')) || 250;
+    const PAD = 22;
+    // Bildpfade im Manifest sind relativ zu www/
+    for (const who of Object.keys(window.PTFigures)) {
+      for (const p of Object.values(window.PTFigures[who])) p.src = '../www/' + p.src;
+    }
+
+    function Lab() {
+      const [b, setB] = React.useState('idle');
+      const [j, setJ] = React.useState('idle');
+      const [dark, setDark] = React.useState(false);
+      const [run, setRun] = React.useState(0);
+      React.useEffect(() => { document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); }, [dark]);
+      const has = (p) => PTFigures.benny[p] && PTFigures.joni[p];
+      const chip = (on, p, t, fn) => (
+        <button key={p} type="button" disabled={!has(p)} className={`ob-chip${on ? ' is-on' : ''}`} onClick={fn}>{t}</button>
+      );
+      return (
+        <div className="lab">
+          <div className="lab-top">
+            <h1>Benny & Joni</h1>
+            <button type="button" className="ob-chip" onClick={() => setDark(!dark)}>{dark ? 'Hell' : 'Dunkel'}</button>
+          </div>
+          <div className="lab-stage">
+            <div className="lab-ruler" style={{ bottom: PAD + TALL }}><span>Benny · 190 cm</span></div>
+            <div className="lab-ruler" style={{ bottom: PAD + TALL * 170 / 190 }}><span>Joni · 170 cm</span></div>
+            <ObDuo key={run} benny={b} joni={j} tall={TALL} tap enter />
+          </div>
+          <div className="ob-chips">{POSES.map(([p, t]) => chip(b === p && j === p, p, t, () => { setB(p); setJ(p); }))}</div>
+          <div className="lab-h">Einzeln</div>
+          <div className="ob-chips">{POSES.map(([p, t]) => chip(b === p, p, `Benny ${t.toLowerCase()}`, () => setB(p)))}</div>
+          <div className="ob-chips">{POSES.map(([p, t]) => chip(j === p, p, `Joni ${t.toLowerCase()}`, () => setJ(p)))}</div>
+          <div className="ob-chips"><button type="button" className="ob-chip" onClick={() => setRun(run + 1)}>Auftritt wiederholen</button></div>
+          <div className="lab-h">So klein im Onboarding</div>
+          <div className="lab-small">
+            <ObDuo benny={b} joni={j} tall={130} tap />
+            <button type="button" className="btn">Los geht’s</button>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Lab />);
+  </script>
+</body>
+</html>

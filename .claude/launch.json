@@ -8,6 +8,12 @@
       "port": 8000
     },
     {
+      "name": "Figuren-Labor",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8013", "."],
+      "port": 8013
+    },
+    {
       "name": "Projekt Terminator (legacy)",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8001", "Projekt Terminator"],

@@ -484,3 +484,52 @@
 
 .ob-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .ob-layer .ob-confetti { position: fixed; z-index: 5; }
+
+/* ─── Benny & Joni (onboarding-figures.jsx) ─────────────────────────────── */
+.ob-duo { display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
+.ob-fig {
+  --ob-fig-phase: 0s;
+  position: relative; display: inline-block; flex: none; padding: 0; border: 0; background: none;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+}
+button.ob-fig { cursor: pointer; }
+.ob-fig.is-joni { --ob-fig-phase: -1.1s; }
+.ob-fig-shadow {
+  position: absolute; left: 50%; bottom: -4px; width: 78%; height: 12px; margin-left: -39%;
+  border-radius: 50%; background: radial-gradient(closest-side, rgba(28, 27, 46, .28), rgba(28, 27, 46, 0));
+}
+[data-theme="dark"] .ob-fig-shadow { background: radial-gradient(closest-side, rgba(0, 0, 0, .6), rgba(0, 0, 0, 0)); }
+.ob-fig-in, .ob-fig-body { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.ob-fig-img {
+  position: absolute; left: 50%; max-width: none; pointer-events: none;
+  opacity: 0; transform-origin: 50% 100%; transition: opacity .12s linear;
+}
+.ob-fig-img.is-on { opacity: 1; animation: ob-fig-pop .5s cubic-bezier(.34, 1.56, .64, 1); }
+
+/* Bewegung pro Pose */
+.ob-fig[data-pose="idle"] .ob-fig-body { animation: ob-fig-breathe 3.4s ease-in-out var(--ob-fig-phase) infinite; }
+.ob-fig[data-pose="wave"] .ob-fig-body { animation: ob-fig-rock 1.1s ease-in-out var(--ob-fig-phase) infinite; }
+.ob-fig[data-pose="flex"] .ob-fig-body { animation: ob-fig-pump 1s ease-in-out .3s infinite; }
+.ob-fig[data-pose="cheer"] .ob-fig-body { animation: ob-fig-jump .9s cubic-bezier(.3, 0, .4, 1) var(--ob-fig-phase) infinite; }
+.ob-fig[data-pose="cheer"] .ob-fig-shadow { animation: ob-fig-shadow .9s cubic-bezier(.3, 0, .4, 1) var(--ob-fig-phase) infinite; }
+.ob-fig[data-pose="point"] .ob-fig-body { animation: ob-fig-nudge 1.2s ease-in-out var(--ob-fig-phase) infinite; }
+.ob-fig.is-enter .ob-fig-in { animation: ob-fig-enter .75s cubic-bezier(.34, 1.5, .55, 1) both; }
+.ob-fig.is-enter.is-joni .ob-fig-in { animation-delay: .14s; }
+
+@keyframes ob-fig-pop { 0% { transform: scale(.9, .94); } 55% { transform: scale(1.04, 1.03); } 100% { transform: none; } }
+@keyframes ob-fig-breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.012, 1.016) rotate(.6deg); } }
+@keyframes ob-fig-rock { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) translateY(-2px); } }
+@keyframes ob-fig-pump { 0%, 100% { transform: none; } 40%, 60% { transform: scale(1.045, 1.03); } }
+@keyframes ob-fig-jump {
+  0%, 100% { transform: scale(1.05, .93); }
+  20% { transform: scale(.97, 1.04); }
+  50% { transform: translateY(calc(var(--ob-fig-h) * -.09)); }
+  80% { transform: scale(1.03, .96); }
+}
+@keyframes ob-fig-shadow { 0%, 100% { transform: scale(1.05); } 50% { transform: scale(.65); opacity: .5; } }
+@keyframes ob-fig-nudge { 0%, 100% { transform: none; } 50% { transform: rotate(1.6deg) translateY(1px); } }
+@keyframes ob-fig-enter { from { opacity: 0; transform: translateY(36px) scale(.8); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-fig *, .ob-fig .ob-fig-img.is-on { animation: none !important; }
+}
