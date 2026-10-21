@@ -88,8 +88,20 @@
     if (type === 'bring_sally_up') {
       return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}${v >= SALLY_FULL_SECONDS ? ' ✓' : ''}`;
     }
-    if (type === 'tom_holland') return `${v} Runden`;
+    if (type === 'tom_holland') return trn(v, '{n} Runde', '{n} Runden');
     return String(v);
+  }
+
+  // Pflicht-Workouts speichern eine deutsche Notiz für alle Mitglieder
+  // („Zeit: 12:34“ bei Tom Holland, „3:10 von 3:24“ bei Bring Sally Up).
+  // Angezeigt wird sie in der App-Sprache; eigene Notizen bleiben, wie sie sind.
+  function noteText(note) {
+    if (!note) return note;
+    let m = /^Zeit: (\d+:\d{2})$/.exec(note);
+    if (m) return tr('Zeit: {time}', { time: m[1] });
+    m = /^(\d+:\d{2}) von (\d+:\d{2})$/.exec(note);
+    if (m) return tr('{time} von {total}', { time: m[1], total: m[2] });
+    return note;
   }
 
   // „2× · 3:00, 3:24 ✓“ für die Durchgänge einer Person, älteste zuerst.
@@ -136,6 +148,7 @@
         const share = shareOn(ch, participantCount);
         if (reps < share) out.push({
           athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
+          // i18n-ignore: `reason` ist nur intern, angezeigt wird aus rule_mode
           reason: ch.workout ? 'Pflicht-Workout fehlt' : `${share - reps} unter dem eigenen Anteil`,
         });
       }
@@ -151,23 +164,42 @@
     let failed = false, reason = '';
     if (mode === 'per_week_any') {
       failed = perCh.some(x => x.missed);
-      reason = failed ? `${perCh.filter(x => x.missed).length} Challenge(s) verfehlt` : '';
+      reason = failed ? `${perCh.filter(x => x.missed).length} Challenge(s) verfehlt` : ''; // i18n-ignore: nur intern
     } else if (mode === 'per_week_all') {
       failed = perCh.every(x => x.missed);
-      reason = failed ? 'alle Challenges verfehlt' : '';
+      reason = failed ? 'alle Challenges verfehlt' : ''; // i18n-ignore: nur intern
     } else { // per_week_aggregate — ein fehlendes Pflicht-Workout gleichen Wiederholungen nicht aus
       const repCh = perCh.filter(x => !x.ch.workout);
       const totalReps  = repCh.reduce((a, x) => a + x.reps, 0);
       const totalShare = repCh.reduce((a, x) => a + x.share, 0);
       const workoutMissed = perCh.some(x => x.ch.workout && x.missed);
       failed = totalReps < totalShare || workoutMissed;
+      // i18n-ignore: `reason` ist nur intern, angezeigt wird aus rule_mode
       reason = totalReps < totalShare ? `Insgesamt ${totalShare - totalReps} unter dem eigenen Anteil`
-        : workoutMissed ? 'Pflicht-Workout fehlt' : '';
+        : workoutMissed ? 'Pflicht-Workout fehlt' : ''; // i18n-ignore: nur intern
     }
 
     return failed
       ? [{ athlete, challenge_id: null, amount_cents: amount, rule_mode: mode, reason }]
       : [];
+  }
+
+  // ── Standard-Übungen ────────────────────────────────────────────────
+  // Die globalen Standard-Kategorien (competition_id null) heißen in der
+  // Datenbank deutsch. Beim Laden bekommt die Zeile den Namen in der
+  // App-Sprache; in die Datenbank geht nie ein übersetzter Name zurück.
+  // Eigene Kategorien einer Challenge bleiben, wie sie sind.
+  function localizeCategory(row) {
+    if (!row || row.competition_id != null) return row;
+    let name = null;
+    switch (row.name) {
+      case 'Liegestütze': name = tr('Liegestütze'); break;
+      case 'Klimmzüge': name = tr('Klimmzüge'); break;
+      case 'Kniebeugen': name = tr('Kniebeugen'); break;
+      case '20-Min-AMRAP': name = tr('20-Min-AMRAP'); break;
+      default: return row;
+    }
+    return name === row.name ? row : { ...row, name };
   }
 
   // ── Row normalisation ───────────────────────────────────────────────
@@ -192,31 +224,33 @@
   }
 
   const TEXT = {
-    exists: 'Für diese E-Mail gibt es schon einen Account.',
-    badEmail: 'Diese E-Mail-Adresse sieht nicht richtig aus.',
-    shortPassword: 'Passwort muss mindestens 6 Zeichen haben.',
-    weakPassword: 'Passwort zu schwach. Nimm ein anderes.',
-    rateLimit: 'Zu viele Versuche. Warte kurz und probier es dann nochmal.',
-    signupOff: 'Neue Konten sind gerade gesperrt.',
-    unconfirmed: 'E-Mail ist noch nicht bestätigt.',
-    credentials: 'E-Mail oder Passwort falsch.',
-    otp: 'Code ungültig oder abgelaufen.',
-    offline: 'Keine Verbindung. Prüf dein Internet.',
-    duplicate: 'Gibt es schon.',
-    invalid: 'Ungültiger Wert.',
-    noAccess: 'Keine Berechtigung – bist du noch in der Challenge?',
-    generic: 'Etwas ist schiefgelaufen. Versuch es nochmal.',
-    profilePending: 'Dein Profil wird noch angelegt. Versuch es gleich nochmal.',
-    hasSets: 'Für dieses Ziel gibt es schon Sätze. Ändere stattdessen die Zielmenge.',
-    categoryLocked: 'Die Übung lässt sich nicht mehr wechseln, es gibt schon Sätze.',
-    deleteFailed: 'Konto konnte nicht gelöscht werden. Prüfe deine Verbindung und versuch es nochmal.',
+    exists: tr('Für diese E-Mail gibt es schon einen Account.'),
+    badEmail: tr('Diese E-Mail-Adresse sieht nicht richtig aus.'),
+    shortPassword: tr('Passwort muss mindestens 6 Zeichen haben.'),
+    weakPassword: tr('Passwort zu schwach. Nimm ein anderes.'),
+    rateLimit: tr('Zu viele Versuche. Warte kurz und probier es dann nochmal.'),
+    signupOff: tr('Neue Konten sind gerade gesperrt.'),
+    unconfirmed: tr('E-Mail ist noch nicht bestätigt.'),
+    credentials: tr('E-Mail oder Passwort falsch.'),
+    otp: tr('Code ungültig oder abgelaufen.'),
+    offline: tr('Keine Verbindung. Prüf dein Internet.'),
+    duplicate: tr('Gibt es schon.'),
+    invalid: tr('Ungültiger Wert.'),
+    noAccess: tr('Keine Berechtigung – bist du noch in der Challenge?'),
+    generic: tr('Etwas ist schiefgelaufen. Versuch es nochmal.'),
+    profilePending: tr('Dein Profil wird noch angelegt. Versuch es gleich nochmal.'),
+    hasSets: tr('Für dieses Ziel gibt es schon Sätze. Ändere stattdessen die Zielmenge.'),
+    categoryLocked: tr('Die Übung lässt sich nicht mehr wechseln, es gibt schon Sätze.'),
+    deleteFailed: tr('Konto konnte nicht gelöscht werden. Prüfe deine Verbindung und versuch es nochmal.'),
   };
 
   // Mailversand (Bestätigung, Passwort-Reset) gescheitert; mit Support-Adresse,
   // sobald PTOnboarding.SUPPORT_EMAIL gesetzt ist.
   function mailText() {
     const mail = window.PTOnboarding?.SUPPORT_EMAIL;
-    return `Mail konnte gerade nicht verschickt werden. Versuch es später nochmal oder schreib uns${mail ? ` an ${mail}` : ''}.`;
+    return mail
+      ? tr('Mail konnte gerade nicht verschickt werden. Versuch es später nochmal oder schreib uns an {mail}.', { mail })
+      : tr('Mail konnte gerade nicht verschickt werden. Versuch es später nochmal oder schreib uns.');
   }
 
   // Eigene Fehler mit festem Code (z. B. 'has_sets'); auch demo.js baut sie hiermit.
@@ -237,7 +271,7 @@
       || /^(Auth|Storage|Functions|Postgrest)/.test(error.name || '');
   }
 
-  // Supabase-Fehler (Text oder `code`) → deutscher Text, `code` bleibt erhalten.
+  // Supabase-Fehler (Text oder `code`) → Text in der App-Sprache, `code` bleibt erhalten.
   // Netzfehler bekommen `code = 'offline'`. Unbekannte Roh-Fehler landen in der
   // Konsole, die Person sieht einen allgemeinen Satz statt englischem Fachtext.
   function friendlyError(error) {
@@ -246,12 +280,12 @@
     const code = error?.code || '';
     const wrap = (text, c = code) => { const e = new Error(text); e.code = c; e.friendly = true; return e; };
     const map = {
-      invalid_code: 'Code nicht gefunden.',
-      competition_full: 'Diese Challenge ist schon voll.',
-      team_full: 'Dieses Team ist schon voll.',
-      invalid_team: 'Ungültiges Team.',
-      forbidden: 'Das darf nur der Ersteller der Challenge.',
-      not_authenticated: 'Bitte zuerst anmelden.',
+      invalid_code: tr('Code nicht gefunden.'),
+      competition_full: tr('Diese Challenge ist schon voll.'),
+      team_full: tr('Dieses Team ist schon voll.'),
+      invalid_team: tr('Ungültiges Team.'),
+      forbidden: tr('Das darf nur der Ersteller der Challenge.'),
+      not_authenticated: tr('Bitte zuerst anmelden.'),
       'Invalid login credentials': TEXT.credentials,
       'User already registered': TEXT.exists,
       'Email not confirmed': TEXT.unconfirmed,
@@ -329,7 +363,7 @@
     let currentUserId = null;
     client.auth.onAuthStateChange((_evt, session) => { currentUserId = session?.user?.id || null; });
     const uid = () => {
-      if (!currentUserId) throw new Error('Bitte zuerst anmelden.');
+      if (!currentUserId) throw new Error(tr('Bitte zuerst anmelden.'));
       return currentUserId;
     };
 
@@ -394,6 +428,7 @@
           options: { data: name ? { display_name: name } : {} },
         }));
         if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          // i18n-ignore: Supabase-Fehlertext, wird oben in friendlyError übersetzt
           throw friendlyError({ message: 'User already registered', code: 'user_already_exists' });
         }
         return { session: data.session, user: data.user, needsConfirm: !data.session };
@@ -409,7 +444,7 @@
         currentUserId = null;
       },
       // Konto endgültig löschen (App Store 5.1.1(v)): Profilbilder, dann das Konto
-      // per RPC delete_my_account (Migration 20261021000000; Ausweichweg Edge Function
+      // per RPC delete_my_account (Migration 20261021000010; Ausweichweg Edge Function
       // delete-account), dann lokal abmelden und Gerätedaten entfernen. Die Oberfläche
       // lädt danach die Startseite neu.
       async deleteAccount() {
@@ -531,7 +566,7 @@
           members,
           challenges: challenges.map(normChallenge),
           sets: sets.map(withAthlete),
-          categories,
+          categories: categories.map(localizeCategory),
         };
       },
 
@@ -612,9 +647,10 @@
       },
 
       async getCategories() {
-        return check(await client.from('categories').select('*')
+        const rows = check(await client.from('categories').select('*')
           .or(`competition_id.is.null,competition_id.eq.${cid}`)
           .order('created_at'));
+        return (rows || []).map(localizeCategory);
       },
       async addCategory(name, emoji='💪', kind='sports') {
         const data = check(await client.from('categories')
@@ -625,14 +661,14 @@
       async updateCategory(id, patch) {
         const { data, error } = await client.from('categories').update(patch).eq('id', id).select();
         if (error) throw friendlyError(error);
-        if (!data?.length) throw new Error('Standard-Kategorien können nicht bearbeitet werden.');
+        if (!data?.length) throw new Error(tr('Standard-Kategorien können nicht bearbeitet werden.'));
         emit();
         return data[0];
       },
       async deleteCategory(id) {
         const { data, error } = await client.from('categories').delete().eq('id', id).select('id');
-        if (error) throw new Error(error.message.includes('foreign') ? 'Kategorie wird genutzt – nicht löschbar' : error.message);
-        if (!data?.length) throw new Error('Standard-Kategorien können nicht gelöscht werden.');
+        if (error) throw new Error(error.message.includes('foreign') ? tr('Kategorie wird genutzt – nicht löschbar') : error.message);
+        if (!data?.length) throw new Error(tr('Standard-Kategorien können nicht gelöscht werden.'));
         emit();
       },
 
@@ -750,7 +786,7 @@
           .limit(limit));
         return (data || []).map(s => {
           normSet(s);
-          return { ...s, category: s.challenge?.category, challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
+          return { ...s, category: localizeCategory(s.challenge?.category), challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
         });
       },
       async getAllSets() {
@@ -865,7 +901,7 @@
         const { error: clErr } = await client.from('week_closures')
           .insert({ week_start: weekStart, competition_id: cid, closed_by_user: uid() });
         if (clErr) {
-          if (clErr.code === '23505') throw new Error('Woche bereits abgeschlossen');
+          if (clErr.code === '23505') throw new Error(tr('Woche bereits abgeschlossen'));
           throw friendlyError(clErr);
         }
         const { penalties } = await api.previewWeekClose(weekStart);
@@ -993,9 +1029,9 @@
 
   // ── Gerätedaten nach dem Löschen des Kontos ─────────────────────────
   // Alle Schlüssel mit pt: und pt_ (Einladung, Onboarding-Stand, aktive Challenge,
-  // Push-Token, Timer, „Willkommen zurück“ …) plus die Schnellwerte. Das
-  // Erscheinungsbild gehört zum Gerät und bleibt.
-  const KEEP_LOCAL_KEYS = ['pt:theme2'];
+  // Push-Token, Timer, „Willkommen zurück“ …) plus die Schnellwerte. Erscheinungsbild
+  // und Sprache (pt:lang, i18n.js) gehören zum Gerät und bleiben.
+  const KEEP_LOCAL_KEYS = ['pt:theme2', 'pt:lang'];
   const isAppKey = (k) => (/^pt[:_]/.test(k) || k === 'quickSets') && !KEEP_LOCAL_KEYS.includes(k);
   function clearLocalData() {
     for (const name of ['localStorage', 'sessionStorage']) {
@@ -1027,7 +1063,7 @@
         try { context = ctx.componentStack || JSON.stringify(ctx); } catch (e) { context = String(ctx); }
       }
       const row = {
-        message: clip(err?.message || err, 500) || 'Unbekannt',
+        message: clip(err?.message || err, 500) || 'Unbekannt', // i18n-ignore: Protokoll, nicht sichtbar
         stack: clip(err?.stack, 4000),
         context: clip(context, 1000),
         url: clip(typeof location !== 'undefined' ? location.pathname : null, 300),
@@ -1055,7 +1091,7 @@
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
-    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, workoutSummary, workoutPeopleDone,
-    friendlyError, appError, clearLocalData,
+    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, workoutPeopleDone,
+    friendlyError, appError, clearLocalData, localizeCategory,
   };
 })();

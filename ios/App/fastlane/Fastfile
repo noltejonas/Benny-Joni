@@ -206,6 +206,8 @@ platform :ios do
       Bundler.with_unbundled_env do
         sh("npm", "ci")
         sh("npx", "cap", "sync", "ios")
+        # cap sync endet auch bei Hook-Fehlern mit Exit 0; das hier bricht ab
+        sh("node", "tools/build-web.cjs", "--verify")
       end
     end
 

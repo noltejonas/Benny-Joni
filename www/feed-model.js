@@ -195,25 +195,32 @@
   // mailto an den Support mit den IDs, die wir zum Prüfen brauchen. Leer,
   // solange keine Support-Adresse feststeht. Normalerweise übernimmt das
   // PTOnboarding.reportContent; das hier ist der Ersatz, falls es fehlt.
+  // Die Mail steht in der Sprache der meldenden Person (gleiche Etiketten wie
+  // PTOnboarding.reportText); IDs und Notiz bleiben, wie sie sind.
   function reportMailto({ kind = 'set', setId, userId, challengeId, note } = {}, email = '') {
     if (!email) return '';
+    const label = kind === 'set' ? tr('Eintrag im Feed') : kind;
     const facts = [
-      `Art: ${kind === 'set' ? 'Eintrag im Feed' : kind}`,
-      setId && `Satz-ID: ${setId}`,
-      userId && `User-ID: ${userId}`,
-      challengeId && `Challenge-ID: ${challengeId}`,
-      note && `Notiz: „${note}“`,
+      tr('Art: {label}', { label }),
+      setId && tr('Satz-ID: {id}', { id: setId }),
+      userId && tr('Nutzer-ID: {id}', { id: userId }),
+      challengeId && tr('Challenge-ID: {id}', { id: challengeId }),
+      note && tr('Notiz: „{note}“', { note }),
     ].filter(Boolean);
-    const body = ['Was stimmt mit dem Eintrag nicht?', '', '', '— Angaben für uns (bitte drinlassen) —', ...facts].join('\n');
-    return `mailto:${email}?subject=${encodeURIComponent('Meldung: Eintrag im Feed')}&body=${encodeURIComponent(body)}`;
+    const body = [tr('Was stimmt mit dem Eintrag nicht?'), '', '', tr('— Angaben für uns (bitte drinlassen) —'), ...facts].join('\n');
+    return `mailto:${email}?subject=${encodeURIComponent(tr('Meldung: {label}', { label }))}&body=${encodeURIComponent(body)}`;
   }
 
   // ── Teilen ───────────────────────────────────────────────────────────
-  // Texte für „Ergebnis teilen“ (WhatsApp & Co.). Link und Code nur, wenn
-  // vorhanden: appUrl kommt aus PTOnboarding.APP_STORE_URL, code ist der
-  // Einladungscode der Challenge.
+  // Texte für „Ergebnis teilen“ (WhatsApp & Co.), in der Sprache der teilenden
+  // Person. Link und Code nur, wenn vorhanden: appUrl kommt aus
+  // PTOnboarding.APP_STORE_URL, code ist der Einladungscode der Challenge.
   function shareFooter({ appName = 'Benny & Joni', appUrl = '', code = '' } = {}) {
-    const out = [`Mach mit bei ${appName}${appUrl ? `: ${appUrl}` : ''}`];
+    const out = [appUrl
+      ? tr('Mach mit bei {app}: {url}', { app: appName, url: appUrl })
+      : tr('Mach mit bei {app}', { app: appName })];
+    // „Code: …“ bleibt in jeder Sprache gleich: PTOnboarding.normalizeCode
+    // findet den Code ohne Link nur über dieses Etikett.
     if (code) out.push(`Code: ${String(code).toUpperCase()}`);
     return out.join('\n');
   }
@@ -221,39 +228,68 @@
   // recap aus buildWeekRecaps (app.jsx), sides wie dort: Seite 0 ist die eigene.
   // kw: Kalenderwoche, name: Name der Challenge. fmt formatiert Werte
   // (Work-Wochen: Dauer, dann unit leer lassen).
-  function recapShareText({ recap, sides = [], kw = null, name = '', unit = 'Reps', fmt = String, appName, appUrl, code }) {
+  function recapShareText({ recap, sides = [], kw = null, name = '', unit = trc('Einheit', 'Reps'), fmt = String, appName, appUrl, code }) {
     const totals = recap?.totals || [];
     const mine = totals[0] || 0;
     const tail = unit ? ` ${unit}` : '';
     const one = (a) => `${fmt(a)}${tail}`;
-    const pair = (a, b) => `${fmt(a)} zu ${fmt(b)}${tail}`;
+    const pair = (a, b) => tr('{a} zu {b}', { a: fmt(a), b: fmt(b) }) + tail;
     const many = (side) => (side?.userIds?.length || 0) > 1;
     let line;
     if (sides.length === 2) {
       const other = totals[1] || 0;
-      if (recap?.winnerIdx === 0) line = `${many(sides[0]) ? 'Wir haben' : 'Ich hab'} die Woche geholt: ${pair(mine, other)} 💪`;
-      else if (recap?.winnerIdx === 1) line = `${sides[1].label} ${many(sides[1]) ? 'haben' : 'hat'} die Woche geholt: ${pair(other, mine)}. Revanche läuft.`;
-      else line = `Unentschieden: ${pair(mine, other)}.`;
+      if (recap?.winnerIdx === 0) {
+        line = many(sides[0])
+          ? tr('Wir haben die Woche geholt: {score} 💪', { score: pair(mine, other) })
+          : tr('Ich hab die Woche geholt: {score} 💪', { score: pair(mine, other) });
+      } else if (recap?.winnerIdx === 1) {
+        const vars = { name: sides[1].label, score: pair(other, mine) };
+        line = many(sides[1])
+          ? tr('{name} haben die Woche geholt: {score}. Revanche läuft.', vars)
+          : tr('{name} hat die Woche geholt: {score}. Revanche läuft.', vars);
+      } else {
+        line = tr('Unentschieden: {score}.', { score: pair(mine, other) });
+      }
     } else if (sides.length > 2) {
       const rank = 1 + totals.filter((v) => v > mine).length;
-      line = `Platz ${rank} von ${sides.length} mit ${one(mine)}${rank === 1 ? ' 🏆' : '.'}`;
+      const vars = { rank, total: sides.length, value: one(mine) };
+      line = rank === 1
+        ? tr('Platz {rank} von {total} mit {value} 🏆', vars)
+        : tr('Platz {rank} von {total} mit {value}.', vars);
     } else {
-      line = `${one(mine)} diese Woche.`;
+      line = tr('{value} diese Woche.', { value: one(mine) });
     }
-    const head = `🏁 ${kw != null ? `KW ${kw}` : 'Wochenergebnis'}${name ? ` in „${name}“` : ''}`;
-    return [head, line, '', shareFooter({ appName, appUrl, code })].join('\n');
+    const title = kw != null
+      ? (name ? tr('KW {week} in „{name}“', { week: kw, name }) : tr('KW {week}', { week: kw }))
+      : (name ? tr('Wochenergebnis in „{name}“', { name }) : tr('Wochenergebnis'));
+    return [`🏁 ${title}`, line, '', shareFooter({ appName, appUrl, code })].join('\n');
   }
 
   // summary aus PTOnboarding.weekOneSummary. fmtMinutes für reine Work-Wochen.
   function weekOneShareText({ summary, fmtMinutes = (m) => `${m} min`, appName = 'Benny & Joni', appUrl, code }) {
     const s = summary || {};
-    const main = s.myMinutes && !s.myReps ? `${fmtMinutes(s.myMinutes)} Fokuszeit` : `${s.myReps || 0} Reps`;
-    const days = s.activeDays > 0 ? ` an ${s.activeDays} ${s.activeDays === 1 ? 'Tag' : 'Tagen'}` : '';
-    const result = s.result === 'won' ? (s.diff > 0 ? `Ich hab die Woche geholt, ${s.diff} vorne.` : 'Ich hab die Woche geholt.')
-      : s.result === 'lost' ? `${s.leader || 'Die anderen'} lag ${s.diff} vorne. Revanche läuft.`
-      : s.result === 'tie' ? 'Gleichstand. Woche 2 entscheidet.'
+    const days = s.activeDays > 0 ? s.activeDays : 0;
+    let main;
+    if (s.myMinutes && !s.myReps) {
+      const time = fmtMinutes(s.myMinutes);
+      main = days
+        ? trn(days, '{time} Fokuszeit an {n} Tag.', '{time} Fokuszeit an {n} Tagen.', { time })
+        : tr('{time} Fokuszeit.', { time });
+    } else {
+      const reps = s.myReps || 0;
+      main = days
+        ? trn(days, '{reps} Reps an {n} Tag.', '{reps} Reps an {n} Tagen.', { reps })
+        : tr('{reps} Reps.', { reps });
+    }
+    const result = s.result === 'won'
+      ? (s.diff > 0 ? tr('Ich hab die Woche geholt, {n} vorne.', { n: s.diff }) : tr('Ich hab die Woche geholt.'))
+      : s.result === 'lost'
+        ? (s.leader
+          ? tr('{name} lag {n} vorne. Revanche läuft.', { name: s.leader, n: s.diff })
+          : tr('Die anderen lagen {n} vorne. Revanche läuft.', { n: s.diff }))
+      : s.result === 'tie' ? tr('Gleichstand. Woche 2 entscheidet.')
       : '';
-    return [`🏁 Woche 1 bei ${appName} geschafft`, `${main}${days}.${result ? ` ${result}` : ''}`, '',
+    return [`🏁 ${tr('Woche 1 bei {app} geschafft', { app: appName })}`, [main, result].filter(Boolean).join(' '), '',
       shareFooter({ appName, appUrl, code })].join('\n');
   }
 

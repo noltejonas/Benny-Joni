@@ -104,6 +104,7 @@
     <ul>
       <li>Anzeigename, Profilfarbe und, wenn du willst, ein Profilfoto.</li>
       <li>Deine Haupt-Challenge und dein Fortschritt beim Einstieg in die App.</li>
+      <li>Die Sprache, in der du die App nutzt (Deutsch oder Englisch). Damit schicken wir dir Mitteilungen in dieser Sprache.</li>
     </ul>
     <p>
       Anzeigename, Farbe und Foto sehen die Mitglieder deiner Challenges.
@@ -141,13 +142,15 @@
     <p>
       Zugestellt werden Mitteilungen über den Apple Push Notification service (APNs) von Apple.
       Dafür übermitteln wir Apple den Push-Token und den Text der Mitteilung, zum Beispiel den Anzeigenamen einer anderen Person, den Namen der Challenge und eine Anzahl Wiederholungen.
+      Den Text schreiben wir in der Sprache deiner App (siehe 2.2).
       Ausschalten kannst du Mitteilungen jederzeit in den iOS-Einstellungen unter „Benny &amp; Joni“ → „Mitteilungen“.
       Beim Abmelden und beim Löschen des Kontos entfernen wir den Push-Token.
     </p>
 
     <h3>2.6 Daten nur auf deinem Gerät</h3>
     <p>
-      Die App speichert auf deinem Gerät deine Anmeldung (Sitzung), das Farbschema, deinen Fortschritt beim Einstieg, zuletzt geöffnete Ansichten und deine Blockliste.
+      Die App speichert auf deinem Gerät deine Anmeldung (Sitzung), das Farbschema, die gewählte Sprache, deinen Fortschritt beim Einstieg, zuletzt geöffnete Ansichten, deine Blockliste,
+      eine noch offene Einladung (höchstens 7 Tage), deine Schnellsatz-Werte, die Mitteilungs-Einstellung samt Push-Token und einen laufenden Arbeitszeit-Timer.
       Diese Daten bleiben auf dem Gerät. Sie sind unbedingt nötig, damit die App so funktioniert, wie du sie nutzt (§ 25 Abs. 2 Nr. 2 TDDDG).
       Ab Version 1.4.1 speichert der Einwilligungsdialog von Google dort außerdem deine Auswahl zur Werbung (Abschnitt 2.11).
     </p>
@@ -162,7 +165,7 @@
     <h3>2.8 Technische Fehlerberichte</h3>
     <p>
       Tritt in der App ein Fehler auf, kann sie eine kurze technische Meldung an unsere Datenbank schicken, höchstens fünf pro Sitzung:
-      Fehlertext, betroffene Stelle in der App, Zeitpunkt, App-Version und deine Nutzer-ID. Damit finden und beheben wir Fehler.
+      Fehlertext, technischer Ablauf (Stacktrace), betroffene Stelle in der App, Zeitpunkt, Geräte- und Systemangaben (User-Agent) und deine Nutzer-ID. Damit finden und beheben wir Fehler.
       Wir löschen diese Meldungen nach spätestens <mark class="todo">[BITTE AUSFÜLLEN: Löschfrist für Fehlerberichte, Vorschlag 90]</mark> Tagen.
     </p>
 

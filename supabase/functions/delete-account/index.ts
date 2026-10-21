@@ -7,7 +7,8 @@
 // löschen) → auth.admin.deleteUser mit dem Service-Key. Den Rest erledigt die
 // Kaskade über profiles. Die Antwort enthält keine Daten.
 //
-// Deploy (morgens, nur wenn nötig): supabase functions deploy delete-account
+// Deploy (morgens, nur wenn nötig):
+//   supabase functions deploy delete-account --project-ref jczyyupxxqrdgbeifcwe
 // SUPABASE_URL, SUPABASE_ANON_KEY und SUPABASE_SERVICE_ROLE_KEY setzt Supabase selbst.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";

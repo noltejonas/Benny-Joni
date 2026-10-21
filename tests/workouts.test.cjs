@@ -8,8 +8,10 @@ const vm = require('node:vm');
 function loadPTData() {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
-  const src = fs.readFileSync(path.join(__dirname, '..', 'www', 'data.js'), 'utf8');
-  vm.runInContext(src, ctx, { filename: 'data.js' });
+  for (const f of ['i18n.js', 'data.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+    vm.runInContext(src, ctx, { filename: f });
+  }
   return ctx.window.PTData;
 }
 const P = loadPTData();

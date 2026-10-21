@@ -8,7 +8,7 @@ const vm = require('node:vm');
 function load() {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
-  for (const f of ['data.js', 'feed-model.js']) {
+  for (const f of ['i18n.js', 'data.js', 'feed-model.js']) {
     const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
     vm.runInContext(src, ctx, { filename: f });
   }
@@ -137,7 +137,7 @@ function memoryStorage(initial = {}) {
 function loadWith(localStorage) {
   const ctx = { window: { localStorage }, console };
   vm.createContext(ctx);
-  for (const f of ['data.js', 'feed-model.js']) {
+  for (const f of ['i18n.js', 'data.js', 'feed-model.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8'), ctx, { filename: f });
   }
   return ctx.window.PTFeed;
@@ -197,7 +197,7 @@ test('reportMailto: mailto mit Betreff und IDs, leer ohne Adresse', () => {
   const q = new URLSearchParams(url.split('?')[1]);
   assert.equal(q.get('subject'), 'Meldung: Eintrag im Feed');
   const body = q.get('body');
-  for (const part of ['Satz-ID: s-1', 'User-ID: u-jonas', 'Challenge-ID: c-bj', 'blöder Spruch']) {
+  for (const part of ['Art: Eintrag im Feed', 'Satz-ID: s-1', 'Nutzer-ID: u-jonas', 'Challenge-ID: c-bj', 'blöder Spruch']) {
     assert.ok(body.includes(part), part);
   }
 });
@@ -236,4 +236,39 @@ test('weekOneShareText: Ergebnis, Tage und Fokuszeit', () => {
   assert.ok(lost.includes('Jonas lag 5 vorne. Revanche läuft.'));
   const work = F.weekOneShareText({ summary: { myReps: 0, myMinutes: 90, activeDays: 2, result: 'tie' }, fmtMinutes: () => '1:30 h' });
   assert.ok(work.includes('1:30 h Fokuszeit an 2 Tagen. Gleichstand. Woche 2 entscheidet.'));
+});
+
+// Wie auf einem englischen Gerät. Die Texte stehen hier selbst, damit der Test
+// nicht vom Stand von i18n/en.js abhängt.
+function loadEnglish() {
+  const ctx = { window: {}, console, navigator: { languages: ['en-GB'], language: 'en-GB' } };
+  vm.createContext(ctx);
+  for (const f of ['i18n.js', 'data.js', 'feed-model.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8'), ctx, { filename: f });
+  }
+  ctx.PTi18n.add('en', {
+    'Einheit|Reps': 'reps',
+    '{a} zu {b}': '{a} to {b}',
+    'Ich hab die Woche geholt: {score} 💪': 'I took the week: {score} 💪',
+    'KW {week} in „{name}“': 'W{week} in “{name}”',
+    'Mach mit bei {app}': 'Join me on {app}',
+    'Woche 1 bei {app} geschafft': 'Week 1 on {app} done',
+    '{reps} Reps an {n} Tagen.': { one: '{reps} reps on {n} day.', other: '{reps} reps on {n} days.' },
+    'Gleichstand. Woche 2 entscheidet.': 'Dead even. Week 2 decides.',
+  });
+  return { E: ctx.window.PTFeed, I: ctx.PTi18n };
+}
+
+test('Teilen-Texte in der Sprache der teilenden Person, „Code:“ bleibt gleich', () => {
+  const { E, I } = loadEnglish();
+  assert.equal(I.lang, 'en');
+  const won = E.recapShareText({ sides, kw: 43, name: 'Duel', recap: { totals: [312, 270], winnerIdx: 0 }, code: 'abc234' });
+  assert.equal(won, '🏁 W43 in “Duel”\nI took the week: 312 to 270 reps 💪\n\nJoin me on Benny & Joni\nCode: ABC234');
+  const one = E.weekOneShareText({ summary: { myReps: 30, activeDays: 1, result: 'tie' } });
+  assert.equal(one.split('\n')[1], '30 reps on 1 day. Dead even. Week 2 decides.');
+});
+
+test('weekOneShareText: ohne Namen der Führenden „Die anderen lagen …“', () => {
+  const lost = F.weekOneShareText({ summary: { myReps: 10, activeDays: 0, result: 'lost', diff: 5 } });
+  assert.equal(lost.split('\n')[1], '10 Reps. Die anderen lagen 5 vorne. Revanche läuft.');
 });

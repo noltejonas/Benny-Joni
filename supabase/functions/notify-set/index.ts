@@ -6,9 +6,12 @@ import {
   isFresh,
   isQuietHour,
   joinAlert,
+  localizedCategoryName,
   opponentsOf,
   PUSH_KIND,
   type PushKind,
+  type PushLang,
+  pushLang,
   reactionAlert,
   rivalAlert,
   rivalReached,
@@ -20,6 +23,8 @@ import {
 //   competition_members → „X ist dabei“ (Migration 20261021002000_social_push.sql)
 //   reactions           → Reaktion auf einen Satz (dieselbe Migration)
 // Regeln (Schwelle, Ruhezeit, Texte) stehen in ../_shared/push-rules.ts.
+// Texte kommen in der Sprache der Empfänger (profiles.language, Migration
+// 20261021000000_profile_language.sql). Ohne Eintrag oder ohne Spalte: Deutsch.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -41,7 +46,7 @@ interface Member {
   user_id: string;
   team: string | null;
   left_at: string | null;
-  profile: { display_name: string } | null;
+  profile: { display_name: string; language?: string | null } | null;
 }
 
 interface Competition {
@@ -52,13 +57,21 @@ interface Competition {
   archived_at: string | null;
 }
 
+interface Recipient {
+  user_id: string;
+  lang: PushLang;
+}
+
+const recipientOf = (m: Member): Recipient => ({ user_id: m.user_id, lang: pushLang(m.profile?.language) });
+
 // Was eine Verzweigung verschicken möchte. Empfänger werden in deliver()
-// noch auf Token und Tages-Obergrenze geprüft.
+// noch auf Token und Tages-Obergrenze geprüft. Den Text baut alert() je
+// Empfänger in dessen Sprache.
 interface PushJob {
   kind: PushKind;
   competition: Competition;
-  recipients: string[];
-  alert: Alert;
+  recipients: Recipient[];
+  alert: (lang: PushLang) => Alert;
   extra?: Record<string, unknown>;
 }
 
@@ -163,13 +176,13 @@ async function rivalJob(supabase: SupabaseClient, record: Record<string, unknown
   if (opponents.length === 0) return ignored("no_opponents");
 
   // 3. Nur wer heute in dieser Challenge noch bei 0 ist
-  const recipients: string[] = [];
+  const recipients: Recipient[] = [];
   for (const o of opponents) {
     const { data: n, error } = await supabase.rpc(
       "user_reps_today",
       { p_user: o.user_id, p_competition: set.competition_id },
     );
-    if (!error && (n ?? 0) === 0) recipients.push(o.user_id);
+    if (!error && (n ?? 0) === 0) recipients.push(recipientOf(o));
   }
   if (recipients.length === 0) return ignored("recipients_active");
 
@@ -177,12 +190,14 @@ async function rivalJob(supabase: SupabaseClient, record: Record<string, unknown
     kind: PUSH_KIND.rival,
     competition,
     recipients,
-    alert: rivalAlert({
-      senderName: sender?.profile?.display_name ?? "Jemand",
-      senderToday,
-      compName: competition.name,
-      compEmoji: competition.emoji,
-    }),
+    alert: (lang) =>
+      rivalAlert({
+        lang,
+        senderName: sender?.profile?.display_name ?? "",
+        senderToday,
+        compName: competition.name,
+        compEmoji: competition.emoji,
+      }),
     extra: { sender_id: set.user_id },
   };
 }
@@ -204,19 +219,21 @@ async function joinJob(supabase: SupabaseClient, record: Record<string, unknown>
   if (loaded instanceof Response) return loaded;
   const { competition, members } = loaded;
   const joiner = members.find((m) => m.user_id === row.user_id);
-  const recipients = members.filter((m) => !m.left_at && m.user_id !== row.user_id).map((m) => m.user_id);
+  const recipients = members.filter((m) => !m.left_at && m.user_id !== row.user_id).map(recipientOf);
   if (recipients.length === 0) return ignored("no_recipients");
 
   return {
     kind: PUSH_KIND.join,
     competition,
     recipients,
-    alert: joinAlert({
-      name: joiner?.profile?.display_name ?? "Jemand",
-      mode: competition.mode,
-      compName: competition.name,
-      compEmoji: competition.emoji,
-    }),
+    alert: (lang) =>
+      joinAlert({
+        lang,
+        name: joiner?.profile?.display_name ?? "",
+        mode: competition.mode,
+        compName: competition.name,
+        compEmoji: competition.emoji,
+      }),
   };
 }
 
@@ -234,7 +251,7 @@ async function reactionJob(supabase: SupabaseClient, record: Record<string, unkn
 
   const { data: set, error: setErr } = await supabase
     .from("sets")
-    .select("id, user_id, competition_id, reps, challenge:challenge_id(category:category_id(name, kind, challenge_type))")
+    .select("id, user_id, competition_id, reps, challenge:challenge_id(category:category_id(name, competition_id, kind, challenge_type))")
     .eq("id", reaction.set_id)
     .maybeSingle();
   if (setErr) return Response.json({ error: "set", detail: setErr.message }, { status: 500 });
@@ -254,15 +271,17 @@ async function reactionJob(supabase: SupabaseClient, record: Record<string, unkn
   return {
     kind: PUSH_KIND.reaction,
     competition,
-    recipients: [set.user_id],
-    alert: reactionAlert({
-      reactorName: reactor.profile?.display_name ?? "Jemand",
-      emoji: reaction.emoji,
-      amount: isReps ? set.reps : null,
-      unitName: isReps ? category?.name : null,
-      compName: competition.name,
-      compEmoji: competition.emoji,
-    }),
+    recipients: [recipientOf(owner)],
+    alert: (lang) =>
+      reactionAlert({
+        lang,
+        reactorName: reactor.profile?.display_name ?? "",
+        emoji: reaction.emoji,
+        amount: isReps ? set.reps : null,
+        unitName: isReps ? localizedCategoryName(category, lang) : null,
+        compName: competition.name,
+        compEmoji: competition.emoji,
+      }),
     extra: { set_id: set.id },
   };
 }
@@ -271,13 +290,19 @@ async function loadCompetition(
   supabase: SupabaseClient,
   competitionId: string,
 ): Promise<{ competition: Competition; members: Member[] } | Response> {
-  const [{ data: competition }, { data: members, error: memErr }] = await Promise.all([
-    supabase.from("competitions").select("id, name, emoji, mode, archived_at").eq("id", competitionId).maybeSingle(),
+  const fetchMembers = (profileCols: string) =>
     supabase.from("competition_members")
-      .select("user_id, team, left_at, profile:user_id(display_name)")
+      .select(`user_id, team, left_at, profile:user_id(${profileCols})`)
       .eq("competition_id", competitionId)
-      .is("left_at", null),
+      .is("left_at", null);
+  const [{ data: competition }, firstTry] = await Promise.all([
+    supabase.from("competitions").select("id, name, emoji, mode, archived_at").eq("id", competitionId).maybeSingle(),
+    fetchMembers("display_name, language"),
   ]);
+  // Ohne Spalte profiles.language (Migration noch nicht eingespielt) wie bisher
+  // laden; die Texte sind dann Deutsch.
+  let { data: members, error: memErr } = firstTry;
+  if (memErr && /language/.test(memErr.message)) ({ data: members, error: memErr } = await fetchMembers("display_name"));
   if (memErr || !competition) {
     return Response.json({ error: "members", detail: memErr?.message }, { status: 500 });
   }
@@ -291,13 +316,14 @@ async function deliver(supabase: SupabaseClient, job: PushJob) {
   const skipped: Record<string, number> = {};
   const skip = (reason: string) => { skipped[reason] = (skipped[reason] ?? 0) + 1; };
 
+  const userIds = job.recipients.map((r) => r.user_id);
   // Tokens BEFORE claiming the daily slot so we don't burn the slot when the
   // recipient has no device registered yet.
   const [{ data: tokens }, { data: sentToday }] = await Promise.all([
-    supabase.from("device_tokens").select("user_id, token, platform").in("user_id", job.recipients),
+    supabase.from("device_tokens").select("user_id, token, platform").in("user_id", userIds),
     // Obergrenze: höchstens eine Mitteilung pro Nutzer, Challenge und Tag, egal welcher Art.
     supabase.from("push_log").select("user_id")
-      .eq("competition_id", job.competition.id).eq("day", today).in("user_id", job.recipients),
+      .eq("competition_id", job.competition.id).eq("day", today).in("user_id", userIds),
   ]);
   const alreadyPushed = new Set((sentToday ?? []).map((r) => r.user_id));
 
@@ -306,7 +332,7 @@ async function deliver(supabase: SupabaseClient, job: PushJob) {
   const dead: string[] = [];
   const failures: Record<string, number> = {};
 
-  for (const userId of job.recipients) {
+  for (const { user_id: userId, lang } of job.recipients) {
     const iosTokens = (tokens ?? []).filter((t) => t.user_id === userId && t.platform === "ios").map((t) => t.token);
     if (iosTokens.length === 0) { skip("no_tokens"); continue; }
     if (alreadyPushed.has(userId)) { skip("already_sent_today"); continue; }
@@ -321,7 +347,7 @@ async function deliver(supabase: SupabaseClient, job: PushJob) {
 
     jwt ??= await buildApnsJwt({ keyId: APNS.keyId, teamId: APNS.teamId, privateKeyPem: APNS.privateKeyPem });
     const r = await sendToDevices(APNS, jwt, iosTokens, {
-      aps: { alert: job.alert, sound: "default" },
+      aps: { alert: job.alert(lang), sound: "default" },
       kind: job.kind,
       competition_id: job.competition.id,
       ...job.extra,

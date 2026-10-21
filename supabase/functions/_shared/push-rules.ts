@@ -165,6 +165,7 @@ export interface MemberRow extends MemberLike {
   joined_at?: string | null;
   display_name?: string | null;
   main_competition_id?: string | null;
+  language?: string | null; // profiles.language, bestimmt die Sprache der Erinnerung
 }
 
 // Wie PTData.participantsFor: wer bis Sonntag beigetreten und nicht vor Montag
@@ -192,6 +193,7 @@ export function opponentsOf<T extends MemberLike>(members: T[], userId: string, 
 
 export interface GoalCategory {
   name?: string | null;
+  competition_id?: string | null; // leer = Standard-Übung (Name wird übersetzt)
   emoji?: string | null;
   kind?: string | null;
   challenge_type?: string | null;
@@ -213,6 +215,102 @@ export function isRepGoal(goal: GoalRow): boolean {
     (goal.target_reps ?? 0) > 0;
 }
 
+// ── Sprache der Empfänger ────────────────────────────────────────────────────
+// Die App meldet ihre Sprache in profiles.language (Migration
+// 20261021000000_profile_language.sql, Codes wie in www/i18n.js). Ohne Eintrag,
+// ohne Spalte oder bei einer Sprache ohne Push-Texte: Deutsch wie bisher.
+// Neue Sprache: Eintrag in PUSH_TEXT (und STANDARD_CATEGORY_NAMES) ergänzen.
+export type PushLang = "de" | "en";
+export const PUSH_LANG_DEFAULT: PushLang = "de";
+
+export function pushLang(raw: string | null | undefined): PushLang {
+  const code = String(raw ?? "").trim().toLowerCase();
+  return Object.hasOwn(PUSH_TEXT, code) ? (code as PushLang) : PUSH_LANG_DEFAULT;
+}
+
+interface PushTexts {
+  someone: string;
+  yourChallenge: string;
+  yourRival: string;
+  reps: string;
+  and: string;
+  rivalTitle: (name: string) => string;
+  rivalBody: (n: number) => string;
+  dailyTitle: (comp: string) => string;
+  dailyBody: (rival: string, n: number) => string;
+  dailyBodyFirst: string;
+  lastCallTitle: (comp: string) => string;
+  lastCallBody: (list: string) => string;
+  joinTitle: (name: string) => string;
+  joinBodyDuel: string;
+  joinBodyGroup: string;
+  reactionAmount: (who: string, amount: number, unit: string) => string;
+  reactionSet: (who: string) => string;
+}
+
+// Gleiche Wortwahl wie in der App (www/i18n/en.js: British English, typografischer
+// Apostroph). Namen, Challenge-Namen und eigene Übungen bleiben, wie sie sind.
+export const PUSH_TEXT: Record<PushLang, PushTexts> = {
+  de: {
+    someone: "Jemand",
+    yourChallenge: "deine Challenge",
+    yourRival: "Dein Rivale",
+    reps: "Wiederholungen",
+    and: "und",
+    rivalTitle: (name) => `🔥 ${name} ist los`,
+    rivalBody: (n) => `Schon ${n} Reps heute — du noch bei 0.`,
+    dailyTitle: (comp) => `⏰ Heute noch nichts für ${comp}`,
+    dailyBody: (rival, n) => `${rival} hat schon ${n} Reps – zieh nach!`,
+    dailyBodyFirst: "Ein Satz reicht, um vorzulegen.",
+    lastCallTitle: (comp) => `⏳ Letzte Chance für ${comp}`,
+    lastCallBody: (list) => `Dir fehlen noch ${list} bis Mitternacht.`,
+    joinTitle: (name) => `🎉 ${name} ist dabei`,
+    joinBodyDuel: "Das Duell läuft. Leg los!",
+    joinBodyGroup: "Die Challenge läuft. Leg los!",
+    reactionAmount: (who, amount, unit) => `${who} hat auf deine ${amount} ${unit} reagiert.`,
+    reactionSet: (who) => `${who} hat auf deinen Satz reagiert.`,
+  },
+  en: {
+    someone: "Someone",
+    yourChallenge: "your challenge",
+    yourRival: "Your rival",
+    reps: "reps",
+    and: "and",
+    rivalTitle: (name) => `🔥 ${name} is on a roll`,
+    rivalBody: (n) => `Already ${n} ${n === 1 ? "rep" : "reps"} today — you’re still at 0.`,
+    dailyTitle: (comp) => `⏰ Nothing yet today for ${comp}`,
+    dailyBody: (rival, n) => `${rival} already has ${n} ${n === 1 ? "rep" : "reps"} – time to catch up!`,
+    dailyBodyFirst: "One set is all it takes to get ahead.",
+    lastCallTitle: (comp) => `⏳ Last chance for ${comp}`,
+    lastCallBody: (list) => `You still need ${list} before midnight.`,
+    joinTitle: (name) => `🎉 ${name} is in`,
+    joinBodyDuel: "The duel is on. Let’s go!",
+    joinBodyGroup: "The challenge is on. Let’s go!",
+    reactionAmount: (who, amount, unit) => `${who} reacted to your ${amount} ${unit}.`,
+    reactionSet: (who) => `${who} reacted to your set.`,
+  },
+};
+
+const textFor = (lang: string | null | undefined): PushTexts => PUSH_TEXT[pushLang(lang)];
+
+// Standard-Übungen (categories.competition_id leer) übersetzt die App beim Laden
+// (PTData.localizeCategory in www/data.js); hier dieselben Namen für Mitteilungen.
+// Eigene Übungen und andere Namen bleiben unverändert.
+export const STANDARD_CATEGORY_NAMES: Record<PushLang, Record<string, string>> = {
+  de: {},
+  en: { "Liegestütze": "Push-ups", "Klimmzüge": "Pull-ups", "Kniebeugen": "Squats", "20-Min-AMRAP": "20-min AMRAP" },
+};
+
+export function localizedCategoryName(
+  category: { name?: string | null; competition_id?: string | null } | null | undefined,
+  lang: string | null | undefined,
+): string {
+  const name = String(category?.name ?? "");
+  if (category?.competition_id != null) return name;
+  const names = STANDARD_CATEGORY_NAMES[pushLang(lang)];
+  return Object.hasOwn(names, name) ? names[name] : name;
+}
+
 // ── Texte ────────────────────────────────────────────────────────────────────
 export function cleanText(value: unknown, max = 40, fallback = ""): string {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -221,14 +319,15 @@ export function cleanText(value: unknown, max = 40, fallback = ""): string {
   return chars.length > max ? chars.slice(0, max - 1).join("") + "…" : text;
 }
 
-export function joinList(items: string[]): string {
+export function joinList(items: string[], and = PUSH_TEXT.de.and): string {
   if (items.length <= 1) return items[0] ?? "";
-  return `${items.slice(0, -1).join(", ")} und ${items[items.length - 1]}`;
+  return `${items.slice(0, -1).join(", ")} ${and} ${items[items.length - 1]}`;
 }
 
 interface CompText {
   compName: string;
   compEmoji?: string | null;
+  lang?: string | null; // Sprache der Empfänger, Standard Deutsch
 }
 
 function compLine({ compName, compEmoji }: CompText): string {
@@ -236,48 +335,52 @@ function compLine({ compName, compEmoji }: CompText): string {
 }
 
 export function rivalAlert(o: CompText & { senderName: string; senderToday: number }): Alert {
+  const t = textFor(o.lang);
   return {
-    title: `🔥 ${cleanText(o.senderName, 30, "Jemand")} ist los`,
+    title: t.rivalTitle(cleanText(o.senderName, 30, t.someone)),
     subtitle: compLine(o),
-    body: `Schon ${o.senderToday} Reps heute — du noch bei 0.`,
+    body: t.rivalBody(o.senderToday),
   };
 }
 
 export function dailyNudgeAlert(o: CompText & { rivalName?: string | null; rivalToday?: number }): Alert {
+  const t = textFor(o.lang);
   const n = o.rivalToday ?? 0;
   return {
-    title: `⏰ Heute noch nichts für ${cleanText(o.compName, 40, "deine Challenge")}`,
-    body: n > 0
-      ? `${cleanText(o.rivalName, 30, "Dein Rivale")} hat schon ${n} Reps – zieh nach!`
-      : "Ein Satz reicht, um vorzulegen.",
+    title: t.dailyTitle(cleanText(o.compName, 40, t.yourChallenge)),
+    body: n > 0 ? t.dailyBody(cleanText(o.rivalName, 30, t.yourRival), n) : t.dailyBodyFirst,
   };
 }
 
+// missing[].name ist schon in der Sprache der Empfänger (localizedCategoryName).
 export function lastCallAlert(o: CompText & { missing: { amount: number; name: string }[] }): Alert {
-  const items = o.missing.slice(0, 3).map((x) => `${x.amount} ${cleanText(x.name, 30, "Wiederholungen")}`);
+  const t = textFor(o.lang);
+  const items = o.missing.slice(0, 3).map((x) => `${x.amount} ${cleanText(x.name, 30, t.reps)}`);
   return {
-    title: `⏳ Letzte Chance für ${cleanText(o.compName, 40, "deine Challenge")}`,
-    body: `Dir fehlen noch ${joinList(items)} bis Mitternacht.`,
+    title: t.lastCallTitle(cleanText(o.compName, 40, t.yourChallenge)),
+    body: t.lastCallBody(joinList(items, t.and)),
   };
 }
 
 export function joinAlert(o: CompText & { name: string; mode: string }): Alert {
+  const t = textFor(o.lang);
   return {
-    title: `🎉 ${cleanText(o.name, 30, "Jemand")} ist dabei`,
+    title: t.joinTitle(cleanText(o.name, 30, t.someone)),
     subtitle: compLine(o),
-    body: o.mode === "1v1" ? "Das Duell läuft. Leg los!" : "Die Challenge läuft. Leg los!",
+    body: o.mode === "1v1" ? t.joinBodyDuel : t.joinBodyGroup,
   };
 }
 
+// unitName ist schon in der Sprache der Empfänger (localizedCategoryName).
 export function reactionAlert(o: CompText & { reactorName: string; emoji: string; amount?: number | null; unitName?: string | null }): Alert {
-  const who = cleanText(o.reactorName, 30, "Jemand");
-  const what = (o.amount ?? 0) > 1 && o.unitName
-    ? `deine ${o.amount} ${cleanText(o.unitName, 30)}`
-    : "deinen Satz";
+  const t = textFor(o.lang);
+  const who = cleanText(o.reactorName, 30, t.someone);
+  const amount = o.amount ?? 0;
+  const unit = cleanText(o.unitName, 30);
   return {
     title: `${cleanText(o.emoji, 8, "👏")} ${who}`,
     subtitle: compLine(o),
-    body: `${who} hat auf ${what} reagiert.`,
+    body: amount > 1 && unit ? t.reactionAmount(who, amount, unit) : t.reactionSet(who),
   };
 }
 
@@ -385,6 +488,7 @@ export function planNudges(input: NudgeInput): NudgePlan[] {
       const key = pushKey(me.user_id, c.id);
       if (pushed.has(key)) continue;
       const base = { user_id: me.user_id, competition_id: c.id, main: me.main_competition_id === c.id, name: c.name };
+      const lang = pushLang(me.language);
 
       if (input.kind === "daily") {
         if (todayAny.has(key)) continue;
@@ -396,17 +500,17 @@ export function planNudges(input: NudgeInput): NudgePlan[] {
         }
         candidates.push({
           ...base, kind: "daily", score: bestToday,
-          alert: dailyNudgeAlert({ ...comp, rivalName: best?.display_name, rivalToday: bestToday }),
+          alert: dailyNudgeAlert({ ...comp, lang, rivalName: best?.display_name, rivalToday: bestToday }),
         });
       } else {
         const missing = repGoals
           .map((g) => ({
             amount: fairShareOf(g.target_reps ?? 0, people) - (weekDone.get(pushKey(me.user_id, g.id)) ?? 0),
-            name: g.category?.name ?? "",
+            name: localizedCategoryName(g.category, lang),
           }))
           .filter((x) => x.amount > 0);
         if (!missing.length) continue;
-        candidates.push({ ...base, kind: "last_call", score: 0, alert: lastCallAlert({ ...comp, missing }) });
+        candidates.push({ ...base, kind: "last_call", score: 0, alert: lastCallAlert({ ...comp, lang, missing }) });
       }
     }
   }

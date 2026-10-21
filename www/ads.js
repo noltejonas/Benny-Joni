@@ -45,7 +45,7 @@
   const TEST_DEVICES = [];
   // Passend zur Altersfreigabe im App Store: 4+ General, 9+ ParentalGuidance,
   // 13+ Teen (Apple 2.5.18).
-  const MAX_AD_CONTENT_RATING = 'General';
+  const MAX_AD_CONTENT_RATING = 'General'; // i18n-ignore: AdMob-Wert, keine Anzeige
   // Nur nicht-personalisierte Anzeigen (npa=1): Trainingsdaten können als
   // Gesundheitsdaten gelten, deshalb kein Profiling für Werbung. Kein ATT.
   const NON_PERSONALIZED = true;
@@ -133,7 +133,7 @@
     if (!infoPromise) {
       infoPromise = requestInfo()
         .then((info) => (info?.canRequestAds ? startSdk() : false))
-        .catch((e) => { warn('Einwilligungsstand', e); infoPromise = null; return false; });
+        .catch((e) => { warn('Einwilligungsstand', e); infoPromise = null; return false; }); // i18n-ignore: nur Log
     }
     return infoPromise;
   }
@@ -152,7 +152,7 @@
       applyInfo({ ...info, ...after });
       return after?.canRequestAds ? startSdk() : false;
     } catch (e) {
-      warn('Einwilligungsformular', e);
+      warn('Einwilligungsformular', e); // i18n-ignore: nur Log
       return false;
     }
   }
@@ -170,7 +170,7 @@
         watchOverlays();
         syncBanner();
         return true;
-      })().catch((e) => { warn('Start', e); sdkPromise = null; return false; });
+      })().catch((e) => { warn('Start', e); sdkPromise = null; return false; }); // i18n-ignore: nur Log
     }
     return sdkPromise;
   }
@@ -243,7 +243,7 @@
     // Keine Anzeige: Das Plugin entfernt die Ansicht, also keine Lücke lassen
     // und später neu laden.
     await P.addListener(EV.failedToLoad, (err) => {
-      warn('Banner ohne Anzeige', err);
+      warn('Banner ohne Anzeige', err); // i18n-ignore: nur Log
       created = false;
       nativeHidden = false;
       bannerHeight = 0;
@@ -260,7 +260,7 @@
     try {
       await P.prepareRewardVideoAd({ adId: IDS.rewarded, ...requestOpts() });
     } catch (e) {
-      warn('Belohnungsvideo nicht geladen', e);
+      warn('Belohnungsvideo nicht geladen', e); // i18n-ignore: nur Log
       return false;
     }
     let rewarded = false;
@@ -284,7 +284,7 @@
       await P.showPrivacyOptionsForm();
       const info = await requestInfo();
       if (info?.canRequestAds && wanted) startSdk();
-    } catch (e) { warn('Datenschutzoptionen', e); }
+    } catch (e) { warn('Datenschutzoptionen', e); } // i18n-ignore: nur Log
   }
 
   window.PTAds = {

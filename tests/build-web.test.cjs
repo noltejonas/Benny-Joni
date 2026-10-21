@@ -25,6 +25,8 @@ function copyWww() {
     if (f === 'index.html' || /\.(js|jsx)$/.test(f)) fs.copyFileSync(path.join(WWW, f), path.join(dir, f));
   }
   fs.cpSync(path.join(WWW, 'vendor'), path.join(dir, 'vendor'), { recursive: true });
+  // Wörterbücher (i18n/en.js …) bindet index.html als klassische Skripte ein.
+  fs.cpSync(path.join(WWW, 'i18n'), path.join(dir, 'i18n'), { recursive: true });
   return dir;
 }
 
@@ -139,6 +141,10 @@ test('buildPublic: keine .jsx, kein Babel, defer-Skripte in derselben Reihenfolg
     assert.equal(fs.existsSync(path.join(dir, 'vendor', B.BABEL_FILE)), false);
     // Klassische Skripte (Daten, React) bleiben unverändert vor den defer-Skripten.
     assert.ok(out.indexOf('src="data.js"') < out.indexOf('src="tweaks-panel.js"'));
+    // tr() steht vor dem ersten Aufruf bereit: i18n.js, dann das Wörterbuch, dann data.js.
+    assert.ok(out.indexOf('src="i18n.js"') > 0);
+    assert.ok(out.indexOf('src="i18n.js"') < out.indexOf('src="i18n/en.js"'));
+    assert.ok(out.indexOf('src="i18n/en.js"') < out.indexOf('src="data.js"'));
     assert.deepEqual(B.verifyPublic(dir), []);
     // Ein zweiter Lauf ändert nichts.
     assert.equal(B.buildPublic(dir, path.join(WWW, 'vendor', B.BABEL_FILE)).files, 0);

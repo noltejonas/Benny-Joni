@@ -20,5 +20,8 @@
     "@capacitor/ios": "^8.3.3",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/push-notifications": "^8.0.4"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.29.0"
   }
 }

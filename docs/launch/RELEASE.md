@@ -34,8 +34,13 @@ Apple-ID aus dem Team angemeldet, Node und npm sind da.
    ```bash
    npx cap sync ios
    ```
-   Bricht das mit einer Meldung aus `tools/build-web.cjs` ab: nicht weiterbauen,
-   Meldung an Claude. Notlösung: in `package.json` die Zeile
+   Achtung: Scheitert der Hook, endet `npx cap sync ios` trotzdem mit „Sync
+   finished“, nur mit einer roten `[error]`-Zeile. Deshalb danach immer:
+   ```bash
+   node tools/build-web.cjs --verify
+   ```
+   Erwartet wird „… geprüft, alles in Ordnung“. Meldet es Probleme: nicht
+   weiterbauen, Meldung an Claude. Notlösung: in `package.json` die Zeile
    `"capacitor:copy:after"` entfernen und Schritt 3 wiederholen. Die App
    übersetzt dann wie bisher im Gerät (langsamerer Start, funktioniert aber).
 4. Kurz prüfen, dass nichts Unerwartetes geändert wurde:
@@ -133,9 +138,12 @@ bundle exec fastlane release submit:true        # zusätzlich zur Prüfung einre
    von Hand eintragen). Sonst nimmt sie die englischen Notizen aus
    `docs/launch/REVIEW_NOTES.md` und setzt `REVIEW_CODE` als Einladungscode ein.
 3. Baut genau wie `beta` (gemeinsame `build_ipa`-Lane: Build-Nummer aus
-   TestFlight + 1, `npm ci`, `npx cap sync ios`, Archiv, Export).
-4. Lädt Build, Texte, URLs, Copyright, Kategorie und Review-Daten hoch, legt die
-   Version 1.4 an bzw. benennt die vorbereitete um. Screenshots nicht.
+   TestFlight + 1, `npm ci`, `npx cap sync ios`, `node tools/build-web.cjs
+   --verify`, Archiv, Export). Die Prüfung bricht die Lane ab, wenn das
+   Vorkompilieren gescheitert ist.
+4. Lädt Build, Texte (alle Sprachordner, also `de-DE` und `en-GB`), URLs,
+   Copyright, Kategorie und Review-Daten hoch, legt die Version 1.4 an bzw.
+   benennt die vorbereitete um. Screenshots nicht.
 5. Veröffentlichung immer **manuell** nach der Freigabe, keine phasenweise
    Veröffentlichung. Mit `submit:true` reicht sie ein und zieht dabei eine noch
    wartende Einreichung zurück.
@@ -155,7 +163,8 @@ Verfügbarkeit, Screenshots, DSA-Händlerangaben.
 
 1. Fix auf `main`, Tests grün.
 2. In Xcode Version auf `1.4.1` erhöhen (Target App → General → Version).
-3. `ios/App/fastlane/metadata/de-DE/release_notes.txt` anpassen. Bei der ersten
+3. `ios/App/fastlane/metadata/de-DE/release_notes.txt` und
+   `ios/App/fastlane/metadata/en-GB/release_notes.txt` anpassen. Bei der ersten
    Version hat fastlane das Feld übersprungen, ab 1.4.1 wird es verwendet.
 4. Weg A oder `bundle exec fastlane release submit:true`.
 5. Jede neue Version geht wieder durch die Prüfung (meist schneller als die

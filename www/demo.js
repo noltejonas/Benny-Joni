@@ -35,7 +35,7 @@
     if (localStorage.getItem('pt_demo') !== '1') return;
   } catch (e) { return; }
 
-  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts, friendlyError, appError } = window.PTData;
+  const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts, friendlyError, appError, localizeCategory } = window.PTData;
   const DB_KEY = 'pt_demo_db_v1';
   const USER_KEY = 'pt_demo_user';
   const ME = 'u-benny';
@@ -43,8 +43,9 @@
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
   const DB_VERSION = 3;
   // Neutrale Namen statt Marken und Personen (catType bleibt 'tom_holland').
+  // i18n-ignore: Datenbank-Namen (Kategorie, Projekt-Tag)
   const TH_NAME = '20-Min-AMRAP';
-  const PROJECT_NAME = 'Side Project';
+  const PROJECT_NAME = 'Side Project'; // i18n-ignore: Datenbank-Name
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -61,12 +62,12 @@
     const id = (p) => `${p}-${++n}`;
 
     const profiles = [
-      ['u-benny', 'Benny', 'uploads/benny.jpg', COLORS[0]],
-      ['u-jonas', 'Jonas', 'uploads/jonas.jpg', COLORS[1]],
-      ['u-lea', 'Lea', null, COLORS[2]],
-      ['u-max', 'Max', null, COLORS[3]],
-      ['u-sara', 'Sara', null, COLORS[4]],
-      ['u-tim', 'Tim', null, COLORS[5]],
+      ['u-benny', 'Benny', 'uploads/benny.jpg', COLORS[0]], // i18n-ignore: Namen
+      ['u-jonas', 'Jonas', 'uploads/jonas.jpg', COLORS[1]], // i18n-ignore: Namen
+      ['u-lea', 'Lea', null, COLORS[2]], // i18n-ignore: Namen
+      ['u-max', 'Max', null, COLORS[3]], // i18n-ignore: Namen
+      ['u-sara', 'Sara', null, COLORS[4]], // i18n-ignore: Namen
+      ['u-tim', 'Tim', null, COLORS[5]], // i18n-ignore: Namen
     ].map(([pid, name, avatar, color]) => ({
       id: pid, display_name: name, avatar_url: avatar, color,
       main_competition_id: pid === ME ? 'c-bj' : null, created_at: addDays(monday, -60) + 'T08:00:00Z',
@@ -75,12 +76,15 @@
 
     const cat = (cid, name, emoji, kind = 'sports', type = 'standard') =>
       ({ id: cid, name, emoji, kind, challenge_type: type, competition_id: null, created_at: '2026-01-01T00:00:00Z' });
+    // Standard-Übungen wie in der Datenbank (deutsche Namen); übersetzt wird
+    // beim Laden über PTData.localizeCategory.
     const categories = [
+      // i18n-ignore: Datenbank-Namen der Standard-Übungen
       cat('cat-push', 'Liegestütze', '🤜'), cat('cat-pull', 'Klimmzüge', '🆙'), cat('cat-dips', 'Dips', '🔽'),
-      cat('cat-legs', 'Leg Raises', '🦵'), cat('cat-hspu', 'HSPU', '🤸'), cat('cat-sit', 'Sit-ups', '🧘'),
+      cat('cat-legs', 'Leg Raises', '🦵'), cat('cat-hspu', 'HSPU', '🤸'), cat('cat-sit', 'Sit-ups', '🧘'), // i18n-ignore: Übungsnamen
       cat('cat-th', TH_NAME, '🦸', 'sports', 'tom_holland'),
-      cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up'),
-      cat('cat-vibe', 'Vibe Coding', '💻', 'work'),
+      cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up'), // i18n-ignore: Übungsname
+      cat('cat-vibe', 'Vibe Coding', '💻', 'work'), // i18n-ignore: Übungsname
     ];
 
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
@@ -91,10 +95,10 @@
       created_by: owner, created_at: startOf(weeksBack) + 'T08:00:00Z',
     });
     const competitions = [
-      comp('c-bj', 'Benny vs Jonas', '💪', '1v1', 'BJ4K7X', { rotation: 1, penalties: 1, work: 1 }, 6, 'u-benny'),
-      comp('c-team', 'Büro-Duell', '🏢', '2v2', 'TEAM42', {}, 3, 'u-lea'),
-      comp('c-ffa', 'Freundeskreis', '🔥', 'ffa', 'FFA777', { penalties: 1 }, 3, 'u-benny'),
-      comp('c-run', 'Laufgruppe', '🏃', 'ffa', 'RUN555', {}, 2, 'u-tim'),
+      comp('c-bj', 'Benny vs Jonas', '💪', '1v1', 'BJ4K7X', { rotation: 1, penalties: 1, work: 1 }, 6, 'u-benny'), // i18n-ignore: Namen
+      comp('c-team', tr('Büro-Duell'), '🏢', '2v2', 'TEAM42', {}, 3, 'u-lea'),
+      comp('c-ffa', tr('Freundeskreis'), '🔥', 'ffa', 'FFA777', { penalties: 1 }, 3, 'u-benny'),
+      comp('c-run', tr('Laufgruppe'), '🏃', 'ffa', 'RUN555', {}, 2, 'u-tim'),
     ];
     const mem = (cid, uid, role, team, weeksBack) =>
       ({ competition_id: cid, user_id: uid, role, team, joined_at: startOf(weeksBack) + 'T08:00:00Z', left_at: null });
@@ -199,7 +203,7 @@
         }
       }
     }
-    const payouts = [{ id: id('po'), competition_id: 'c-bj', user_id: 'u-jonas', amount_cents: 500, note: 'Bar beim Training',
+    const payouts = [{ id: id('po'), competition_id: 'c-bj', user_id: 'u-jonas', amount_cents: 500, note: tr('Bar beim Training'),
       paid_at: addDays(monday, -10) + 'T18:00:00Z' }];
 
     const rotation_config = competitions.map(c => ({ competition_id: c.id, enabled: c.rotation_enabled, start_date: c.start_date }));
@@ -213,7 +217,7 @@
       profiles, categories, competitions, members, weekly_challenges, sets, reactions,
       penalty_config, penalties, week_closures, payouts, rotation_config, plan_slots,
       project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: PROJECT_NAME, emoji: '📁', created_at: monday }],
-      tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }],
+      tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }], // i18n-ignore: Tool-Name
       accounts: [{ email: 'benny@demo.local', user_id: ME }],
       v: DB_VERSION,
       seq: n,
@@ -256,7 +260,7 @@
     || (() => { try { return localStorage.getItem('pt_demo_offline') === '1'; } catch (e) { return false; } })();
   // Wie ein Netzaufruf: kurz warten, ohne Netz mit demselben Fehler wie Supabase scheitern.
   const later = (v) => new Promise((res, rej) => setTimeout(() => (
-    offline() ? rej(friendlyError(new TypeError('Failed to fetch'))) : res(clone(v))
+    offline() ? rej(friendlyError(new TypeError('Failed to fetch'))) : res(clone(v)) // i18n-ignore: Netzfehler-Text des Browsers
   ), 60));
   const local = (v) => Promise.resolve(clone(v));
   const fail = (message, code) => friendlyError(Object.assign(new Error(message), code ? { code } : {}));
@@ -291,7 +295,8 @@
 
   // Demo verlassen und die Startseite laden. pt:returning stammt aus der Demo-Session
   // und würde sonst „Willkommen zurück“ statt „Willkommen“ zeigen. `wipe`: wie ein
-  // gelöschtes Konto – Demo-Daten und alle Gerätedaten der App (außer Erscheinungsbild) weg.
+  // gelöschtes Konto – Demo-Daten und alle Gerätedaten der App (außer Erscheinungsbild
+  // und Sprache) weg.
   function leaveDemo({ wipe = false } = {}) {
     try {
       if (wipe) {
@@ -313,7 +318,7 @@
   });
 
   function createDemoAPI() {
-    const uid = () => { if (!session) throw new Error('Bitte zuerst anmelden.'); return session.user.id; };
+    const uid = () => { if (!session) throw new Error(tr('Bitte zuerst anmelden.')); return session.user.id; };
     const base = {
       mode: 'demo', client: null, mondayOf, isoDate,
 
@@ -325,7 +330,7 @@
         const mail = String(email || '').trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw fail('Unable to validate email address: invalid format', 'validation_failed');
         if (String(password || '').length < 6) throw fail('Password should be at least 6 characters.', 'weak_password');
-        if (db.accounts.some(a => a.email === mail)) throw fail('User already registered', 'user_already_exists');
+        if (db.accounts.some(a => a.email === mail)) throw fail('User already registered', 'user_already_exists'); // i18n-ignore: Supabase-Fehlertext
         // Eindeutig über Zurücksetzen hinweg (seq beginnt dann neu).
         const userId = `u-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         db.profiles.push({
@@ -437,7 +442,7 @@
           members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
           challenges: db.weekly_challenges.filter(c => set.has(c.competition_id)).map(normCh),
           sets: db.sets.filter(s => set.has(s.competition_id)).map(withAthlete),
-          categories: db.categories,
+          categories: db.categories.map(localizeCategory),
         });
       },
       async upsertDeviceToken() { return null; },
@@ -474,20 +479,20 @@
       async getCompetition() { return later(db.competitions.find(c => c.id === cid)); },
       async getMembers() { return later(membersOf(cid)); },
 
-      async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid)); },
+      async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid).map(localizeCategory)); },
       async addCategory(name, emoji = '💪', kind = 'sports') {
         const c = { id: newId('cat'), name, emoji, kind, challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
         db.categories.push(c); emit(); return later(c);
       },
       async updateCategory(id, patch) {
         const c = db.categories.find(x => x.id === id && x.competition_id === cid);
-        if (!c) throw new Error('Standard-Kategorien können nicht bearbeitet werden.');
+        if (!c) throw new Error(tr('Standard-Kategorien können nicht bearbeitet werden.'));
         Object.assign(c, patch); emit(); return later(c);
       },
       async deleteCategory(id) {
         const c = db.categories.find(x => x.id === id && x.competition_id === cid);
-        if (!c) throw new Error('Standard-Kategorien können nicht gelöscht werden.');
-        if (db.weekly_challenges.some(w => w.category_id === id)) throw new Error('Kategorie wird genutzt – nicht löschbar');
+        if (!c) throw new Error(tr('Standard-Kategorien können nicht gelöscht werden.'));
+        if (db.weekly_challenges.some(w => w.category_id === id)) throw new Error(tr('Kategorie wird genutzt – nicht löschbar'));
         db.categories = db.categories.filter(x => x.id !== id); emit();
       },
 
@@ -534,7 +539,7 @@
         const rows = mine('sets').sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
         return later(rows.map(s => {
           const ch = db.weekly_challenges.find(c => c.id === s.challenge_id);
-          const category = ch && db.categories.find(c => c.id === ch.category_id);
+          const category = ch && localizeCategory(db.categories.find(c => c.id === ch.category_id));
           return { ...withAthlete(s), challenge: ch ? { ...normCh(ch), category } : null, category,
             reactions: db.reactions.filter(r => r.set_id === s.id).map(withAthlete) };
         }));
@@ -587,7 +592,7 @@
         return { penalties: pens, cfg };
       },
       async closeWeek(ws) {
-        if (mine('week_closures').some(x => x.week_start === ws)) throw new Error('Woche bereits abgeschlossen');
+        if (mine('week_closures').some(x => x.week_start === ws)) throw new Error(tr('Woche bereits abgeschlossen'));
         db.week_closures.push({ competition_id: cid, week_start: ws, closed_by_user: uid(), created_at: new Date().toISOString() });
         const { penalties } = await api.previewWeekClose(ws);
         for (const p of penalties) db.penalties.push({ id: newId('p'), competition_id: cid, week_start: ws, user_id: p.athlete, challenge_id: p.challenge_id,
@@ -727,8 +732,9 @@
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'pt-demo-badge';
-    el.textContent = 'Demo · Eigene Challenge starten →';
-    el.addEventListener('click', () => leaveDemo());
+    el.textContent = tr('Demo · Eigene Challenge starten →');
+    // Liegt nah an ‚Workout starten‘: ein Fehltipp soll die Demo nicht beenden.
+    el.addEventListener('click', () => { if (confirm(tr('Demo beenden und eigene Challenge starten?'))) leaveDemo(); });
     el.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);z-index:60;' +
       // Tab-Leiste endet 84 px über dem Rand, .app-main hat 120 px Luft: dazwischen passt der Knopf.
       // --pt-ad-h: Höhe eines AdMob-Banners über der Tab-Leiste (www/ads.js), sonst 0.
