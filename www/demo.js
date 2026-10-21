@@ -323,7 +323,12 @@
       async signOut() { setSession(null, 'SIGNED_OUT'); },
       async resendSignup() { return later(null); },
       async requestPasswordReset() { return later(null); },
-      async resetPasswordWithCode() { return later(null); },
+      // Wie Supabase (verifyOtp mit type 'recovery'): Der Code meldet die Person an.
+      async resetPasswordWithCode({ email } = {}) {
+        await later(null);
+        const acc = db.accounts.find(a => a.email === String(email || '').trim().toLowerCase());
+        setSession(sessionFor(acc ? acc.user_id : ME), 'SIGNED_IN');
+      },
 
       async getMyProfile() { return later(db.profiles.find(p => p.id === uid())); },
       async updateProfile(patch) {

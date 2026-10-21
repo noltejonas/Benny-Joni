@@ -269,6 +269,8 @@ function App() {
       if (saved) { await api.deleteDeviceToken(saved).catch(() => {}); localStorage.removeItem('pt_apns_token'); }
     } catch (e) {}
     setSheet(null);
+    // Nach dem nächsten Anmelden auf „Heute“ starten, nicht im zuletzt offenen Tab.
+    try { sessionStorage.removeItem('pt:tab'); } catch (e) {}
     await api.signOut();
   }
 
