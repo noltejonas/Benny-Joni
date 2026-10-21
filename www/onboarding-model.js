@@ -53,23 +53,30 @@
   }
 
   // Inhalt melden (Apple 1.2): Mail an den Support mit allen IDs, ohne
-  // Adresse die Support-Seite. Liefert die geöffnete Adresse.
-  const REPORT_KINDS = {
-    set: 'Satz', note: 'Notiz', member: 'Person', user: 'Person', profile: 'Person',
-    photo: 'Profilfoto', avatar: 'Profilfoto', challenge: 'Challenge',
-  };
+  // Adresse die Support-Seite. Liefert die geöffnete Adresse. Die Mail steht
+  // in der Sprache der meldenden Person; IDs und Notiz bleiben, wie sie sind.
+  function reportLabel(kind) {
+    switch (kind) {
+      case 'set': return tr('Satz');
+      case 'note': return tr('Notiz');
+      case 'member': case 'user': case 'profile': return tr('Person');
+      case 'photo': case 'avatar': return tr('Profilfoto');
+      case 'challenge': return tr('Challenge');
+      default: return tr('Inhalt');
+    }
+  }
   function reportText({ kind, setId, userId, challengeId, note } = {}) {
-    const label = REPORT_KINDS[kind] || 'Inhalt';
+    const label = reportLabel(kind);
     const facts = [
-      `Art: ${label}`,
-      setId && `Satz-ID: ${setId}`,
-      userId && `Nutzer-ID: ${userId}`,
-      challengeId && `Challenge-ID: ${challengeId}`,
-      note && `Notiz: „${String(note).slice(0, 300)}“`,
+      tr('Art: {label}', { label }),
+      setId && tr('Satz-ID: {id}', { id: setId }),
+      userId && tr('Nutzer-ID: {id}', { id: userId }),
+      challengeId && tr('Challenge-ID: {id}', { id: challengeId }),
+      note && tr('Notiz: „{note}“', { note: String(note).slice(0, 300) }),
       `App: ${APP_NAME}`,
     ].filter(Boolean);
-    const body = ['Was ist passiert? Beschreib es kurz:', '', '', '––––––––', ...facts].join('\n');
-    return { subject: `Meldung: ${label}`, body };
+    const body = [tr('Was ist passiert? Beschreib es kurz:'), '', '', '––––––––', ...facts].join('\n');
+    return { subject: tr('Meldung: {label}', { label }), body };
   }
   function reportContent(info = {}) {
     const { subject, body } = reportText(info);
@@ -111,22 +118,34 @@
     if (fromLink) return fromLink;
     const compact = raw.replace(/[\s-]/g, '');
     if (compact.length === 6) return cleanCode(compact);
-    const labelled = raw.match(/code\s*[:=]?\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/i);
-    return labelled ? cleanCode(labelled[1]) : null;
+    // Strengstes Etikett zuerst: die eigene Zeile „Code: ABC234“ aus inviteText,
+    // dann „Code:“ irgendwo, zuletzt „Code ABC234“. Sonst gewinnt ein
+    // Challenge-Name wie „Code Sprint“, der vor der Code-Zeile steht.
+    const LABELS = [
+      /^\s*code\s*[:=]\s*([A-Za-z0-9]{6})\s*$/im,
+      /code\s*[:=]\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/i,
+      /code\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/i,
+    ];
+    for (const re of LABELS) {
+      const m = raw.match(re);
+      if (m) return cleanCode(m[1]);
+    }
+    return null;
   }
 
   function inviteLink(code) {
     return `${SCHEME}://join/${String(code || '').toUpperCase()}`;
   }
 
-  // Teilen-Text: Wer die App noch nicht hat, braucht Store-Link bzw. Namen;
-  // „Code:“ muss bleiben, daran erkennt normalizeCode den Code.
+  // Teilen-Text in der Sprache des Absenders. Wer die App noch nicht hat,
+  // braucht Store-Link bzw. Namen. Die Zeile „Code: …“ bleibt in jeder Sprache
+  // gleich, weil normalizeCode den Code ohne Link nur über dieses Etikett findet.
   function inviteText(competition) {
     const code = String(competition.invite_code || '').toUpperCase();
-    return `Komm in meine Challenge „${competition.name}“ bei ${APP_NAME} 💪\n`
-      + (APP_STORE_URL ? `App laden: ${APP_STORE_URL}\n` : `Im App Store: ${APP_NAME}\n`)
+    return tr('Komm in meine Challenge „{name}“ bei {app} 💪', { name: competition.name, app: APP_NAME }) + '\n'
+      + (APP_STORE_URL ? tr('App laden: {url}', { url: APP_STORE_URL }) : tr('Im App Store: {app}', { app: APP_NAME })) + '\n'
       + `Code: ${code}\n`
-      + `Schon installiert? ${inviteLink(code)}`;
+      + tr('Schon installiert? {link}', { link: inviteLink(code) });
   }
 
   // ── Einstieg ────────────────────────────────────────────────────────

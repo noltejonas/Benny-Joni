@@ -27,6 +27,12 @@ Regeln für alle Arten:
 - Anteil wie in der App (SHARE_BASIS): Wochenziel geteilt durch die echten Teilnehmer, sobald mindestens 2 aktiv sind, sonst durch die erwartete Besetzung (1v1: 2, 2v2: 4).
 - Die Daily-Erinnerung schickt pro Lauf höchstens eine Mitteilung pro Nutzer, auch bei mehreren Challenges (zuerst die Haupt-Challenge).
 
+- **Sprache der Empfänger:** Texte auf Englisch, wenn `profiles.language = 'en'`
+  (die App meldet ihre Sprache, Migration `20261021000000_profile_language.sql`),
+  sonst Deutsch. Beispiel Rivale: **🔥 Benny is on a roll** · 💪 Büro-Battle · Already 12 reps
+  today — you’re still at 0. Namen von Personen, Challenges und eigenen Übungen bleiben, wie sie
+  sind; Standard-Übungen (Liegestütze, Klimmzüge, Kniebeugen) werden übersetzt.
+
 Code: `supabase/functions/notify-set/index.ts`, `supabase/functions/daily-nudge/index.ts`.
 Alle Regeln und Texte stehen in `supabase/functions/_shared/push-rules.ts` und sind in
 `tests/push-rules.test.mjs` geprüft (`node --test tests/push-rules.test.mjs`).

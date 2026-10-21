@@ -179,6 +179,60 @@ test('Texte: Rivale wie im Vorab-Bildschirm, Erinnerungen kurz', () => {
   assert.equal(R.joinList(['a', 'b', 'c']), 'a, b und c');
 });
 
+test('pushLang: Sprache aus profiles.language, sonst Deutsch', () => {
+  assert.equal(R.pushLang('en'), 'en');
+  assert.equal(R.pushLang(' EN '), 'en');
+  assert.equal(R.pushLang('de'), 'de');
+  assert.equal(R.pushLang(null), 'de');
+  assert.equal(R.pushLang(undefined), 'de');
+  assert.equal(R.pushLang('fr'), 'de'); // keine Push-Texte → Deutsch
+  assert.equal(R.pushLang('constructor'), 'de');
+  // Jede Sprache hat alle Texte
+  assert.deepEqual(Object.keys(R.PUSH_TEXT.en).sort(), Object.keys(R.PUSH_TEXT.de).sort());
+});
+
+test('Texte auf Englisch: gleiche Platzhalter, Namen bleiben', () => {
+  assert.deepEqual(R.rivalAlert({ lang: 'en', senderName: 'Benny', senderToday: 12, compName: 'Büro-Battle', compEmoji: '💪' }), {
+    title: '🔥 Benny is on a roll', subtitle: '💪 Büro-Battle', body: 'Already 12 reps today — you’re still at 0.',
+  });
+  assert.equal(R.rivalAlert({ lang: 'en', senderName: '', senderToday: 10, compName: 'X' }).title, '🔥 Someone is on a roll');
+  assert.equal(R.rivalAlert({ senderName: '', senderToday: 10, compName: 'X' }).title, '🔥 Jemand ist los');
+  assert.deepEqual(R.dailyNudgeAlert({ lang: 'en', compName: 'Büro-Battle', rivalName: 'Joni', rivalToday: 40 }), {
+    title: '⏰ Nothing yet today for Büro-Battle', body: 'Joni already has 40 reps – time to catch up!',
+  });
+  assert.equal(R.dailyNudgeAlert({ lang: 'en', compName: 'X', rivalName: 'Joni', rivalToday: 1 }).body, 'Joni already has 1 rep – time to catch up!');
+  assert.equal(R.dailyNudgeAlert({ lang: 'en', compName: '', rivalToday: 0 }).title, '⏰ Nothing yet today for your challenge');
+  assert.equal(R.dailyNudgeAlert({ lang: 'en', compName: 'X', rivalToday: 0 }).body, 'One set is all it takes to get ahead.');
+  assert.deepEqual(
+    R.lastCallAlert({ lang: 'en', compName: 'X', missing: [{ amount: 20, name: 'Push-ups' }, { amount: 5, name: 'Dips' }, { amount: 3, name: '' }] }),
+    { title: '⏳ Last chance for X', body: 'You still need 20 Push-ups, 5 Dips and 3 reps before midnight.' },
+  );
+  assert.equal(R.joinAlert({ lang: 'en', name: 'Joni', mode: '1v1', compName: 'X' }).title, '🎉 Joni is in');
+  assert.equal(R.joinAlert({ lang: 'en', name: 'Joni', mode: '1v1', compName: 'X' }).body, 'The duel is on. Let’s go!');
+  assert.equal(R.joinAlert({ lang: 'en', name: 'Joni', mode: '2v2', compName: 'X' }).body, 'The challenge is on. Let’s go!');
+  assert.equal(
+    R.reactionAlert({ lang: 'en', reactorName: 'Joni', emoji: '🔥', amount: 25, unitName: 'Pull-ups', compName: 'X' }).body,
+    'Joni reacted to your 25 Pull-ups.',
+  );
+  assert.equal(R.reactionAlert({ lang: 'en', reactorName: 'Joni', emoji: '🔥', amount: 1, unitName: 'Pull-ups', compName: 'X' }).body, 'Joni reacted to your set.');
+  assert.equal(R.joinList(['a', 'b', 'c'], 'and'), 'a, b and c');
+});
+
+test('localizedCategoryName: nur Standard-Übungen werden übersetzt', () => {
+  assert.equal(R.localizedCategoryName({ name: 'Liegestütze', competition_id: null }, 'en'), 'Push-ups');
+  assert.equal(R.localizedCategoryName({ name: 'Klimmzüge' }, 'en'), 'Pull-ups');
+  assert.equal(R.localizedCategoryName({ name: 'Kniebeugen', competition_id: null }, 'en'), 'Squats');
+  assert.equal(R.localizedCategoryName({ name: '20-Min-AMRAP', competition_id: null }, 'en'), '20-min AMRAP');
+  assert.equal(R.localizedCategoryName({ name: '20-Min-AMRAP', competition_id: null }, 'de'), '20-Min-AMRAP');
+  assert.equal(R.localizedCategoryName({ name: 'Liegestütze', competition_id: null }, 'de'), 'Liegestütze');
+  assert.equal(R.localizedCategoryName({ name: 'Liegestütze', competition_id: null }, null), 'Liegestütze');
+  // Eigene Übung einer Challenge bleibt, wie sie ist
+  assert.equal(R.localizedCategoryName({ name: 'Liegestütze', competition_id: 'c1' }, 'en'), 'Liegestütze');
+  assert.equal(R.localizedCategoryName({ name: 'Dips', competition_id: null }, 'en'), 'Dips');
+  assert.equal(R.localizedCategoryName({ name: 'constructor', competition_id: null }, 'en'), 'constructor');
+  assert.equal(R.localizedCategoryName(null, 'en'), '');
+});
+
 test('Texte nennen weder den alten Namen noch Tom Holland', () => {
   const src = readFileSync(fn('_shared/push-rules.ts'), 'utf8')
     .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
@@ -307,6 +361,24 @@ test('last_call: offener Wochenanteil nach SHARE_BASIS', () => {
   assert.deepEqual(R.planNudges(p).map((x) => x.user_id), ['b']);
 });
 
+test('Erinnerungen in der Sprache der Empfänger (profiles.language)', () => {
+  const p = base({ members: [member('c1', 'a', { language: 'en' }), member('c1', 'b')] });
+  assert.deepEqual(R.planNudges(p), [{
+    user_id: 'a', competition_id: 'c1', kind: 'daily',
+    alert: { title: '⏰ Nothing yet today for C-c1', body: 'B already has 15 reps – time to catch up!' },
+  }]);
+  // last_call: Standard-Übung übersetzt, eigene Übung nicht; ohne Sprache Deutsch
+  const lc = base({
+    kind: 'last_call', today: '2026-10-25',
+    members: [member('c1', 'a', { language: 'en' }), member('c1', 'b', { language: null })],
+    goals: [goal('g1', 'c1', 100, { competition_id: null }), goal('g4', 'c1', 20, { name: 'Dips', competition_id: 'c1' })],
+  });
+  assert.deepEqual(R.planNudges(lc).map((x) => [x.user_id, x.alert.title, x.alert.body]), [
+    ['a', '⏳ Last chance for C-c1', 'You still need 30 Push-ups and 10 Dips before midnight.'],
+    ['b', '⏳ Letzte Chance für C-c1', 'Dir fehlen noch 35 Liegestütze und 10 Dips bis Mitternacht.'],
+  ]);
+});
+
 test('last_call: allein gerechnet mit erwarteter Besetzung, ausgetretene zählen in der Woche mit', () => {
   // Allein in 1v1: Anteil = 100 / 2
   const solo = base({ kind: 'last_call', today: '2026-10-25', tokenUsers: ['a'], members: [member('c1', 'a')], sets: [] });
@@ -362,6 +434,19 @@ test('notify-set: Schwelle aus Env, Antwort ohne Empfänger und Tageswert', () =
   }
   // Ruhezeit vor dem Anlegen des Clients, also vor jedem push_log-Insert
   assert.ok(src.indexOf('isQuietHour(') < src.indexOf('createClient(SUPABASE_URL'));
+  // Texte je Empfänger in dessen Sprache, mit Ausweichweg ohne Spalte profiles.language
+  assert.match(src, /fetchMembers\("display_name, language"\)/);
+  assert.match(src, /fetchMembers\("display_name"\)/);
+  assert.match(src, /alert: job\.alert\(lang\)/);
+  assert.doesNotMatch(src, /"Jemand"/);
+});
+
+test('daily-nudge: Sprache der Empfänger, ohne Spalte profiles.language wie bisher', () => {
+  const src = readFileSync(fn('daily-nudge/index.ts'), 'utf8');
+  assert.match(src, /loadMembers\("display_name, main_competition_id, language"\)/);
+  assert.match(src, /loadMembers\("display_name, main_competition_id"\)/);
+  assert.match(src, /language: m\.profile\?\.language \?\? null/);
+  assert.match(src, /category:category_id\(name, competition_id,/);
 });
 
 test('daily-nudge: im DRY_RUN kein Versand und kein push_log', () => {

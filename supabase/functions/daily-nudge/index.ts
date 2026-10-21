@@ -25,6 +25,9 @@ import {
 // „Letzte Chance“, sonst passiert nichts. Wer was bekommt, entscheidet
 // planNudges() in ../_shared/push-rules.ts.
 //
+// Texte kommen in der Sprache der Empfänger (profiles.language, Migration
+// 20261021000000_profile_language.sql); ohne Eintrag oder ohne Spalte Deutsch.
+//
 // DRY_RUN ist Standard: Dann werden nur die Kandidaten geloggt (Edge Functions →
 // daily-nudge → Logs), es wird nichts verschickt und nichts in push_log
 // geschrieben. Scharf schalten mit dem Secret DRY_RUN=false.
@@ -139,10 +142,11 @@ async function loadAndPlan(supabase: SupabaseClient, kind: NudgeKind, today: str
   )).filter((c) => isRunning(c, today));
 
   // 3. Ziele dieser Woche (week_start = Montag in Berlin) mit Kategorie
+  //    (competition_id der Kategorie: leer = Standard-Übung, Name wird übersetzt)
   const goals = await inChunks(competitions.map((c) => c.id), (ids) =>
     fetchAll<GoalRow>((from, to) =>
       supabase.from("weekly_challenges")
-        .select("id, competition_id, target_reps, category:category_id(name, emoji, kind, challenge_type)")
+        .select("id, competition_id, target_reps, category:category_id(name, competition_id, emoji, kind, challenge_type)")
         .in("competition_id", ids).eq("week_start", weekStart)
         .order("id").range(from, to)
     )
@@ -155,21 +159,31 @@ async function loadAndPlan(supabase: SupabaseClient, kind: NudgeKind, today: str
   if (!relevantComps.length) return { plans: [] as NudgePlan[], tokensByUser, stats };
 
   // 4. Alle Mitglieder dieser Challenges, auch ausgetretene (Teilnehmer der Woche)
-  const memberRows = await inChunks(relevantComps.map((c) => c.id), (ids) =>
-    fetchAll<{
-      competition_id: string;
-      user_id: string;
-      team: string | null;
-      joined_at: string | null;
-      left_at: string | null;
-      profile: { display_name: string | null; main_competition_id: string | null } | null;
-    }>((from, to) =>
-      supabase.from("competition_members")
-        .select("competition_id, user_id, team, joined_at, left_at, profile:user_id(display_name, main_competition_id)")
-        .in("competition_id", ids)
-        .order("competition_id").order("user_id").range(from, to)
-    )
-  );
+  const loadMembers = (profileCols: string) =>
+    inChunks(relevantComps.map((c) => c.id), (ids) =>
+      fetchAll<{
+        competition_id: string;
+        user_id: string;
+        team: string | null;
+        joined_at: string | null;
+        left_at: string | null;
+        profile: { display_name: string | null; main_competition_id: string | null; language?: string | null } | null;
+      }>((from, to) =>
+        supabase.from("competition_members")
+          .select(`competition_id, user_id, team, joined_at, left_at, profile:user_id(${profileCols})`)
+          .in("competition_id", ids)
+          .order("competition_id").order("user_id").range(from, to)
+      )
+    );
+  let memberRows: Awaited<ReturnType<typeof loadMembers>>;
+  try {
+    memberRows = await loadMembers("display_name, main_competition_id, language");
+  } catch (e) {
+    // Ohne Spalte profiles.language (Migration noch nicht eingespielt) wie bisher
+    // laden; die Texte sind dann Deutsch.
+    if (!/language/.test(String((e as Error)?.message ?? e))) throw e;
+    memberRows = await loadMembers("display_name, main_competition_id");
+  }
   const members: MemberRow[] = memberRows.map((m) => ({
     competition_id: m.competition_id,
     user_id: m.user_id,
@@ -178,6 +192,7 @@ async function loadAndPlan(supabase: SupabaseClient, kind: NudgeKind, today: str
     left_at: m.left_at,
     display_name: m.profile?.display_name ?? null,
     main_competition_id: m.profile?.main_competition_id ?? null,
+    language: m.profile?.language ?? null,
   }));
 
   // 5. Sätze zu den Zielen dieser Woche (Wochenanteil und „heute schon was?“)

@@ -69,6 +69,27 @@
     (function () {
       var LIMIT_MS = 15000;
       var shown = false;
+      // Sprache wie in i18n.js (Einstellung pt:lang, sonst Gerätesprache, sonst
+      // Englisch). i18n.js lädt erst nach den Bibliotheken, deshalb stehen die
+      // wenigen Texte für Platzhalter und Notfallansicht hier selbst.
+      var lang = (function () {
+        var ok = { de: 1, en: 1 };
+        try { var pref = localStorage.getItem('pt:lang'); if (ok[pref]) return pref; } catch (e) {}
+        var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+        for (var i = 0; i < tags.length; i++) {
+          var base = String(tags[i] || '').toLowerCase().split(/[-_]/)[0];
+          if (ok[base]) return base;
+        }
+        return 'en';
+      })();
+      var TEXT = lang === 'de'
+        ? { start: 'Starte…', fail: 'App konnte nicht starten. Prüfe deine Verbindung.', reload: 'Neu laden' }
+        : { start: 'Starting…', fail: 'The app couldn’t start. Check your connection.', reload: 'Reload' };
+      try {
+        document.documentElement.lang = lang;
+        var label = document.querySelector('#pt-boot .pt-boot-text');
+        if (label) label.textContent = TEXT.start;
+      } catch (e) {}
       function stuck() {
         var root = document.getElementById('root');
         return !!document.getElementById('pt-boot') || (root && root.childElementCount === 0);
@@ -81,8 +102,8 @@
         root.innerHTML =
           '<div id="pt-boot-fail" class="pt-boot" role="alert">' +
             '<div class="pt-boot-name">Benny &amp; Joni</div>' +
-            '<p class="pt-boot-msg">App konnte nicht starten. Prüfe deine Verbindung.</p>' +
-            '<button type="button" class="pt-boot-btn">Neu laden</button>' +
+            '<p class="pt-boot-msg">' + TEXT.fail + '</p>' +
+            '<button type="button" class="pt-boot-btn">' + TEXT.reload + '</button>' +
           '</div>';
         root.querySelector('button').addEventListener('click', function () { location.reload(); });
         window.addEventListener('online', function () {
@@ -128,6 +149,10 @@
   <script src="vendor/react-18.3.1.production.min.js"></script>
   <script src="vendor/react-dom-18.3.1.production.min.js"></script>
   <script src="vendor/babel-standalone-7.29.0.min.js"></script>
+
+  <!-- Sprachen: vor allem anderen, damit tr() überall bereitsteht -->
+  <script src="i18n.js"></script>
+  <script src="i18n/en.js"></script>
 
   <!-- Data layer -->
   <script src="data.js"></script>

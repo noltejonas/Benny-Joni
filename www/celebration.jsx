@@ -1,4 +1,4 @@
-/* global React */
+/* global React, tr, PTi18n */
 /* eslint-disable no-unused-vars */
 
 // Hook: detect unseen goal crossings + provide persistent style.
@@ -217,7 +217,7 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
         const eased = 1 - Math.pow(1 - p, 3);
         v = Math.round(eased * target);
       } else v = target;
-      counterEl.textContent = v.toLocaleString('de-DE');
+      counterEl.textContent = PTi18n.number(v);
       if (elapsed < COUNT_DELAY + COUNT_DURATION) {
         rafId = requestAnimationFrame(tickCounter);
       }
@@ -282,7 +282,8 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
     }
   }, [skipping, onDone]);
 
-  const targetFormatted = (targetReps || 0).toLocaleString('de-DE');
+  const targetFormatted = PTi18n.number(targetReps || 0);
+  const unit = category?.name || tr('Reps');
 
   return (
     <div
@@ -308,16 +309,16 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
           <div className="cel-halo cel-halo-2">🔥</div>
           <div className="cel-halo cel-halo-3">⚡</div>
           <div className="cel-halo cel-halo-4">🏆</div>
-          <div className="cel-hero-text">ZIEL<br/>ERREICHT</div>
+          <div className="cel-hero-text">{tr('ZIEL{br}ERREICHT', { br: <br/> })}</div>
         </div>
         <div className="cel-counter-row">
           <span className="cel-counter-num" data-target={targetReps}>0</span>
-          <span className="cel-counter-of">/ {targetFormatted} {category?.name || 'Reps'}</span>
+          <span className="cel-counter-of">/ {targetFormatted} {unit}</span>
         </div>
-        <div className="cel-subtext">{category?.emoji || '🏆'} {targetFormatted} {category?.name || 'Reps'} geknackt</div>
+        <div className="cel-subtext">{category?.emoji || '🏆'} {tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</div>
       </div>
 
-      <div className="cel-skip-hint">tap zum Überspringen</div>
+      <div className="cel-skip-hint">{tr('tap zum Überspringen')}</div>
     </div>
   );
 }

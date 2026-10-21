@@ -24,8 +24,11 @@ function load({ window: extra = {} } = {}) {
   const quietConsole = { ...console, error: (...a) => errors.push(a), warn: () => {} };
   const ctx = { window: { ...extra }, console: quietConsole, setTimeout, clearTimeout };
   vm.createContext(ctx);
-  const src = fs.readFileSync(path.join(__dirname, '..', 'www', 'data.js'), 'utf8');
-  vm.runInContext(src, ctx, { filename: 'data.js' });
+  // i18n.js zuerst (tr/trn, ohne Gerätesprache bleibt es Deutsch), dann data.js
+  for (const f of ['i18n.js', 'data.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+    vm.runInContext(src, ctx, { filename: f });
+  }
   return { D: ctx.window.PTData, win: ctx.window, errors };
 }
 
@@ -114,15 +117,15 @@ test('Strafgründe ohne Fachbegriffe', () => {
 
 // ── Gerätedaten ─────────────────────────────────────────────────────────────
 
-test('clearLocalData entfernt App-Schlüssel, das Erscheinungsbild bleibt', () => {
+test('clearLocalData entfernt App-Schlüssel, Erscheinungsbild und Sprache bleiben', () => {
   const localStorage = memoryStorage({
-    'pt:theme2': 'dark', 'pt:returning': '1', 'pt:invite': '{}', 'pt:onboarding:u1': '{}',
+    'pt:theme2': 'dark', 'pt:lang': 'en', 'pt:returning': '1', 'pt:invite': '{}', 'pt:onboarding:u1': '{}',
     pt_active_competition: 'c1', pt_apns_token: 't', quickSets: '{}', 'sb-x-auth-token': 's', other: 'x',
   });
   const sessionStorage = memoryStorage({ 'pt:tab': 'feed', keep: '1' });
   const { D } = load({ window: { localStorage, sessionStorage } });
   D.clearLocalData();
-  assert.deepEqual(localStorage.keys(), ['other', 'pt:theme2', 'sb-x-auth-token']);
+  assert.deepEqual(localStorage.keys(), ['other', 'pt:lang', 'pt:theme2', 'sb-x-auth-token']);
   assert.deepEqual(sessionStorage.keys(), ['keep']);
 });
 
@@ -299,4 +302,24 @@ test('upsertChallenge: Anlegen mit vorhandener Übung bleibt still (23505 → be
   });
   const row = await api.forCompetition('c1').upsertChallenge({ week_start: '2026-10-19', category_id: 'c-push', target_reps: 100 });
   assert.equal(row.id, 'w9');
+});
+
+// ── Standard-Übungen ────────────────────────────────────────────────────────
+
+test('localizeCategory: Standard-Übungen auf Englisch, eigene bleiben', () => {
+  const ctx = {
+    window: {}, console, setTimeout, clearTimeout,
+    localStorage: { getItem: k => (k === 'pt:lang' ? 'en' : null), setItem() {}, removeItem() {} },
+  };
+  vm.createContext(ctx);
+  for (const f of ['i18n.js', 'i18n/en.js', 'data.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8'), ctx, { filename: f });
+  }
+  const L = ctx.window.PTData.localizeCategory;
+  assert.equal(L({ name: 'Liegestütze', competition_id: null }).name, 'Push-ups');
+  assert.equal(L({ name: '20-Min-AMRAP', competition_id: null }).name, '20-min AMRAP');
+  assert.equal(L({ name: 'Bring Sally Up', competition_id: null }).name, 'Bring Sally Up');
+  assert.equal(L({ name: '20-Min-AMRAP', competition_id: 'c1' }).name, '20-Min-AMRAP');
+  // Deutsch: Name unverändert
+  assert.equal(load().D.localizeCategory({ name: '20-Min-AMRAP', competition_id: null }).name, '20-Min-AMRAP');
 });

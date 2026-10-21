@@ -1,4 +1,4 @@
-/* global React */
+/* global React, PTi18n, tr */
 // Shared UI components for Benny & Joni
 const { useState, useEffect, useRef, useMemo } = React;
 
@@ -31,6 +31,7 @@ function Icon({ name, size = 24, color = 'currentColor', strokeWidth = 2 }) {
     users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
     share: <><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="m16 6-4-4-4 4M12 2v13"/></>,
     contrast: <><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill={color} stroke="none"/></>,
+    globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></>,
     star: <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>,
     archive: <><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></>,
     trash: <><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>,
@@ -168,13 +169,13 @@ function formatRelative(ts) {
   const d = new Date(ts);
   const diffMs = Date.now() - d.getTime();
   const m = Math.floor(diffMs / 60000);
-  if (m < 1) return 'gerade eben';
-  if (m < 60) return `vor ${m} min`;
+  if (m < 1) return tr('gerade eben');
+  if (m < 60) return tr('vor {n} min', { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `vor ${h} h`;
+  if (h < 24) return tr('vor {n} h', { n: h });
   const days = Math.floor(h / 24);
-  if (days < 7) return `vor ${days} d`;
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+  if (days < 7) return tr('vor {n} d', { n: days });
+  return PTi18n.date(d, { day: '2-digit', month: 'short' });
 }
 
 function formatDuration(minutes) {
@@ -186,15 +187,22 @@ function formatDuration(minutes) {
   return `${h}h ${m}m`;
 }
 
+// 'YYYY-MM-DD' als lokaler Kalendertag. new Date('2026-10-19') liest UTC und
+// ist westlich davon schon Sonntag (falsche KW, falsche Wochenlinien).
+function localDay(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(value + 'T00:00:00') : new Date(value);
+}
+
 function formatWeek(weekStart) {
-  const d = new Date(weekStart);
+  const d = localDay(weekStart);
   const end = new Date(d); end.setDate(d.getDate() + 6);
-  const fmt = (x) => x.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+  const fmt = (x) => PTi18n.date(x, { day: '2-digit', month: 'short' });
   return `${fmt(d)} – ${fmt(end)}`;
 }
 
 function weekNumber(weekStart) {
-  const d = new Date(weekStart);
+  const d = localDay(weekStart);
   const target = new Date(d.valueOf());
   const dayNr = (d.getDay() + 6) % 7;
   target.setDate(target.getDate() - dayNr + 3);
@@ -206,13 +214,13 @@ function weekNumber(weekStart) {
 
 function todayGreeting() {
   const h = new Date().getHours();
-  if (h < 5) return 'Gute Nacht';
-  if (h < 11) return 'Guten Morgen';
-  if (h < 18) return 'Guten Tag';
-  return 'Guten Abend';
+  if (h < 5) return tr('Gute Nacht');
+  if (h < 11) return tr('Guten Morgen');
+  if (h < 18) return tr('Guten Tag');
+  return tr('Guten Abend');
 }
 
 Object.assign(window, {
   Icon, MiniRing, CountUp, Ring, Toast, Sheet, Stepper,
-  formatRelative, formatDuration, formatWeek, weekNumber, todayGreeting,
+  formatRelative, formatDuration, formatWeek, weekNumber, localDay, todayGreeting,
 });

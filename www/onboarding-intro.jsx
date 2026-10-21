@@ -1,4 +1,4 @@
-/* global React, PTData, PTOnboarding, PTHaptics, PTSound, PTPeople, Icon, Avatar, MiniRing, ObScreen, ObMessage, ObSlots, useObOnline, shareInvite, formatDuration */
+/* global React, PTData, PTOnboarding, PTHaptics, PTSound, PTPeople, Icon, Avatar, MiniRing, ObScreen, ObMessage, ObSlots, useObOnline, shareInvite, formatDuration, tr, trn */
 // Onboarding in der Challenge: Ebenen über Home (Einladen, Wochenziel, erster
 // Satz, Feier, Push-Vorab, Woche 1) und die Startkarte. Die Reihenfolge steuert
 // CompetitionApp; was erledigt ist, kommt aus den Daten (onboarding-model.js).
@@ -17,10 +17,10 @@ function ObLayer({ children, label }) {
 
 // ─── Einladen ───────────────────────────────────────────────────────────────
 function obInviteLine(mode, free) {
-  if (free <= 0) return 'Alle Plätze sind besetzt. Los geht’s!';
-  if (mode === '1v1') return 'Fehlt nur noch dein Gegner.';
-  if (mode === '2v2') return free === 1 ? 'Fehlt noch eine Person.' : `Fehlen noch ${free === 2 ? 'zwei' : 'drei'}.`;
-  return 'Hol deine Leute rein.';
+  if (free <= 0) return tr('Alle Plätze sind besetzt. Los geht’s!');
+  if (mode === '1v1') return tr('Fehlt nur noch dein Gegner.');
+  if (mode === '2v2') return free === 1 ? tr('Fehlt noch eine Person.') : free === 2 ? tr('Fehlen noch zwei.') : tr('Fehlen noch drei.');
+  return tr('Hol deine Leute rein.');
 }
 
 // `fresh`: direkt nach dem Erstellen („Challenge steht 🎉“).
@@ -39,8 +39,8 @@ function ObInviteLayer({ competition, members, me, fresh, onDone }) {
   async function share() {
     const r = await shareInvite(competition);
     if (r === 'shared') setShared(true);
-    if (r === 'copied') { setShared(true); setInfo('Einladung kopiert. Füg sie in den Chat ein.'); }
-    if (r === 'failed') setInfo('Teilen ging nicht. Schick den Code einfach selbst.');
+    if (r === 'copied') { setShared(true); setInfo(tr('Einladung kopiert. Füg sie in den Chat ein.')); }
+    if (r === 'failed') setInfo(tr('Teilen ging nicht. Schick den Code einfach selbst.'));
   }
   async function copyCode() {
     try { await navigator.clipboard.writeText(competition.invite_code); } catch (e) {}
@@ -52,28 +52,28 @@ function ObInviteLayer({ competition, members, me, fresh, onDone }) {
   const free = capacity - active.length;
   const done = shared || active.length >= 2;
   return (
-    <ObLayer label="Leute einladen">
+    <ObLayer label={tr('Leute einladen')}>
       <ObScreen stepKey="invite" foot={<>
         {free > 0 && (
           <button type="button" className={done ? 'btn btn-secondary' : 'btn'} onClick={share}>
-            <Icon name="share" size={18} /> Einladung senden
+            <Icon name="share" size={18} /> {tr('Einladung senden')}
           </button>
         )}
-        <button type="button" className={done ? 'btn' : 'btn-link'} onClick={onDone}>{done ? 'Weiter' : 'Später einladen'}</button>
+        <button type="button" className={done ? 'btn' : 'btn-link'} onClick={onDone}>{done ? tr('Weiter') : tr('Später einladen')}</button>
       </>}>
-        <h1 className="ob-title">{fresh ? 'Challenge steht 🎉' : 'Leute einladen'}</h1>
+        <h1 className="ob-title">{fresh ? tr('Challenge steht 🎉') : tr('Leute einladen')}</h1>
         <p className="ob-sub">{obInviteLine(competition.mode, free)}</p>
         <div className="ob-preview">
           <div className="ob-preview-emoji" aria-hidden="true">{competition.emoji}</div>
           <div className="ob-preview-name">{competition.name}</div>
-          <div className="ob-preview-meta">{active.length}/{capacity} dabei</div>
+          <div className="ob-preview-meta">{tr('{count}/{capacity} dabei', { count: active.length, capacity })}</div>
           <ObSlots members={active} capacity={capacity} newIds={newIds} />
         </div>
-        {newest && <ObMessage info={`${(newest.profile?.display_name || 'Jemand').split(/\s+/)[0]} ist dabei 🎉`} />}
+        {newest && <ObMessage info={tr('{name} ist dabei 🎉', { name: (newest.profile?.display_name || tr('Jemand')).split(/\s+/)[0] })} />}
         <div className="ob-codebox">
-          <span className="ob-codebox-code mono" aria-label={`Code ${competition.invite_code}`}>{competition.invite_code}</span>
+          <span className="ob-codebox-code mono" aria-label={tr('Code {code}', { code: competition.invite_code })}>{competition.invite_code}</span>
           <button type="button" className="ob-codebox-copy" onClick={copyCode}>
-            <Icon name={copied ? 'check' : 'copy'} size={16} strokeWidth={2.4} />{copied ? 'Kopiert' : 'Kopieren'}
+            <Icon name={copied ? 'check' : 'copy'} size={16} strokeWidth={2.4} />{copied ? tr('Kopiert') : tr('Kopieren')}
           </button>
         </div>
         <ObMessage info={info} />
@@ -98,11 +98,11 @@ function ObAmount({ value, onChange, choices, unit, note }) {
   return (
     <div className="ob-amount">
       <div className="ob-amount-row">
-        <button type="button" className="ob-step-btn" aria-label="weniger" disabled={value <= 1}
+        <button type="button" className="ob-step-btn" aria-label={tr('weniger')} disabled={value <= 1}
           onClick={() => set(value - obStepOf(value - 1))}>−</button>
         <input className="ob-amount-num" type="text" inputMode="numeric" pattern="[0-9]*" value={draft ?? value} aria-label={unit}
           onFocus={e => e.target.select()} onChange={e => type(e.target.value)} onBlur={() => setDraft(null)} />
-        <button type="button" className="ob-step-btn" aria-label="mehr" onClick={() => set(value + obStepOf(value))}>+</button>
+        <button type="button" className="ob-step-btn" aria-label={tr('mehr')} onClick={() => set(value + obStepOf(value))}>+</button>
       </div>
       <div className="ob-amount-unit">{unit}</div>
       {choices?.length > 0 && (
@@ -117,7 +117,13 @@ function ObAmount({ value, onChange, choices, unit, note }) {
   );
 }
 
-const obPeopleWord = (n) => (n === 2 ? 'euch beide' : n === 3 ? 'euch drei' : n === 4 ? 'euch vier' : `euch ${n}`);
+// „Zusammen 60 für euch beide.“ — ganze Sätze, weil die Zahlwörter je Sprache anders laufen.
+function obTogetherNote(total, n) {
+  if (n === 2) return tr('Zusammen {total} für euch beide.', { total });
+  if (n === 3) return tr('Zusammen {total} für euch drei.', { total });
+  if (n === 4) return tr('Zusammen {total} für euch vier.', { total });
+  return tr('Zusammen {total} für euch {n}.', { total, n });
+}
 
 // Nur Standard-Sportübungen: Pflicht-Workouts haben kein Mengenziel, und Home
 // zeigt nur Sport.
@@ -125,7 +131,7 @@ function obGoalCategories(categories) {
   return categories.filter(c => (c.kind || 'sports') === 'sports' && (c.challenge_type || 'standard') === 'standard');
 }
 
-function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = 'Euer erstes Wochenziel', onDone, onSkip }) {
+function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = tr('Euer erstes Wochenziel'), onDone, onSkip }) {
   const online = useObOnline();
   const cats = obGoalCategories(categories);
   const [showAll, setShowAll] = React.useState(false);
@@ -143,7 +149,7 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
 
   async function save() {
     if (!cat) return;
-    if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
     setError(''); setBusy(true);
     try {
       const ch = await api.upsertChallenge({ week_start: weekStart, category_id: cat.id, chosen_by: me,
@@ -154,14 +160,16 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
   }
 
   return (
-    <ObLayer label="Wochenziel festlegen">
+    <ObLayer label={tr('Wochenziel festlegen')}>
       <ObScreen stepKey="goal" foot={<>
-        <button type="button" className="btn" disabled={busy || !cat} onClick={save}>{busy ? '…' : 'Ziel setzen'}</button>
-        <button type="button" className="btn-link" onClick={onSkip}>Später</button>
+        <button type="button" className="btn" disabled={busy || !cat} onClick={save}>{busy ? '…' : tr('Ziel setzen')}</button>
+        <button type="button" className="btn-link" onClick={onSkip}>{tr('Später')}</button>
       </>}>
         <h1 className="ob-title">{title}</h1>
-        <p className="ob-sub">Was macht ihr bis Sonntag?{daysLeft <= 1 ? ' Heute ist der letzte Tag.' : daysLeft < 7 ? ` Noch ${daysLeft} Tage.` : ''}</p>
-        <div className="ob-ex-grid" role="radiogroup" aria-label="Übung">
+        <p className="ob-sub">{tr('Was macht ihr bis Sonntag?')}{daysLeft <= 1
+          ? ' ' + tr('Heute ist der letzte Tag.')
+          : daysLeft < 7 ? ' ' + trn(daysLeft, 'Noch {n} Tag.', 'Noch {n} Tage.') : ''}</p>
+        <div className="ob-ex-grid" role="radiogroup" aria-label={tr('Übung')}>
           {visible.map(c => (
             <button key={c.id} type="button" role="radio" aria-checked={c.id === catId}
               className={`ob-ex${c.id === catId ? ' is-on' : ''}`} onClick={() => pick(c)}>
@@ -170,14 +178,14 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
             </button>
           ))}
         </div>
-        {!showAll && cats.length > 6 && <button type="button" className="btn-link ob-more" onClick={() => setShowAll(true)}>Mehr Übungen</button>}
+        {!showAll && cats.length > 6 && <button type="button" className="btn-link ob-more" onClick={() => setShowAll(true)}>{tr('Mehr Übungen')}</button>}
         {cat && (
-          <ObAmount value={amount} onChange={setAmount} unit="pro Person bis Sonntag"
+          <ObAmount value={amount} onChange={setAmount} unit={tr('pro Person bis Sonntag')}
             choices={PTOnboarding.goalChoices(def)}
             note={competition.mode === 'ffa'
               // Jeder gegen jeden: gespeichert wird die Summe, geteilt durch alle, die mitmachen.
-              ? `Zusammen ${PTOnboarding.goalTarget(amount, people)} – wird auf alle verteilt, die mitmachen.`
-              : `Zusammen ${PTOnboarding.goalTarget(amount, people)} für ${obPeopleWord(people)}.`} />
+              ? tr('Zusammen {total} – wird auf alle verteilt, die mitmachen.', { total: PTOnboarding.goalTarget(amount, people) })
+              : obTogetherNote(PTOnboarding.goalTarget(amount, people), people)} />
         )}
         <ObMessage error={error} />
       </ObScreen>
@@ -202,7 +210,7 @@ function ObFirstLogLayer({ api, challenges, categories, people = 2, onLogged, on
 
   async function log() {
     if (!ch) return;
-    if (!online) { setError('Keine Verbindung. Prüf dein Internet.'); return; }
+    if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
     if (typeof window.confirmReps === 'function' && !window.confirmReps(reps)) return;
     setError(''); setBusy(true);
     try {
@@ -212,15 +220,15 @@ function ObFirstLogLayer({ api, challenges, categories, people = 2, onLogged, on
   }
 
   return (
-    <ObLayer label="Erster Satz">
+    <ObLayer label={tr('Erster Satz')}>
       <ObScreen stepKey="firstlog" foot={<>
-        <button type="button" className="btn" disabled={busy || !ch} onClick={log}>{busy ? '…' : `+${reps} loggen`}</button>
-        <button type="button" className="btn-link" onClick={onSkip}>Später</button>
+        <button type="button" className="btn" disabled={busy || !ch} onClick={log}>{busy ? '…' : tr('+{n} loggen', { n: reps })}</button>
+        <button type="button" className="btn-link" onClick={onSkip}>{tr('Später')}</button>
       </>}>
-        <h1 className="ob-title">Dein erster Satz</h1>
-        <p className="ob-sub">Mach ein paar {cat?.name || 'Wiederholungen'}. Wir warten.</p>
+        <h1 className="ob-title">{tr('Dein erster Satz')}</h1>
+        <p className="ob-sub">{cat?.name ? tr('Mach ein paar {name}. Wir warten.', { name: cat.name }) : tr('Mach ein paar Wiederholungen. Wir warten.')}</p>
         {options.length > 1 && (
-          <div className="ob-chips" style={{ justifyContent: 'flex-start' }} role="radiogroup" aria-label="Übung">
+          <div className="ob-chips" style={{ justifyContent: 'flex-start' }} role="radiogroup" aria-label={tr('Übung')}>
             {options.map(o => (
               <button key={o.id} type="button" role="radio" aria-checked={o.id === chId}
                 className={`ob-chip${o.id === chId ? ' is-on' : ''}`} onClick={() => setChId(o.id)}>
@@ -229,10 +237,10 @@ function ObFirstLogLayer({ api, challenges, categories, people = 2, onLogged, on
             ))}
           </div>
         )}
-        <ObAmount value={reps} onChange={setReps} unit={cat?.name || 'Wiederholungen'} choices={[5, 10, 15, 20]} />
+        <ObAmount value={reps} onChange={setReps} unit={cat?.name || tr('Wiederholungen')} choices={[5, 10, 15, 20]} />
         {ch && (
           <div className="ob-note"><span className="ob-note-emoji" aria-hidden="true">🎯</span>
-            Dein Teil bis Sonntag: {PTData.fairShareOf(ch.target_reps, people)} {cat?.name}</div>
+            {tr('Dein Teil bis Sonntag: {n} {name}', { n: PTData.fairShareOf(ch.target_reps, people), name: cat?.name || '' })}</div>
         )}
         <ObMessage error={error} />
       </ObScreen>
@@ -284,16 +292,16 @@ function ObCelebrate({ value, category, myDone, share, onDone }) {
   }, [value]);
   const pct = share > 0 ? Math.min(1, myDone / share) : 0;
   return (
-    <div className="ob-cele" role="dialog" aria-modal="true" aria-label="Erster Satz geschafft">
+    <div className="ob-cele" role="dialog" aria-modal="true" aria-label={tr('Erster Satz geschafft')}>
       <ObConfetti />
       <div className="ob-cele-over">{category?.emoji} {category?.name}</div>
-      <h1 className="ob-cele-title">Erster Satz! 💪</h1>
+      <h1 className="ob-cele-title">{tr('Erster Satz! 💪')}</h1>
       <div className="ob-cele-num">+{shown}</div>
       <div className="ob-cele-ring">
         <MiniRing pct={pct} size={96} stroke={9} color="#fff" track="rgba(255,255,255,0.25)">{Math.round(pct * 100)}%</MiniRing>
       </div>
-      <div className="ob-cele-sub">{myDone} von {share} · dein Teil diese Woche</div>
-      <button type="button" className="rd-btn-white" onClick={onDone}>Weiter</button>
+      <div className="ob-cele-sub">{tr('{done} von {share} · dein Teil diese Woche', { done: myDone, share })}</div>
+      <button type="button" className="rd-btn-white" onClick={onDone}>{tr('Weiter')}</button>
     </div>
   );
 }
@@ -331,27 +339,27 @@ const PTPush = {
 // Zeigt genau die Mitteilung, die notify-set verschickt (Rivalen-Push).
 function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
   return (
-    <ObLayer label="Mitteilungen">
+    <ObLayer label={tr('Mitteilungen')}>
       <ObScreen stepKey="push" foot={<>
-        <button type="button" className="btn" disabled={busy} onClick={onAllow}>{busy ? '…' : 'Mitteilungen erlauben'}</button>
-        <button type="button" className="btn-link" disabled={busy} onClick={onLater}>Jetzt nicht</button>
+        <button type="button" className="btn" disabled={busy} onClick={onAllow}>{busy ? '…' : tr('Mitteilungen erlauben')}</button>
+        <button type="button" className="btn-link" disabled={busy} onClick={onLater}>{tr('Jetzt nicht')}</button>
       </>}>
         <div className="ob-bell" aria-hidden="true"><Icon name="bell" size={44} strokeWidth={2} /></div>
-        <h1 className="ob-title" style={{ textAlign: 'center' }}>Bleib im Rennen</h1>
-        <p className="ob-sub" style={{ textAlign: 'center' }}>Wir melden uns nur, wenn es zählt.</p>
-        <div className="ob-preview-push" aria-label="Beispiel einer Mitteilung">
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Bleib im Rennen')}</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>{tr('Wir melden uns nur, wenn es zählt.')}</p>
+        <div className="ob-preview-push" aria-label={tr('Beispiel einer Mitteilung')}>
           <img src="icons/icon-192.png" alt="" />
           <span>
-            <strong>🔥 {rival || 'Dein Rivale'} ist los</strong>
+            <strong>🔥 {rival ? tr('{name} ist los', { name: rival }) : tr('Dein Rivale ist los')}</strong>
             {competition.emoji} {competition.name}<br />
-            Schon 120 Reps heute — du noch bei 0.
+            {tr('Schon 120 Reps heute — du noch bei 0.')}
           </span>
         </div>
         <ul className="ob-points">
           <li className="ob-point"><span className="ob-point-emoji" aria-hidden="true">🔥</span>
-            <span>Dein Rivale legt los und du bist heute noch bei 0? Wir sagen Bescheid.</span></li>
+            <span>{tr('Dein Rivale legt los und du bist heute noch bei 0? Wir sagen Bescheid.')}</span></li>
           <li className="ob-point"><span className="ob-point-emoji" aria-hidden="true">🤫</span>
-            <span>Höchstens eine Mitteilung pro Tag und Challenge.</span></li>
+            <span>{tr('Höchstens eine Mitteilung pro Tag und Challenge.')}</span></li>
         </ul>
       </ObScreen>
     </ObLayer>
@@ -361,10 +369,10 @@ function ObPushPrimer({ competition, rival, busy, onAllow, onLater }) {
 // ─── Woche 1 geschafft ──────────────────────────────────────────────────────
 // summary aus PTOnboarding.weekOneSummary.
 function obWeekOneResult(s) {
-  if (s.result === 'won') return { emoji: '🏆', line: s.diff > 0 ? `Du hast die Woche geholt, ${s.diff} vorne.` : 'Du hast die Woche geholt.' };
-  if (s.result === 'lost') return { emoji: '💪', line: `${s.leader} lag ${s.diff} vorne. Revanche?` };
-  if (s.result === 'tie') return { emoji: '🤝', line: 'Gleichstand. Woche 2 entscheidet.' };
-  return { emoji: '🏁', line: 'Solo durchgezogen.' };
+  if (s.result === 'won') return { emoji: '🏆', line: s.diff > 0 ? tr('Du hast die Woche geholt, {n} vorne.', { n: s.diff }) : tr('Du hast die Woche geholt.') };
+  if (s.result === 'lost') return { emoji: '💪', line: tr('{name} lag {n} vorne. Revanche?', { name: s.leader, n: s.diff }) };
+  if (s.result === 'tie') return { emoji: '🤝', line: tr('Gleichstand. Woche 2 entscheidet.') };
+  return { emoji: '🏁', line: tr('Solo durchgezogen.') };
 }
 
 // competition (optional): Einladungscode für „Ergebnis teilen“.
@@ -372,8 +380,8 @@ function ObWeekOne({ summary, competition = null, onDone }) {
   React.useEffect(() => { PTHaptics.celebrate(); PTSound.play('first-log', 0.6); }, []);
   const r = obWeekOneResult(summary);
   const main = summary.myMinutes && !summary.myReps
-    ? { num: formatDuration(summary.myMinutes), cap: 'Fokuszeit' }
-    : { num: summary.myReps, cap: 'Reps' };
+    ? { num: formatDuration(summary.myMinutes), cap: tr('Fokuszeit') }
+    : { num: summary.myReps, cap: tr('Reps') };
   // Teilen-Knopf und Text kommen aus screens.jsx bzw. feed-model.js.
   const Share = window.ShareResultButton;
   const canShare = typeof Share === 'function' && typeof window.PTFeed?.weekOneShareText === 'function';
@@ -383,19 +391,19 @@ function ObWeekOne({ summary, competition = null, onDone }) {
     code: competition?.invite_code || '',
   });
   return (
-    <ObLayer label="Woche 1 geschafft">
+    <ObLayer label={tr('Woche 1 geschafft')}>
       <ObConfetti count={40} />
       <ObScreen stepKey="week1" center foot={<>
-        {canShare && <Share getText={shareText} title="Woche 1" />}
-        <button type="button" className="btn" onClick={onDone}>Auf in Woche 2</button>
+        {canShare && <Share getText={shareText} title={tr('Woche 1')} />}
+        <button type="button" className="btn" onClick={onDone}>{tr('Auf in Woche 2')}</button>
       </>}>
         <div className="ob-trophy" aria-hidden="true">{r.emoji}</div>
-        <div className="ob-overline" style={{ textAlign: 'center' }}>Woche 1</div>
-        <h1 className="ob-title" style={{ textAlign: 'center' }}>Geschafft 🏁</h1>
+        <div className="ob-overline" style={{ textAlign: 'center' }}>{tr('Woche 1')}</div>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Geschafft 🏁')}</h1>
         <div className="ob-stats">
           <div className="ob-stat"><span className="ob-stat-num">{main.num}</span><span className="ob-stat-cap">{main.cap}</span></div>
-          <div className="ob-stat"><span className="ob-stat-num">{summary.activeDays}</span><span className="ob-stat-cap">aktive Tage</span></div>
-          <div className="ob-stat"><span className="ob-stat-num">{summary.sharesHit}/{summary.sharesTotal}</span><span className="ob-stat-cap">Teile erfüllt</span></div>
+          <div className="ob-stat"><span className="ob-stat-num">{summary.activeDays}</span><span className="ob-stat-cap">{tr('aktive Tage')}</span></div>
+          <div className="ob-stat"><span className="ob-stat-num">{summary.sharesHit}/{summary.sharesTotal}</span><span className="ob-stat-cap">{tr('Teile erfüllt')}</span></div>
         </div>
         <div className="ob-result">{r.line}</div>
       </ObScreen>
@@ -406,22 +414,24 @@ function ObWeekOne({ summary, competition = null, onDone }) {
 // ─── Home: Startkarte ───────────────────────────────────────────────────────
 // Punkte aus PTOnboarding.starterItems; erledigt ist, was die Daten hergeben.
 const OB_STARTER_LABELS = {
-  invite: 'Leute einladen', goal: 'Wochenziel setzen', log: 'Ersten Satz loggen', push: 'Mitteilungen an',
+  invite: tr('Leute einladen'), goal: tr('Wochenziel setzen'), log: tr('Ersten Satz loggen'), push: tr('Mitteilungen an'),
 };
 
 function ObStarterCard({ items, midWeek, daysLeft, onOpen, onDismiss }) {
   const done = items.filter(i => i.done).length;
   return (
-    <section className="ob-starter" aria-label="Startklar">
+    <section className="ob-starter" aria-label={tr('Startklar')}>
       <div className="ob-starter-head">
-        <span className="ob-starter-title">Startklar</span>
-        <span className="ob-starter-count">{done} von {items.length}</span>
-        <button type="button" className="ob-starter-close" aria-label="Startkarte ausblenden" onClick={onDismiss}>
+        <span className="ob-starter-title">{tr('Startklar')}</span>
+        <span className="ob-starter-count">{tr('{done} von {total}', { done, total: items.length })}</span>
+        <button type="button" className="ob-starter-close" aria-label={tr('Startkarte ausblenden')} onClick={onDismiss}>
           <Icon name="close" size={16} strokeWidth={2.4} />
         </button>
       </div>
       {/* Resttage zählen heute mit – genau wie die Duell-Karte auf „Heute“. */}
-      {midWeek && <div className="ob-starter-sub">Die Woche läuft seit Montag · {daysLeft <= 1 ? 'letzter Tag' : `noch ${daysLeft} Tage`}</div>}
+      {midWeek && <div className="ob-starter-sub">{daysLeft <= 1
+        ? tr('Die Woche läuft seit Montag · letzter Tag')
+        : trn(daysLeft, 'Die Woche läuft seit Montag · noch {n} Tag', 'Die Woche läuft seit Montag · noch {n} Tage')}</div>}
       <div className="ob-progress" aria-hidden="true"><span style={{ width: `${(done / items.length) * 100}%` }} /></div>
       <ul className="ob-starter-list">
         {items.map(i => (
@@ -430,7 +440,7 @@ function ObStarterCard({ items, midWeek, daysLeft, onOpen, onDismiss }) {
               onClick={() => onOpen(i.id)}>
               <span className="ob-check" aria-hidden="true">{i.done && <Icon name="check" size={14} strokeWidth={3} />}</span>
               <span className="ob-starter-label">{OB_STARTER_LABELS[i.id]}</span>
-              {i.done ? <span className="ob-sr">erledigt</span> : <span className="ob-chev"><Icon name="chevron" size={18} /></span>}
+              {i.done ? <span className="ob-sr">{tr('erledigt')}</span> : <span className="ob-chev"><Icon name="chevron" size={18} /></span>}
             </button>
           </li>
         ))}
@@ -444,15 +454,15 @@ function ObInviteCard({ competition, members, onInvite }) {
   const active = members.filter(m => !m.left_at);
   const capacity = OB_CAPACITY[competition.mode] || 12;
   return (
-    <section className="ob-invite-card" aria-label="Leute einladen">
+    <section className="ob-invite-card" aria-label={tr('Leute einladen')}>
       <div className="ob-invite-card-top">
         <ObSlots members={active} capacity={capacity} size={40} />
       </div>
       <div className="ob-invite-card-text">
-        <strong>{active.length < 2 ? 'Noch allein hier.' : 'Noch kein Gegner-Team.'}</strong>{' '}
-        Schick deinen Leuten den Code <span className="mono">{competition.invite_code}</span>.
+        <strong>{active.length < 2 ? tr('Noch allein hier.') : tr('Noch kein Gegner-Team.')}</strong>{' '}
+        {tr('Schick deinen Leuten den Code {code}.', { code: <span className="mono">{competition.invite_code}</span> })}
       </div>
-      <button type="button" className="btn" onClick={onInvite}><Icon name="share" size={18} /> Einladen</button>
+      <button type="button" className="btn" onClick={onInvite}><Icon name="share" size={18} /> {tr('Einladen')}</button>
     </section>
   );
 }

@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTStats, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTStats, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -55,7 +55,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "notifications": true
 } /*EDITMODE-END*/;
 
-function Loader({ text = 'Lade Daten…' }) {
+function Loader({ text = tr('Lade Daten…') }) {
   return (
     <div className="app-loader" role="status" aria-live="polite">
       <div className="app-loader-spinner" aria-hidden="true" />
@@ -90,20 +90,20 @@ class PTErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.error) return this.props.children;
-    const title = 'Da ist etwas schiefgelaufen';
+    const title = tr('Da ist etwas schiefgelaufen');
     const actions = (
       <>
-        <button className="btn" onClick={() => location.reload()}>Neu laden</button>
+        <button className="btn" onClick={() => location.reload()}>{tr('Neu laden')}</button>
         {/* Nur die Karte: Um <App/> würde reset die App neu mounten und einen
             zweiten Supabase-Client anlegen, während der alte weiterläuft. */}
-        {this.props.variant === 'card' && <button className="btn-link" onClick={this.reset}>Zur Übersicht</button>}
+        {this.props.variant === 'card' && <button className="btn-link" onClick={this.reset}>{tr('Zur Übersicht')}</button>}
       </>
     );
     if (this.props.variant === 'card') {
       return (
         <div className="rd-empty" role="alert">
           <div className="rd-empty-title">{title}</div>
-          <div className="rd-empty-text">Dieser Bereich lässt sich gerade nicht anzeigen. Deine Sätze sind gespeichert.</div>
+          <div className="rd-empty-text">{tr('Dieser Bereich lässt sich gerade nicht anzeigen. Deine Sätze sind gespeichert.')}</div>
           {actions}
         </div>
       );
@@ -114,12 +114,17 @@ class PTErrorBoundary extends React.Component {
         <main className="ob-body is-center">
           <div className="ob-trophy" aria-hidden="true">😵</div>
           <h1 className="ob-title" style={{ textAlign: 'center' }}>{title}</h1>
-          <p className="ob-sub" style={{ textAlign: 'center' }}>Lade die App neu, dann geht’s weiter. Deine Sätze sind gespeichert.</p>
+          <p className="ob-sub" style={{ textAlign: 'center' }}>{tr('Lade die App neu, dann geht’s weiter. Deine Sätze sind gespeichert.')}</p>
         </main>
         <div className="ob-foot">{actions}</div>
       </div>
     );
   }
+}
+
+// Toast nach dem Loggen; value ist schon formatiert („+12“, „+30 min“, „1h 30m“).
+function loggedToast(value, name) {
+  return name ? tr('{value} {name} geloggt', { value, name }) : tr('{value} geloggt', { value });
 }
 
 // ─── Hülle: Session, Profil, Challenge-Auswahl ──────────────────────────────
@@ -155,7 +160,7 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [competitions, setCompetitions] = useState(null);
   const [activeId, setActiveId] = useState(null);
-  const [accountError, setAccountError] = useState('');
+  const [accountError, setAccountError] = useState(null); // { text, offline } nach einem Ladefehler
   const [sheet, setSheet] = useState(null); // 'switcher' | 'create' | 'join' | 'profile'
   const [toast, setToast] = useState('');
   const [invite, setInviteState] = useState(readInvite);
@@ -253,10 +258,10 @@ function App() {
       setProfile(p);
       setCompetitions(list);
       setActiveId(cur => pickActive(p, list, preferId ?? cur));
-      setAccountError('');
+      setAccountError(null);
     } catch (e) {
       console.error('loadAccount failed', e);
-      setAccountError(e.message || String(e));
+      setAccountError({ text: e.message || String(e), offline: e?.code === 'offline' });
     }
   }, [api, userId, pickActive]);
 
@@ -264,6 +269,15 @@ function App() {
     if (userId) loadAccount();
     else { setProfile(null); setCompetitions(null); setActiveId(null); }
   }, [userId, loadAccount]);
+
+  // App-Sprache ins Profil, damit Push-Mitteilungen in dieser Sprache kommen
+  // (Spalte profiles.language, Migration 20261021000000; ohne Spalte nichts tun).
+  useEffect(() => {
+    if (!profile || !('language' in profile) || profile.language === PTi18n.lang) return;
+    api.updateProfile({ language: PTi18n.lang })
+      .then(p => { PTPeople.set([p]); setProfile(p); })
+      .catch(e => console.warn('save language failed', e));
+  }, [profile, api]);
 
   // Ladefehler (meist offline): automatisch neu versuchen, sobald das Netz zurück ist.
   useEffect(() => {
@@ -289,7 +303,7 @@ function App() {
     if (!invite || !competitions?.some(c => !c.archived_at)) return;
     const mine = competitions.find(c => c.invite_code === invite && !c.archived_at);
     setInvite(null);
-    if (mine) { setActiveId(mine.id); setSheet(null); setToast('Du bist schon dabei.'); }
+    if (mine) { setActiveId(mine.id); setSheet(null); setToast(tr('Du bist schon dabei.')); }
     else { setJoinCode(invite); setSheet('join'); }
   }, [invite, competitions, setInvite]);
 
@@ -313,7 +327,7 @@ function App() {
   }, [competitions]);
 
   async function signOut() {
-    if (!confirm('Abmelden?')) return;
+    if (!confirm(tr('Abmelden?'))) return;
     try {
       const saved = localStorage.getItem('pt_apns_token');
       if (saved) { await api.deleteDeviceToken(saved).catch(() => {}); localStorage.removeItem('pt_apns_token'); }
@@ -340,45 +354,45 @@ function App() {
     await loadAccount(id);
     setActiveId(id);
     setInvite(null); setStartView(null);
-    if (!newcomer) setToast('Willkommen in der Challenge 💪');
+    if (!newcomer) setToast(tr('Willkommen in der Challenge 💪'));
   }
 
   async function setMain(id) {
     try {
       const p = await api.updateProfile({ main_competition_id: id });
       setProfile(p);
-      setToast(id ? 'Haupt-Challenge gesetzt ★' : 'Haupt-Challenge entfernt');
+      setToast(id ? tr('Haupt-Challenge gesetzt ★') : tr('Haupt-Challenge entfernt'));
     } catch (e) { alert(e.message); }
   }
 
   if (!api) {
     return (
-      <ObScreen center foot={<button className="btn" onClick={() => location.reload()}>Erneut versuchen</button>}>
+      <ObScreen center foot={<button className="btn" onClick={() => location.reload()}>{tr('Erneut versuchen')}</button>}>
         <div className="ob-trophy" aria-hidden="true">📡</div>
-        <h1 className="ob-title" style={{ textAlign: 'center' }}>Keine Verbindung</h1>
-        <p className="ob-sub" style={{ textAlign: 'center' }}>Die App braucht Internet, um deine Challenges zu laden. Sobald du online bist, geht’s weiter.</p>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{tr('Keine Verbindung')}</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>{tr('Die App braucht Internet, um deine Challenges zu laden. Sobald du online bist, geht’s weiter.')}</p>
       </ObScreen>
     );
   }
-  if (session === undefined) return <Loader text="Starte…" />;
+  if (session === undefined) return <Loader text={tr('Starte…')} />;
   if (!session) {
     return <ObAuthFlow api={api} invite={invite} onInvite={setInvite}
       returning={readPref(RETURNING_KEY, '') === '1'} />;
   }
   if (accountError && !profile) {
-    const offline = navigator.onLine === false || /Keine Verbindung/.test(accountError);
+    const offline = navigator.onLine === false || accountError.offline;
     return (
       <ObScreen center foot={<>
-        <button className="btn" onClick={() => loadAccount()}>Erneut versuchen</button>
-        <button className="btn-link" onClick={signOut}>Abmelden</button>
+        <button className="btn" onClick={() => loadAccount()}>{tr('Erneut versuchen')}</button>
+        <button className="btn-link" onClick={signOut}>{tr('Abmelden')}</button>
       </>}>
         <div className="ob-trophy" aria-hidden="true">{offline ? '📡' : '😵'}</div>
-        <h1 className="ob-title" style={{ textAlign: 'center' }}>{offline ? 'Keine Verbindung' : 'Laden fehlgeschlagen'}</h1>
-        <p className="ob-sub" style={{ textAlign: 'center' }}>{offline ? 'Sobald du wieder online bist, geht’s weiter.' : accountError}</p>
+        <h1 className="ob-title" style={{ textAlign: 'center' }}>{offline ? tr('Keine Verbindung') : tr('Laden fehlgeschlagen')}</h1>
+        <p className="ob-sub" style={{ textAlign: 'center' }}>{offline ? tr('Sobald du wieder online bist, geht’s weiter.') : accountError.text}</p>
       </ObScreen>
     );
   }
-  if (!profile || !competitions) return <Loader text="Lade Profil…" />;
+  if (!profile || !competitions) return <Loader text={tr('Lade Profil…')} />;
 
   if (route === 'profile') {
     return (
@@ -407,7 +421,7 @@ function App() {
         onClose={() => { setSheet(null); setJoinCode(''); }} onJoined={handleJoined} />
       <ProfileSheet open={sheet === 'profile'} api={api} profile={profile} onClose={() => setSheet(null)}
         onSignOut={signOut}
-        onSaved={(p, opts) => { PTPeople.set([p]); setProfile(p); if (!opts?.keepOpen) { setSheet(null); setToast('Profil gespeichert'); } }} />
+        onSaved={(p, opts) => { PTPeople.set([p]); setProfile(p); if (!opts?.keepOpen) { setSheet(null); setToast(tr('Profil gespeichert')); } }} />
       <Toast message={toast} onDone={() => setToast('')} />
     </>
   );
@@ -429,7 +443,7 @@ function App() {
     }
     return <>{screen}{sheets}</>;
   }
-  if (!active) return <Loader text="Lade Challenge…" />;
+  if (!active) return <Loader text={tr('Lade Challenge…')} />;
 
   return (
     <>
@@ -445,7 +459,7 @@ function App() {
         onSetMain={setMain}
         onSignOut={signOut}
         onCompetitionChanged={() => loadAccount()}
-        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast('Challenge verlassen'); }}
+        onLeft={async () => { setActiveId(null); await loadAccount(null); setToast(trc('Meldung', 'Challenge verlassen')); }}
         intro={intro?.id === active.id ? intro.kind : null} onIntroDone={() => setIntro(null)}
         newcomer={newcomer} obState={obState} onObPatch={patchOb} />
       {sheets}
@@ -492,15 +506,16 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
     const ranked = totals.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
     const diff = ranked.length > 1 ? ranked[0].v - ranked[1].v : ranked[0]?.v || 0;
     const hitCount = challStats.filter(c => c.hit).length;
+    // Einheit min (nur Work) oder Reps; je eigener Satz für die Übersetzung.
     const allWork = challStats.length > 0 && challStats.every(c => c.isWorkCh);
-    const unit = allWork ? 'min' : 'Reps';
     const winnerLabel = winnerIdx != null ? sides[winnerIdx].label : null;
+    const v = { name: winnerLabel, n: diff };
     let analysis;
-    if (sumAll === 0) analysis = 'Stille Woche. Auf in die nächste!';
-    else if (winnerIdx == null) analysis = 'Unentschieden an der Spitze — perfekt ausbalanciert.';
-    else if (diff / sumAll > 0.4) analysis = `Klare Sache: ${winnerLabel} dominiert mit ${diff} ${unit} Vorsprung.`;
-    else if (diff / sumAll > 0.15) analysis = `${winnerLabel} setzt sich durch — ${diff} ${unit} Vorsprung.`;
-    else analysis = `Knapper Sieg für ${winnerLabel} — nur ${diff} ${unit} Unterschied.`;
+    if (sumAll === 0) analysis = tr('Stille Woche. Auf in die nächste!');
+    else if (winnerIdx == null) analysis = tr('Unentschieden an der Spitze — perfekt ausbalanciert.');
+    else if (diff / sumAll > 0.4) analysis = allWork ? tr('Klare Sache: {name} dominiert mit {n} min Vorsprung.', v) : trn(v.n, 'Klare Sache: {name} dominiert mit {n} Rep Vorsprung.', 'Klare Sache: {name} dominiert mit {n} Reps Vorsprung.', v);
+    else if (diff / sumAll > 0.15) analysis = allWork ? tr('{name} setzt sich durch — {n} min Vorsprung.', v) : trn(v.n, '{name} setzt sich durch — {n} Rep Vorsprung.', '{name} setzt sich durch — {n} Reps Vorsprung.', v);
+    else analysis = allWork ? tr('Knapper Sieg für {name} — nur {n} min Unterschied.', v) : trn(v.n, 'Knapper Sieg für {name} — nur {n} Rep Unterschied.', 'Knapper Sieg für {name} — nur {n} Reps Unterschied.', v);
 
     const weekSets = allSets.filter(s => challs.some(ch => ch.id === s.challenge_id));
     const sideIdx = window.sideIndexByUser(sides);
@@ -566,8 +581,16 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
   }, [tab, competition.penalties_enabled]);
-  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'work')
-  const [settingsPage, setSettingsPage] = useState('root');
+  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'work', 'language').
+  // Nach einem Sprachwechsel lädt die App neu und öffnet wieder die Sprachseite.
+  const [settingsPage, setSettingsPage] = useState(() => {
+    try {
+      const page = sessionStorage.getItem('pt:reopen-settings');
+      sessionStorage.removeItem('pt:reopen-settings');
+      if (page) return page;
+    } catch (e) {}
+    return 'root';
+  });
   const openSettings = (page = 'root') => { setSettingsPage(page); setTab('settings'); };
 
   // Data
@@ -696,8 +719,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     setPushBusy(false);
     const next = PTOnboarding.nextPrimerState(primer, result);
     PTPush.writePrimer(next); setPrimer(next); setPushPerm(result);
-    if (result === 'granted') { onSetNotifications(true); setToast('Mitteilungen sind an 🔔'); }
-    else if (result === 'denied') setToast('Alles klar. Geht auch später in den Einstellungen.');
+    if (result === 'granted') { onSetNotifications(true); setToast(tr('Mitteilungen sind an 🔔')); }
+    else if (result === 'denied') setToast(tr('Alles klar. Geht auch später in den Einstellungen.'));
     advance();
   }
   function laterPush() {
@@ -831,7 +854,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           target_reps: p.target_reps,
         });
       }
-      setToast(`Woche fixiert – los geht's, ${profile.display_name.split(/\s+/)[0]}!`);
+      setToast(tr("Woche fixiert – los geht's, {name}!", { name: profile.display_name.split(/\s+/)[0] }));
       reload();
     } catch (e) { alert(e.message); }
   }
@@ -896,7 +919,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       if (memberIdsRef.current) {
         const fresh = mems.find(m => !m.left_at && m.user_id !== me && !memberIdsRef.current.includes(m.user_id));
         if (fresh && layerRef.current?.kind !== 'invite') {
-          setToast(`${(fresh.profile?.display_name || 'Jemand').split(/\s+/)[0]} ist dabei 🎉`);
+          setToast(tr('{name} ist dabei 🎉', { name: (fresh.profile?.display_name || tr('Jemand')).split(/\s+/)[0] }));
           PTHaptics.success();
         }
       }
@@ -934,7 +957,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       // (42501, z. B. aus der Challenge entfernt) → zurück zur Auswahl
       if (e?.code === 'PGRST116' || e?.code === '42501') { leave(); return; }
       if (!loadedOnce.current) setLoadError(e || new Error('reload failed'));
-      else setToast(e?.code === 'offline' ? 'Keine Verbindung – zeige letzten Stand' : 'Aktualisieren hat nicht geklappt – zeige letzten Stand');
+      else setToast(e?.code === 'offline' ? tr('Keine Verbindung – zeige letzten Stand') : tr('Aktualisieren hat nicht geklappt – zeige letzten Stand'));
     } finally {
       if (seq === reloadSeq.current) setLoading(false);
     }
@@ -966,8 +989,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     // Im offenen Feed erscheint der Satz ohnehin live; dort keinen Toast doppelt.
     if (tabRef.current !== 'feed') setToast(`${who}: ${valStr} ${set.category?.name || ''}`);
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`${isWork ? '💻' : '💪'} ${who} hat geliefert`, {
-        body: `${valStr} ${set.category?.name || (isWork ? 'min' : 'Reps')} · ${competition.name}`,
+      new Notification(`${isWork ? '💻' : '💪'} ${tr('{name} hat geliefert', { name: who })}`, {
+        body: `${valStr} ${set.category?.name || (isWork ? 'min' : tr('Reps'))} · ${competition.name}`,
         icon: '/favicon.ico'
       });
     }
@@ -1133,9 +1156,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   return (
     <div className="app">
       <header className="app-header">
-        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={`Challenge wechseln, aktuell ${competition.name}`}>
+        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={tr('Challenge wechseln, aktuell {name}', { name: competition.name })}>
           <span className="date">
-            {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {new Date().toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}
+            {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {PTi18n.date(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
           <span className="greeting">
             <span className="app-header-name">{competition.name}</span>
@@ -1144,7 +1167,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         </button>
         <button className={`avatar-btn${tab === 'settings' ? ' is-active' : ''}`}
           onClick={() => tab === 'settings' ? setTab('home') : openSettings()}
-          aria-label="Profil und Einstellungen">
+          aria-label={tr('Profil und Einstellungen')}>
           <Avatar userId={me} profile={profile} size={44} />
         </button>
       </header>
@@ -1155,13 +1178,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onReset={() => { setSettingsPage('root'); setTab('home'); }}>
         {loading ? <Loader /> : loadError ? (
           <div className="rd-empty" role="alert">
-            <div className="rd-empty-title">Konnte nicht laden</div>
+            <div className="rd-empty-title">{tr('Konnte nicht laden')}</div>
             <div className="rd-empty-text">
               {loadError.code === 'offline' || navigator.onLine === false
-                ? 'Keine Verbindung. Sobald du online bist, geht’s weiter.'
-                : 'Gerade klappt es nicht. Versuch es gleich nochmal.'}
+                ? tr('Keine Verbindung. Sobald du online bist, geht’s weiter.')
+                : tr('Gerade klappt es nicht. Versuch es gleich nochmal.')}
             </div>
-            <button className="btn" onClick={retryLoad}>Erneut versuchen</button>
+            <button className="btn" onClick={retryLoad}>{tr('Erneut versuchen')}</button>
           </div>
         ) : (<>
         {tab === 'home' && starterVisible && (
@@ -1178,8 +1201,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         {tab === 'home' && !currentChallenges.length && !proposalDismissed && fixTemplate.length > 0 &&
           <WeekFixCard key={`${weekStart}-${fixFromPrev ? 'prev' : 'plan'}`}
             template={fixTemplate} categories={categories} me={me}
-            title={fixFromPrev ? 'Wie letzte Woche starten' : undefined}
-            sub={fixFromPrev ? 'Gleiche Übungen wie letzte Woche. Ziele anpassen und los.' : undefined}
+            title={fixFromPrev ? tr('Wie letzte Woche starten') : undefined}
+            sub={fixFromPrev ? tr('Gleiche Übungen wie letzte Woche. Ziele anpassen und los.') : undefined}
             onFix={fixWeek}
             onDismiss={() => setProposalDismissed(true)} />
         }
@@ -1220,12 +1243,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 : { challenge_id: ch.id, reps: parseInt(val), note: null };
               await capi.addSet(payload);
               PTHaptics.tap();
-              const what = cat?.name ? ` ${cat.name}` : '';
               if (first) celebrateFirst(parseInt(val), ch, cat);
-              else { setToast(`+${val}${isWork ? ' min' : ''}${what} geloggt`); maybePushPrimer(); }
+              else { setToast(loggedToast(`+${val}${isWork ? ' min' : ''}`, cat?.name)); maybePushPrimer(); }
               reload();
             } catch (e) {
-              if (e?.code === 'offline') setToast('Keine Verbindung. Satz nicht gespeichert.');
+              if (e?.code === 'offline') setToast(tr('Keine Verbindung. Satz nicht gespeichert.'));
               else alert(e.message);
             } finally {
               unlock();
@@ -1248,8 +1270,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           challenges={currentChallenges} weekSets={currentWeekSets} participantCount={peopleForShare}
           loading={loading}
           projectTags={projectTags} toolTags={toolTags}
-          onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast('Satz aktualisiert'); reload(); } catch (e) { alert(e.message); } }}
-          onDeleteSet={async (s) => { try { await capi.deleteSet(s.id); setToast('Gelöscht'); reload(); } catch (e) { alert(e.message); } }}
+          onEditSet={async (s, patch) => { try { await capi.updateSet(s.id, patch); setToast(tr('Satz aktualisiert')); reload(); } catch (e) { alert(e.message); } }}
+          onDeleteSet={async (s) => { try { await capi.deleteSet(s.id); setToast(tr('Gelöscht')); reload(); } catch (e) { alert(e.message); } }}
           onToggleReaction={async (s, emoji) => {
             const mineHas = (s.reactions || []).some(r => r.athlete === me && r.emoji === emoji);
             try {
@@ -1295,20 +1317,20 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         </PTErrorBoundary>
       </main>
 
-      <nav className="tabbar" aria-label="Hauptnavigation">
+      <nav className="tabbar" aria-label={tr('Hauptnavigation')}>
         <div className="tabbar-inner">
           {[
-            { id: 'home', icon: 'home', label: 'Heute' },
-            { id: 'feed', icon: 'feed', label: 'Feed' },
-            { id: 'history', icon: 'stats', label: 'Stats' },
-            ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: 'Strafkonto', badge: openPenaltyCount }] : []),
+            { id: 'home', icon: 'home', label: tr('Heute') },
+            { id: 'feed', icon: 'feed', label: tr('Feed') },
+            { id: 'history', icon: 'stats', label: tr('Stats') },
+            ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: tr('Strafkonto'), badge: openPenaltyCount }] : []),
           ].map(t => (
             <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`}
               aria-current={tab === t.id ? 'page' : undefined}
               onClick={() => setTab(t.id)}>
               <span className="tab-icon">
                 <Icon name={t.icon} size={22} />
-                {t.badge > 0 && <span className="tab-badge" aria-label={t.badge === 1 ? '1 Person mit offener Strafe' : `${t.badge} Personen mit offener Strafe`}>{t.badge}</span>}
+                {t.badge > 0 && <span className="tab-badge" aria-label={trn(t.badge, '{n} Person mit offener Strafe', '{n} Personen mit offener Strafe')}>{t.badge}</span>}
               </span>
               {t.label}
             </button>
@@ -1319,7 +1341,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {closingWeek && (
         <WeekCloseSheet weekStart={closingWeek} api={capi} me={me}
           onClose={() => setClosingWeek(null)}
-          onDone={() => { setClosingWeek(null); setToast('Woche abgeschlossen'); reload(); }} />
+          onDone={() => { setClosingWeek(null); setToast(tr('Woche abgeschlossen')); reload(); }} />
       )}
 
       <Sheet open={!!setupForChallenge} onClose={() => setSetupForChallenge(null)}>
@@ -1334,8 +1356,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags}
           toolTags={toolTags}
           onClose={() => setSetupForChallenge(null)}
-          onSaved={() => {setSetupForChallenge(null);setToast('Ziel gespeichert');reload();}}
-          onDeleted={() => {setSetupForChallenge(null);setToast('Ziel gelöscht');reload();}}
+          onSaved={() => {setSetupForChallenge(null);setToast(tr('Ziel gespeichert'));reload();}}
+          onDeleted={() => {setSetupForChallenge(null);setToast(tr('Ziel gelöscht'));reload();}}
           onAddCategory={reload} />
       </Sheet>
 
@@ -1344,7 +1366,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           if (!logForChallenge) return null;
           const logCat = categories.find(c => c.id === logForChallenge.category_id);
           const ctype = logCat?.challenge_type || 'standard';
-          const what = logCat?.name ? ` ${logCat.name}` : '';
+          const catName = logCat?.name || '';
           if (ctype === 'tom_holland') {
             return (
               <TomHollandSheet
@@ -1355,7 +1377,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 onClose={() => setLogForChallenge(null)}
                 onLogged={(rounds) => {
                   setLogForChallenge(null);
-                  setToast(`${rounds} Runden${what} geloggt`);
+                  setToast(catName
+                    ? trn(rounds, '{n} Runde {name} geloggt', '{n} Runden {name} geloggt', { name: catName })
+                    : trn(rounds, '{n} Runde geloggt', '{n} Runden geloggt'));
                   reload();
                 }} />
             );
@@ -1371,7 +1395,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 onLogged={(val) => {
                   setLogForChallenge(null);
                   const m = Math.floor(val/60), s = val%60;
-                  setToast(val >= 204 ? 'Bring Sally Up geschafft!' : `${m}:${String(s).padStart(2,'0')}${what} geloggt`);
+                  setToast(val >= 204 ? tr('Bring Sally Up geschafft!') : loggedToast(`${m}:${String(s).padStart(2,'0')}`, catName));
                   reload();
                 }} />
             );
@@ -1391,7 +1415,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 PTHaptics.tap();
                 const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
                 if (isFirstLog && !isWork) celebrateFirst(r, ch, logCat);
-                else { setToast(`${valStr}${what} geloggt`); maybePushPrimer(); }
+                else { setToast(loggedToast(valStr, catName)); maybePushPrimer(); }
                 reload();
               }} />
           );
@@ -1407,7 +1431,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags}
           toolTags={toolTags}
           onClose={() => setBackfillOpen(false)}
-          onSaved={(r) => {setBackfillOpen(false);setToast(`+${r} nachgetragen`);reload();}} />
+          onSaved={(r) => {setBackfillOpen(false);setToast(tr('+{n} nachgetragen', { n: r }));reload();}} />
       </Sheet>
 
       <Sheet open={!!pickerForSet} onClose={() => setPickerForSet(null)}>
@@ -1439,7 +1463,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onLogged={(reps, ch, cat) => {
             PTHaptics.tap();
             if (!obState.firstLog) celebrateFirst(reps, ch, cat);
-            else { setToast(`+${reps}${cat?.name ? ` ${cat.name}` : ''} geloggt`); advance({ sets: 1 }); maybePushPrimer(); }
+            else { setToast(loggedToast(`+${reps}`, cat?.name)); advance({ sets: 1 }); maybePushPrimer(); }
             reload();
           }}
           onSkip={() => advance()} />
@@ -1451,7 +1475,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {layer?.kind === 'week1' && (
         <ObWeekOne summary={layer.summary} competition={competition} onDone={() => {
           onObPatch?.({ weekOne: { [competition.id]: layer.first } });
-          if (!sportsGoalsNow.length) openLayer(['goal'], { data: { title: 'Ziel für Woche 2' } });
+          if (!sportsGoalsNow.length) openLayer(['goal'], { data: { title: tr('Ziel für Woche 2') } });
           else setLayer(null);
         }} />
       )}
@@ -1463,17 +1487,18 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
       <Toast message={toast} onDone={() => setToast('')} />
 
+      {/* i18n-ignore: Entwickler-Panel (nur im Bearbeiten-Modus des Design-Hosts), bleibt deutsch */}
       <TweaksPanel title="Tweaks">
-        <TweakSection label="Theme" />
+        <TweakSection label="Theme" />{/* i18n-ignore */}
         <TweakRadio label="Modus" value={t.theme} options={['dark', 'light']}
-        onChange={(v) => setTweak('theme', v)} />
+        onChange={(v) => setTweak('theme', v)} />{/* i18n-ignore */}
         <TweakColor label="Akzent" value={t.accent} onChange={(v) => setTweak('accent', v)}
         options={['#32d74b', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2']} />
-        <TweakSection label="Layout" />
-        <TweakRadio label="Heute-Screen" value={t.layout}
+        <TweakSection label="Layout" />{/* i18n-ignore */}
+        <TweakRadio label="Heute-Screen" value={t.layout} /* i18n-ignore */
         options={[{ label: 'Ring', value: 'rings' }, { label: 'Balken', value: 'bar' }, { label: 'Zahl', value: 'numeric' }]}
         onChange={(v) => setTweak('layout', v)} />
-        <TweakSection label="Sonstiges" />
+        <TweakSection label="Sonstiges" />{/* i18n-ignore */}
         <TweakToggle label="Benachrichtigungen" value={notificationsOn}
         onChange={onSetNotifications} />
       </TweaksPanel>

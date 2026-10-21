@@ -117,3 +117,10 @@ select tgrelid::regclass as tabelle, tgname, tgenabled
 from pg_trigger
 where tgrelid in ('public.competition_members'::regclass, 'public.reactions'::regclass) and not tgisinternal
 order by 1, 2;
+
+-- 20. App-Sprache (kommt mit 20261021000000_profile_language.sql). Ohne Spalte: 0 Zeilen
+--     im ersten Ergebnis, Push-Mitteilungen sind dann immer deutsch. Die zweite Abfrage
+--     nur ausführen, wenn die Spalte da ist (null = App-Version ohne Sprachmeldung → Deutsch).
+select column_name, data_type from information_schema.columns
+where table_schema = 'public' and table_name = 'profiles' and column_name = 'language';
+-- select coalesce(language, '(leer)') as sprache, count(*) from public.profiles group by 1 order by 2 desc;

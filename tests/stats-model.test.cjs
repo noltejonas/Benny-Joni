@@ -8,7 +8,7 @@ const vm = require('node:vm');
 function load() {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
-  for (const f of ['data.js', 'stats-model.js']) {
+  for (const f of ['i18n.js', 'data.js', 'stats-model.js']) {
     const src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
     vm.runInContext(src, ctx, { filename: f });
   }

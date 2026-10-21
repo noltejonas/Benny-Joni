@@ -39,25 +39,28 @@ Platzhalter übrig ist (siehe `docs/launch/RELEASE.md`).
 <!-- review-notes:start -->
 Benny & Joni is a fitness challenge app for small groups of friends. Members agree on a weekly goal (for example 300 push-ups together), log their sets and see each other's progress in a live feed. Groups are closed: you can only join with a 6-character invite code from a friend. There is no public feed, no chat and no phone number.
 
-HOW TO REVIEW
-1. Tap "Schon dabei? Anmelden" on the welcome screen and sign in with the demo account provided in the App Review Information. It already belongs to a challenge with a second member, logged sets, reactions and an enabled penalty box ("Strafkonto").
-2. To test joining a challenge: register a new account (no email confirmation needed), choose "Code eingeben" and enter the invite code [BITTE AUSFÜLLEN: Einladungscode].
-3. Without an account: "Demo ansehen" on the welcome screen opens a local demo with sample data. Nothing is sent to our server.
+LANGUAGE
+The app is in English and German. It follows the device language (any other language shows English) and can be switched in Settings > App > "Language". Below, button labels are given in English with the German label in brackets.
 
-PENALTY BOX ("Strafkonto")
+HOW TO REVIEW
+1. Tap "Already a member? Sign in" ("Schon dabei? Anmelden") on the welcome screen and sign in with the demo account provided in the App Review Information. It already belongs to a challenge with a second member, logged sets, reactions and an enabled penalty pot ("Strafkonto").
+2. To test joining a challenge: register a new account (no email confirmation needed), choose "Enter code" ("Code eingeben") and enter the invite code [BITTE AUSFÜLLEN: Einladungscode].
+3. Without an account: "Try the demo" ("Demo ansehen") on the welcome screen opens a local demo with sample data. Nothing is sent to our server.
+
+PENALTY POT ("Strafkonto")
 Optional per challenge. It only records amounts that friends agreed to pay into their own group kitty when they miss their weekly share. The app does not process, hold or transfer money. There are no payments, no in-app purchases and no prizes. It is not gambling.
 
 ACCOUNT DELETION (Guideline 5.1.1(v))
-Settings (tap your avatar at the top right) > "Konto löschen", confirm twice. Also in the profile sheet (tap the challenge name at the top > your profile > "Konto löschen"). Profile, sets, reactions, penalty entries and the profile photo are deleted immediately. To test deletion, please register a new account first (no email confirmation needed) and delete that one, so the demo account stays available for future reviews.
+Settings (tap your avatar at the top right) > "Delete account" ("Konto löschen"), confirm twice. Also in the profile sheet (tap the challenge name at the top > your profile > "Delete account"). Profile, sets, reactions, penalty entries and the profile photo are deleted immediately. To test deletion, please register a new account first (no email confirmation needed) and delete that one, so the demo account stays available for future reviews.
 
 USER-GENERATED CONTENT (Guideline 1.2)
-Report/block: open the "Feed" tab and tap an entry of the other member to expand it, then "Melden" (report) or "Blockieren" (block). People can also be reported in Settings (avatar top right) > "Teilnehmer & Einladen" > "Melden", anything else via Settings > "Problem oder Inhalt melden". Reports open a pre-filled email to our support address with the IDs; we review within 24 hours, remove offending content and ban the account. Blocking hides that person's notes and photo on this device; leaving the challenge in Settings removes all contact. Content is only visible inside invite-only groups; there is no public feed, search or discovery. Zero-tolerance terms: https://noltejonas.github.io/Benny-Joni/nutzungsbedingungen.html
+Report/block: open the "Feed" tab and tap an entry of the other member to expand it, then "Report" ("Melden") or "Block" ("Blockieren"). People can also be reported in Settings (avatar top right) > "Members & invites" ("Teilnehmer & Einladen") > "Report", anything else via Settings > "Report a problem or content" ("Problem oder Inhalt melden"). Reports open a pre-filled email to our support address with the IDs; we review within 24 hours, remove offending content and ban the account. Blocking hides that person's notes and photo on this device; leaving the challenge in Settings removes all contact. Content is only visible inside invite-only groups; there is no public feed, search or discovery. Zero-tolerance terms: https://noltejonas.github.io/Benny-Joni/nutzungsbedingungen.html
 
 SIGN-IN
 Email and password only. There is no third-party or social login, so Sign in with Apple is not required (Guideline 4.8).
 
 OTHER
-No ads, no tracking, no analytics SDK. Push notifications are optional (at most one per day and challenge). The camera and photo library are only used to pick a profile photo. The app is in German and for iPhone only. Legal pages open in Safari: Settings > "Info & Rechtliches".
+No ads, no tracking, no analytics SDK. Push notifications are optional (at most one per day and challenge). The camera and photo library are only used to pick a profile photo. iPhone only. Legal pages (German) open in Safari: Settings > "Info & legal" ("Info & Rechtliches").
 
 Support: [BITTE AUSFÜLLEN: Support-E-Mail-Adresse] (we reply within 24 hours)
 <!-- review-notes:end -->
@@ -105,15 +108,23 @@ Null-Toleranz-Regel.
 **Login:** nur E-Mail und Passwort, kein Drittanbieter-Login. Deshalb ist
 „Mit Apple anmelden“ nicht nötig (4.8).
 
+**Sprache:** Die App gibt es auf Englisch und Deutsch. Sie folgt der
+Gerätesprache (andere Sprachen → Englisch) und lässt sich unter Einstellungen
+→ App → „Sprache“ umstellen. Prüfer nutzen meist ein englisches iPhone und
+sehen die App deshalb auf Englisch; die Notizen nennen die Knöpfe auf
+Englisch mit dem deutschen Text in Klammern.
+
 **Sonst:** keine Werbung, kein Tracking, kein Analyse-SDK. Push ist optional
 (höchstens eine Mitteilung pro Tag und Challenge). Kamera und Fotos nur fürs
-Profilbild. Nur Deutsch, nur iPhone. Rechtstexte öffnen in Safari:
+Profilbild. Nur iPhone. Rechtstexte (deutsch) öffnen in Safari:
 Einstellungen → „Info & Rechtliches“.
 
 ## Vor dem Absenden prüfen
 
-- Die Wege oben im gemergten Build einmal nachklicken. Die Beschriftungen
-  „Melden“, „Blockieren“, „Konto löschen“ und „Info & Rechtliches“ kommen aus
-  den Nacht-Paketen; heißen sie anders, den englischen Block anpassen.
+- Die Wege oben im gemergten Build einmal nachklicken, **einmal auf Deutsch
+  und einmal auf Englisch** (Einstellungen → App → Sprache → English, die App
+  lädt neu). Die englischen Beschriftungen im Block („Delete account“,
+  „Report“, „Block“, „Info & legal“, „Report a problem or content“) müssen zu
+  `www/i18n/en.js` passen; heißen sie anders, den englischen Block anpassen.
 - „Confirm email“ in Supabase ist AUS (sonst stimmt Schritt 2 nicht).
 - Die Support-Adresse beantwortet wirklich jemand, auch am Launch-Wochenende.

@@ -24,7 +24,7 @@ App freigegeben ist (realistisch 21.10. nachmittags bis 22.10.).
 | 06:10–06:30 | DSA-Händlerstatus | Nacht-PR mergen, Pages-Quelle umstellen, Rechtstexte ausfüllen | 2, 3, 5 |
 | 06:30–06:40 | App-Infos: Apple-ID, Sprache, Name, Version | Rechtstexte weiter | 4, 5 |
 | 06:40–06:50 | Apple-ID an B geben | Konstanten im Code eintragen | 6 |
-| 06:50–07:10 | Rechtsseiten veröffentlichen, URLs prüfen | Supabase: Prüfskript, zwei Migrationen, Reset-Vorlage | 7, 8 |
+| 06:50–07:10 | Rechtsseiten veröffentlichen, URLs prüfen | Supabase: Prüfskript, drei Migrationen, Reset-Vorlage | 7, 8 |
 | 07:05–07:45 | Build bauen und hochladen | Review-Konten mit Daten anlegen | 9, 10 |
 | 07:45–08:30 | Version 1.4 in App Store Connect ausfüllen | Gerätetest auf echtem iPhone + Screenshots | 11, 11a, 12 |
 | 08:30–08:45 | Build wählen, einreichen, Expedited Review beantragen | | 13 |
@@ -49,8 +49,9 @@ jede Abweichung ist eine Konstante (Spalte „Wo ändern“):
 | Rechtstexte | GitHub Pages, `https://noltejonas.github.io/Benny-Joni/` | `LEGAL_BASE` in `www/onboarding-model.js` |
 | Veröffentlichung | Manuell nach Freigabe, dazu Expedited Review | App Store Connect, Schritt 11 |
 | Anteil-Regel | Echte Teilnehmerzahl ab 2 Aktiven, sonst erwartete Personen | `SHARE_BASIS` in `www/stats-model.js` und dieselbe Regel im Abschnitt „Anteil (SHARE_BASIS)“ in `supabase/functions/_shared/push-rules.ts` (danach notify-set/daily-nudge neu deployen) |
-| Push | Rivalen-Push ab 10 Wdh./Tag, Ruhezeit 22–7 Uhr, max. 1 pro Tag und Challenge; Tageserinnerung erst ab 22.10. | Secret `RIVAL_THRESHOLD`; Ruhezeit in `supabase/functions/_shared/push-rules.ts`; `DRY_RUN` bei daily-nudge |
-| Sprache, Geräte, Länder | Nur Deutsch, nur iPhone, DE/AT/CH | App Store Connect (Schritt 11) |
+| Push | Rivalen-Push ab 10 Wdh./Tag, Ruhezeit 22–7 Uhr, max. 1 pro Tag und Challenge; Tageserinnerung erst ab 22.10. Texte in der Sprache der Empfänger (`profiles.language`, sonst Deutsch) | Secret `RIVAL_THRESHOLD`; Ruhezeit und Texte (`PUSH_TEXT`) in `supabase/functions/_shared/push-rules.ts`; `DRY_RUN` bei daily-nudge |
+| Sprache | **Deutsch + Englisch**, automatisch nach Gerätesprache (andere Sprachen → Englisch), umstellbar unter Einstellungen → App → Sprache. Store: Deutsch primär, Englisch (UK) als zweite Store-Seite empfohlen | `LANGUAGES`/`FALLBACK` in `www/i18n.js`, `CFBundleLocalizations` in `ios/App/App/Info.plist` (Regeln: `docs/SPRACHEN.md`); Store: Schritt 4 und 11 |
+| Geräte, Länder | Nur iPhone, DE/AT/CH (breiter erst mit englischen Rechtstexten, `STORE_LISTING.md` Abschnitt 5) | App Store Connect (Schritt 11) |
 | JSX vorkompiliert in V1 | Ja. Hook aktiv (`capacitor:copy:after` → `node tools/build-web.cjs`). Simulator-Check ca. 00:48 grün (Kaltstart → Willkommen, Preferences, Haptik, Push-Abfrage, Einladungslink bei offener App; kein Babel und keine .jsx im Bundle). Achtung: Ein Hook-Fehler bricht `cap sync` NICHT ab, deshalb danach `node tools/build-web.cjs --verify` (Schritt 9). | Zeile `"capacitor:copy:after"` in `package.json` |
 
 Abweichungen sofort Claude melden.
@@ -88,7 +89,8 @@ Die Rechtsseiten werden nur von `main` veröffentlicht, deshalb zuerst mergen.
    git switch main && git pull
    npm test
    ```
-   Erwartet: `fail 0` in der Zusammenfassung am Ende (heute Nacht 133 Tests).
+   Erwartet: `fail 0` in der Zusammenfassung am Ende (heute Nacht 133 Tests,
+   mit den Übersetzungen aus PR #12 mehr).
 
 Ab hier arbeitet ihr direkt auf `main`.
 
@@ -99,7 +101,8 @@ App Store Connect → Apps → die App mit Bundle-ID `com.bennyjoni.terminator`:
 1. **App-Informationen** → „Allgemeine Informationen“ → **Apple-ID** (nur
    Ziffern, z. B. 6741234567) notieren und an B geben.
 2. **Primäre Sprache: Deutsch.** Steht dort Englisch, umstellen; sonst
-   verlangt App Store Connect englische Texte.
+   verlangt App Store Connect englische Texte für die Hauptsprache. Englisch
+   kommt in Schritt 11 als zweite Store-Sprache dazu (optional).
 3. **Name** `Benny & Joni: Fitness-Duell` und **Untertitel**
    `Trainier gegen deine Freunde` eintragen und sichern. Ist der Name vergeben:
    Ersatz aus `docs/launch/STORE_LISTING.md`, dann auch `name.txt` ändern.
@@ -196,7 +199,18 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    1, 2, 4b, 5, 5b, 9 und 13; Abschnitt 14 nur, wenn 10b true zeigt. Das
    Skript liest nur. Ergebnisse kopieren und Claude geben.
 2. **SQL Editor** → New query → Inhalt von
-   `supabase/migrations/20261021000000_delete_account.sql` einfügen → Run.
+   `supabase/migrations/20261021000000_profile_language.sql` → Run (Spalte
+   `profiles.language`: Die App meldet ihre Sprache, Push-Mitteilungen kommen
+   dann auf Englisch bzw. Deutsch. Ohne die Spalte läuft alles, Pushes sind
+   aber immer deutsch). Idempotent. Kontrolle:
+   ```sql
+   select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'language';
+   -- → eine Zeile
+   ```
+
+   2a. **SQL Editor** → New query → Inhalt von
+   `supabase/migrations/20261021000010_delete_account.sql` einfügen → Run.
    Muss ohne Fehler durchlaufen (die Datei ist idempotent, ein zweiter Lauf
    schadet nicht).
 
@@ -222,10 +236,16 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    selbst per `auth.getUser`. Danach „Konto löschen“ erneut testen; die App
    weicht bei 42501 automatisch auf die Function aus.
 5. **Authentication → Emails → Templates → „Reset Password“**: Betreff
-   „Dein Code für Benny & Joni“, Text auf Deutsch mit `{{ .Token }}` als
-   6-stelligem Code, **kein Link** (die App erwartet einen Code; 5 min). Mit
-   einer Team-Adresse testen: „Passwort vergessen?“ → Mail mit Code → neues
-   Passwort.
+   „Dein Code für Benny & Joni / Your Benny & Joni code“, Text auf Deutsch mit
+   `{{ .Token }}` als 6-stelligem Code, darunter derselbe Satz auf Englisch
+   (die Vorlage kennt die App-Sprache nicht), **kein Link** (die App erwartet
+   einen Code; 5 min). Zum Beispiel:
+   ```html
+   <p>Dein Code für Benny &amp; Joni: <strong>{{ .Token }}</strong></p>
+   <p>Your Benny &amp; Joni code: <strong>{{ .Token }}</strong></p>
+   ```
+   Mit einer Team-Adresse testen: „Passwort vergessen?“ → Mail mit Code →
+   neues Passwort.
 
 **Jetzt NICHT einspielen:** `20261021000100_launch_optional.sql` (nur noch
 Abschnitt 4 `client_errors`, nach dem Launch), `20261021001000_daily_nudge_cron.sql` (ab 22.10.),
@@ -272,6 +292,9 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
 
 1. Texte: Werbetext, Beschreibung, Schlüsselwörter, Support-URL,
    Marketing-URL aus `ios/App/fastlane/metadata/de-DE/*.txt` kopieren.
+   **Empfohlen (10 min):** Sprache „Englisch (Vereinigtes Königreich)“
+   hinzufügen und dieselben Felder aus `ios/App/fastlane/metadata/en-GB/*.txt`
+   füllen (`STORE_LISTING.md` Abschnitt 1b). Screenshots dafür nicht nötig.
 2. Screenshots aus Schritt 11a hochladen, Pflicht ist „iPhone mit Dynamic
    Island (mittel)“ (1206×2622 oder 1179×2556). Die großen Größen sind
    optional. Keine iPad-Screenshots.
@@ -280,7 +303,9 @@ Alles steht in `docs/launch/STORE_LISTING.md`:
    überschreiben**.
 4. **App-Datenschutz** nach Abschnitt 4 (ohne Werbung, Tracking: Nein),
    Datenschutz-URL `https://noltejonas.github.io/Benny-Joni/datenschutz.html`.
-5. Preise und Verfügbarkeit: kostenlos, nur Deutschland, Österreich, Schweiz.
+5. Preise und Verfügbarkeit: kostenlos, Deutschland, Österreich, Schweiz
+   (Empfehlung für heute; weitere Länder erst mit englischen Rechtstexten,
+   geht jederzeit ohne neuen Build, `STORE_LISTING.md` Abschnitt 5).
 6. Copyright: `2026 <Name bzw. GbR>`.
 7. **App-Prüfung**: „Anmeldung erforderlich“ an, Login des Review-Kontos,
    Kontakt (Name, Telefon, E-Mail), Notizen = englischer Block aus
@@ -334,6 +359,13 @@ eigene iPhone. Prüfen:
       Bildschirm. In Supabase (Table Editor → profiles) ist das Konto weg.
 - [ ] Homescreen-Name und alle Texte: „Benny & Joni“, nirgends „Projekt
       Terminator“ oder „Tom Holland“.
+- [ ] Englisch: Einstellungen → App → Sprache → „English“. Die App lädt neu,
+      alle Texte englisch (Home, Feed, Stats, Strafkonto, Einstellungen,
+      „Delete account“, „Report“/„Block“ im Feed). Profilbild ändern: die
+      iOS-Rückfrage für Fotos kommt auf Englisch, sobald das iPhone selbst auf
+      Englisch steht (iOS-Einstellungen → Benny & Joni → Sprache). Mit
+      Migration 8.2 steht in Supabase `profiles.language` = `en`. Danach
+      zurück auf „Wie das Gerät“.
 
 Fehler sofort Claude melden, mit Screenshot.
 
@@ -369,7 +401,9 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
    ```
    **`--no-verify-jwt` ist Pflicht** (der Trigger schickt kein JWT). Danach
    Dashboard → Edge Functions → notify-set: „Verify JWT“ muss AUS sein.
-   Verlangt die CLI Docker: `--use-api` anhängen.
+   Verlangt die CLI Docker: `--use-api` anhängen. Die Texte kommen in der
+   Sprache der Empfänger, wenn Migration 8.2 (`profiles.language`) drin ist,
+   sonst auf Deutsch.
 
    Danach im SQL Editor
    `select status_code, count(*) from net._http_response group by 1;`:
@@ -440,6 +474,8 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `package.json` | `"capacitor:copy:after"` | drin: `node tools/build-web.cjs` | Notlösung siehe `RELEASE.md` | nur bei Build-Problemen |
 | `capacitor.config.json` | `appName` | `Benny & Joni` | – | – |
 | `ios/App/App/Info.plist` | `CFBundleDisplayName` | `Benny & Joni` | – | – |
+| `ios/App/App/Info.plist` | `CFBundleLocalizations` / `CFBundleDevelopmentRegion` | `en`, `de` / `en` | nur bei neuer Sprache (`docs/SPRACHEN.md`) | – |
+| `www/i18n.js` | `LANGUAGES` / `FALLBACK` | Deutsch, Englisch / Englisch | nur bei neuer Sprache | – |
 | `ios/App/App.xcodeproj` | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | `1.4` / `20` | Build +1 bei jedem neuen Upload | Schritt 9 |
 | `www/index.html`, `www/manifest.webmanifest` | Titel, Name | `Benny & Joni` | – | – |
 | `www/ads.js` (nur Branch `claude/admob-1.4.1`) | `ADS_ENABLED`, `PROD` | aus / Test-IDs | echte AdMob-IDs | 1.4.1 |
@@ -463,6 +499,7 @@ kein Entwurfs-Kasten mehr da ist.
 | Wo | Was | Wann |
 |---|---|---|
 | `ios/App/fastlane/metadata/copyright.txt` | `2026 <Name bzw. GbR>` | Schritt 6 |
+| `ios/App/fastlane/metadata/en-GB/` | Englische Store-Texte (fertig, optional); fastlane lädt sie automatisch mit | Schritt 11 |
 | `docs/launch/REVIEW_NOTES.md` | Support-Adresse im englischen Block | Schritt 6 |
 | App Store Connect → App-Prüfung | Login Review-Konto, Kontakt, Einladungscode | Schritt 11 |
 | `ios/App/fastlane/.env` (nur für fastlane, gitignored) | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`, `REVIEW_FIRST_NAME`, `REVIEW_LAST_NAME`, `REVIEW_EMAIL`, `REVIEW_PHONE`, `REVIEW_USER`, `REVIEW_PASSWORD`, `REVIEW_CODE` | wenn ihr fastlane nutzt |
@@ -472,7 +509,8 @@ kein Entwurfs-Kasten mehr da ist.
 | Was | Datei / Ort | Wann |
 |---|---|---|
 | Prüfskript (nur lesend) | `docs/launch/supabase-checks.sql` | Schritt 8, **P0** |
-| Migration „Konto löschen“ | `supabase/migrations/20261021000000_delete_account.sql` | Schritt 8, **P0** |
+| Migration „App-Sprache“ (`profiles.language`, Push-Texte je Sprache) | `supabase/migrations/20261021000000_profile_language.sql` | Schritt 8 |
+| Migration „Konto löschen“ | `supabase/migrations/20261021000010_delete_account.sql` | Schritt 8, **P0** |
 | Migration vor dem Review (Avatar-Listing, Kategorie) | `supabase/migrations/20261021000050_launch_vor_review.sql` | Schritt 8, **P0** |
 | „Confirm email“ AUS | Authentication → Providers → Email | Schritt 8, **P0** |
 | AV-Vertrag (DPA) | Organization → Legal Documents | Schritt 5 |
@@ -497,8 +535,9 @@ kein Entwurfs-Kasten mehr da ist.
 
 ### App Store Connect
 
-DSA-Händlerstatus, Vereinbarungen, Apple-ID, primäre Sprache Deutsch, Name und
-Untertitel, Version 1.4, Texte, Screenshots, Kategorie, Altersfreigabe,
+DSA-Händlerstatus, Vereinbarungen, Apple-ID, primäre Sprache Deutsch (dazu
+optional Englisch UK), Name und Untertitel, Version 1.4, Texte, Screenshots,
+Kategorie, Altersfreigabe,
 App-Datenschutz, Preis kostenlos, Verfügbarkeit DE/AT/CH, App-Prüfung,
 manuelle Veröffentlichung, Expedited Review. Alles in Schritt 2, 4, 11, 11a
 (Screenshots) und 13.
@@ -533,8 +572,10 @@ Pro Paket: was drin ist, was offen blieb, worauf ihr achten müsst.
   Switcher, Einladung mit Store-Link, Code und `projektterminator://join/…`.
 - **p0-ios-projekt** (Privacy-Manifest, nur iPhone, Deutsch, Startbildschirm,
   Build 20): Gemergt, braucht einen neuen nativen Build. Privacy-Manifest
-  (jetzt auch „Andere Finanzinformationen“), nur iPhone, Deutsch,
+  (jetzt auch „Andere Finanzinformationen“), nur iPhone,
   Startbildschirm ohne Splash-Bild, 1.4 (20), `appName` „Benny & Joni“.
+  „Nur Deutsch“ gilt nicht mehr: Mit PR #12 (unten) nennt die Info.plist
+  `en` und `de`, Entwicklungsregion `en`.
   **Offen:** Startbildschirm hell/dunkel im Gerätetest ansehen.
 - **p0-start-ohne-cdn** (lokale Bibliotheken und Schrift, Start-Fallback,
   Vorkompilieren): Gemergt. Vorkompilieren **JA**. React, ReactDOM,
@@ -582,6 +623,18 @@ Pro Paket: was drin ist, was offen blieb, worauf ihr achten müsst.
   setzen.
 - **p1-store-screenshots** (geplant: 6 Motive): **Nicht umgesetzt** →
   Schritt 11a (Pflicht vor dem Einreichen).
+- **PR #12 Übersetzung** (morgens in den Launch-Branch gemergt): Die App gibt
+  es auf Deutsch und Englisch. Sprache nach Gerät (andere Sprachen →
+  Englisch), Einstellung unter Einstellungen → App → Sprache, Datum und Zahlen
+  im Format der Sprache. Alle Texte der Nacht-Pakete sind mit übersetzt.
+  iOS-Rückfragen in `de.lproj`/`en.lproj`, `CFBundleLocalizations` `en` und
+  `de`, `CFBundleDevelopmentRegion` `en` (Englisch für alle anderen
+  Gerätesprachen, passend zur App). Push-Mitteilungen (Rivale, Beitritt,
+  Reaktion, Tageserinnerung) in der Sprache der Empfänger über
+  `profiles.language` (Migration Schritt 8.2). Die Migration „Konto löschen“
+  heißt deshalb jetzt `20261021000010_delete_account.sql` (gleiche
+  Versionsnummer wie die Sprach-Migration). Regeln für neue Texte:
+  `docs/SPRACHEN.md`.
 - **p2-admob-update-branch** (eigener Branch `claude/admob-1.4.1`, NICHT im
   Launch-Build): Um 01:33 zeigte der Branch auf `ca20176` (enthält den
   Nacht-Stand `d3dd7ef`, dazu `www/ads.js` und `docs/launch/ADMOB.md`). Nachts

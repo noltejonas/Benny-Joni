@@ -7,19 +7,23 @@ const vm = require('node:vm');
 
 // `config` setzt Konstanten der Launch-Konfiguration (z. B. APP_STORE_ID), so
 // wie die Gründer sie morgens in onboarding-model.js eintragen.
+function readWww(f, config = {}) {
+  let src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
+  if (f === 'onboarding-model.js') {
+    for (const [key, value] of Object.entries(config)) {
+      const re = new RegExp(`const ${key} = '[^']*';`);
+      assert.match(src, re, `${key} steht als Konstante in onboarding-model.js`);
+      src = src.replace(re, `const ${key} = ${JSON.stringify(value)};`);
+    }
+  }
+  return src;
+}
+
 function load(config = {}) {
   const ctx = { window: {}, console };
   vm.createContext(ctx);
-  for (const f of ['data.js', 'onboarding-model.js']) {
-    let src = fs.readFileSync(path.join(__dirname, '..', 'www', f), 'utf8');
-    if (f === 'onboarding-model.js') {
-      for (const [key, value] of Object.entries(config)) {
-        const re = new RegExp(`const ${key} = '[^']*';`);
-        assert.match(src, re, `${key} steht als Konstante in onboarding-model.js`);
-        src = src.replace(re, `const ${key} = ${JSON.stringify(value)};`);
-      }
-    }
-    vm.runInContext(src, ctx, { filename: f });
+  for (const f of ['i18n.js', 'data.js', 'onboarding-model.js']) {
+    vm.runInContext(readWww(f, config), ctx, { filename: f });
   }
   return { O: ctx.window.PTOnboarding, D: ctx.window.PTData, window: ctx.window };
 }
@@ -184,6 +188,88 @@ test('reportContent: ohne Support-Adresse die Support-Seite, sonst Mail mit IDs'
   assert.equal(subject, 'Meldung: Person');
   assert.doesNotMatch(plain, /Satz-ID|Challenge-ID|Notiz|undefined/);
   assert.equal(m.reportText({}).subject, 'Meldung: Inhalt');
+});
+
+// Wie auf einem englischen Gerät. Die Texte stehen hier selbst, damit der Test
+// nicht vom Stand von i18n/en.js abhängt.
+function loadEnglish(config = {}) {
+  const ctx = { window: {}, console, navigator: { languages: ['en-US'], language: 'en-US' } };
+  vm.createContext(ctx);
+  for (const f of ['i18n.js', 'i18n/en.js', 'data.js', 'onboarding-model.js']) {
+    vm.runInContext(readWww(f, config), ctx, { filename: f });
+  }
+  ctx.PTi18n.add('en', {
+    'Komm in meine Challenge „{name}“ bei {app} 💪': 'Join my challenge “{name}” on {app} 💪',
+    'App laden: {url}': 'Get the app: {url}',
+    'Im App Store: {app}': 'On the App Store: {app}',
+    'Schon installiert? {link}': 'Already installed? {link}',
+    'Satz': 'Set',
+    'Art: {label}': 'Type: {label}',
+    'Satz-ID: {id}': 'Set ID: {id}',
+    'Nutzer-ID: {id}': 'User ID: {id}',
+    'Was ist passiert? Beschreib es kurz:': 'What happened? Tell us briefly:',
+    'Meldung: {label}': 'Report: {label}',
+  });
+  return { O: ctx.window.PTOnboarding, I: ctx.PTi18n };
+}
+
+test('englische Einladung lässt sich wieder einlesen, auch ohne Link', () => {
+  const { O: E, I } = loadEnglish();
+  assert.equal(I.lang, 'en');
+  const text = E.inviteText({ name: 'Office Battle', invite_code: 'bj4k7x' });
+  assert.match(text, /^Join my challenge “Office Battle” on /);
+  assert.ok(text.includes(E.APP_NAME), text);
+  assert.doesNotMatch(text, /Terminator/);
+  assert.match(text, /Code: BJ4K7X/);
+  assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
+  assert.equal(E.normalizeCode(text), 'BJ4K7X');
+  const withoutLink = text.split('\n').slice(0, -1).join('\n');
+  assert.equal(E.normalizeCode(withoutLink), 'BJ4K7X', 'nur über „Code:“');
+  // englische Wörter mit sechs Buchstaben („Office“, „Battle“) sind kein Code
+  assert.equal(E.normalizeCode('Office Battle is great'), null);
+  assert.equal(E.normalizeCode(`Join my challenge “Office” on ${E.APP_NAME} 💪`), null);
+  // Einladungen in der jeweils anderen Sprache gehen auch
+  assert.equal(O.normalizeCode(text), 'BJ4K7X');
+  assert.equal(E.normalizeCode(O.inviteText({ name: 'Büro-Battle', invite_code: '3A9UQM' })), '3A9UQM');
+});
+
+test('englische Einladung mit und ohne App-Store-ID', () => {
+  const { O: none } = loadEnglish({ APP_STORE_ID: '' });
+  assert.deepEqual(none.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n'), [
+    `Join my challenge “Duel” on ${none.APP_NAME} 💪`,
+    `On the App Store: ${none.APP_NAME}`,
+    'Code: GTB34L',
+    'Already installed? projektterminator://join/GTB34L',
+  ]);
+  const { O: store } = loadEnglish({ APP_STORE_ID: '6741234567' });
+  const lines = store.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n');
+  assert.equal(lines[1], 'Get the app: https://apps.apple.com/de/app/id6741234567');
+  assert.equal(store.normalizeCode(lines.join('\n')), 'GTB34L');
+});
+
+test('Meldung auf Englisch: Texte übersetzt, IDs unverändert', () => {
+  const { O: E } = loadEnglish();
+  const { subject, body } = E.reportText({ kind: 'set', setId: 's-1', userId: 'u-2' });
+  assert.equal(subject, 'Report: Set');
+  for (const part of ['What happened?', 'Type: Set', 'Set ID: s-1', 'User ID: u-2', `App: ${E.APP_NAME}`]) {
+    assert.ok(body.includes(part), part);
+  }
+  assert.doesNotMatch(body, /Satz|Nutzer|Was ist passiert/);
+});
+
+test('„Code“ im Challenge-Namen verdrängt nicht den echten Code', () => {
+  const { O: E } = loadEnglish();
+  const cut = (text) => text.split('\n').slice(0, -1).join('\n'); // ohne Link-Zeile
+  for (const M of [O, E]) {
+    for (const name of ['Code Sprint', 'Promo Code: SOMMER', 'code=HALLO1']) {
+      const text = M.inviteText({ name, invite_code: 'BJ4K7X' });
+      assert.equal(M.normalizeCode(text), 'BJ4K7X', `${name} mit Link`);
+      assert.equal(M.normalizeCode(cut(text)), 'BJ4K7X', `${name} ohne Link`);
+    }
+  }
+  // Etikett mitten im Satz und ohne Doppelpunkt geht weiterhin
+  assert.equal(O.normalizeCode('Hier der Code: bj4k7x, bis gleich'), 'BJ4K7X');
+  assert.equal(O.normalizeCode('Code bj4k7x'), 'BJ4K7X');
 });
 
 // ── Einstieg ────────────────────────────────────────────────────────────────
