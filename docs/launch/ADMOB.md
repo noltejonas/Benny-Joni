@@ -1,14 +1,32 @@
 # AdMob für den Launch
 
-Stand 21.10.2026: **Technisch für iOS und Android vorbereitet, noch nicht für produktive Werbung freigeschaltet.**
-Das AdMob-Konto wird neu angelegt. Echte App- und Banner-IDs, veröffentlichte
-Einwilligungsnachrichten und die Prüfung der Store-Verknüpfung stehen noch aus.
-Die App verwendet deshalb ausschließlich Googles Testanzeigen. Store-Release-Lanes
-müssen weiter abbrechen, solange Werbung aktiviert ist und produktive IDs fehlen.
+Stand 21.10.2026: **iOS- und Android-App mit je einem Banner in AdMob angelegt;
+beide produktiven ID-Paare sind im Projekt eingetragen.**
+Publisher: `pub-8393455800337394`.
+
+| Plattform | App-ID | Banner-ID |
+|---|---|---|
+| iOS | `ca-app-pub-8393455800337394~4603844935` | `ca-app-pub-8393455800337394/7259209697` |
+| Android | `ca-app-pub-8393455800337394~1570487484` | `ca-app-pub-8393455800337394/3252516074` |
+
+Die Werte stimmen zwischen `www/ads.js` und der jeweiligen nativen
+App-Konfiguration (`Info.plist` bzw. `AndroidManifest.xml`) überein.
+Das Zahlungsprofil bleibt auf Wunsch des Betreibers vorerst offen.
+Store-Verknüpfung, Googles app-ads.txt-Verifizierung und echte Gerätetests
+stehen noch aus. Die eingetragenen IDs allein bestätigen keine Anzeigenfreigabe.
 Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
 
 ## Bereits umgesetzt
 
+- AdMob-Konsole: EU-Nachricht „Benny & Joni – EU-Einwilligung“ ist für beide
+  Apps veröffentlicht. Standardsprache Deutsch, zusätzlich Englisch;
+  Zielregion EWR/Vereinigtes Königreich/Schweiz. „Nicht einwilligen“ ist für
+  alle Länder aktiviert, Schließen ohne Einwilligung bleibt deaktiviert.
+  Beide Apps verwenden die erreichbare Datenschutzadresse.
+- Im Konto ist Google der einzige ausgewählte Werbepartner; keine automatische
+  Ergänzung weiterer Partner. Berechtigtes Interesse ist nicht vorausgewählt;
+  die zusätzliche Einwilligungsprüfung für Echtzeitgebots-Creatives ist aktiv.
+  Höchste Anzeigenfreigabe im Konto ist G (alle Altersgruppen), passend zum Code.
 - `@capacitor-community/admob` 8.2.1; Capacitor 8.5.2.
 - `www/ads.js` lädt das Plugin über die native Bridge, ohne CDN. Im Browser und
   in der Demo gibt es keine Anzeigen.
@@ -26,9 +44,12 @@ Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
 - iOS: Google-App-ID, SKAdNetwork-Liste und Privacy-Manifeste vorhanden.
   Der Code fordert keine ATT-Berechtigung an. Keine IDFA-Nachricht in AdMob
   konfigurieren, solange das Anzeigenmodell ohne ATT vorgesehen ist.
-- Android: natives Capacitor-Projekt, separate Test-App-ID, verzögerte
-  Anzeigenmessung und Release-Sperre vorhanden. Ein Android-Build und echte
-  Gerätetests stehen noch aus; hierfür fehlen lokal JDK/Android-SDK.
+- Android: natives Capacitor-Projekt, eigene produktive App-ID, verzögerte
+  Anzeigenmessung und Release-Sperre vorhanden. JDK 21 und Android SDK sind
+  eingerichtet; die Debug-APK wurde am 21. Oktober 2026 erfolgreich gebaut.
+  Die produktive App-ID und Banner-ID wurden im APK-Inhalt geprüft.
+  Anzeigen- und Einwilligungstests auf einem Android-Gerät stehen noch aus;
+  Build-Details stehen in [ANDROID.md](ANDROID.md).
   Android-Push bleibt bis zur separaten FCM-Einrichtung deaktiviert.
 
 ## Konto und IDs einrichten
@@ -70,16 +91,22 @@ AdMob sucht `app-ads.txt` an der **Wurzel des Hostnamens** der Entwicklerwebsite
 
 Mit `https://noltejonas.github.io/Benny-Joni/` als Website sucht AdMob unter
 `https://noltejonas.github.io/app-ads.txt`. Eine Datei im Unterverzeichnis
-`/Benny-Joni/app-ads.txt` genügt nicht. Entweder eine eigene Domain verwenden oder
-auf dem GitHub-Pages-Host ein Root-Repository `noltejonas.github.io` mit dieser
-Datei einrichten. Den personalisierten Eintrag aus der AdMob-Konsole übernehmen:
+`/Benny-Joni/app-ads.txt` genügt nicht. Im bereits bestehenden Root-Repository
+`noltejonas.github.io` wurde diese Datei additiv veröffentlicht. Der Eintrag:
 
 ```text
-google.com, pub-<eigene Publisher-ID>, DIRECT, f08c47fec0942fa0
+google.com, pub-8393455800337394, DIRECT, f08c47fec0942fa0
 ```
 
-Keine Platzhalterdatei veröffentlichen. Danach in AdMob die Erkennung und
-Verifizierung prüfen. Bis Google die App freigegeben hat, können produktive
+Der korrekte Inhalt liegt lokal in `docs/launch/app-ads.txt` und öffentlich unter
+`https://noltejonas.github.io/app-ads.txt` (HTTP 200 und Inhalt geprüft).
+Die fünf App-/Rechtsseiten sind unter `/Benny-Joni/` ebenfalls erreichbar.
+Sie werden derzeit additiv aus dem Root-Repository bereitgestellt
+(Commit `7b64ddba2ba1321f170e76ddb51914768eaa5a30`); die vorhandene Flutter-Website
+bleibt erhalten. Spätere Änderungen müssen auch dort veröffentlicht werden,
+bis der eigene Pages-Workflow des App-Repos aktiv ist.
+In AdMob die Erkennung und Verifizierung nach der Store-Verknüpfung prüfen.
+Bis Google die App freigegeben hat, können produktive
 Anzeigen eingeschränkt bleiben.
 
 ## Prüfen
@@ -96,8 +123,9 @@ npx cap sync ios
 npx cap sync android
 ```
 
-Die beiden Prüfungen mit `ADS_REQUIRE_LIVE=1` sollen aktuell fehlschlagen,
-weil noch keine echten Anzeigen-IDs vorliegen. Die Sperre nicht umgehen.
+Beide Prüfungen mit `ADS_REQUIRE_LIVE=1` prüfen jetzt die echten IDs und müssen
+bestehen. Das Bestehen der ID-Prüfung ersetzt weder UMP-/Zahlungseinrichtung
+noch Geräteprüfung oder Googles Freigabe.
 
 Vor Einreichung je Plattform auf echtem Gerät prüfen: Einwilligung, korrekt
 markierte Testanzeige über der Tab-Leiste, letzter Eintrag und Toast sichtbar,
@@ -106,8 +134,9 @@ keine Banner in Onboarding, Heute, Strafkonto oder Demo. Einwilligung ablehnen
 und Offline-Start ebenfalls prüfen. Browsertests ersetzen diese Prüfung nicht.
 
 Datenschutzerklärung und Store-Datenschutzauskünfte müssen das tatsächliche
-Verhalten von App und Google-SDK wiedergeben. Vorhandene Entwürfe und Platzhalter
-in `docs/launch/site/` sowie `STORE_LISTING.md` vor Upload vervollständigen.
+Verhalten von App und Google-SDK wiedergeben. Die lokalen Rechtsseiten in
+`docs/launch/site/` stimmen mit der veröffentlichten Fassung überein.
+Offene Betriebsfakten stehen in `LEGAL_FACTS.md`.
 Das eingebettete SDK-Manifest und Xcodes Privacy Report dabei abgleichen.
 
 ## Offizielle Grundlagen

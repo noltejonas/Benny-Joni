@@ -39,7 +39,7 @@ die längere Seite darf höchstens doppelt so lang wie die kürzere sein.
 - Primäre Sprache: Deutsch; zusätzliche Lokalisierung: Englisch (UK).
 - Kategorie: Gesundheit und Fitness; die App erfasst vom Nutzer eingetragene Trainingswerte.
 - Version und Build müssen zum tatsächlichen Upload passen. Die aktuelle Version steht als `MARKETING_VERSION` im Xcode-Projekt.
-- Copyright: tatsächlicher Betreiber wie im Impressum; der vorhandene Platzhalter muss ersetzt werden.
+- Copyright: Jonas Nolte und Benjamin Frey, wie in den veröffentlichten Anbieterangaben.
 - Support-, Marketing- und Datenschutz-URL: Dateien `*_url.txt`; die öffentlich erreichbaren Seiten müssen vollständig und aktuell sein.
 - Review-Zugang und Notizen: `REVIEW_NOTES.md`; `REVIEW_*` nur in der ignorierten `.env`.
 - Preis und Länder: im Konto bewusst festlegen. Die App ist auf Deutsch und Englisch verfügbar; die vorbereiteten Rechtstexte sind deutsch.
@@ -77,12 +77,12 @@ Möglichkeit zur Kontolöschanfrage und das Formular für Gesundheits-Apps
 
 ## Was aktuell noch fehlt
 
-- AdMob-Konto, echte App-/Banner-IDs je Plattform, veröffentlichte UMP-Nachricht und bestätigtes `app-ads.txt`.
-- Tatsächliche Betreiber-/Supportdaten und weitere markierte Rechtsangaben; Veröffentlichung der vollständigen Rechtsseiten.
-- Store-Zugänge und erreichbarer Review-Login, sofern nicht bereits lokal eingerichtet.
-- Für Android: SDK/JDK, Upload-Keystore, signiertes AAB, echte Screenshots und erster Upload in Play Console.
+- AdMob-Zahlungsprofil (auf Wunsch vorerst offen), Store-Verknüpfung und Googles Bestätigung von `app-ads.txt`. Beide Apps/Banner und die UMP-Nachricht sind eingerichtet; die Datei ist am Domain-Stamm erreichbar.
+- Produktions-E-Mail-Versand und verbleibende Betriebsfakten aus `LEGAL_FACTS.md` überprüfen. Anbieter-/Supportdaten sind eingesetzt und die fünf App-/Rechtsseiten öffentlich erreichbar.
+- Store-API-Zugänge, gültige Apple-Verträge und erreichbarer Review-Login; die bekannten Review-Kontaktdaten sind lokal hinterlegt.
+- Für Android: externes Backup des lokal erstellten Upload-Keys, Gerätetests, echte Screenshots und erster Upload des geprüften signierten AAB in Play Console.
 
 Die Release-Sperren stoppen bei Test-Anzeigenkennungen oder unvollständigen
 Unterlagen. Die vollständigen Befehle stehen in
-[FASTLANE_STORES.md](FASTLANE_STORES.md). Es wurde nichts zur Prüfung
-abgesendet oder veröffentlicht.
+[FASTLANE_STORES.md](FASTLANE_STORES.md). Es wurde keine App-Version zur
+Store-Prüfung abgesendet oder veröffentlicht.

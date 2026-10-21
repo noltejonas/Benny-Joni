@@ -40,13 +40,11 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<!-- AdMob (www/ads.js, docs/launch/ADMOB.md). PLATZHALTER: Das ist Googles
-	     öffentliche Test-App-ID. Vor dem Release durch die echte App-ID aus der
-	     AdMob-Konsole ersetzen, dieselbe wie PROD.appId in www/ads.js;
-	     tests/ads-config.test.cjs schlägt sonst fehl. Fehlt der Schlüssel ganz,
-	     beendet sich die App beim Start des Google-SDKs. -->
+	<!-- AdMob iOS-App-ID, am 21.10.2026 aus der Konsole übernommen.
+	     Muss PROD.appId in www/ads.js entsprechen; die Konfigurationsprüfung
+	     sperrt abweichende Werte vor dem Release. -->
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-8393455800337394~4603844935</string>
 	<!-- SKAdNetwork-IDs aus Googles AdMob-Anleitung für iOS (Stand WIP 1.4.1). -->
 	<key>SKAdNetworkItems</key>
 	<array>

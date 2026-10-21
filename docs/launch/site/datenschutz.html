@@ -39,8 +39,6 @@
     a { color: var(--accent); }
     .meta { color: var(--text-2); font-size: 14px; margin-bottom: 20px; }
     .box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
-    mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 3px; border-radius: 4px; }
-    .draft { background: var(--draft-bg); border: 1px solid var(--draft-line); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px; font-size: 15px; }
     footer { color: var(--text-2); font-size: 14px; margin-top: 24px; text-align: center; }
     footer a { color: var(--text-2); }
   </style>
@@ -57,38 +55,31 @@
     </nav>
   </header>
 
-  <div class="draft" role="note">
-    <strong>Entwurf – so nicht veröffentlichen.</strong>
-    Dieser Text beschreibt die Datenflüsse der App nach dem Stand des Codes vom 21.10.2026. Er ist keine Rechtsberatung.
-    Vor dem Veröffentlichen alle gelb markierten Stellen <mark class="todo">[BITTE AUSFÜLLEN]</mark> ersetzen,
-    den Text prüfen lassen (z.&nbsp;B. Abgleich mit einem Generator wie eRecht24 oder durch eine Anwältin bzw. einen Anwalt)
-    und danach diesen Kasten löschen. Der Workflow <code>legal-pages</code> veröffentlicht erst, wenn beides erledigt ist.
-  </div>
-
   <main>
     <h1>Datenschutzerklärung</h1>
-    <p class="meta">für die iPhone-App „Benny &amp; Joni“ und diese Website · Stand: 21. Oktober 2026</p>
+    <p class="meta">für die App „Benny &amp; Joni“ auf iOS und Android und diese Website · Stand: 21. Oktober 2026</p>
 
     <div class="box">
       <strong>Kurz gesagt</strong>
       <ul>
-        <li>Wir speichern nur, was die App zum Funktionieren braucht: dein Konto, dein Profil und deine Trainingsdaten.</li>
+        <li>Für die App verarbeiten wir dein Konto, dein Profil und deine Trainingsdaten. Für Werbung, Sicherheit und Fehlerbehebung fallen außerdem die unten beschriebenen technischen Daten an.</li>
         <li>Wir verkaufen keine Daten. Neben technischen Fehlerberichten verarbeitet das Werbe-SDK Anzeigen- und Diagnosedaten, wie in Abschnitt 2.11 beschrieben.</li>
-        <li>Ab Version 1.4.1 zeigt die App im Feed und in den Stats Werbebanner von Google: nur nicht personalisiert und erst nach deiner Auswahl im Einwilligungsdialog (Abschnitt 2.11). Deine Trainingsdaten bekommt Google nicht.</li>
+        <li>Ab Version 1.4.1 zeigt die App im Feed und in den Stats Werbebanner von Google: nur nicht personalisiert und entsprechend dem von Google ermittelten Einwilligungsstand (Abschnitt 2.11). Die App übergibt keine Trainingsdaten an das Werbe-SDK.</li>
         <li>Die App lädt keine Schriften oder Skripte von Fremdservern nach. Mit Google verbindet sie sich nur für die Werbung.</li>
         <li>Deine Challenge-Daten sehen die Mitglieder deiner Challenge. Wenn du der Rangliste zustimmst, sehen andere App-Nutzer außerdem deinen Anzeigenamen, dein Foto und deine gewerteten Trainingsergebnisse (Abschnitt 2.12).</li>
-        <li>Du kannst dein Konto jederzeit in der App löschen. Dann löschen wir deine Daten.</li>
+        <li>Du kannst dein Konto jederzeit in der App löschen. Den Umfang und verbleibende Sicherungskopien erläutert Abschnitt 6.</li>
       </ul>
     </div>
 
     <h2>1. Wer ist verantwortlich?</h2>
     <p>
-      <mark class="todo">[BITTE AUSFÜLLEN: Vor- und Nachname bzw. Name der GbR mit allen Gesellschafterinnen und Gesellschaftern]</mark><br />
-      <mark class="todo">[BITTE AUSFÜLLEN: Straße und Hausnummer]</mark><br />
-      <mark class="todo">[BITTE AUSFÜLLEN: PLZ und Ort]</mark>, Deutschland<br />
-      E-Mail: <mark class="todo">[BITTE AUSFÜLLEN: Support-E-Mail-Adresse]</mark>
+      Jonas Nolte und Benjamin Frey<br />
+      Furtbachstraße 16A<br />
+      70178 Stuttgart, Deutschland<br />
+      E-Mail: <a href="mailto:bennyundjoni@gmail.com">bennyundjoni@gmail.com</a><br />
+      Telefon: <a href="tel:+491781479821">+49 178 1479821</a> (Jonas Nolte)
     </p>
-    <p>Weitere Angaben findest du im <a href="impressum.html">Impressum</a>. Wir sind nicht verpflichtet, eine Datenschutzbeauftragte oder einen Datenschutzbeauftragten zu benennen.</p>
+    <p>Weitere Angaben findest du im <a href="impressum.html">Impressum</a>.</p>
 
     <h2>2. Welche Daten die App verarbeitet</h2>
     <p>Ohne Konto kannst du nur die Demo ansehen. Die Demo läuft komplett auf deinem Gerät und schickt nichts an unsere Server.</p>
@@ -111,7 +102,7 @@
       Das Profilfoto wird auf deinem Gerät verkleinert und in einem Dateispeicher abgelegt, dessen Dateien über eine Internetadresse abrufbar sind.
       Die App zeigt diese Adresse Mitgliedern deiner Challenges und bei freiwilliger Ranglisten-Teilnahme auch anderen App-Nutzern. Wer sie kennt, kann das Bild aber auch ohne Anmeldung öffnen.
       Lade deshalb nur ein Foto hoch, das du so zeigen möchtest.
-      Für die Auswahl fragt iOS dich nach Zugriff auf Kamera oder Fotos. Die App liest nur das Foto, das du auswählst.
+      Für die Auswahl nutzt die App die Kamera- oder Fotoauswahl deines Betriebssystems. Die App erhält das Foto, das du auswählst.
     </p>
 
     <h3>2.3 Challenges und Training</h3>
@@ -151,7 +142,7 @@
     <p>
       Die App speichert auf deinem Gerät deine Anmeldung (Sitzung), das Farbschema, die gewählte Sprache, deinen Fortschritt beim Einstieg, zuletzt geöffnete Ansichten, deine Blockliste,
       eine noch offene Einladung (höchstens 7 Tage), deine Schnellsatz-Werte und die Mitteilungs-Einstellung samt Push-Token. Daten eines Arbeitszeit-Timers aus früheren Versionen können noch vorhanden sein; der Work-Modus ist nicht mehr aktivierbar.
-      Diese Daten bleiben auf dem Gerät. Sie sind unbedingt nötig, damit die App so funktioniert, wie du sie nutzt (§ 25 Abs. 2 Nr. 2 TDDDG).
+      Diese lokalen Kopien und Einstellungen sind nötig, damit die App so funktioniert, wie du sie nutzt (§ 25 Abs. 2 Nr. 2 TDDDG). Inhalte wie Profil, Trainingsdaten und Einstiegsfortschritt werden daneben wie oben beschrieben deinem Konto auf dem Server zugeordnet.
       Ab Version 1.4.1 speichert der Einwilligungsdialog von Google dort außerdem deine Auswahl zur Werbung (Abschnitt 2.11).
     </p>
 
@@ -159,38 +150,35 @@
     <p>
       Bei jedem Zugriff der App auf den Server verarbeitet unser Hosting-Dienstleister technisch nötige Daten:
       IP-Adresse, Zeitpunkt, die aufgerufene Funktion, Fehlercodes sowie Angaben zu App und Gerät (User-Agent).
-      Zweck sind ein sicherer und stabiler Betrieb und das Abwehren von Missbrauch. Die Protokolle werden je nach Tarif nach 1 bis 7 Tagen gelöscht.
+      Zweck sind ein sicherer und stabiler Betrieb und das Abwehren von Missbrauch. Die Aufbewahrung technischer Protokolle richtet sich nach der Konfiguration des Hosting-Dienstes und dem Zweck der Betriebs- und Sicherheitsanalyse. Wir verwenden sie nicht zur werblichen Profilbildung.
     </p>
 
     <h3>2.8 Technische Fehlerberichte</h3>
     <p>
       Tritt in der App ein Fehler auf, kann sie eine kurze technische Meldung an unsere Datenbank schicken, höchstens fünf pro Sitzung:
       Fehlertext, technischer Ablauf (Stacktrace), betroffene Stelle in der App, Zeitpunkt, Geräte- und Systemangaben (User-Agent) und deine Nutzer-ID. Damit finden und beheben wir Fehler.
-      Wir löschen diese Meldungen nach spätestens <mark class="todo">[BITTE AUSFÜLLEN: Löschfrist für Fehlerberichte, Vorschlag 90]</mark> Tagen.
+      Diese Meldungen sind dem Konto zugeordnet und werden beim Löschen des Kontos entfernt. Eine automatische Löschung nach einer festen Zahl von Tagen ist derzeit nicht eingerichtet; eine frühere Entfernung oder Anonymisierung zur Fehlerbehebung ist möglich.
     </p>
 
     <h3>2.9 Kontakt, Support und Meldungen</h3>
     <p>
       Wenn du uns schreibst, etwa über „Support &amp; Feedback“ oder „Melden“ in der App, verarbeiten wir deine E-Mail-Adresse, den Inhalt deiner Nachricht
       und die mitgeschickten Kennungen (z.&nbsp;B. Nutzer-, Challenge- oder Satz-ID). Damit beantworten wir deine Anfrage oder prüfen eine Meldung.
-      Unser E-Mail-Postfach liegt bei <mark class="todo">[BITTE AUSFÜLLEN: E-Mail-Anbieter der Support-Adresse, z. B. Google Ireland Ltd. (Gmail)]</mark>.
+      Unser Support-Postfach nutzt Gmail von Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland.
       Wir löschen die Nachrichten, wenn die Anfrage erledigt ist und keine gesetzliche Aufbewahrungspflicht besteht.
     </p>
 
     <h3>2.10 E-Mails der App</h3>
     <p>
       Wenn du „Passwort vergessen“ nutzt, schickt dir unser Hosting-Dienstleister in unserem Auftrag eine E-Mail mit einem Code.
-      Für den Versand nutzen wir <mark class="todo">[BITTE AUSFÜLLEN: E-Mail-Versanddienst (SMTP), z. B. Resend, Brevo oder Postmark, oder den Standardversand von Supabase]</mark>.
+      Die Anmeldung und der Versand solcher Sicherheits-E-Mails werden über Supabase Auth und die dafür eingerichtete E-Mail-Infrastruktur abgewickelt. Dabei werden Empfängeradresse, Zustellinformationen und der für den Vorgang erforderliche Nachrichteninhalt verarbeitet.
       Werbe-E-Mails verschicken wir nicht.
     </p>
 
     <h3>2.11 Werbung (Google AdMob, ab Version 1.4.1)</h3>
     <p>
-      <mark class="todo">[BITTE AUSFÜLLEN: Abschnitt 2.11 rechtlich prüfen lassen, dann diese Markierung löschen]</mark>
-    </p>
-    <p>
       Ab Version 1.4.1 zeigt die App in den Bereichen „Feed“ und „Stats“ ein Werbebanner. Auf „Heute“, im Strafkonto, in den Einstellungen,
-      während des Einstiegs und in der Demo gibt es keine Werbung, Vollbild- oder Videowerbung gar nicht.
+      während des Einstiegs und in der Demo gibt es keine Werbung. Wir nutzen keine Vollbild-, Prämien- oder App-Start-Anzeigen. Ein Banner kann auch bewegte Inhalte enthalten.
       Die Anzeigen liefert Google AdMob. Anbieter ist die Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland („Google“).
       Google verarbeitet die Daten für die Werbung in eigener Verantwortung (Google Ads Controller-Controller Data Protection Terms).
     </p>
@@ -198,12 +186,12 @@
       <strong>Nur nicht personalisierte Anzeigen.</strong> Die App fordert bei Google ausschließlich nicht personalisierte Anzeigen an.
       Google wählt sie nach dem Umfeld und dem ungefähren Standort aus, nicht nach einem Profil von dir.
       Deine Trainingsdaten, dein Profil, deine Challenges und deine Nutzer-ID gibt die App nicht an Google weiter.
-      Die App fragt nicht nach App-Tracking-Transparenz. Die Werbe-ID (IDFA) deines iPhones bleibt damit für die App und für Google gesperrt.
+      Unter iOS fordert die App keine App-Tracking-Transparenz-Berechtigung (ATT) an. Unter Android kann das Google-SDK unter anderem die Android-Werbe-ID und die App-Set-ID verarbeiten, soweit das Betriebssystem und dein Einwilligungsstand dies erlauben. Nicht personalisierte Werbung bedeutet daher nicht, dass keine Gerätekennungen oder Diagnosedaten verarbeitet werden. Die zusätzliche Publisher-first-party-ID von Google ist in unserer App auf beiden Plattformen deaktiviert.
     </p>
     <p><strong>Was Google dabei verarbeitet:</strong></p>
     <ul>
       <li>IP-Adresse und daraus abgeleitet ein ungefährer Standort (Land, Region)</li>
-      <li>Geräte- und App-Angaben, z.&nbsp;B. Gerätemodell, iOS-Version, Sprache und App-Version, sowie Kennungen, die Google für diese App auf deinem Gerät speichert oder ausliest</li>
+      <li>Geräte- und App-Angaben, z.&nbsp;B. Gerätemodell, Betriebssystemversion, Sprache und App-Version, sowie Kennungen, die Google für diese App auf deinem Gerät speichert oder ausliest</li>
       <li>Interaktionen mit Anzeigen: welche Anzeige gezeigt wurde und ob du sie angetippt hast</li>
       <li>Diagnose- und Leistungsdaten des Werbe-SDKs, z.&nbsp;B. Ladezeiten und Abstürze</li>
     </ul>
@@ -213,20 +201,19 @@
       <a href="https://policies.google.com/privacy">Datenschutzerklärung von Google</a>.
     </p>
     <p>
-      <strong>Einwilligung.</strong> Bevor Werbung geladen wird, fragt die App beim ersten Öffnen von „Feed“ oder „Stats“ mit dem Einwilligungsdialog von Google
-      (User Messaging Platform, IAB Transparency &amp; Consent Framework) nach deiner Einwilligung.
+      <strong>Einwilligung.</strong> Vor dem Laden von Werbung prüft die App den Einwilligungsstand mit Googles User Messaging Platform. Soweit eine Auswahl erforderlich ist, erscheint beim Öffnen von „Feed“ oder „Stats“ der Einwilligungsdialog von Google (IAB Transparency &amp; Consent Framework).
       Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, für das Speichern und Auslesen auf deinem Gerät § 25 Abs. 1 TDDDG).
       Lehnst du ab, kannst du die App ganz normal weiter nutzen. Welche Anzeigen noch zulässig sind, bestimmt das Google-SDK anhand deiner Auswahl.
       Bei eingeschränkten Anzeigen („Limited Ads“) kann Google für die Erkennung ungültiger Zugriffe weiterhin lokalen Speicher verwenden. Eine Ablehnung bedeutet deshalb nicht pauschal, dass keinerlei Datenverarbeitung stattfindet.
       Einzelne Verarbeitungen, etwa zur Messung und Betrugsabwehr, erläutert Google im Dialog. Weitere Einzelheiten findest du in <a href="https://support.google.com/admob/answer/10105530?hl=de">Googles Beschreibung eingeschränkter Anzeigen</a>.
     </p>
     <p>
-      <strong>Ändern und widerrufen:</strong> jederzeit in der App unter Einstellungen (dein Profilbild oben rechts) → „Werbe-Einwilligung“. Der Widerruf gilt für die Zukunft.
+      <strong>Ändern und widerrufen:</strong> über Einstellungen (dein Profilbild oben rechts) → „Werbe-Einwilligung“, wenn Google für deine Region diesen Einstieg verlangt. Der Widerruf gilt für die Zukunft.
       Deine Auswahl speichert der Dialog auf deinem Gerät, bis du sie änderst oder die App löschst.
     </p>
     <p>
       <strong>Übermittlung in die USA.</strong> Google kann Daten auch an die Google LLC in den USA übermitteln.
-      Die Google LLC ist nach dem EU-US Data Privacy Framework zertifiziert (Angemessenheitsbeschluss, Art. 45 DSGVO); daneben gelten EU-Standardvertragsklauseln.
+      Google beschreibt die für internationale Übermittlungen verwendeten Schutzmechanismen in seinen <a href="https://policies.google.com/privacy/frameworks">Informationen zu internationalen Datenübermittlungen</a>, insbesondere Angemessenheitsbeschlüsse und Standardvertragsklauseln.
       Wie lange Google die Daten speichert, regelt Google selbst (siehe Links oben).
     </p>
 
@@ -246,39 +233,38 @@
     <h2>3. Dienstleister und Empfänger</h2>
     <ul>
       <li>
-        <strong>Supabase</strong> (Supabase, Inc., USA) betreibt für uns Datenbank, Anmeldung, Dateispeicher und Server-Funktionen.
-        Die Server stehen in einem Rechenzentrum von Amazon Web Services in Irland (Region eu-west-1).
-        <mark class="todo">[BITTE AUSFÜLLEN: Bestätigen, dass der Vertrag zur Auftragsverarbeitung (DPA) mit Supabase abgeschlossen ist – Supabase-Dashboard → Organization → Legal Documents]</mark>
-        Wir haben mit Supabase einen Vertrag zur Auftragsverarbeitung nach Art. 28 DSGVO geschlossen.
-        Ein Zugriff aus den USA lässt sich nicht ganz ausschließen. Grundlage dafür sind die EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO).
+        <strong>Supabase</strong> betreibt für uns Datenbank, Anmeldung, Dateispeicher und Server-Funktionen als Cloud-Dienstleister.
+        Die Vertragsgrundlage zur Verarbeitung erläutert das <a href="https://supabase.com/legal/customer-resources/data-processing-addendum">Data Processing Addendum von Supabase</a>.
+        Projektbezogene Daten werden in der für das Projekt gewählten Region gespeichert. Für technische Betriebsdaten, weltweite Auslieferung, Support oder Unterauftragnehmer können außerdem Verarbeitungen außerhalb dieser Region und außerhalb des EWR stattfinden.
+        Supabase beschreibt hierfür insbesondere Standardvertragsklauseln und weitere Schutzmaßnahmen in seinen <a href="https://supabase.com/legal/privacy-resources/data-residency-and-transfers-faq">Informationen zu Speicherorten und internationalen Übermittlungen</a> und seiner <a href="https://supabase.com/legal/customer-resources/subprocessor-list">Liste der Unterauftragnehmer</a>. Diese Erklärung verspricht keine ausschließlich europäische Verarbeitung.
       </li>
       <li>
         <strong>Apple</strong> stellt Push-Mitteilungen zu (siehe 2.5) und vertreibt die App über den App Store.
         Für den Download und den App Store ist Apple selbst verantwortlich. Von Apple erhalten wir nur zusammengefasste Statistiken, etwa die Zahl der Downloads.
       </li>
       <li>
-        <strong>E-Mail</strong>: der unter 2.9 und 2.10 genannte Anbieter.
+        <strong>E-Mail</strong>: Google stellt unser Support-Postfach bereit; Supabase Auth und die dafür eingerichtete Versand-Infrastruktur verarbeiten Sicherheits-E-Mails der App (Abschnitte 2.9 und 2.10).
       </li>
       <li>
-        <strong>GitHub</strong> (GitHub, Inc., USA) stellt diese Website bereit, siehe Abschnitt 4.
+        <strong>GitHub</strong> stellt diese Website über GitHub Pages bereit, siehe Abschnitt 4.
       </li>
       <li>
         <strong>Google</strong> (Google Ireland Limited, Irland, und Google LLC, USA) liefert ab Version 1.4.1 die Werbung aus, in eigener Verantwortung, siehe 2.11.
       </li>
     </ul>
-    <p>Andere Nutzer sehen, was unter 2.2 bis 2.4 und bei freiwilliger Ranglisten-Teilnahme unter 2.12 als sichtbar beschrieben ist. Darüber hinaus geben wir Daten nur weiter, wenn uns ein Gesetz dazu verpflichtet.</p>
+    <p>Andere Nutzer sehen, was unter 2.2 bis 2.4 und bei freiwilliger Ranglisten-Teilnahme unter 2.12 als sichtbar beschrieben ist. Neben den in dieser Erklärung genannten Empfängern geben wir Daten nur weiter, wenn uns ein Gesetz dazu verpflichtet.</p>
 
     <h2>4. Diese Website</h2>
     <p>
       Diese Seiten liegen bei GitHub Pages. Beim Aufruf verarbeitet GitHub technisch nötige Daten wie IP-Adresse, Zeitpunkt und Browser, um die Seiten auszuliefern und vor Angriffen zu schützen.
       Wir setzen keine Cookies, keine Analyse-Tools und laden keine Inhalte von anderen Servern.
-      Für Übermittlungen in die USA nutzt GitHub das EU-US Data Privacy Framework bzw. EU-Standardvertragsklauseln.
+      GitHub erläutert seine Verarbeitung, Aufbewahrung und Schutzmaßnahmen für internationale Übermittlungen in der <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">GitHub-Datenschutzerklärung</a>.
       Rechtsgrundlage ist unser berechtigtes Interesse an einer sicheren, einfachen Bereitstellung dieser Informationen (Art. 6 Abs. 1 lit. f DSGVO).
     </p>
 
     <h2>5. Rechtsgrundlagen</h2>
     <ul>
-      <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertrag): Konto, Profil, Challenges, Trainingsdaten, Strafkonto, Push-Mitteilungen und Support. Ohne diese Daten können wir dir die App nicht anbieten.</li>
+      <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertrag): Konto, Profil, Challenges, Trainingsdaten, ein von dir genutztes Strafkonto, gewünschte Push-Mitteilungen und Support. Welche Daten dafür nötig sind, hängt von den Funktionen ab, die du nutzt; etwa Profilfoto, Strafkonto und Push-Mitteilungen sind freiwillig.</li>
       <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> (berechtigtes Interesse): Server- und Sicherheitsprotokolle, Fehlerberichte, die Prüfung von Meldungen und der Schutz anderer Nutzer sowie diese Website.</li>
       <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> (Einwilligung): freiwillige Veröffentlichung in der Rangliste (Abschnitt 2.12), jederzeit in den Einstellungen ausschaltbar.</li>
       <li><strong>Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG</strong> (Einwilligung): Werbung ab Version 1.4.1 (Abschnitt 2.11). Widerruf jederzeit unter Einstellungen → „Werbe-Einwilligung“, sofern Google diesen Eintrag verlangt.</li>
@@ -291,12 +277,12 @@
       <li>Grundsätzlich so lange, wie dein Konto besteht.</li>
       <li>
         <strong>Konto löschen:</strong> In der App unter Einstellungen (dein Profilbild oben rechts) → „Konto löschen“.
-        Dann löschen wir sofort dein Konto, dein Profil, deine Profilfotos, Sätze, Reaktionen, Strafkonto-Einträge, Push-Tokens und Mitgliedschaften.
-        Challenges, in denen danach niemand mehr ist, löschen wir ganz. In anderen Challenges übernimmt ein anderes Mitglied die Leitung.
+        Der Löschvorgang entfernt dein Konto und die zugeordneten App-Datensätze, etwa Profil, Sätze, Reaktionen, Strafkonto-Einträge, Push-Tokens und Mitgliedschaften. Profilfotos werden im selben Vorgang zur Löschung aus dem Dateispeicher angefordert. Falls dabei ein technischer Fehler auftritt, wende dich an den Support, damit wir die Entfernung prüfen können.
+        Neu angelegte Challenges ohne verbleibende Mitglieder werden dabei ebenfalls entfernt. In anderen Challenges übernimmt ein anderes Mitglied die Leitung. Die aus einer früheren App-Version übernommene Alt-Challenge kann als Struktur ohne dein Profil und deine kontobezogenen Datensätze bestehen bleiben.
         Übungen, die du in einer Challenge angelegt hast, bleiben dort ohne Bezug zu dir.
       </li>
       <li>Verlässt du nur eine Challenge, bleiben deine bisherigen Sätze dort sichtbar, bis du dein Konto löschst.</li>
-      <li>Server-Protokolle: 1 bis 7 Tage. In Sicherungskopien unseres Hosting-Dienstleisters können gelöschte Daten noch bis zu 7 Tage enthalten sein.</li>
+      <li>Server-Protokolle und Sicherungskopien folgen den Aufbewahrungszyklen der eingesetzten Hosting-Konfiguration. Eine Löschung aus der laufenden Datenbank entfernt Daten nicht unmittelbar aus bereits vorhandenen Sicherungen; diese fallen mit dem Ablauf des jeweiligen Sicherungszyklus weg und werden nicht für den normalen App-Betrieb verwendet. Eine feste Tagesfrist für Protokolle oder Sicherungskopien wird hier nicht zugesagt.</li>
       <li>Support-Nachrichten: bis die Anfrage erledigt ist, außer eine gesetzliche Pflicht verlangt mehr.</li>
     </ul>
 
@@ -308,16 +294,16 @@
       Schreib uns dazu einfach eine E-Mail.
     </div>
     <p>
-      Für alle Anfragen genügt eine E-Mail an <mark class="todo">[BITTE AUSFÜLLEN: Support-E-Mail-Adresse]</mark>.
+      Für alle Anfragen genügt eine E-Mail an <a href="mailto:bennyundjoni@gmail.com">bennyundjoni@gmail.com</a>.
       Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), zum Beispiel bei der Behörde an deinem Wohnort oder bei der für uns zuständigen Behörde:
-      <mark class="todo">[BITTE AUSFÜLLEN: Landesdatenschutzbehörde am Sitz des Anbieters mit Anschrift und Website]</mark>.
+      <a href="https://www.baden-wuerttemberg.datenschutz.de/kontakt-aufnehmen/">Der Landesbeauftragte für den Datenschutz und die Informationsfreiheit Baden-Württemberg</a>, Heilbronner Straße 35, 70191 Stuttgart.
     </p>
 
     <h2>8. Mindestalter</h2>
     <p>Die App richtet sich an Personen ab 16 Jahren (siehe <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>).</p>
 
     <h2>9. Keine automatisierten Entscheidungen</h2>
-    <p>Wir treffen keine automatisierten Entscheidungen und erstellen keine Profile im Sinne von Art. 22 DSGVO. Statistiken und Vergleiche in der App zählen nur eure eingetragenen Sätze zusammen. Auch für die Werbung fordert die App nur nicht personalisierte Anzeigen an.</p>
+    <p>Die App trifft keine ausschließlich automatisierten Entscheidungen mit rechtlicher oder ähnlich erheblicher Wirkung über dich. Statistiken und Vergleiche in der App werden aus den von euch eingetragenen Sätzen berechnet. Auch für die Werbung fordert die App nur nicht personalisierte Anzeigen an.</p>
 
     <h2>10. Änderungen</h2>
     <p>Ändert sich die App, passen wir diese Erklärung an. Die aktuelle Fassung steht immer auf dieser Seite und ist in der App unter Einstellungen verlinkt.</p>

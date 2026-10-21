@@ -13,6 +13,10 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 const WWW = path.join(ROOT, 'www');
 const ADS_SRC = fs.readFileSync(path.join(WWW, 'ads.js'), 'utf8');
+// Verhalten immer gegen kontrollierte Test-IDs prüfen; die echte Konfiguration
+// wird separat unverändert gegen die nativen Dateien und Release-Sperre geprüft.
+const TEST_SOURCE = ADS_SRC.replace(/const PROD(?:_ANDROID)? = \{[\s\S]*?\n  \};/g,
+  (block) => block.replace(/(appId|banner|rewarded): '[^']*'/g, "$1: ''"));
 const PLIST = fs.readFileSync(path.join(ROOT, 'ios', 'App', 'App', 'Info.plist'), 'utf8');
 
 // Googles öffentliche Test-Publisher-ID (developers.google.com/admob/ios/test-ads)
@@ -77,7 +81,7 @@ function configProblems({ config, plistAppId }) {
 // ── Nachgebaute Umgebung ────────────────────────────────────────────────────
 // native: false = Browser, null = gar kein window.Capacitor.
 function makeEnv({ native = true, platform = 'ios', plugin = true, info = {}, afterForm = {},
-  failInfo = 0, afterPrivacy = {}, source = ADS_SRC } = {}) {
+  failInfo = 0, afterPrivacy = {}, source = TEST_SOURCE } = {}) {
   const calls = [];
   const listeners = {};
   const present = new Set();
@@ -159,7 +163,7 @@ async function settle() { for (let i = 0; i < 30; i++) await new Promise((r) => 
 // ── Konfiguration ───────────────────────────────────────────────────────────
 
 test('Konfiguration in www/ads.js und Info.plist passt zusammen (Release-Sperre)', () => {
-  const { config } = makeEnv({ native: false }).PTAds;
+  const { config } = makeEnv({ native: false, source: ADS_SRC }).PTAds;
   const plistAppId = plistValue('GADApplicationIdentifier');
   assert.deepEqual(configProblems({ config, plistAppId }), []);
 });
@@ -169,7 +173,7 @@ test('Konfiguration in www/ads.js und Info.plist passt zusammen (Release-Sperre)
 test('Release-Sperre: mit ADS_REQUIRE_LIVE=1 keine Testanzeigen im App-Store-Build',
   { skip: process.env.ADS_REQUIRE_LIVE !== '1' && 'nur mit ADS_REQUIRE_LIVE=1 (fastlane release)' }, () => {
     const platform = process.env.ADS_PLATFORM || 'ios';
-    const { config } = makeEnv({ native: false, platform }).PTAds;
+    const { config } = makeEnv({ native: false, platform, source: ADS_SRC }).PTAds;
     assert.ok(!config.enabled || !config.testing,
       `ADS_ENABLED ist an, aber die produktive Banner-ID für ${platform} fehlt: Der Build zeigt nur Testanzeigen. `
       + 'Echte IDs eintragen (docs/launch/ADMOB.md) oder ADS_ENABLED = false.');
@@ -210,7 +214,7 @@ test('Testmodus hängt nur an PROD.banner und nutzt Googles Test-Blöcke', () =>
   assert.equal(c.maxAdContentRating, 'General');
   if (c.testing) assert.ok(c.banner.startsWith(`ca-app-pub-${TEST_PUB}/`));
   // Mit echten IDs (per Quelltext ersetzt) ist der Testmodus aus und die echten Blöcke gelten.
-  const src = ADS_SRC
+  const src = TEST_SOURCE
     .replace(/appId: '',/, "appId: 'ca-app-pub-1234567890123456~1111111111',")
     .replace(/banner: '',/, "banner: 'ca-app-pub-1234567890123456/2222222222',");
   const live = makeEnv({ native: false, source: src }).PTAds.config;
@@ -287,7 +291,7 @@ test('Browser, fremde Plattform oder fehlendes Plugin: alles No-op', async () =>
 });
 
 test('ADS_ENABLED = false: kein SDK-Start, keine Anfrage an Google', async () => {
-  const src = ADS_SRC.replace('const ADS_ENABLED = true;', 'const ADS_ENABLED = false;');
+  const src = TEST_SOURCE.replace('const ADS_ENABLED = true;', 'const ADS_ENABLED = false;');
   assert.notEqual(src, ADS_SRC);
   const env = makeEnv({ source: src, info: { canRequestAds: true, status: 'OBTAINED' } });
   assert.equal(env.PTAds.config.enabled, false);
@@ -433,7 +437,7 @@ test('Android nutzt eigene Test-IDs und denselben UMP-Ablauf', async () => {
 });
 
 test('Produktive iOS-IDs aktivieren keine Android-Anzeigen mit fremden IDs', () => {
-  const src = ADS_SRC
+  const src = TEST_SOURCE
     .replace(/appId: '',/, "appId: 'ca-app-pub-1234567890123456~1111111111',")
     .replace(/banner: '',/, "banner: 'ca-app-pub-1234567890123456/2222222222',");
   const android = makeEnv({ platform: 'android', source: src }).PTAds.config;
@@ -482,7 +486,7 @@ test('iOS deaktiviert Googles Publisher first-party ID vor dem SDK-Start', () =>
 
 
 test('Android-Manifest hat eine zur Anzeigenkonfiguration passende App-ID', () => {
-  const { config } = makeEnv({ platform: 'android', native: false }).PTAds;
+  const { config } = makeEnv({ platform: 'android', native: false, source: ADS_SRC }).PTAds;
   assert.deepEqual(configProblems({ config, plistAppId: androidAppId() }), []);
 });
 

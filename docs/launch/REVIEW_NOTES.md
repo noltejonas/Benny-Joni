@@ -1,5 +1,11 @@
 # Hinweise für die App-Prüfung
 
+Anbieter sind Jonas Nolte und Benjamin Frey, beide unter Furtbachstraße 16A,
+70178 Stuttgart, Deutschland. Support und Review-Ansprechpartner: Jonas Nolte,
+`bennyundjoni@gmail.com`, `+491781479821`. Die Support-Adresse ist in der App
+hinterlegt. Die folgenden Notizen benötigen weiterhin einen funktionierenden
+Review-Login und den echten Einladungscode; diese Zugangsdaten werden nur lokal konfiguriert.
+
 Die englischen Notizen zwischen den Markierungen werden von Fastlane
 übernommen. Der Einladungscode wird ausschließlich aus `REVIEW_CODE` in der
 ignorierten `.env` eingesetzt. Die tatsächlichen Kontaktdaten und der echte
@@ -38,11 +44,11 @@ ADS
 Google AdMob is integrated for banner ads in Feed and Stats. There are no interstitial, rewarded or app-open ad placements. Ads are absent from onboarding and the local demo and hidden while sheets or full-screen overlays are open. Only non-personalised ads are requested. Where required, Google's User Messaging Platform obtains consent; Settings > "Ad consent" ("Werbe-Einwilligung") reopens the privacy options when Google requires this entry point. Ad availability depends on consent status and supply. The app does not request ATT or provide training data, account IDs or challenge data to AdMob.
 
 OTHER
-Email and password sign-in; optional push notifications. Profile photos are chosen by the user. Legal and support pages open externally. The store's Support URL and the contact supplied in App Review Information can be used for questions.
+Email and password sign-in; optional push notifications. Profile photos are chosen by the user. Legal and support pages open externally. Support contact: Jonas Nolte, bennyundjoni@gmail.com, +49 178 1479821. The store's Support URL and the contact supplied in App Review Information can also be used for questions.
 <!-- review-notes:end -->
 
 Die Notizen beschreiben den vorgesehenen Release mit produktiven AdMob-IDs.
-Aktuell fehlen diese IDs noch; `check_ads_live!` verhindert deshalb einen
+`check_ads_live!` prüft die tatsächlich eingetragenen IDs und verhindert einen
 App-Store-Build mit Testanzeigen. Vor dem Einreichen müssen die Angaben zu
 Werbung und SDK-Daten mit dem tatsächlich hochgeladenen Build übereinstimmen.
 Es wird weder automatisch eingereicht noch veröffentlicht.

@@ -9,3 +9,5 @@ ios/App/DerivedData/
 # Supabase-CLI-Zwischenstand (Projekt-Ref, Konto-Name) – gehört nicht ins öffentliche Repo
 supabase/.temp/
 dist/
+# Local release signing material and machine-only configuration
+.local/

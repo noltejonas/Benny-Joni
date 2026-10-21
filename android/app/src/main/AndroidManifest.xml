@@ -9,9 +9,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- Google test ID; replace together with PROD_ANDROID.appId before release. -->
+        <!-- AdMob app ID verified in the console; must match PROD_ANDROID.appId. -->
         <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-8393455800337394~1570487484" />
         <meta-data android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT" android:value="true" />
 
         <activity

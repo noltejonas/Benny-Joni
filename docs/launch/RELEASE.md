@@ -35,8 +35,8 @@ bundle exec fastlane store_metadata
 verwenden. `store_metadata` lädt die Texte und ausgewählten Screenshots in
 die vorbereitete Store-Version. Ein kompletter App-Store-Build mit
 Store-Unterlagen ist `bundle exec fastlane release`. Der Build setzt echte,
-zusammenpassende AdMob-IDs voraus; solange diese fehlen, stoppt die
-Release-Sperre. `screenshots:false` überspringt Bilder, `metadata_only:true`
+zusammenpassende AdMob-IDs voraus; diese sind für beide Plattformen eingesetzt
+und geprüft. `screenshots:false` überspringt Bilder, `metadata_only:true`
 überspringt den Build. Vor dem Upload werden lokale Rechts-/Support-Entwürfe
 und Text-/Bilddateien geprüft.
 
@@ -53,8 +53,14 @@ bundle exec fastlane android store_metadata
 bundle exec fastlane android internal_draft aab:/absoluter/pfad/app-release.aab
 ```
 
-Android SDK/JDK und Signierung sind auf diesem Mac noch nicht eingerichtet;
-es liegt noch kein signiertes AAB vor. Der erste Play-Upload und eventuell
+JDK 21 und Android SDK sind auf diesem Mac eingerichtet. Die Debug-APK mit
+Version 1.4.1 (Code 1, Ziel-API 36) wurde am 21. Oktober 2026 erfolgreich
+gebaut und mit der lokalen Debug-Signatur geprüft. Anschließend wurden der
+lokale Upload-Keystore und das signierte Release-Bundle
+`android/app/build/outputs/bundle/release/app-release.aab` erstellt und geprüft.
+Vor dem ersten Upload fehlen das externe Schlüssel-Backup, Gerätetests und
+echte Android-Screenshots; siehe [ANDROID.md](ANDROID.md).
+Der erste Play-Upload und eventuell
 vorgeschriebene geschlossene Tests bleiben Kontoschritte. Die Play-Lanes
 senden keine Änderung zur Prüfung und veröffentlichen keine Version.
 
@@ -62,3 +68,9 @@ Die lokalen Zugangsdaten bleiben in der ignorierten `.env`; `.p8`,
 Dienstkonto-JSON und Upload-Keystore außerhalb des öffentlichen Repos
 aufbewahren. Bei `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED` muss der
 Account Holder die offene Apple-Vereinbarung im Konto prüfen.
+
+Die Work-Sperrmigration `20261021120000_disable_work_mode.sql` ist seit dem
+21. Oktober 2026 produktiv angewendet und in der Migrationshistorie registriert.
+Eine zuvor aktive Work-Flag wurde deaktiviert; Challenge, Kategorien und
+Trainingssätze sind erhalten. Der Trigger verhindert erneutes Aktivieren
+auch durch alte Clients.

@@ -15,9 +15,8 @@
   const APP_STORE_ID = '';
   const STORE_DIGITS = APP_STORE_ID.replace(/\D/g, ''); // verzeiht „id…“ und Leerzeichen
   const APP_STORE_URL = STORE_DIGITS ? `https://apps.apple.com/de/app/id${STORE_DIGITS}` : '';
-  // Support-Adresse: morgens eintragen. Leer = Support und Meldungen öffnen
-  // stattdessen die Support-Seite (LEGAL.support).
-  const SUPPORT_EMAIL = '';
+  // Support und Meldungen öffnen eine vorausgefüllte E-Mail an diese Adresse.
+  const SUPPORT_EMAIL = 'bennyundjoni@gmail.com';
   // Rechtstexte auf GitHub Pages (docs/launch/site).
   const LEGAL_BASE = 'https://noltejonas.github.io/Benny-Joni/';
   const LEGAL = Object.freeze({

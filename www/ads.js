@@ -35,15 +35,15 @@
   // Googles Test-IDs. PROD.appId muss gleich GADApplicationIdentifier in
   // ios/App/App/Info.plist sein; tests/ads-config.test.cjs prüft das.
   const PROD = {
-    appId: '',    // ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX
-    banner: '',   // ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX
+    appId: 'ca-app-pub-8393455800337394~4603844935',
+    banner: 'ca-app-pub-8393455800337394/7259209697',
     rewarded: '', // optional, noch ohne Aufrufer
   };
   // Android wird in AdMob als eigene App angelegt und bekommt eigene IDs.
   // appId muss zur Manifest-Angabe com.google.android.gms.ads.APPLICATION_ID passen.
   const PROD_ANDROID = {
-    appId: '',
-    banner: '',
+    appId: 'ca-app-pub-8393455800337394~1570487484',
+    banner: 'ca-app-pub-8393455800337394/3252516074',
     rewarded: '',
   };
   // Googles öffentliche Test-IDs je Plattform.

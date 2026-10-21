@@ -119,12 +119,15 @@ PLAY_PACKAGE_NAME=com.bennyjoni.terminator
 Vor dem ersten Einsatz von Fastlane muss mindestens ein signiertes
 Android-Build im Play-Console-Eintrag hochgeladen worden sein. Dafür werden
 ein Android-Projekt, ein dauerhaft gesicherter Upload-Keystore und ein
-signiertes Android App Bundle (`.aab`) benötigt. Ein Android-Projekt wird
-im Repo vorbereitet und enthält Icons sowie die Signierungs-Konfiguration.
-Auf dem aktuellen Mac fehlen noch Android SDK/JDK und der Upload-Keystore;
-deshalb liegt noch kein signiertes AAB vor. Der native Android-Build und das
-Verhalten auf einem Android-Gerät sind noch nicht geprüft. Die Upload-Lanes
-erzeugen keinen Keystore. Android-Server-Push benötigt zusätzlich eine
+signiertes Android App Bundle (`.aab`) benötigt. Das Android-Projekt im Repo
+enthält Icons sowie die Signierungs-Konfiguration. JDK 21 und Android SDK
+sind auf diesem Mac eingerichtet; am 21. Oktober 2026 wurde die Debug-APK
+mit Version 1.4.1 (Code 1, Ziel-API 36) erfolgreich gebaut und ihre Signatur
+geprüft. Auch Upload-Keystore und signiertes Release-AAB sind lokal erstellt
+und geprüft. Vor dem ersten Upload fehlen das externe Schlüssel-Backup,
+Gerätetests und echte Android-Screenshots. Build-Befehle und den konkreten
+AAB-Pfad beschreibt [ANDROID.md](ANDROID.md). Die Upload-Lanes erzeugen
+keinen Keystore. Android-Server-Push benötigt zusätzlich eine
 FCM-Einrichtung; APNs ist nur für iOS eingerichtet. Die Play-Texte versprechen
 deshalb keine Android-Push-Mitteilungen.
 
