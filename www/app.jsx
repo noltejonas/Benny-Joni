@@ -1,5 +1,4 @@
 /* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
-/* global PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -728,6 +727,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     [allChallenges, allSets, categories, penalties, sides, members]
   );
 
+/* global PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay */
   // Rangliste: Ergebnis des letzten abgeschlossenen Monats für die Feed-Karte
   // und die Feier, wenn ich eine Medaille geholt habe.
   const [monthRecap, setMonthRecap] = useState(null);
