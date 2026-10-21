@@ -27,8 +27,11 @@ bundle exec fastlane beta
 
 1. Holt die letzte Build-Nummer aus App Store Connect und nimmt die nächste.
    `project.pbxproj` bleibt dabei unverändert.
-2. `npm ci` und `npx cap sync ios` übernehmen `www/` und die Plugins ins
-   Xcode-Projekt.
+2. `npm ci`, `npm run build` und `npx cap sync ios` übernehmen die App und die
+   Plugins ins Xcode-Projekt. Der Build (`tools/build.cjs`) macht aus `www/`
+   den Ordner `dist/`: JSX vorab übersetzt, React, Supabase, Capacitor-Plugins
+   und Schrift lokal statt vom CDN. So startet die App ohne Babel im WebView
+   und ohne Netz vor dem ersten Bild.
 3. Archiviert und exportiert die Release-IPA. Signiert wird automatisch über den
    API-Key, in Xcode muss keine Apple-ID angemeldet sein.
 4. Lädt die IPA zu TestFlight hoch. Interne Tester bekommen den Build, sobald
@@ -39,6 +42,20 @@ Optionen:
 - `bundle exec fastlane beta build_number:12` setzt die Build-Nummer selbst.
 - `bundle exec fastlane beta upload:false build_number:12` baut nur die IPA
   (landet in `ios/App/build/fastlane/`).
+
+## Web-Teil bauen
+
+`www/` ist die Quelle und läuft im Browser wie gehabt (Babel übersetzt beim
+Laden). Die App lädt `dist/` (`webDir` in `capacitor.config.json`):
+
+```bash
+npm run build          # www/ → dist/
+npx cap sync ios       # baut dist/ vorher selbst noch einmal (capacitor:copy:before)
+```
+
+Nach einem frischen Klon einmal `npm run build`, sonst bricht `cap sync` mit
+„Could not find the web assets directory: ./dist“ ab. Den Build im Browser
+prüfen: Startkonfiguration „dist (iOS-Build …)“ in `.claude/launch.json`.
 
 ## Typische Fehler
 

@@ -249,7 +249,7 @@ function DuelCard({ entries, title, meta }) {
 function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = [], categories = [], allSets = [], layout,
   weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   openClosures = [], onCloseWeek,
-  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false }) {
+  onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false, celebrate = true }) {
   const [timerRunning, setTimerRunning] = React.useState(() => {
     const v = localStorage.getItem('pt_work_timer_start');
     const parsed = v ? parseInt(v) : null;
@@ -529,7 +529,8 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
         </section>
       );
     })()}
-    {celebration.pendingCelebration && (
+    {/* Erst mit frischen Daten feiern, nicht aus dem Stand vom letzten Öffnen */}
+    {celebrate && celebration.pendingCelebration && (
       <CelebrationOverlay
         category={celebration.pendingCelebration.category}
         targetReps={celebration.pendingCelebration.challenge.target_reps}

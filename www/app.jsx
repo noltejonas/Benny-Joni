@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n */
+/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -23,6 +23,9 @@ function readInvite() {
     if (v?.code && Date.now() - v.at < INVITE_TTL) return v.code;
   } catch (e) {}
   return null;
+}
+function readObLocal(userId) {
+  try { return JSON.parse(localStorage.getItem(PTOnboarding.stateKey(userId)) || '{}'); } catch (e) { return {}; }
 }
 function writeInvite(code) {
   try {
@@ -141,23 +144,55 @@ function App() {
     return () => { alive = false; handle?.remove(); };
   }, [setInvite]);
 
-  useEffect(() => {
-    if (!api) return;
-    api.getSession().then(setSession).catch(() => setSession(null));
-    return api.onAuthChange((s) => setSession(s));
-  }, [api]);
-
-  const userId = session?.user?.id || null;
-  useEffect(() => { if (userId) writePref(RETURNING_KEY, '1'); }, [userId]);
+  // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
+  const pickActive = useCallback((p, list, current) => {
+    const usable = list.filter(c => !c.archived_at);
+    const valid = (id) => id && list.some(c => c.id === id);
+    if (valid(current)) return current;
+    if (valid(p.main_competition_id) && usable.some(c => c.id === p.main_competition_id)) return p.main_competition_id;
+    let last = null;
+    try { last = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
+    if (valid(last)) return last;
+    return usable[0]?.id || null;
+  }, []);
 
   // Onboarding-Stand: Gerät (localStorage) + Konto (profiles.onboarding, nur
   // wenn die Spalte existiert — Migration 20261020000000).
   const [obLocal, setObLocal] = useState({});
+
+  // Session übernehmen. Für ein neu angemeldetes Konto im selben Render den
+  // Stand vom letzten Öffnen zeigen (PTBootCache), statt „Lade Profil…“;
+  // loadAccount lädt danach frisch.
+  const sessionUserRef = React.useRef(null);
+  const adoptSession = useCallback((s) => {
+    const id = s?.user?.id || null;
+    if (id && id !== sessionUserRef.current) {
+      setObLocal(readObLocal(id));
+      const cached = PTBootCache.read(id, 'account');
+      if (cached?.profile && cached.competitions) {
+        PTPeople.set([cached.profile]);
+        setProfile(cached.profile);
+        setCompetitions(cached.competitions);
+        setActiveId(cur => pickActive(cached.profile, cached.competitions, cur));
+      }
+    }
+    sessionUserRef.current = id;
+    setSession(s);
+  }, [pickActive]);
+
   useEffect(() => {
-    if (!userId) { setObLocal({}); return; }
-    try { setObLocal(JSON.parse(localStorage.getItem(PTOnboarding.stateKey(userId)) || '{}')); }
-    catch (e) { setObLocal({}); }
-  }, [userId]);
+    if (!api) return;
+    api.getSession().then(adoptSession).catch(() => setSession(null));
+    return api.onAuthChange((s, evt) => {
+      if (evt === 'SIGNED_OUT') PTBootCache.clear();
+      adoptSession(s);
+    });
+  }, [api, adoptSession]);
+
+  const userId = session?.user?.id || null;
+  useEffect(() => { if (userId) writePref(RETURNING_KEY, '1'); }, [userId]);
+  useEffect(() => { if (!userId) setObLocal({}); }, [userId]);
+
   const obState = useMemo(() => PTOnboarding.mergeState(obLocal, profile?.onboarding), [obLocal, profile]);
   const obStateRef = React.useRef(obState);
   obStateRef.current = obState;
@@ -174,18 +209,6 @@ function App() {
     }
   }, [userId, profile, api]);
 
-  // Auswahl beim Start: Haupt-Challenge → zuletzt geöffnete → erste aktive.
-  const pickActive = useCallback((p, list, current) => {
-    const usable = list.filter(c => !c.archived_at);
-    const valid = (id) => id && list.some(c => c.id === id);
-    if (valid(current)) return current;
-    if (valid(p.main_competition_id) && usable.some(c => c.id === p.main_competition_id)) return p.main_competition_id;
-    let last = null;
-    try { last = localStorage.getItem(ACTIVE_KEY); } catch (e) {}
-    if (valid(last)) return last;
-    return usable[0]?.id || null;
-  }, []);
-
   const loadAccount = useCallback(async (preferId) => {
     if (!api || !userId) return;
     try {
@@ -195,6 +218,7 @@ function App() {
       setCompetitions(list);
       setActiveId(cur => pickActive(p, list, preferId ?? cur));
       setAccountError(null);
+      PTBootCache.write(userId, 'account', { profile: p, competitions: list });
     } catch (e) {
       console.error('loadAccount failed', e);
       setAccountError({ text: e.message || String(e), offline: e?.code === 'offline' });
@@ -269,6 +293,7 @@ function App() {
       if (saved) { await api.deleteDeviceToken(saved).catch(() => {}); localStorage.removeItem('pt_apns_token'); }
     } catch (e) {}
     setSheet(null);
+    PTBootCache.clear();
     await api.signOut();
   }
 
@@ -527,23 +552,34 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   });
   const openSettings = (page = 'root') => { setSettingsPage(page); setTab('settings'); };
 
-  // Data
-  const [members, setMembers] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [allChallenges, setAllChallenges] = useState([]);
-  const [feed, setFeed] = useState([]);
-  const [allSets, setAllSets] = useState([]);
-  const [planSlots, setPlanSlots] = useState([]);
-  const [rotationConfig, setRotationConfig] = useState(null);
-  const [penalties, setPenalties] = useState([]);
-  const [closures, setClosures] = useState([]);
-  const [openClosures, setOpenClosures] = useState([]);
-  const [payouts, setPayouts] = useState([]);
-  const [projectTags, setProjectTags] = useState([]);
-  const [toolTags, setToolTags]       = useState([]);
+  // Data. Startwerte: Stand vom letzten Öffnen (PTBootCache), reload() holt
+  // frisch. Frisch erstellt oder beigetreten (intro) gibt es keinen.
+  const cacheName = `comp:${initialCompetition.id}`;
+  const [boot] = useState(() => {
+    const b = intro ? null : PTBootCache.read(me, cacheName);
+    if (!b) return null;
+    PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
+    PTData.annotateWorkouts(b.allSets, b.allChallenges, b.categories);
+    PTData.annotateWorkouts(b.feed, b.allChallenges, b.categories);
+    return b;
+  });
+  const [members, setMembers] = useState(() => boot?.members || []);
+  const [categories, setCategories] = useState(() => boot?.categories || []);
+  const [allChallenges, setAllChallenges] = useState(() => boot?.allChallenges || []);
+  const [feed, setFeed] = useState(() => boot?.feed || []);
+  const [allSets, setAllSets] = useState(() => boot?.allSets || []);
+  const [planSlots, setPlanSlots] = useState(() => boot?.planSlots || []);
+  const [rotationConfig, setRotationConfig] = useState(() => boot?.rotationConfig || null);
+  const [penalties, setPenalties] = useState(() => boot?.penalties || []);
+  const [closures, setClosures] = useState(() => boot?.closures || []);
+  const [openClosures, setOpenClosures] = useState(() => boot?.openClosures || []);
+  const [payouts, setPayouts] = useState(() => boot?.payouts || []);
+  const [projectTags, setProjectTags] = useState(() => boot?.projectTags || []);
+  const [toolTags, setToolTags]       = useState(() => boot?.toolTags || []);
   const [closingWeek, setClosingWeek] = useState(null);
   const [proposalDismissed, setProposalDismissed] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!boot); // nichts zum Zeigen da
+  const [synced, setSynced] = useState(false);   // erster reload() durch
 
   // UI state
   const [setupForChallenge, setSetupForChallenge] = useState(null); // null=closed, {} = new, {id, ...} = edit
@@ -644,14 +680,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Nach Erstellen bzw. Beitreten: Ebenen einmal starten, sobald die Daten da sind.
   useEffect(() => {
-    if (loading || !intro || introStarted.current) return;
+    if (!synced || !intro || introStarted.current) return;
     introStarted.current = true;
     // Erster Satz mit Feier gibt es einmal pro Konto (obState.firstLog).
     const firstLog = obState.firstLog ? [] : ['log'];
     const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', ...firstLog] : ['invite'])
       : newcomer ? ['goal', ...firstLog] : [];
     openLayer(kinds);
-  }, [loading, intro, newcomer, openLayer, obState.firstLog]);
+  }, [synced, intro, newcomer, openLayer, obState.firstLog]);
 
   // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
   const celebrateFirst = useCallback((value, ch, cat) => {
@@ -682,7 +718,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // Rückblick beim ersten Öffnen in Woche 2 einer Mitgliedschaft (nur neue Leute, einmal).
   const weekOneChecked = React.useRef(false);
   useEffect(() => {
-    if (loading || intro || !newcomer || weekOneChecked.current || !myMembership) return;
+    if (!synced || intro || !newcomer || weekOneChecked.current || !myMembership) return;
     weekOneChecked.current = true;
     const first = PTOnboarding.weekOneDue({ joinedAt: myMembership.joined_at, startDate: competition.start_date,
       seen: obState.weekOne?.[competition.id] });
@@ -692,7 +728,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       challenges: allChallenges, categories, participantCount: people });
     setTab('home');
     setLayer({ kind: 'week1', summary, first });
-  }, [loading, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories]);
+  }, [synced, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories]);
 
   // „Ersten Satz loggen“ aus leeren Zuständen: Ziel fehlt → Ziel, sonst Satz.
   function startFirstLog() {
@@ -808,6 +844,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       setPayouts(pys || []);
       setProjectTags(projTags || []);
       setToolTags(toolTagsData || []);
+      setSynced(true);
+      const member = mems.some(m => m.user_id === me && !m.left_at);
+      if (member) PTBootCache.write(me, cacheName, {
+        members: mems, categories: cats, allChallenges: challs, feed: feedData, allSets: allSetsData,
+        planSlots: slots, rotationConfig: cfg, penalties: pens || [], closures: cls || [],
+        openClosures: openCls || [], payouts: pys || [], projectTags: projTags || [], toolTags: toolTagsData || [],
+      });
 
       // Notification trigger
       if (lastFeedRef.current !== null && feedData[0] && feedData[0].id !== lastFeedRef.current &&
@@ -817,7 +860,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       lastFeedRef.current = feedData[0]?.id || null;
 
       // Mitgliedschaft beendet (entfernt oder Challenge gelöscht)
-      if (!mems.some(m => m.user_id === me && !m.left_at)) onLeft?.();
+      if (!member) onLeft?.();
     } catch (e) {
       console.error('reload failed', e);
       // Challenge nicht mehr sichtbar (entfernt worden) → zurück zur Auswahl
@@ -825,7 +868,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     } finally {
       setLoading(false);
     }
-  }, [capi, me, notificationsOn]);
+  }, [capi, me, notificationsOn, cacheName]);
 
   function notify(set) {
     const isWork = set.category?.kind === 'work';
@@ -958,6 +1001,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
+          celebrate={synced}
           layout={t.layout}
           weekStart={weekStart}
           nextWeekStart={nextWeekStart}

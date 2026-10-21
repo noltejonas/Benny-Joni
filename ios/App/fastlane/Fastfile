@@ -103,13 +103,16 @@ platform :ios do
     end
     UI.message("Baue #{version} (#{build_number})")
 
-    # www/ und die Capacitor-Plugins ins Xcode-Projekt übernehmen. Das schreibt
+    # dist/ aus www/ bauen (tools/build.cjs) und mit den Capacitor-Plugins ins
+    # Xcode-Projekt übernehmen. cap sync baut dist/ zwar selbst noch einmal
+    # (capacitor:copy:before), prüft aber vorher, ob es dist/ gibt. Das schreibt
     # auch CapApp-SPM/Package.swift neu, das unter Windows Backslash-Pfade
     # bekommt und so auf dem Mac nicht baut. Außerhalb der Bundler-Umgebung,
     # damit node/CocoaPods nicht die Gems dieses Bundles sehen.
     Dir.chdir(REPO_ROOT) do
       Bundler.with_unbundled_env do
         sh("npm", "ci")
+        sh("npm", "run", "build")
         sh("npx", "cap", "sync", "ios")
       end
     end

@@ -17,16 +17,22 @@
       document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
     } catch (e) {}
   </script>
+  <!-- build:fonts -->
+  <!-- Blöcke von build:… bis /build ersetzt tools/build.cjs für die iOS-App
+       (dist/) durch Dateien aus node_modules. Im Browser bleibt alles wie hier. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- /build -->
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="redesign.css" />
   <link rel="stylesheet" href="onboarding.css" />
 </head>
 <body>
-  <div id="root"></div>
+  <!-- Spinner bis React übernimmt, damit der Start nicht weiß bleibt -->
+  <div id="root"><div class="app-loader" aria-hidden="true"><div class="app-loader-spinner"></div><div class="app-loader-text">&nbsp;</div></div></div>
 
+  <!-- build:vendor -->
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
@@ -65,7 +71,7 @@
   <script type="module">
     // Expose Capacitor Haptics globally for our non-module JSX files.
     try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/haptics@6/+esm');
+      const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/haptics@8/+esm');
       window.PTCelebrationHaptics = mod;
     } catch (e) {
       window.PTCelebrationHaptics = null;
@@ -91,6 +97,7 @@
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <!-- /build -->
 
   <!-- Sprachen: vor allem anderen, damit tr() überall bereitsteht -->
   <script src="i18n.js"></script>
@@ -102,6 +109,7 @@
   <script src="stats-model.js"></script>
   <script src="feed-model.js"></script>
   <script src="onboarding-model.js"></script>
+  <script src="boot-cache.js"></script>
 
   <!-- Tweaks shell -->
   <script type="text/babel" src="tweaks-panel.jsx"></script>

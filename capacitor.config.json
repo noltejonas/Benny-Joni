@@ -1,5 +1,5 @@
 {
   "appId": "com.bennyjoni.terminator",
   "appName": "Projekt Terminator",
-  "webDir": "www"
+  "webDir": "dist"
 }

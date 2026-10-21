@@ -6,3 +6,4 @@ ios/App/build/
 ios/App/DerivedData/
 *.log
 *.tmp
+dist/
