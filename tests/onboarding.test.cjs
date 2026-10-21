@@ -167,6 +167,49 @@ test('suggestName macht aus der E-Mail einen Vornamen', () => {
   assert.equal(O.suggestName(undefined), '');
 });
 
+test('checkEmail: gültige Adressen ohne Vorschlag', () => {
+  for (const mail of ['max@gmail.com', 'Lenn.Hoffmann@bauerlieferant.de', 'a+b@gmx.at', 'x@müller.de', 'jo@sub.firma.co.uk']) {
+    const r = O.checkEmail(mail);
+    assert.equal(r.ok, true, mail);
+    assert.equal(r.suggestion, null, mail);
+  }
+});
+
+test('checkEmail: kaputte Form wird abgelehnt', () => {
+  for (const mail of ['', 'abc', '@gmail.com', 'max@', 'max@gmail..com', 'ma x@gmail.com', '.max@gmail.com', 'max.@gmail.com', 'max@gmail.c0m', 'max@-gmail.com']) {
+    assert.equal(O.checkEmail(mail).ok, false, mail);
+  }
+});
+
+test('checkEmail: Tippfehler bei großen Anbietern ergeben einen Vorschlag', () => {
+  const cases = {
+    'max@gmial.com': 'max@gmail.com',
+    'max@gamil.com': 'max@gmail.com',
+    'max@gmail.de': 'max@gmail.com',
+    'max@gmail.co': 'max@gmail.com',
+    'max@hotmial.de': 'max@hotmail.de',
+    'max@wbe.de': 'max@web.de',
+    'Max@T-Onlien.de': 'Max@t-online.de',
+  };
+  for (const [typed, meant] of Object.entries(cases)) {
+    const r = O.checkEmail(typed);
+    assert.equal(r.ok, true, typed);
+    assert.equal(r.suggestion, meant, typed);
+  }
+});
+
+test('checkEmail: Endungen, die es nicht gibt, sind ungültig, mit Vorschlag', () => {
+  assert.deepEqual({ ...O.checkEmail('max@gmail.con') }, { ok: false, suggestion: 'max@gmail.com' });
+  assert.deepEqual({ ...O.checkEmail('max@gmx.ed') }, { ok: false, suggestion: 'max@gmx.de' });
+  assert.deepEqual({ ...O.checkEmail('max@firma.cmo') }, { ok: false, suggestion: 'max@firma.com' });
+});
+
+test('checkEmail: fehlende Endung ist ungültig, mit Vorschlag', () => {
+  assert.deepEqual({ ...O.checkEmail('max@gmail') }, { ok: false, suggestion: 'max@gmail.com' });
+  assert.deepEqual({ ...O.checkEmail('max@gmx') }, { ok: false, suggestion: 'max@gmx.com' });
+  assert.deepEqual({ ...O.checkEmail('max@firma') }, { ok: false, suggestion: null });
+});
+
 test('mergeState vereint Gerät und Profil', () => {
   const local = { started: 't1', dismissed: { c1: 't2' } };
   const remote = { profileDone: 't3', dismissed: { c2: 't4' }, weekOne: { c1: '2026-10-12' } };

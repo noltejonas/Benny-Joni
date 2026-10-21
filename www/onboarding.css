@@ -64,6 +64,8 @@
 .ob-msg { font-size: 14px; line-height: 20px; font-weight: 600; border-radius: 14px; padding: 10px 14px; }
 .ob-msg.is-error { background: var(--penalty-tint); color: var(--penalty); }
 .ob-msg.is-info { background: var(--primary-tint); color: var(--primary-ink); }
+.ob-mail-hint { width: 100%; border: none; text-align: left; cursor: pointer; font-family: inherit; overflow-wrap: anywhere; }
+.ob-mail-hint strong { font-weight: 800; }
 
 .ob-offline {
   align-self: center; display: inline-flex; align-items: center; gap: 6px;

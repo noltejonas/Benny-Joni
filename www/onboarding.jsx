@@ -195,7 +195,6 @@ function ObCodeField({ value, onChange, onComplete, autoFocus, onPasteFail }) {
 }
 
 // ─── Ohne Konto: Willkommen, Code, Konto, Mail-Bestätigung ──────────────────
-const OB_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 // Erkennung über den Fehlercode; fehlt er (ältere Supabase-Antworten), über den
 // Text, den PTData.friendlyError für diesen Code liefert — egal in welcher Sprache.
 const obErrorText = (code) => PTData.friendlyError({ code }).message;
@@ -226,6 +225,10 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   const [error, setError] = React.useState('');
   const [info, setInfo] = React.useState('');
   const [cooldown, setCooldown] = React.useState(0);
+  // Vermuteter Tippfehler in der E-Mail („gmial.com“) und die Adresse, bei der
+  // trotzdem auf „Weiter“ getippt wurde — dann gilt sie wie eingegeben.
+  const [mailHint, setMailHint] = React.useState(null);
+  const [mailKept, setMailKept] = React.useState('');
 
   React.useEffect(() => {
     if (cooldown <= 0) return;
@@ -233,7 +236,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const go = (v, msg = {}) => { setView(v); setError(msg.error || ''); setInfo(msg.info || ''); };
+  const go = (v, msg = {}) => { setView(v); setError(msg.error || ''); setInfo(msg.info || ''); setMailHint(null); };
 
   async function run(fn) {
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
@@ -244,11 +247,17 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   }
 
   function checkFields({ withPassword = true } = {}) {
-    if (!OB_EMAIL_RE.test(email.trim())) throw new Error(tr('Diese E-Mail-Adresse sieht nicht richtig aus.'));
+    if (!PTOnboarding.checkEmail(email).ok) throw new Error(tr('Diese E-Mail-Adresse sieht nicht richtig aus.'));
     if (withPassword && password.length < 6) throw new Error(tr('Passwort muss mindestens 6 Zeichen haben.'));
   }
 
   const signup = () => run(async () => {
+    const mail = PTOnboarding.checkEmail(email);
+    if (mail.suggestion && email.trim() !== mailKept) {
+      setMailHint(mail.suggestion);
+      setMailKept(email.trim());
+      return;
+    }
     checkFields();
     try {
       const r = await api.signUp({ email, password, displayName: PTOnboarding.suggestName(email) });
@@ -308,7 +317,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
   const emailInput = (
     <input className="input" type="email" placeholder={tr('E-Mail')} autoComplete="email" inputMode="email"
       autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email}
-      onChange={e => setEmail(e.target.value)} disabled={view === 'reset-code'} />
+      onChange={e => { setEmail(e.target.value); setMailHint(null); }} disabled={view === 'reset-code'} />
   );
   const passwordInput = (placeholder, autoComplete) => (
     <div className="ob-pass">
@@ -349,6 +358,12 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
           {emailInput}
           {passwordInput(tr('Passwort (mind. 6 Zeichen)'), 'new-password')}
         </form>
+        {mailHint && (
+          <button type="button" className="ob-msg is-info ob-mail-hint"
+            onClick={() => { setEmail(mailHint); setMailHint(null); setError(''); }}>
+            {tr('Meintest du {email}?', { email: <strong>{mailHint}</strong> })}
+          </button>
+        )}
         <ObMessage error={error} info={info} />
       </ObScreen>
     );
@@ -557,7 +572,7 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
 
   const current = OB_MODES.find(m => m.id === mode);
   const pickMode = (m) => { setMode(m.id); if (!emojiTouched) setEmoji(m.emoji); };
-  const on = [penalties && tr('Strafkasse'), rotation && tr('Wochenplan'), work && tr('Arbeitszeit')].filter(Boolean);
+  const on = [penalties && tr('Strafkonto'), rotation && tr('Wochenplan'), work && tr('Work-Tracking')].filter(Boolean);
 
   async function create() {
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
@@ -621,9 +636,9 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
       </button>
       {extrasOpen && (
         <div className="ob-extras-body">
-          {toggle(tr('Strafkasse'), tr('Wer seinen Wochenteil nicht schafft, zahlt {amount} in die Kasse.', { amount: PTi18n.euro(500) }), penalties, setPenalties)}
+          {toggle(tr('Strafkonto'), tr('Wer seinen Wochenteil nicht schafft, zahlt {amount} in die Kasse.', { amount: PTi18n.euro(500) }), penalties, setPenalties)}
           {toggle(tr('Wochenplan'), tr('Ihr legt Übungen fest, die jede Woche wiederkommen.'), rotation, setRotation)}
-          {toggle(tr('Arbeitszeit'), tr('Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.'), work, setWork)}
+          {toggle(tr('Work-Tracking'), tr('Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.'), work, setWork)}
           <div className="ob-dates">
             <label>{tr('Start')}<input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value || PTData.isoDate(new Date()))} /></label>
             <label>{tr('Ende (optional)')}<input className="input" type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} /></label>
