@@ -22,7 +22,7 @@ Bestätigt:
 3. **Rangliste pro Monat**, Reset am 1. Platzierungen bringen Punkte, die All-Time-Tabelle entsteht aus den Monatsergebnissen.
 4. **Keine Telefonnummer, kein Chat**, auch keine Freitext-Bio. Kontakt zwischen Fremden gibt es nicht.
 
-Vorschläge (siehe Offene Fragen):
+Umgesetzt nach Vorschlag (lässt sich später ändern, siehe Offene Fragen):
 
 5. Punkte nach dem **F1-Schema** für die Plätze 1–10.
 6. **Einmal loggen, zählt überall**, dazu **Freies Training** für Grundübungen ohne passendes Wochenziel.
@@ -44,7 +44,10 @@ Vorschläge (siehe Offene Fragen):
 | Leg Raises | `volume` | Summe der Reps | 600 |
 | Klimmzüge | `volume` | Summe der Reps | 400 |
 | HSPU | `volume` | Summe der Reps | 300 |
-| Bring Sally Up | `best` | längster Durchgang (Sekunden, max. 204) | – |
+| Crunches | `volume` | Summe der Reps | 1.000 |
+| Kniebeugen | `volume` | Summe der Reps | 1.000 |
+| Burpees | `volume` | Summe der Reps | 500 |
+| Bring Sally Up | `best` | längster Durchgang (Sekunden) | 204 pro Durchgang |
 | Tom Holland | `best` | meiste Runden | 40 pro Durchgang |
 | Work-Kategorien | – | nicht gewertet | – |
 
@@ -52,12 +55,13 @@ Vorschläge (siehe Offene Fragen):
 - **`rule`:** ein Satz zur Ausführung (z. B. „Aus dem toten Hang, Kinn über die Stange“), angezeigt in der Rangliste unter „So zählt’s“.
 - Eine **eigene Übung mit Katalognamen** (Groß-/Kleinschreibung egal) wird abgelehnt. Bestehende Dubletten listet die Migration auf, sie werden von Hand umbenannt.
 - In der Übungsauswahl tragen eigene Übungen den Hinweis „zählt nicht für die Rangliste“.
+- Die Migration markiert Übungen über den Namen; was es in der Datenbank nicht gibt, wird übersprungen. Live gewertet sind seit dem 21.10.2026: Liegestütze, Klimmzüge, Dips, Leg Raises, HSPU, Sit-ups, Crunches (eigene Migration `20261021080000_rank_crunches.sql`), Burpees, Bring Sally Up, Tom Holland. Kniebeugen gibt es live nicht; „Bibel lesen“ steht als Sport im Katalog und bleibt ungewertet.
 
 ### Zeitraum
 
 - Kalendermonat in Europe/Berlin, nach dem Tag von `sets.created_at`.
 - **Nachtragsfrist** bis zum 2. des Folgemonats, 12:00. Dann wird der Monat abgeschlossen: `monthly_results` ist ein fester Stand, spätere Änderungen an Sätzen wirken nicht zurück.
-- Der erste gewertete Monat ist der erste volle Monat nach dem Release von Phase 1. Vergangene Monate werden nicht gewertet, weil doppelt eingetragene Sätze rückwirkend nicht zu trennen sind.
+- Der erste gewertete Monat ist der erste volle Monat nach dem Release von Phase 1 (`ranking_settings.start_month`, Standard 1. November 2026). Vergangene Monate werden nicht gewertet, weil doppelt eingetragene Sätze rückwirkend nicht zu trennen sind. Davor läuft der aktuelle Monat als „Probelauf“.
 
 ### Punkte
 
@@ -85,33 +89,33 @@ Vorschläge (siehe Offene Fragen):
 ### Ein Satz zählt einmal
 
 - `sets.log_id uuid not null default gen_random_uuid()`. Bestehende Sätze bekommen je eine eigene `log_id`.
-- Gewertete Übungen loggt die App über die RPC `log_ranked_set(p_category, p_reps, p_day, p_skip uuid[])`. Sie legt in jeder aktiven Challenge, die die Übung in dieser Woche als Wochenziel hat, eine Zeile mit derselben `log_id` an. Mit `p_skip` lassen sich Challenges abwählen.
-- Das LogSheet zeigt bei gewerteten Übungen „Zählt für: Benny vs Jonas, Freundeskreis“. Jede Challenge ist abwählbar, standardmäßig sind alle an.
-- Bearbeiten und Löschen wirken auf alle Zeilen mit derselben `log_id` (`api.updateSet`/`deleteSet` filtern auf `log_id` und `user_id`).
-- Die Rangliste zählt pro `log_id` nur einen Wert.
-- Nicht gewertete Übungen (eigene, Work) laufen wie bisher über `addSet` in eine Challenge.
+- Sport-Sätze loggt die App über die RPC `log_set(p_challenge, p_reps, p_note, p_created_at, p_skip)`. Bei gewerteten Übungen legt sie in jeder anderen aktiven Challenge, die die Übung in derselben Woche als Wochenziel hat, eine Zeile mit derselben `log_id` an. Mit `p_skip` lassen sich Challenges abwählen. Work-Sätze gehen wie bisher direkt in die Tabelle; fehlt die RPC (Migration noch nicht eingespielt), fällt `addSet` auf das direkte Einfügen zurück.
+- Das LogSheet zeigt bei gewerteten Übungen „Zählt auch für: …“ mit einem Chip pro Challenge, standardmäßig alle an. Pflicht-Workouts, Schnellsatz und Nachtrag verteilen immer auf alle.
+- Bearbeiten und Löschen wirken auf alle Zeilen derselben `log_id`: Trigger `sync_log_siblings`. Löschungen per Cascade (Challenge, Wochenziel oder Profil gelöscht) reicht er nicht weiter.
+- Die Rangliste und „Ich“-Stats zählen pro `log_id` nur einen Wert.
 
 ### Freies Training
 
-- Hat keine Challenge die Übung in dieser Woche, landet der Satz im **Freien Training**: eine versteckte Solo-Challenge pro User (`competitions.mode = 'solo'`), die `log_ranked_set` bei Bedarf anlegt, samt Wochenziel (`target_reps = 0`). Loggen, RLS, Feed-Daten und „Ich“-Stats funktionieren damit ohne Sonderweg.
-- Eintragen geht direkt aus der Rangliste („+ Eintragen“ in der Übungsansicht) und aus dem LogSheet.
-- Die Solo-Challenge erscheint nicht im Challenge-Switcher, nicht in Duellen und nicht bei Wochensiegen und Zielquoten. Ihr Volumen zählt in „Reps gesamt“ und den Bestwerten.
+- `log_free_set(p_category, p_reps, …)` aus der Rangliste nimmt die erste eigene Challenge, die die Übung diese Woche hat. Gibt es keine, landet der Satz im **Freien Training**: eine versteckte Solo-Challenge pro User (`competitions.mode = 'solo'`, Code `SOLO-…` ist lang und zufällig) samt Wochenziel (`target_reps = 1`, weil die Spalte > 0 verlangt). Loggen, RLS, Feed-Daten und „Ich“-Stats funktionieren damit ohne Sonderweg.
+- `log_targets(p_category, p_week)` liefert, wohin ein Satz geht; der Eintragen-Dialog zeigt das an.
+- Die Solo-Challenge erscheint nicht im Challenge-Switcher (`listMyCompetitions` ohne `includeSolo`), nicht in Duellen und nicht bei Wochensiegen. Ihr Volumen zählt in „Reps gesamt“ und den Bestwerten.
 
 ## Sichtbarkeit & Schutz
 
-- `profiles.ranking_opt_in boolean` (`null` = noch nicht gefragt). Beim ersten Öffnen der Rangliste kommt ein Sheet: „Mit Name und Bild in der Rangliste erscheinen?“
+- `profiles.ranking_opt_in boolean` (`null` = noch nicht gefragt). Beim ersten Öffnen der Rangliste kommt ein Sheet: „In der Rangliste erscheinen?“
   - **Ja:** wird gewertet und gelistet.
-  - **Nein:** wird nicht gewertet (sonst hätten andere unsichtbare Gegner) und sieht nur „Du wärst Platz 14“. Die Entscheidung lässt sich in den Einstellungen ändern und gilt ab dem laufenden Monat.
+  - **Nein:** wird nicht gewertet (sonst hätten andere unsichtbare Gegner) und sieht nur „Du wärst Platz 14“. Die Entscheidung lässt sich in den Einstellungen ändern.
 - Fremde sehen nur Name, Bild, Farbe, Werte und Medaillen. Die RPCs liefern genau diese Felder, an `profiles`-RLS ändert sich nichts.
-- **Melden** (Apple-Guideline 1.2): an jedem Eintrag, Grund „Unrealistische Werte“ oder „Name/Bild unangemessen“. Ab 3 Meldungen von verschiedenen Leuten wird der Eintrag ausgeblendet, bis ein Admin (`profiles.is_admin`) ihn freigibt oder entfernt.
-- **Blockieren:** Der Blockierte erscheint für mich als „Ausgeblendet“ ohne Bild, bleibt aber gewertet.
-- **Konto löschen** (Apple-Guideline 5.1.1(v)): in den Einstellungen, mit Bestätigung. Eine Edge Function löscht den Auth-User per Service Role, das Profil folgt per Cascade. Vorher geht `competitions.created_by` an ein anderes Mitglied über; Challenges ohne Mitglieder werden gelöscht.
+- **Melden** (Apple-Guideline 1.2): in der Profilkarte, Grund „Unrealistische Werte“ (Übung und Monat der Ansicht) oder „Name oder Bild unangemessen“. Ab 3 Meldungen von verschiedenen Leuten wird der Eintrag ausgeblendet. Admins stehen in `ranking_admins` (eigene Tabelle, weil `profiles` vom User selbst beschreibbar ist; die Migration trägt Benny und Jonas über `legacy_athlete` ein) und entscheiden unter Einstellungen → Meldungen prüfen: „In Ordnung“ oder „Entfernen“ (Eintrag weg; bei Profil-Meldungen die Person aus allen Listen, Profilbild gelöscht).
+- **Blockieren:** Der Blockierte erscheint für mich als „Ausgeblendet“ ohne Bild, bleibt aber gewertet und bekommt keine „überholt“-Pushes über mich. Liste unter Einstellungen → Blockiert.
+- **Konto löschen** (Apple-Guideline 5.1.1(v)): in den Einstellungen, zwei Bestätigungen. Die RPC `delete_my_account()` tritt aus allen Challenges aus (Owner-Rolle geht ans älteste Mitglied), löscht leere Challenges inkl. Freiem Training, setzt `created_by` auf den neuen Owner und löscht dann den Auth-User; der Rest folgt per Cascade. `competitions.created_by` ist dafür nullable mit `on delete set null`. Profilbilder löscht die App vorher aus dem Bucket.
 
 ## Darstellung
 
 - **Neuer Tab „Rangliste“** (Pokal-Icon) zwischen Feed und Stats. Er ist global und hängt nicht an der aktiven Challenge.
 - **Kopf:** Übungs-Chips (Gesamt + jede gewertete Übung), Segment Monat · Saison · Ewig, Filter Alle · Meine Leute.
 - **Monat:** „noch 11 Tage“. Zeilen mit Platz, Avatar, Name und Wert (Reps, `m:ss` bzw. „N Runden“), auf den Plätzen 1–10 die Punkte grau dahinter. Die eigene Zeile ist hervorgehoben und unten angeheftet, wenn sie nicht im Bild ist, mit „noch 42 bis Platz 3“.
+- **Monatswechsel** ‹ › zurück bis zum Startmonat. Abgeschlossene Monate zeigen den festen Stand, vor dem Abschluss steht „Nachtragen bis 2.11., 12 Uhr“, vor dem Startmonat „Probelauf“.
 - **Saison/Ewig:** Punkte und Medaillen pro Zeile (🥇3 🥈1).
 - **Tipp auf eine Zeile:** kleine Karte mit Name, Bild, Medaillen und Pokalen sowie Melden/Blockieren. Mehr gibt es nicht.
 - **Eigenes Profil:** Trophäenschrank mit Medaillen nach Monat und Pokalen.
@@ -119,109 +123,60 @@ Vorschläge (siehe Offene Fragen):
 
 ## Push
 
-Über `notify-set` bzw. Cron, Dedup über `push_log`:
+Dedup über `push_log` (`competition_id` leer):
 
 | Art | Auslöser | Text | Grenze |
 |---|---|---|---|
-| `rank_overtaken` | neuer Satz | „Lea hat dich bei Klimmzügen auf Platz 4 verdrängt“ | 1× pro Tag, nur Plätze 1–10 |
-| `month_last_day` | Cron, letzter Tag 18:00 | „Letzter Tag: Dir fehlen 18 Liegestütze bis Platz 2“ | 1× pro Monat, nur wenn der Abstand unter 20 % liegt |
-| `month_closed` | `close_month` | „Oktober: 🥇 Klimmzüge, 🥉 Dips · 40 Punkte“ | 1× pro Monat, nur mit Punkten |
+| `rank_overtaken` | `notify-set` bei jedem neuen Satz | „Lea hat dich bei Klimmzügen auf Platz 4 verdrängt.“ | 1× pro Tag, nur wer vorher in den Top 10 war |
+| `month_last_day` | `ranking-push`, letzter Tag ab 18 Uhr | „Dir fehlen 18 Liegestütze bis Platz 2.“ | 1× pro Person, nur wenn der Abstand höchstens 20 % des eigenen Werts ist |
+| `month_closed` | `ranking-push`, bis 48 h nach dem Abschluss | „🥇 Klimmzüge · 🥉 Dips · 40 Punkte“ | 1× pro Monat, nur mit Punkten |
 
-Wegen der `log_id`-Zeilen in mehreren Challenges feuert `notify-set` pro Zeile. `rank_overtaken` und `month_*` dürfen nur einmal pro `log_id` bzw. Monat zählen.
+`notify-set` feuert pro Zeile, also bei verteilten Sätzen mehrmals; `ranking_overtaken` wertet nur die Zeile mit der kleinsten ID einer `log_id` aus. Ein Tipp auf eine Rangliste-Push öffnet den Rangliste-Tab. `ranking-push` läuft stündlich per Dashboard-Cron (siehe `docs/RANKING_SETUP.md`).
 
 ## Datenmodell
 
-```sql
-alter table categories
-  add column ranked      boolean not null default false,
-  add column metric      text check (metric in ('volume','best')),
-  add column rule        text,
-  add column max_per_day int,
-  add constraint ranked_only_catalog check (not ranked or competition_id is null);
+Migration `supabase/migrations/20261020120000_monthly_ranking.sql`:
 
-alter table sets add column log_id uuid not null default gen_random_uuid();
-create index sets_log_id_idx on sets (log_id);
+- `categories` + `ranked`, `metric`, `rule`, `max_per_day`; Check `not ranked or competition_id is null`; Trigger `guard_catalog_names`.
+- `sets` + `log_id` (Index), Trigger `sync_log_siblings`.
+- `competitions`: Modus `solo`, ein Solo pro User, `created_by` nullable.
+- `profiles` + `ranking_opt_in`.
+- Neu: `ranking_settings` (`start_month`), `ranking_admins`, `monthly_results` (`category_id` als Text, weil der Typ von `categories.id` zwischen den alten Setup-Skripten schwankt), `month_closures`, `ranking_reports`, `user_blocks`. RLS überall an; Zugriff über die Funktionen, nur `user_blocks` und `ranking_settings` haben Policies.
 
-alter table competitions drop constraint competitions_mode_check,
-  add constraint competitions_mode_check check (mode in ('1v1','2v2','ffa','solo'));
+Funktionen (security definer, `search_path` gepinnt):
 
-alter table profiles
-  add column ranking_opt_in boolean,
-  add column is_admin       boolean not null default false;
+| Funktion | Für | Zweck |
+|---|---|---|
+| `log_set`, `log_free_set`, `log_targets` | App | Loggen mit Verteilung, Freies Training, Ziele anzeigen |
+| `ranking_month(p_month)` | App | Monatsliste (live bzw. aus `monthly_results`), plus eigene Zeile mit `counted = false` |
+| `ranking_totals(p_from, p_to)` | App | Saison/Ewig pro User und Übung |
+| `ranking_profile(p_user)`, `season_champions()` | App | Trophäenschrank, Pokale |
+| `close_due_months()` | App, Cron | fällige Monate abschließen, idempotent |
+| `report_ranking_entry`, `set_block`, `my_blocks` | App | Melden, Blockieren |
+| `is_ranking_admin`, `ranking_reports_open`, `resolve_ranking_reports` | Admins | Meldungen prüfen |
+| `delete_my_account()` | App | Konto löschen |
+| `ranking_values`, `ranking_live`, `ranking_hidden`, `close_month`, `ranking_overtaken` | intern, Service Role | Rechnung, Abschluss, Push |
 
-create table monthly_results (
-  month       date not null,                 -- 1. des Monats
-  category_id text not null references categories(id),
-  user_id     uuid not null references profiles(id) on delete cascade,
-  value       int  not null,
-  rank        int  not null,
-  points      int  not null default 0,
-  medal       text check (medal in ('gold','silver','bronze')),
-  primary key (month, category_id, user_id)
-);
-
-create table month_closures (month date primary key, closed_at timestamptz not null default now());
-
-create table ranking_reports (
-  id          uuid primary key default gen_random_uuid(),
-  reporter    uuid not null references profiles(id) on delete cascade,
-  user_id     uuid not null references profiles(id) on delete cascade,
-  category_id text references categories(id),
-  month       date,
-  reason      text not null check (reason in ('values','profile')),
-  resolved_at timestamptz,
-  created_at  timestamptz not null default now(),
-  unique (reporter, user_id, category_id, month)
-);
-
-create table user_blocks (
-  blocker    uuid not null references profiles(id) on delete cascade,
-  blocked    uuid not null references profiles(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  primary key (blocker, blocked)
-);
-```
-
-RPCs (security definer, `search_path` gepinnt):
-
-| RPC | Zweck |
-|---|---|
-| `log_ranked_set(p_category, p_reps, p_day, p_skip)` | Fan-out auf alle passenden Challenges bzw. Freies Training, gemeinsame `log_id` |
-| `monthly_ranking(p_category, p_month)` | Live-Liste: pro User Wert (je `log_id` einmal, pro Tag gedeckelt bzw. Bestwert), `rank()`, Profilfelder; nur `ranking_opt_in`, ohne ausgeblendete Einträge |
-| `ranking_table(p_scope, p_category)` | Saison/Ewig aus `monthly_results`, `p_category = null` = Gesamt |
-| `close_month(p_month)` | schreibt `monthly_results` + `month_closures`, idempotent; nur Service Role |
-| `report_ranking_entry(…)`, `set_block(…)` | Melden, Blockieren |
-
-`close_month` läuft per `pg_cron` am 2. jedes Monats um 12:00 Berlin (Cron rechnet in UTC, Sommerzeit beachten).
+`close_due_months()` läuft per `pg_cron` stündlich (`ranking-close-months`) und zusätzlich, wenn jemand die Rangliste öffnet.
 
 ## Code
 
-- `www/ranking-model.js` (`window.PTRanking`): Punkte-Tabelle, Rangfolge mit Gleichstand, Tageslimit, `log_id`-Dedup, Bestwert, Saison/Ewig-Summen, Abstand zum nächsten Platz. Grundlage für den Demo-Modus und die Anzeige; die DB rechnet dieselben Regeln in `monthly_ranking`/`close_month`.
-- `www/ranking.jsx`: `RankingScreen`, Zeilen, Profilkarte, Opt-in-Sheet, Melden-Sheet.
-- `www/app.jsx`: Tab „Rangliste“, Opt-in-Status, Feier nach Monatsabschluss.
-- `www/screens.jsx` (`LogSheet`): gewertete Übungen über `api.logRankedSet`, Zeile „Zählt für: …“; Hinweis bei eigenen Übungen.
-- `www/data.js`: `logRankedSet`, `getMonthlyRanking`, `getRankingTable`, `getMyMedals`, `setRankingOptIn`, `reportRankingEntry`, `setBlock`, `deleteAccount`; `updateSet`/`deleteSet` über `log_id`.
-- `www/demo.js`: dieselben Methoden auf den Demo-Daten, mit weiteren Demo-Usern, damit die Liste voll aussieht.
-- `www/competitions.jsx`, `www/stats-global.jsx`, `www/stats-model.js`: Solo-Challenge ausblenden bzw. aus Wochensiegen und Duellen herausnehmen.
-- `www/settings.jsx`: „In der Rangliste erscheinen“, „Konto löschen“.
-- `supabase/functions/notify-set`: `rank_overtaken`. Neue Edge Function `delete-account`.
-- Migration `supabase/migrations/<datum>_monthly_ranking.sql`.
-
-## Umsetzung in Phasen
-
-| Phase | Inhalt | Warum zuerst |
-|---|---|---|
-| 1 | Katalog markieren, `log_id`, `log_ranked_set`, Freies Training, Hinweis bei eigenen Übungen | Der erste gewertete Monat braucht saubere Daten ab Tag 1 |
-| 2 | Rangliste-Tab (Monat live), Opt-in, Profilkarte, Melden/Blockieren, Konto löschen | sichtbar, ohne Punkte |
-| 3 | `close_month` + Cron, Punkte, Saison/Ewig, Medaillen im Profil, Feier, Feed-Karte | braucht einen abgeschlossenen Monat |
-| 4 | Push | Feinschliff |
+- `www/ranking-model.js` (`PTRanking`): Punkte, Rangfolge mit Gleichstand, Tageslimit, `log_id`-Dedup, Bestwert, Saison/Ewig-Summen, Medaillenspiegel, Saisonsieger, Abstand nach oben, Monatshilfen. Für Demo-Modus und Anzeige; die DB rechnet dieselben Regeln.
+- `www/ranking.jsx`: `RankingScreen` (Monat mit Monatswechsel, Saison, Ewig; Übungs-Chips; Alle/Meine Leute), angeheftete eigene Zeile, Zustimmung, Eintragen, Profilkarte mit Melden/Blockieren, Feed-Karte `MonthRecapCard`.
+- `www/app.jsx`: Tab „Rangliste“, Feed-Karte und Medaillen-Feier für den letzten abgeschlossenen Monat, Push-Tap.
+- `www/celebration.jsx`: `CelebrationOverlay` mit eigenen Texten.
+- `www/screens.jsx`: „Zählt auch für“ im LogSheet, Hinweis bei eigenen Übungen.
+- `www/data.js`, `www/demo.js`: Rangliste-API; `addSet` über `log_set`; Solo ausgeblendet.
+- `www/stats-model.js`, `www/stats-global.jsx`: „Ich“ zählt jede `log_id` einmal und nimmt das Freie Training mit.
+- `www/settings.jsx`: Gruppe „Rangliste“, Seiten „Blockiert“ und „Meldungen“, „Konto löschen“.
+- `supabase/functions/notify-set`: zusätzlich `rank_overtaken`. Neu: `supabase/functions/ranking-push`.
 
 ## Prüfung
 
-- `node --test tests/` mit neuem `tests/ranking-model.test.cjs`: Punkte, Gleichstand 1-1-3, Tageslimit, `log_id`-Dedup, Bestwert bei Sally/Tom Holland, Saison-/Ewig-Summen, Abstand zum nächsten Platz.
-- Browser-Demo-Modus (`?demo=reset`), iPhone-Breite, hell und dunkel: Rangliste mit allen Segmenten und Filtern, eigene Zeile angeheftet, Eintragen aus der Rangliste, Fan-out in zwei Demo-Challenges mit derselben Übung, Opt-in ablehnen, Melden.
-- SQL auf einem Supabase-Branch: `log_ranked_set` mit und ohne passendes Wochenziel, `monthly_ranking` gegen die JS-Werte, `close_month` zweimal hintereinander (idempotent), Konto löschen mit eigener Challenge.
-- iOS-Build läuft durch.
+- `node --test tests/` mit `tests/ranking-model.test.cjs`.
+- Migration gegen ein nachgebautes Mini-Schema in PGlite (Postgres als WASM): Katalog, Katalognamen-Sperre, Verteilen und `p_skip`, Bearbeiten/Löschen über die `log_id`, Cascade lässt Geschwister stehen, Freies Training, Zustimmung, Gleichstand, Tageslimit, Bestwert, „überholt“, Melden/Admin, Blockieren, Monatsabschluss (idempotent, eingefroren), Totals, Konto löschen. Zweimal einspielen geht.
+- Browser-Demo-Modus (`?demo=reset`), iPhone-Breite, hell und dunkel.
+- Offen: echte Datenbank (Supabase-Branch), iOS-Build, Push auf Geräten.
 
 ## Nicht im Umfang
 
@@ -231,10 +186,10 @@ RPCs (security definer, `search_path` gepinnt):
 
 ## Offene Fragen
 
-1. **Punkte:** F1-Schema für die Plätze 1–10 (Vorschlag) oder nur fürs Podest?
-2. **Einmal loggen, zählt überall + Freies Training:** passt das? Das ist der größte Umbau.
-3. **Sally:** Bei 3:24 teilen sich schnell mehrere Gold. Ist das okay (Vorschlag), oder entscheidet bei Gleichstand die Zahl voller Durchgänge?
-4. **Saison:** zusätzlich zur ewigen Tabelle (Vorschlag) oder nur ewig?
-5. **Opt-in:** Wer ablehnt, wird nicht gewertet (Vorschlag)?
-6. **Tageslimits:** passen die Startwerte?
-7. **Admins:** Benny und Jonas prüfen gemeldete Einträge, wie und wo genau?
+Umgesetzt ist jeweils der Vorschlag; alles lässt sich später ändern.
+
+1. **Punkte:** F1-Schema für die Plätze 1–10 oder nur fürs Podest?
+2. **Sally:** Bei 3:24 teilen sich schnell mehrere Gold. Bleibt das so, oder entscheidet bei Gleichstand die Zahl voller Durchgänge?
+3. **Saison:** zusätzlich zur ewigen Tabelle oder nur ewig?
+4. **Tageslimits:** passen die Startwerte?
+5. **Startmonat:** 1. November 2026 oder später, je nach Release?

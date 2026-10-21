@@ -92,7 +92,9 @@ function SparkleLayer({ active }) {
 
 // Component: 5-second fullscreen celebration overlay.
 // Implementation grows over Tasks 4–7.
-function CelebrationOverlay({ category, targetReps, onDone }) {
+// heroLines / counterLabel / subtext ersetzen die Texte fürs Wochenziel
+// (z.B. Medaille im Monatsabschluss der Rangliste).
+function CelebrationOverlay({ category, targetReps, onDone, heroLines, counterLabel, subtext }) {
   const { useEffect, useState } = React;
   const [skipping, setSkipping] = useState(false);
 
@@ -308,13 +310,15 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
           <div className="cel-halo cel-halo-2">🔥</div>
           <div className="cel-halo cel-halo-3">⚡</div>
           <div className="cel-halo cel-halo-4">🏆</div>
-          <div className="cel-hero-text">ZIEL<br/>ERREICHT</div>
+          <div className="cel-hero-text">
+            {(heroLines || ['ZIEL', 'ERREICHT']).map((l, i) => <React.Fragment key={i}>{i > 0 && <br/>}{l}</React.Fragment>)}
+          </div>
         </div>
         <div className="cel-counter-row">
           <span className="cel-counter-num" data-target={targetReps}>0</span>
-          <span className="cel-counter-of">/ {targetFormatted} {category?.name || 'Reps'}</span>
+          <span className="cel-counter-of">{counterLabel ?? `/ ${targetFormatted} ${category?.name || 'Reps'}`}</span>
         </div>
-        <div className="cel-subtext">{category?.emoji || '🏆'} {targetFormatted} {category?.name || 'Reps'} geknackt</div>
+        <div className="cel-subtext">{subtext ?? `${category?.emoji || '🏆'} ${targetFormatted} ${category?.name || 'Reps'} geknackt`}</div>
       </div>
 
       <div className="cel-skip-hint">tap zum Überspringen</div>

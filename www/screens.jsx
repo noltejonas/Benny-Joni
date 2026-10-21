@@ -671,6 +671,7 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
                   <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
                     <div className="emoji">{c.emoji}</div>
                     <div className="name">{c.name}</div>
+                    {c.competition_id && <div className="cat-note">zählt nicht für die Rangliste</div>}
                   </button>
                   {c.competition_id && (
                     <button className="cat-edit" aria-label="Bearbeiten"
@@ -784,6 +785,19 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
   const [reps, setReps] = useState(10);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  // Gewertete Übungen zählen auch in anderen eigenen Challenges mit derselben
+  // Übung dieser Woche; einzelne lassen sich abwählen (skip).
+  const [others, setOthers] = useState([]);
+  const [skip, setSkip] = useState([]);
+  React.useEffect(() => {
+    if (!category?.ranked || !api.logTargets) return;
+    let off = false;
+    api.logTargets(category.id, challenge.week_start)
+      .then(t => { if (!off) setOthers(t.filter(x => x.competition_id !== challenge.competition_id)); })
+      .catch(() => {});
+    return () => { off = true; };
+  }, [api, category?.id, category?.ranked, challenge.week_start, challenge.competition_id]);
+  const toggleSkip = (id) => setSkip(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
   // Work-mode state
   const TIMER_KEY = 'pt_work_timer_start';
   const [durationMinutes, setDurationMinutes] = useState(0);
@@ -868,6 +882,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
           athlete: me,
           reps: parseInt(reps),
           note: note.trim() || null,
+          skip,
         });
         onLogged(reps, false);
       } catch (e) {
@@ -980,6 +995,19 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         value={note}
         onChange={(e) => setNote(e.target.value)}
         style={{ marginTop: 16 }} />
+      {others.length > 0 && (
+        <div className="log-also">
+          <div className="label">Zählt auch für</div>
+          <div className="chip-row">
+            {others.map(o => (
+              <button key={o.competition_id} className={`chip ${skip.includes(o.competition_id) ? '' : 'chip-active'}`}
+                aria-pressed={!skip.includes(o.competition_id)} onClick={() => toggleSkip(o.competition_id)}>
+                {o.emoji} {o.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         <button className="btn" onClick={save} disabled={saving || reps <= 0}>

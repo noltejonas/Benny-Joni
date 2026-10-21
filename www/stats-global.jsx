@@ -44,11 +44,12 @@ function StatsTab({ api, me, profile, competition, sides, members, challenges, c
   const load = React.useCallback(async () => {
     setError('');
     try {
-      const list = await api.listMyCompetitions();
+      // Freies Training zählt in „Ich“ mit, ist aber keine eigene Challenge.
+      const list = await api.listMyCompetitions({ includeSolo: true });
       const b = await api.getStatsBundle(list.map(c => c.id));
       PTData.annotateWorkouts(b.sets, b.challenges, b.categories);
       PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
-      setComps(list);
+      setComps(list.filter(c => c.mode !== 'solo'));
       setBundle(b);
     } catch (e) { setError(e.message); }
   }, [api]);

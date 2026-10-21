@@ -198,6 +198,9 @@
       competition_full: 'Diese Challenge ist schon voll.',
       team_full: 'Dieses Team ist schon voll.',
       invalid_team: 'Ungültiges Team.',
+      catalog_name: 'Diese Übung gibt es schon im Katalog. Nimm die, dann zählt sie für die Rangliste.',
+      not_ranked: 'Diese Übung zählt nicht für die Rangliste.',
+      invalid_value: 'Bitte einen Wert größer als 0 eingeben.',
       forbidden: 'Das darf nur der Ersteller der Challenge.',
       not_authenticated: 'Bitte zuerst anmelden.',
       'Invalid login credentials': 'E-Mail oder Passwort falsch.',
@@ -214,6 +217,8 @@
     if (error) throw friendlyError(error);
     return data;
   }
+  // RPC fehlt (Migration noch nicht eingespielt)
+  const missingRpc = (error) => error?.code === 'PGRST202' || /Could not find the function/i.test(error?.message || '');
 
   // Paged select — PostgREST liefert max. 1000 Zeilen pro Request.
   async function selectAll(buildQuery) {
@@ -323,13 +328,15 @@
       },
 
       // ── Challenges ───────────────────────────────────────────────────
-      async listMyCompetitions() {
+      // Das Freie Training (mode 'solo') ist eine versteckte Challenge und
+      // kommt nur mit includeSolo mit (Stats „Ich“).
+      async listMyCompetitions({ includeSolo = false } = {}) {
         const rows = check(await client.from('competition_members')
           .select('role, team, joined_at, competition:competition_id(*)')
           .eq('user_id', uid())
           .is('left_at', null));
         return (rows || [])
-          .filter(r => r.competition)
+          .filter(r => r.competition && (includeSolo || r.competition.mode !== 'solo'))
           .map(r => ({ ...r.competition, my_role: r.role, my_team: r.team }))
           .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
       },
@@ -379,7 +386,7 @@
           selectAll(() => client.from('weekly_challenges').select('*')
             .in('competition_id', competitionIds).order('week_start', { ascending: false }).order('created_at')),
           selectAll(() => client.from('sets')
-            .select('id, challenge_id, competition_id, user_id, reps, duration_minutes, created_at')
+            .select('id, challenge_id, competition_id, user_id, reps, duration_minutes, created_at, log_id')
             .in('competition_id', competitionIds).order('created_at', { ascending: false })),
           selectAll(() => client.from('categories').select('*').order('created_at')),
         ]);
@@ -389,6 +396,82 @@
           sets: sets.map(withAthlete),
           categories,
         };
+      },
+
+      // ── Rangliste ────────────────────────────────────────────────────
+      async getRankingSettings() {
+        const { data, error } = await client.from('ranking_settings').select('*').eq('id', 1).maybeSingle();
+        if (error) throw friendlyError(error);
+        return data;
+      },
+      async getRankedCategories() {
+        return check(await client.from('categories').select('*')
+          .is('competition_id', null).eq('ranked', true).order('created_at')) || [];
+      },
+      async rankingMonth(month) {
+        return check(await client.rpc('ranking_month', { p_month: month })) || [];
+      },
+      async rankingTotals({ from = null, to = null } = {}) {
+        return check(await client.rpc('ranking_totals', { p_from: from, p_to: to })) || [];
+      },
+      async rankingProfile(userId) {
+        return check(await client.rpc('ranking_profile', { p_user: userId })) || [];
+      },
+      async seasonChampions() {
+        return check(await client.rpc('season_champions')) || [];
+      },
+      // Fällige Monate abschließen (idempotent, läuft sonst per pg_cron)
+      async closeDueMonths() {
+        const { data } = await client.rpc('close_due_months');
+        return data || 0;
+      },
+      // Wohin ein Satz dieser Übung in dieser Woche geht
+      async logTargets(categoryId, weekStart) {
+        const { data, error } = await client.rpc('log_targets', { p_category: categoryId, p_week: weekStart });
+        if (error) { if (missingRpc(error)) return []; throw friendlyError(error); }
+        return data || [];
+      },
+      // Aus der Rangliste: passende Challenge der Woche, sonst Freies Training
+      async logFreeSet({ categoryId, reps, note = null, createdAt = null }) {
+        return normSet(check(await client.rpc('log_free_set', {
+          p_category: categoryId, p_reps: reps, p_note: note, p_created_at: createdAt,
+        })));
+      },
+      async setRankingOptIn(on) {
+        return base.updateProfile({ ranking_opt_in: !!on });
+      },
+      async reportRankingEntry({ userId, reason, categoryId = null, month = null }) {
+        check(await client.rpc('report_ranking_entry', { p_user: userId, p_reason: reason, p_category: categoryId, p_month: month }));
+      },
+      async setBlock(userId, blocked) {
+        check(await client.rpc('set_block', { p_user: userId, p_blocked: !!blocked }));
+      },
+      async myBlocks() {
+        return check(await client.rpc('my_blocks')) || [];
+      },
+      async isRankingAdmin() {
+        const { data, error } = await client.rpc('is_ranking_admin');
+        return !error && !!data;
+      },
+      async rankingReportsOpen() {
+        return check(await client.rpc('ranking_reports_open')) || [];
+      },
+      async resolveRankingReports({ userId, reason, categoryId = null, month = null, resolution }) {
+        check(await client.rpc('resolve_ranking_reports', {
+          p_user: userId, p_reason: reason, p_category: categoryId, p_month: month, p_resolution: resolution,
+        }));
+      },
+
+      // ── Konto löschen ────────────────────────────────────────────────
+      async deleteMyAccount() {
+        const me = uid();
+        try {
+          const { data: files } = await client.storage.from('avatars').list(me);
+          if (files?.length) await client.storage.from('avatars').remove(files.map(f => `${me}/${f.name}`));
+        } catch (e) { /* Profilbild bleibt im Zweifel liegen */ }
+        check(await client.rpc('delete_my_account'));
+        await client.auth.signOut();
+        currentUserId = null;
       },
 
       // ── Push notification device tokens ──────────────────────────────
@@ -561,7 +644,18 @@
           .order('created_at', { ascending: false }));
         return (data || []).map(normSet);
       },
-      async addSet({ athlete, ...payload }) {
+      // Sport-Sätze laufen über log_set: bei gewerteten Übungen zählt der Satz
+      // in allen Challenges mit derselben Übung dieser Woche (außer skip).
+      // Work-Sätze (Minuten, Tags) gehen wie bisher direkt in die Tabelle.
+      async addSet({ athlete, skip, ...payload }) {
+        if (payload.duration_minutes == null) {
+          const { data, error } = await client.rpc('log_set', {
+            p_challenge: payload.challenge_id, p_reps: payload.reps, p_note: payload.note ?? null,
+            p_created_at: payload.created_at ?? null, p_skip: skip || [],
+          });
+          if (!error) { emit(); return normSet(data); }
+          if (!missingRpc(error)) throw friendlyError(error);
+        }
         const data = check(await client.from('sets')
           .insert({ ...payload, user_id: uid(), competition_id: cid }).select().single());
         emit();
@@ -587,6 +681,12 @@
           normSet(s);
           return { ...s, category: s.challenge?.category, challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
         });
+      },
+      // Andere eigene Challenges, in denen ein Satz dieser Übung mitzählt
+      async logTargets(categoryId, weekStart) {
+        const { data, error } = await client.rpc('log_targets', { p_category: categoryId, p_week: weekStart });
+        if (error) { if (missingRpc(error)) return []; throw friendlyError(error); }
+        return data || [];
       },
       async getAllSets() {
         const data = await selectAll(() => client.from('sets').select('*')

@@ -258,11 +258,11 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
   React.useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
   React.useEffect(() => {
     const sig = new Map();
-    for (const e of entries) if (e.kind !== 'recap') sig.set(e.key, e.count || 1);
+    for (const e of entries) if (e.kind !== 'recap' && e.kind !== 'month') sig.set(e.key, e.count || 1);
     const prev = seenRef.current;
     seenRef.current = sig;
     if (!prev) return;
-    const fresh = entries.filter((e) => e.kind !== 'recap' && (!prev.has(e.key) || (e.count || 1) > prev.get(e.key)));
+    const fresh = entries.filter((e) => e.kind !== 'recap' && e.kind !== 'month' && (!prev.has(e.key) || (e.count || 1) > prev.get(e.key)));
     if (!fresh.length) return;
     const keys = fresh.map((e) => e.key);
     setArriving((a) => { const n = { ...a }; for (const k of keys) n[k] = true; return n; });
@@ -381,6 +381,9 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
 
         if (e.kind === 'recap') {
           return <React.Fragment key={e.key}>{heading}<WeekRecap recap={e} me={me} sides={sides} /></React.Fragment>;
+        }
+        if (e.kind === 'month') {
+          return <React.Fragment key={e.key}>{heading}<MonthRecapCard item={e} me={me} /></React.Fragment>;
         }
         if (e.kind === 'milestone') {
           const side = e.type === 'lead' ? sides[e.sideIndex] : sides[sideIdx[e.athlete]];

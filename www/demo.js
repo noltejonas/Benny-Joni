@@ -3,7 +3,7 @@
 // Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt).
 // `?demo=reset` erzeugt die Beispieldaten neu, `?demo=off` schaltet zurück auf Supabase.
 // Ersetzt PTData.init durch eine In-Memory-API mit denselben Methoden wie data.js.
-// Es gibt keinen Netzwerkzugriff; alles liegt in localStorage (`pt_demo_db_v1`).
+// Es gibt keinen Netzwerkzugriff; alles liegt in localStorage (`pt_demo_db_v2`).
 
 (function () {
   const params = new URLSearchParams(location.search);
@@ -11,12 +11,13 @@
   try {
     if (flag === 'off') localStorage.removeItem('pt_demo');
     else if (flag !== null) localStorage.setItem('pt_demo', '1');
-    if (flag === 'reset') localStorage.removeItem('pt_demo_db_v1');
+    if (flag === 'reset') localStorage.removeItem('pt_demo_db_v2');
+    localStorage.removeItem('pt_demo_db_v1');
     if (localStorage.getItem('pt_demo') !== '1') return;
   } catch (e) { return; }
 
   const { mondayOf, isoDate, addDays, computePenalties, participantsFor, annotateWorkouts } = window.PTData;
-  const DB_KEY = 'pt_demo_db_v1';
+  const DB_KEY = 'pt_demo_db_v2';
   const ME = 'u-benny';
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
 
@@ -34,25 +35,36 @@
     let n = 0;
     const id = (p) => `${p}-${++n}`;
 
+    // Rangliste: Benny wird beim ersten Öffnen gefragt (null), Sara hat abgelehnt.
+    // Die „Welt“-Leute trainieren nur im Freien Training und füllen die Liste.
+    const WORLD = ['Mia', 'Paul', 'Emma', 'Noah', 'Hannah', 'Elias', 'Lina', 'Finn', 'Clara', 'Luis', 'Ida', 'Ben'];
     const profiles = [
-      ['u-benny', 'Benny', 'uploads/benny.jpg', COLORS[0]],
-      ['u-jonas', 'Jonas', 'uploads/jonas.jpg', COLORS[1]],
-      ['u-lea', 'Lea', null, COLORS[2]],
-      ['u-max', 'Max', null, COLORS[3]],
-      ['u-sara', 'Sara', null, COLORS[4]],
-      ['u-tim', 'Tim', null, COLORS[5]],
-    ].map(([pid, name, avatar, color]) => ({
-      id: pid, display_name: name, avatar_url: avatar, color,
+      ['u-benny', 'Benny', 'uploads/benny.jpg', COLORS[0], null],
+      ['u-jonas', 'Jonas', 'uploads/jonas.jpg', COLORS[1], true],
+      ['u-lea', 'Lea', null, COLORS[2], true],
+      ['u-max', 'Max', null, COLORS[3], true],
+      ['u-sara', 'Sara', null, COLORS[4], false],
+      ['u-tim', 'Tim', null, COLORS[5], true],
+      ...WORLD.map((name, i) => [`u-w${i + 1}`, name, null, COLORS[i % COLORS.length], true]),
+    ].map(([pid, name, avatar, color, optIn]) => ({
+      id: pid, display_name: name, avatar_url: avatar, color, ranking_opt_in: optIn,
       main_competition_id: pid === ME ? 'c-bj' : null, created_at: now.toISOString(),
     }));
 
-    const cat = (cid, name, emoji, kind = 'sports', type = 'standard') =>
-      ({ id: cid, name, emoji, kind, challenge_type: type, competition_id: null, created_at: '2026-01-01T00:00:00Z' });
+    // Katalog wie nach der Migration monthly_ranking: Grundübungen gewertet
+    const cat = (cid, name, emoji, kind = 'sports', type = 'standard', rank = null) =>
+      ({ id: cid, name, emoji, kind, challenge_type: type, competition_id: null, created_at: '2026-01-01T00:00:00Z',
+         ranked: !!rank, metric: rank?.[0] || null, max_per_day: rank?.[1] || null, rule: rank?.[2] || null });
     const categories = [
-      cat('cat-push', 'Liegestütze', '🤜'), cat('cat-pull', 'Klimmzüge', '🆙'), cat('cat-dips', 'Dips', '🔽'),
-      cat('cat-legs', 'Leg Raises', '🦵'), cat('cat-hspu', 'HSPU', '🤸'), cat('cat-sit', 'Sit-ups', '🧘'),
-      cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland'),
-      cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up'),
+      cat('cat-push', 'Liegestütze', '🤜', 'sports', 'standard', ['volume', 1000, 'Brust fast am Boden, oben Arme ganz gestreckt.']),
+      cat('cat-pull', 'Klimmzüge', '🆙', 'sports', 'standard', ['volume', 400, 'Aus dem toten Hang, Kinn über die Stange.']),
+      cat('cat-dips', 'Dips', '🔽', 'sports', 'standard', ['volume', 600, 'Oberarme mindestens parallel zum Boden, oben ganz gestreckt.']),
+      cat('cat-legs', 'Leg Raises', '🦵', 'sports', 'standard', ['volume', 600, 'Gestreckte Beine bis mindestens 90 Grad anheben.']),
+      cat('cat-hspu', 'HSPU', '🤸', 'sports', 'standard', ['volume', 300, 'Kopf berührt Boden oder Matte, oben ganz gestreckt.']),
+      cat('cat-sit', 'Sit-ups', '🧘', 'sports', 'standard', ['volume', 1000, 'Schultern ganz ab, Brust bis zu den Knien.']),
+      cat('cat-squat', 'Kniebeugen', '🍑', 'sports', 'standard', ['volume', 1000, 'Hüfte mindestens auf Kniehöhe, oben ganz aufrichten.']),
+      cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']),
+      cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up', ['best', 204, 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.']),
       cat('cat-vibe', 'Vibe Coding', '💻', 'work'),
     ];
 
@@ -109,7 +121,7 @@
               if (r() < 0.8) {
                 const day = rint(0, 6);
                 const t = new Date(ws + 'T00:00:00'); t.setDate(t.getDate() + day); t.setHours(rint(7, 20), rint(0, 59));
-                if (t.getTime() < nowMs) sets.push({ id: id('s'), challenge_id: chId, competition_id: c.id, user_id: m.user_id,
+                if (t.getTime() < nowMs) sets.push({ id: id('s'), challenge_id: chId, competition_id: c.id, user_id: m.user_id, log_id: id('log'),
                   reps: type === 'tom_holland' ? rint(7, 12) : rint(140, 204), duration_minutes: null, note: null, created_at: t.toISOString() });
               }
               continue;
@@ -123,7 +135,7 @@
                 const t = new Date(ws + 'T00:00:00'); t.setDate(t.getDate() + day); t.setHours(rint(7, 21), rint(0, 59));
                 if (t.getTime() >= nowMs) continue;
                 left -= reps;
-                sets.push({ id: id('s'), challenge_id: chId, competition_id: c.id, user_id: m.user_id,
+                sets.push({ id: id('s'), challenge_id: chId, competition_id: c.id, user_id: m.user_id, log_id: id('log'),
                   reps, duration_minutes: null, note: null, created_at: t.toISOString() });
               }
             }
@@ -137,9 +149,58 @@
       chosen_by_user: ME, chosen_by: ME, created_at: monday + 'T07:00:00Z' });
     for (const u of ['u-benny', 'u-jonas']) for (let d = 0; d < 3; d++) {
       const t = new Date(monday + 'T00:00:00'); t.setDate(t.getDate() + d); t.setHours(19, 30);
-      if (t.getTime() < nowMs) sets.push({ id: id('s'), challenge_id: vibe, competition_id: 'c-bj', user_id: u,
+      if (t.getTime() < nowMs) sets.push({ id: id('s'), challenge_id: vibe, competition_id: 'c-bj', user_id: u, log_id: id('log'),
         reps: null, duration_minutes: rint(40, 120), note: null, created_at: t.toISOString(), project_tag_id: 'pt-1', tool_tag_id: 'tt-1' });
     }
+    // Freies Training der Welt-Leute: je eine Solo-Challenge, ein paar Übungen pro Woche
+    const worldCats = ['cat-push', 'cat-pull', 'cat-dips', 'cat-sit', 'cat-squat', 'cat-legs', 'cat-hspu'];
+    WORLD.forEach((_, i) => {
+      const uidW = `u-w${i + 1}`, cidW = `c-solo-${uidW}`;
+      const level = 0.4 + r() * 1.5;
+      competitions.push({ id: cidW, name: 'Freies Training', emoji: '🏋️', mode: 'solo', invite_code: `SOLO-${uidW}`,
+        rotation_enabled: false, penalties_enabled: false, work_enabled: false, start_date: startOf(7), end_date: null,
+        archived_at: null, created_by: uidW, created_at: startOf(7) + 'T08:00:00Z' });
+      members.push({ competition_id: cidW, user_id: uidW, role: 'owner', team: null, joined_at: startOf(7) + 'T08:00:00Z', left_at: null });
+      const mineCats = worldCats.filter(() => r() < 0.6);
+      for (let w = 7; w >= 0; w--) {
+        const ws = startOf(w);
+        for (const catId of [...mineCats, ...(r() < 0.5 ? ['cat-th'] : []), ...(r() < 0.4 ? ['cat-bsu'] : [])]) {
+          const chId = id('ch');
+          weekly_challenges.push({ id: chId, competition_id: cidW, week_start: ws, category_id: catId, target_reps: 1,
+            chosen_by_user: uidW, chosen_by: uidW, created_at: ws + 'T07:00:00Z' });
+          const type = categories.find(x => x.id === catId).challenge_type;
+          for (let day = 0; day < 7; day++) {
+            if (r() < (type === 'standard' ? 0.45 : 0.85)) continue;
+            const t = new Date(ws + 'T00:00:00'); t.setDate(t.getDate() + day); t.setHours(rint(6, 21), rint(0, 59));
+            if (t.getTime() >= nowMs) continue;
+            const base = catId === 'cat-pull' || catId === 'cat-hspu' ? 25 : catId === 'cat-dips' || catId === 'cat-legs' ? 40 : 70;
+            const reps = type === 'tom_holland' ? rint(6, 14) : type === 'bring_sally_up' ? rint(120, 204) : Math.max(5, Math.round(base * level * (0.6 + r())));
+            sets.push({ id: id('s'), challenge_id: chId, competition_id: cidW, user_id: uidW, log_id: id('log'),
+              reps, duration_minutes: null, note: null, created_at: t.toISOString() });
+          }
+        }
+      }
+    });
+
+    // Abgeschlossene Monate: Wertung startet vor sechs Monaten, Ergebnisse
+    // vergangener Monate sind ausgedacht (die Beispielsätze reichen nur ~8 Wochen zurück).
+    const thisMonth = PTRanking.monthOf(now);
+    const ranking_settings = { id: 1, start_month: PTRanking.addMonths(thisMonth, -6) };
+    const monthly_results = [], month_closures = [];
+    const rankedIds = categories.filter(c => c.ranked).map(c => c.id);
+    const optedIn = profiles.filter(p => p.ranking_opt_in).map(p => p.id);
+    for (let k = 6; k >= 1; k--) {
+      const month = PTRanking.addMonths(thisMonth, -k);
+      month_closures.push({ month, closed_at: PTRanking.closeDeadline(month).toISOString() });
+      for (const catId of rankedIds) {
+        const field = [...optedIn, ...(k <= 5 ? [ME] : [])].filter(() => r() < 0.7)
+          .map(u => ({ category_id: catId, user_id: u, value: catId === 'cat-bsu' ? rint(130, 204) : catId === 'cat-th' ? rint(6, 15) : rint(80, 2400) }));
+        for (const b of PTRanking.board(field)) monthly_results.push({ month, ...b });
+      }
+    }
+    const ranking_reports = [{ id: id('rr'), reporter: 'u-jonas', user_id: 'u-w3', reason: 'values', category_id: 'cat-push',
+      month: thisMonth, resolution: null, resolved_by: null, resolved_at: null, created_at: now.toISOString() }];
+
     // Reaktionen auf die letzten Sätze
     const recent = [...sets].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 40);
     for (const s of recent) {
@@ -187,6 +248,8 @@
       penalty_config, penalties, week_closures, payouts, rotation_config, plan_slots,
       project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: 'Terminator', emoji: '📁', created_at: monday }],
       tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }],
+      ranking_settings, monthly_results, month_closures, ranking_reports,
+      user_blocks: [], ranking_admins: [ME],
       seq: n,
     };
   }
@@ -234,10 +297,10 @@
       },
       async uploadAvatar(blob) { return base.updateProfile({ avatar_url: URL.createObjectURL(blob) }); },
 
-      async listMyCompetitions() {
+      async listMyCompetitions({ includeSolo = false } = {}) {
         const mine = db.members.filter(m => m.user_id === uid() && !m.left_at);
         return later(mine.map(m => ({ ...db.competitions.find(c => c.id === m.competition_id), my_role: m.role, my_team: m.team }))
-          .filter(c => c.id).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
+          .filter(c => c.id && (includeSolo || c.mode !== 'solo')).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
       },
       async getMembers(cid) { return later(membersOf(cid)); },
       async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
@@ -251,7 +314,7 @@
         save(); return later(c);
       },
       async previewCompetition(code) {
-        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && !x.archived_at);
+        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && !x.archived_at && x.mode !== 'solo');
         if (!c) return later(null);
         const ms = db.members.filter(m => m.competition_id === c.id && !m.left_at);
         return later({ id: c.id, name: c.name, emoji: c.emoji, mode: c.mode, capacity: capacity(c.mode),
@@ -259,7 +322,7 @@
           members: ms.map(m => { const p = profileOf(m.user_id); return { display_name: p.display_name, team: m.team, avatar_url: p.avatar_url, color: p.color }; }) });
       },
       async joinCompetition(code, team = null) {
-        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase());
+        const c = db.competitions.find(x => x.invite_code === String(code).trim().toUpperCase() && x.mode !== 'solo');
         if (!c) throw new Error('Code nicht gefunden.');
         const ms = db.members.filter(m => m.competition_id === c.id && !m.left_at);
         if (!ms.some(m => m.user_id === uid())) {
@@ -292,8 +355,193 @@
       async upsertDeviceToken() { return null; },
       async deleteDeviceToken() {},
       forCompetition(cid) { return competitionAPI(cid, uid); },
+
+      // ── Rangliste (wie die RPCs der Migration monthly_ranking) ─────
+      async getRankingSettings() { return later(db.ranking_settings); },
+      async getRankedCategories() { return later(db.categories.filter(c => c.ranked && !c.competition_id)); },
+      async rankingMonth(month) { return later(rankingMonth(uid(), month)); },
+      async rankingTotals({ from = null, to = null } = {}) {
+        const me = uid();
+        const rows = PTRanking.totals(visibleResults(me), { from, to });
+        return later(rows.map(r => ({ ...r, ...profileFields(me, r.user_id) })));
+      },
+      async rankingProfile(userId) {
+        const me = uid();
+        return later(visibleResults(me).filter(r => r.user_id === userId && r.points > 0)
+          .sort((a, b) => b.month.localeCompare(a.month) || a.rank - b.rank));
+      },
+      async seasonChampions() {
+        return later(PTRanking.seasonChampions(visibleResults(uid()), db.month_closures.map(m => m.month)));
+      },
+      async closeDueMonths() {
+        let n = 0;
+        for (let m = db.ranking_settings.start_month; PTRanking.closeDeadline(m) <= new Date(); m = PTRanking.addMonths(m, 1)) {
+          if (db.month_closures.some(x => x.month === m)) continue;
+          db.month_closures.push({ month: m, closed_at: new Date().toISOString() });
+          for (const b of liveBoard(m)) { db.monthly_results.push({ month: m, ...b }); n++; }
+        }
+        if (n) save();
+        return later(n);
+      },
+      async logTargets(categoryId, weekStart) { return later(logTargets(uid(), categoryId, weekStart)); },
+      async logFreeSet({ categoryId, reps, note = null, createdAt = null }) {
+        const me = uid();
+        const cat = db.categories.find(c => c.id === categoryId);
+        if (!cat?.ranked) throw new Error('Diese Übung zählt nicht für die Rangliste.');
+        if (!(reps > 0)) throw new Error('Bitte einen Wert größer als 0 eingeben.');
+        const at = createdAt || new Date().toISOString();
+        const ws = isoDate(mondayOf(new Date(at)));
+        let ch = logTargets(me, categoryId, ws)[0];
+        let chId = ch?.challenge_id;
+        if (!chId) {
+          let solo = db.competitions.find(c => c.mode === 'solo' && c.created_by === me);
+          if (!solo) {
+            solo = { id: newId('c'), name: 'Freies Training', emoji: '🏋️', mode: 'solo', invite_code: `SOLO-${newId('x')}`,
+              rotation_enabled: false, penalties_enabled: false, work_enabled: false, start_date: ws, end_date: null,
+              archived_at: null, created_by: me, created_at: new Date().toISOString() };
+            db.competitions.push(solo);
+            db.members.push({ competition_id: solo.id, user_id: me, role: 'owner', team: null, joined_at: solo.created_at, left_at: null });
+          }
+          let wc = db.weekly_challenges.find(w => w.competition_id === solo.id && w.week_start === ws && w.category_id === categoryId);
+          if (!wc) {
+            wc = { id: newId('ch'), competition_id: solo.id, week_start: ws, category_id: categoryId, target_reps: 1,
+              chosen_by_user: me, chosen_by: me, created_at: new Date().toISOString() };
+            db.weekly_challenges.push(wc);
+          }
+          chId = wc.id;
+        }
+        const s = insertSet(me, chId, { reps, note, created_at: at });
+        save(); emitAll();
+        return later(withAthlete(s));
+      },
+      async setRankingOptIn(on) { return base.updateProfile({ ranking_opt_in: !!on }); },
+      async reportRankingEntry({ userId, reason, categoryId = null, month = null }) {
+        const me = uid();
+        if (userId === me) throw new Error('Das darf nur der Ersteller der Challenge.');
+        const cat = reason === 'values' ? categoryId : null, mon = reason === 'values' ? month : null;
+        if (!db.ranking_reports.some(r => r.reporter === me && r.user_id === userId && r.reason === reason
+          && r.category_id === cat && r.month === mon && !r.resolved_at)) {
+          db.ranking_reports.push({ id: newId('rr'), reporter: me, user_id: userId, reason, category_id: cat, month: mon,
+            resolution: null, resolved_by: null, resolved_at: null, created_at: new Date().toISOString() });
+          save();
+        }
+      },
+      async setBlock(userId, blocked) {
+        const me = uid();
+        db.user_blocks = db.user_blocks.filter(b => !(b.blocker === me && b.blocked === userId));
+        if (blocked) db.user_blocks.push({ blocker: me, blocked: userId, created_at: new Date().toISOString() });
+        save();
+      },
+      async myBlocks() {
+        const me = uid();
+        return later(db.user_blocks.filter(b => b.blocker === me).map(b => {
+          const p = profileOf(b.blocked); return { user_id: p.id, display_name: p.display_name, avatar_url: p.avatar_url, color: p.color };
+        }));
+      },
+      async isRankingAdmin() { return later(db.ranking_admins.includes(uid())); },
+      async rankingReportsOpen() {
+        if (!db.ranking_admins.includes(uid())) throw new Error('Das darf nur der Ersteller der Challenge.');
+        const groups = {};
+        for (const r of db.ranking_reports.filter(x => !x.resolved_at)) {
+          const k = [r.user_id, r.reason, r.category_id, r.month].join('|');
+          const p = profileOf(r.user_id);
+          const g = groups[k] ||= { user_id: r.user_id, display_name: p.display_name, avatar_url: p.avatar_url, color: p.color,
+            reason: r.reason, category_id: r.category_id, month: r.month, reporters: new Set(), first_at: r.created_at };
+          g.reporters.add(r.reporter);
+        }
+        return later(Object.values(groups).map(g => ({ ...g, reporters: g.reporters.size,
+          hidden: rankingHidden(g.user_id, g.category_id, g.month) })));
+      },
+      async resolveRankingReports({ userId, reason, categoryId = null, month = null, resolution }) {
+        for (const r of db.ranking_reports) {
+          if (r.user_id === userId && r.reason === reason && r.category_id === categoryId && r.month === month && !r.resolved_at) {
+            Object.assign(r, { resolution, resolved_by: uid(), resolved_at: new Date().toISOString() });
+          }
+        }
+        if (resolution === 'removed' && reason === 'profile') { const p = db.profiles.find(x => x.id === userId); if (p) p.avatar_url = null; }
+        save();
+      },
+      // Demo: Konto „löschen“ heißt Beispieldaten verwerfen und abmelden
+      async deleteMyAccount() {
+        try { localStorage.removeItem(DB_KEY); } catch (e) {}
+        db = seed(); save();
+        setSession(null, 'SIGNED_OUT');
+      },
     };
     return base;
+  }
+
+  // ── Rangliste: Hilfen ────────────────────────────────────────────
+  const optedIn = (id) => db.profiles.find(p => p.id === id)?.ranking_opt_in === true;
+  function rankingHidden(userId, categoryId, month) {
+    const rs = db.ranking_reports.filter(r => r.user_id === userId);
+    if (rs.some(r => r.resolution === 'removed' && (r.reason === 'profile' || (r.category_id === categoryId && r.month === month)))) return true;
+    const open = rs.filter(r => r.reason === 'values' && !r.resolved_at && r.category_id === categoryId && r.month === month);
+    return new Set(open.map(r => r.reporter)).size >= 3;
+  }
+  function shares(me, other) {
+    if (me === other) return true;
+    const mine = new Set(db.members.filter(m => m.user_id === me).map(m => m.competition_id));
+    return db.members.some(m => m.user_id === other && mine.has(m.competition_id));
+  }
+  function profileFields(me, userId) {
+    const p = db.profiles.find(x => x.id === userId) || {};
+    return { display_name: p.display_name, avatar_url: p.avatar_url, color: p.color, is_me: userId === me,
+      is_mine: shares(me, userId), blocked: db.user_blocks.some(b => b.blocker === me && b.blocked === userId) };
+  }
+  function rankedSets() {
+    const chById = Object.fromEntries(db.weekly_challenges.map(w => [w.id, w]));
+    return db.sets.map(s => ({ ...s, category_id: chById[s.challenge_id]?.category_id }));
+  }
+  function liveBoard(month) {
+    const values = PTRanking.monthValues({ sets: rankedSets(), categories: db.categories, month });
+    return PTRanking.board(values, v => optedIn(v.user_id) && !rankingHidden(v.user_id, v.category_id, month));
+  }
+  function rankingMonth(me, month) {
+    const closed = db.month_closures.some(m => m.month === month);
+    const board = closed
+      ? db.monthly_results.filter(r => r.month === month && optedIn(r.user_id) && !rankingHidden(r.user_id, r.category_id, month))
+      : liveBoard(month);
+    const rows = board.map(b => ({ category_id: b.category_id, user_id: b.user_id, value: b.value, rank: b.rank,
+      points: b.points, counted: true, ...profileFields(me, b.user_id) }));
+    if (!closed) {
+      const mine = PTRanking.monthValues({ sets: rankedSets(), categories: db.categories, month })
+        .filter(v => v.user_id === me && v.value > 0 && !board.some(b => b.user_id === me && b.category_id === v.category_id));
+      for (const v of mine) {
+        rows.push({ ...v, rank: PTRanking.hypotheticalRank(board.filter(b => b.category_id === v.category_id), v.value),
+          points: 0, counted: false, ...profileFields(me, me) });
+      }
+    }
+    return rows;
+  }
+  function visibleResults(me) {
+    return db.monthly_results.filter(r => (optedIn(r.user_id) || r.user_id === me) && !rankingHidden(r.user_id, r.category_id, r.month));
+  }
+  function logTargets(me, categoryId, weekStart) {
+    return db.weekly_challenges
+      .filter(w => w.category_id === categoryId && w.week_start === weekStart)
+      .map(w => ({ w, c: db.competitions.find(c => c.id === w.competition_id) }))
+      .filter(({ c }) => c && c.mode !== 'solo' && !c.archived_at
+        && db.members.some(m => m.competition_id === c.id && m.user_id === me && !m.left_at))
+      .sort((a, b) => String(a.c.created_at).localeCompare(String(b.c.created_at)))
+      .map(({ w, c }) => ({ competition_id: c.id, name: c.name, emoji: c.emoji, challenge_id: w.id }));
+  }
+  // Wie log_set: Satz auf das Wochenziel, bei gewerteten Übungen auch in alle
+  // anderen eigenen Challenges mit derselben Übung der Woche (außer skip).
+  function insertSet(me, challengeId, payload, skip = []) {
+    const ch = db.weekly_challenges.find(w => w.id === challengeId);
+    const row = { competition_id: ch.competition_id, user_id: me, reps: null, duration_minutes: null, note: null,
+      created_at: new Date().toISOString(), ...payload, challenge_id: challengeId, log_id: newId('log') };
+    const first = { id: newId('s'), ...row };
+    db.sets.push(first);
+    const cat = db.categories.find(c => c.id === ch.category_id);
+    if (cat?.ranked && row.duration_minutes == null) {
+      for (const t of logTargets(me, ch.category_id, ch.week_start)) {
+        if (t.competition_id === ch.competition_id || skip.includes(t.competition_id)) continue;
+        db.sets.push({ ...row, id: newId('s'), competition_id: t.competition_id, challenge_id: t.challenge_id });
+      }
+    }
+    return first;
   }
 
   function membersOf(cid) {
@@ -367,14 +615,23 @@
       async listSets(challengeId) {
         return later(db.sets.filter(s => s.challenge_id === challengeId).sort((a, b) => b.created_at.localeCompare(a.created_at)).map(withAthlete));
       },
-      async addSet({ athlete, ...payload }) {
-        const s = { id: newId('s'), competition_id: cid, user_id: uid(), reps: null, duration_minutes: null, note: null, created_at: new Date().toISOString(), ...payload };
-        db.sets.push(s); emit(); return later(withAthlete(s));
+      async addSet({ athlete, skip, ...payload }) {
+        const s = insertSet(uid(), payload.challenge_id, payload, skip || []);
+        emit(); emitAll(); return later(withAthlete(s));
       },
+      // Wie der Trigger sync_log_siblings: Änderungen gelten für alle Zeilen der log_id
       async updateSet(id, patch) {
-        const { athlete, ...rest } = patch; const s = db.sets.find(x => x.id === id); Object.assign(s, rest); emit(); return later(withAthlete(s));
+        const { athlete, ...rest } = patch; const s = db.sets.find(x => x.id === id); Object.assign(s, rest);
+        const shared = {};
+        for (const k of ['reps', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
+        for (const x of db.sets) if (x.log_id === s.log_id && x.user_id === s.user_id && x.id !== s.id) Object.assign(x, shared);
+        emit(); emitAll(); return later(withAthlete(s));
       },
-      async deleteSet(id) { db.sets = db.sets.filter(x => x.id !== id); db.reactions = db.reactions.filter(r => r.set_id !== id); emit(); },
+      async deleteSet(id) {
+        const s = db.sets.find(x => x.id === id);
+        const gone = new Set(db.sets.filter(x => x.id === id || (s && x.log_id === s.log_id && x.user_id === s.user_id)).map(x => x.id));
+        db.sets = db.sets.filter(x => !gone.has(x.id)); db.reactions = db.reactions.filter(r => !gone.has(r.set_id)); emit(); emitAll();
+      },
       async recentFeed(limit = 50) {
         const rows = mine('sets').sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
         return later(rows.map(s => {
@@ -385,6 +642,7 @@
         }));
       },
       async getAllSets() { return later(mine('sets').sort((a, b) => b.created_at.localeCompare(a.created_at)).map(withAthlete)); },
+      async logTargets(categoryId, weekStart) { return later(logTargets(uid(), categoryId, weekStart)); },
       async addReaction({ set_id, emoji }) {
         if (db.reactions.some(r => r.set_id === set_id && r.user_id === uid() && r.emoji === emoji)) return null;
         const r = { id: newId('r'), set_id, user_id: uid(), emoji }; db.reactions.push(r); emit(); return later(withAthlete(r));
@@ -500,7 +758,7 @@
     } else {
       const ch = pick(challs);
       const work = db.categories.find(cat => cat.id === ch.category_id)?.kind === 'work';
-      db.sets.push({ id: newId('s'), challenge_id: ch.id, competition_id: cid, user_id: who,
+      db.sets.push({ id: newId('s'), challenge_id: ch.id, competition_id: cid, user_id: who, log_id: newId('log'),
         reps: work ? null : pick([5, 6, 8, 10, 12, 15]),
         duration_minutes: work ? pick([15, 25, 30, 45]) : null,
         note: null, created_at: new Date().toISOString() });

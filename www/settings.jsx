@@ -1,4 +1,4 @@
-/* global React, PTData, Icon, Avatar, Sheet, modeLabel, shareInvite, formatEuro, COMP_EMOJIS */
+/* global React, PTData, PTRanking, Icon, Avatar, Sheet, modeLabel, shareInvite, formatEuro, COMP_EMOJIS */
 // Einstellungen im iOS-Stil: Startseite mit Gruppen, je Thema eine Unterseite.
 // Welche Seite offen ist, steuert CompetitionApp (`page`/`onNavigate`), damit
 // z. B. das Zahnrad im Strafkonto direkt die Strafregeln öffnet.
@@ -127,9 +127,16 @@ function SettingsIconButton({ icon, label, onClick, tone, disabled }) {
 function SettingsScreen({ api, baseApi, competition, members = [], categories = [], me, profile, email,
   planSlots = [], rotationConfig = null, projectTags = [], toolTags = [],
   page = 'root', onNavigate, themePref, onSetThemePref, notificationsEnabled, onSetNotifications,
-  onProfile, onSetMain, onSignOut, onCompetitionChanged, onLeft, onToast }) {
+  onProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft, onToast }) {
   const [penaltyCfg, setPenaltyCfg] = useState(null);
   const [busyModule, setBusyModule] = useState(false);
+  const [rankingAdmin, setRankingAdmin] = useState(false);
+  const [busyRanking, setBusyRanking] = useState(false);
+  useEffect(() => {
+    let off = false;
+    baseApi.isRankingAdmin?.().then(v => { if (!off) setRankingAdmin(!!v); }).catch(() => {});
+    return () => { off = true; };
+  }, [baseApi]);
 
   // Die Strafregeln lädt nur dieser Screen; nach eigenen Änderungen und beim
   // Öffnen der Strafkonto-Seite neu holen.
@@ -180,6 +187,25 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   }
   if (page === 'work') {
     return <SettingsWorkPage {...moduleProps} projectTags={projectTags} toolTags={toolTags} />;
+  }
+  if (page === 'blocks') {
+    return <SettingsBlocksPage baseApi={baseApi} onBack={back} onToast={onToast} />;
+  }
+  if (page === 'reports' && rankingAdmin) {
+    return <SettingsReportsPage baseApi={baseApi} onBack={back} onToast={onToast} />;
+  }
+
+  async function setRanking(on) {
+    setBusyRanking(true);
+    try { onProfileChanged?.(await baseApi.setRankingOptIn(on)); onToast?.(on ? 'Du bist in der Rangliste' : 'Du bist raus aus der Rangliste'); }
+    catch (e) { alert(e.message); }
+    finally { setBusyRanking(false); }
+  }
+  async function deleteAccount() {
+    if (!confirm('Konto wirklich löschen? Deine Sätze, Medaillen und dein Profil werden entfernt. Challenges, die du erstellt hast, gehen an das nächste Mitglied.')) return;
+    if (!confirm('Letzte Frage: endgültig löschen? Das lässt sich nicht rückgängig machen.')) return;
+    try { await baseApi.deleteMyAccount(); }
+    catch (e) { alert(e.message); }
   }
 
   // Module: rechts An/Aus, darunter der Stand, wenn das Modul an ist.
@@ -232,14 +258,100 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
           onClick={() => go('work')} chevron />
       </SettingsGroup>
 
+      <SettingsGroup title="Rangliste">
+        <SettingsSwitchRow icon="trophy" title="In der Rangliste erscheinen"
+          subtitle={profile?.ranking_opt_in == null ? 'Noch nicht entschieden' : null}
+          checked={profile?.ranking_opt_in === true} disabled={busyRanking} onChange={setRanking} />
+        <SettingsRow icon="users" title="Blockiert" onClick={() => go('blocks')} chevron />
+        {rankingAdmin && <SettingsRow icon="bell" title="Meldungen prüfen" onClick={() => go('reports')} chevron />}
+      </SettingsGroup>
+
       <SettingsDeviceGroup themePref={themePref} onSetThemePref={onSetThemePref}
         notificationsEnabled={notificationsEnabled} onSetNotifications={onSetNotifications} />
 
       {onSignOut && (
         <SettingsGroup>
           <SettingsRow title="Abmelden" tone="danger" onClick={onSignOut} />
+          {baseApi.deleteMyAccount && <SettingsRow title="Konto löschen" tone="danger" onClick={deleteAccount} />}
         </SettingsGroup>
       )}
+    </div>
+  );
+}
+
+// ─── Unterseite: Blockiert ──────────────────────────────────────────────────
+function SettingsBlocksPage({ baseApi, onBack, onToast }) {
+  const [rows, setRows] = useState(null);
+  const load = React.useCallback(() => baseApi.myBlocks().then(setRows).catch(() => setRows([])), [baseApi]);
+  useEffect(() => { load(); }, [load]);
+  async function unblock(r) {
+    try { await baseApi.setBlock(r.user_id, false); onToast?.(`${r.display_name} entblockt`); load(); }
+    catch (e) { alert(e.message); }
+  }
+  return (
+    <div className="st-screen">
+      <SettingsPageHeader title="Blockiert" onBack={onBack} />
+      <SettingsGroup footer="Blockierte erscheinen für dich in der Rangliste ohne Name und Bild.">
+        {rows === null ? <SettingsRow title="…" />
+          : !rows.length ? <SettingsRow title="Niemand blockiert" />
+          : rows.map(r => (
+            <div key={r.user_id} className="st-row">
+              <Avatar profile={{ id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url, color: r.color }} size={36} />
+              <span className="st-row-text"><span className="st-row-title">{r.display_name}</span></span>
+              <button className="st-link" onClick={() => unblock(r)}>Entblocken</button>
+            </div>
+          ))}
+      </SettingsGroup>
+    </div>
+  );
+}
+
+// ─── Unterseite: Meldungen (nur Admins) ─────────────────────────────────────
+function SettingsReportsPage({ baseApi, onBack, onToast }) {
+  const [rows, setRows] = useState(null);
+  const [cats, setCats] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const load = React.useCallback(async () => {
+    try {
+      const [r, c] = await Promise.all([baseApi.rankingReportsOpen(), baseApi.getRankedCategories()]);
+      setRows(r); setCats(c);
+    } catch (e) { alert(e.message); setRows([]); }
+  }, [baseApi]);
+  useEffect(() => { load(); }, [load]);
+  async function resolve(r, resolution) {
+    setBusy(true);
+    try {
+      await baseApi.resolveRankingReports({ userId: r.user_id, reason: r.reason, categoryId: r.category_id, month: r.month, resolution });
+      onToast?.(resolution === 'ok' ? 'Freigegeben' : 'Entfernt');
+      load();
+    } catch (e) { alert(e.message); }
+    finally { setBusy(false); }
+  }
+  const what = (r) => {
+    if (r.reason === 'profile') return 'Name oder Bild';
+    const c = cats.find(x => x.id === r.category_id);
+    return `Werte · ${c?.name || 'Übung'}, ${r.month ? PTRanking.monthLabel(r.month) : ''}`;
+  };
+  return (
+    <div className="st-screen">
+      <SettingsPageHeader title="Meldungen" onBack={onBack} />
+      <SettingsGroup footer="Ab drei Meldungen ist ein Eintrag ausgeblendet, bis ihr entscheidet. „Entfernen“ nimmt den Eintrag bzw. bei Profil-Meldungen die Person ganz aus der Rangliste und löscht das Profilbild.">
+        {rows === null ? <SettingsRow title="…" />
+          : !rows.length ? <SettingsRow title="Keine offenen Meldungen" />
+          : rows.map(r => (
+            <div key={`${r.user_id}-${r.reason}-${r.category_id}-${r.month}`} className="st-row st-report">
+              <Avatar profile={{ id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url, color: r.color }} size={36} />
+              <span className="st-row-text">
+                <span className="st-row-title">{r.display_name}</span>
+                <span className="st-row-sub">{what(r)} · {r.reporters}× gemeldet{r.hidden ? ' · ausgeblendet' : ''}</span>
+              </span>
+              <span className="st-report-actions">
+                <button className="st-link" disabled={busy} onClick={() => resolve(r, 'ok')}>In Ordnung</button>
+                <button className="st-link is-danger" disabled={busy} onClick={() => resolve(r, 'removed')}>Entfernen</button>
+              </span>
+            </div>
+          ))}
+      </SettingsGroup>
     </div>
   );
 }

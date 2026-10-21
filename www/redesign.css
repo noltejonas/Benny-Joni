@@ -1102,3 +1102,135 @@ button.st-row:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .mu-profile-row { border-radius: 16px; }
 .mu-recap-podium-row.win { box-shadow: 0 0 0 2px var(--sc); }
 .penalty-row.payout { background: transparent; }
+
+/* ─── Rangliste (rk-*) ─────────────────────────────────────────────────── */
+/* Tab-Bar mit 4 oder 5 Reitern (Strafkonto optional) */
+.tabbar-inner { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+
+.rk { display: flex; flex-direction: column; gap: 16px; }
+.rk-head { display: flex; align-items: baseline; justify-content: space-between; }
+.rk-views { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.rk-chips {
+  display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.rk-chips::-webkit-scrollbar { display: none; }
+.rk-chip {
+  flex: none; height: 36px; padding: 0 14px; border: none; border-radius: 999px;
+  background: var(--surface); color: var(--text-2); box-shadow: var(--shadow);
+  font-size: 14px; font-weight: 600; white-space: nowrap;
+  transition: background .2s var(--ease), color .2s var(--ease), transform .15s var(--ease);
+}
+.rk-chip:active { transform: scale(0.96); }
+.rk-chip.active { background: var(--primary); color: #fff; }
+
+.rk-bar { display: flex; flex-direction: column; gap: 12px; }
+.rk-month { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
+.rk-nav {
+  width: 40px; height: 40px; border: none; border-radius: 12px; display: grid; place-items: center;
+  background: var(--surface); color: var(--text-2); box-shadow: var(--shadow);
+}
+.rk-nav:disabled { opacity: 0.35; box-shadow: none; }
+.rk-flip { display: inline-flex; transform: rotate(180deg); }
+.rk-month-text { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+.rk-month-text b { font-size: 17px; line-height: 22px; font-weight: 800; color: var(--text); }
+.rk-month-text span { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); }
+.rk-period { align-items: flex-start; text-align: left; }
+.rk-filter, .rk-sort { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rk-filter button, .rk-sort button { min-height: 34px; font-size: 13px; }
+
+.rk-optin { padding: 14px 16px; font-size: 14px; line-height: 20px; }
+.rk-optin .btn-link { margin-left: 6px; }
+.rk-rule {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 16px;
+  background: var(--surface-2); color: var(--text-2); font-size: 14px; line-height: 20px;
+}
+.rk-me-line { display: flex; align-items: center; gap: 8px; padding: 0 4px; color: var(--primary-ink); font-size: 14px; font-weight: 700; }
+
+.rk-list { padding: 8px; }
+.rk-rows { list-style: none; margin: 0; padding: 0; }
+.rk-row + .rk-row { border-top: 1px solid var(--line); }
+.rk-row-btn {
+  width: 100%; display: grid; grid-template-columns: 32px 36px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 8px; border: none; border-radius: 14px; background: none; color: var(--text); text-align: left;
+}
+.rk-row.is-me .rk-row-btn { background: var(--primary-tint); }
+.rk-rank { font-size: 15px; font-weight: 800; text-align: center; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rk-row .rk-rank.top { font-size: 20px; color: var(--text); }
+.rk-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.rk-sub { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-3); }
+.rk-medals { display: inline-flex; gap: 6px; font-size: 12px; }
+.rk-medals b { margin-left: 2px; font-weight: 700; color: var(--text-2); }
+.rk-score { display: flex; flex-direction: column; align-items: flex-end; }
+.rk-score b { font-size: 16px; font-weight: 800; }
+.rk-score small { font-size: 12px; font-weight: 700; color: var(--text-3); }
+.rk-empty { padding: 24px 16px; text-align: center; font-size: 14px; line-height: 20px; color: var(--text-3); }
+.rk-loader { min-height: 120px; }
+
+.rk-sticky {
+  position: sticky; bottom: calc(96px + var(--safe-bot)); z-index: 5;
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 18px; background: var(--grad); color: #fff; box-shadow: var(--grad-shadow);
+}
+.rk-sticky .rk-rank, .rk-sticky .rk-sub { color: rgba(255, 255, 255, 0.85); }
+.rk-log { width: 100%; }
+
+.rk-optin-sheet { display: flex; flex-direction: column; gap: 12px; padding-top: 8px; text-align: center; }
+.rk-optin-sheet .title { margin: 0; }
+.rk-optin-sheet .subtitle { margin: 0; font-size: 15px; line-height: 22px; }
+.rk-optin-sheet .btn-row { margin-top: 8px; }
+.rk-optin-icon { font-size: 48px; line-height: 1; }
+
+.rk-time { display: flex; align-items: center; justify-content: center; gap: 24px; }
+.rk-time b { font-size: 44px; line-height: 52px; font-weight: 800; }
+.rk-time .icon-btn { width: 48px; height: 48px; border: none; border-radius: 14px; font-size: 22px; font-weight: 700; }
+.rk-targets {
+  margin-top: 16px; padding: 12px 14px; border-radius: 14px;
+  background: var(--surface-2); color: var(--text-2); font-size: 14px; line-height: 20px;
+}
+
+.rk-card { display: flex; flex-direction: column; gap: 16px; max-height: 78vh; overflow-y: auto; padding-top: 8px; }
+.rk-card-head { display: flex; align-items: center; gap: 16px; }
+.rk-card-name { font-size: 22px; line-height: 28px; font-weight: 800; }
+.rk-card-sub { font-size: 14px; font-weight: 600; color: var(--text-3); }
+.rk-card-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rk-card-kpis > div {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px;
+  border-radius: 14px; background: var(--surface-2);
+}
+.rk-card-kpis b { font-size: 18px; font-weight: 800; }
+.rk-card-kpis span { font-size: 12px; font-weight: 600; color: var(--text-3); }
+.rk-card-label { margin-bottom: -8px; }
+.rk-cups, .rk-trophies { list-style: none; margin: 0; padding: 0; }
+.rk-cups li { padding: 10px 14px; border-radius: 14px; background: var(--primary-tint); color: var(--primary-ink); font-weight: 700; }
+.rk-cups li + li { margin-top: 8px; }
+.rk-trophies li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 0; }
+.rk-trophies li + li { border-top: 1px solid var(--line); }
+.rk-trophy-medal { font-size: 22px; font-weight: 800; text-align: center; color: var(--text-3); }
+.rk-trophy-text { display: flex; flex-direction: column; min-width: 0; }
+.rk-trophy-text b { font-size: 15px; }
+.rk-trophy-text span { font-size: 13px; color: var(--text-3); }
+.rk-trophy-pts { font-weight: 800; }
+.rk-report { display: flex; flex-direction: column; gap: 8px; }
+.rk-report .btn { width: 100%; white-space: normal; height: auto; min-height: 48px; padding: 10px 16px; }
+.rk-card-close { align-self: center; padding: 8px; }
+
+.rk-recap { padding: 20px; }
+.rk-recap-icon { font-size: 20px; }
+.rk-recap-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.rk-recap-list li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 0; }
+.rk-recap-list li + li { border-top: 1px solid var(--line); }
+.rk-recap-text { display: flex; flex-direction: column; min-width: 0; }
+.rk-recap-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-3); }
+
+/* Loggen und Übungsauswahl */
+.cat-note { margin-top: 2px; font-size: 10px; line-height: 12px; font-weight: 600; color: var(--text-4); }
+.log-also { margin-top: 16px; }
+.log-also .chip-row { margin-bottom: 0; }
+
+/* Einstellungen: Meldungen */
+.st-report { align-items: center; }
+.st-report-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.st-link.is-danger { color: var(--danger); }
