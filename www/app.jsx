@@ -294,6 +294,8 @@ function App() {
     } catch (e) {}
     setSheet(null);
     PTBootCache.clear();
+    // Nach dem nächsten Anmelden auf „Heute“ starten, nicht im zuletzt offenen Tab.
+    try { sessionStorage.removeItem('pt:tab'); } catch (e) {}
     await api.signOut();
   }
 
