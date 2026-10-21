@@ -1,1 +1,1 @@
-The first version on the App Store: challenges with friends, shared weekly goals, a live feed with reactions, stats and an optional penalty pot.
+Shared weekly goals, fitness duels, a live feed and statistics. Includes an optional monthly leaderboard and consent options for banner ads in Feed and Stats.

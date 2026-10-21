@@ -608,7 +608,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
   }, [tab, competition.penalties_enabled]);
-  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'work', 'language').
+  // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'language').
   // Nach einem Sprachwechsel lädt die App neu und öffnet wieder die Sprachseite.
   const [settingsPage, setSettingsPage] = useState(() => {
     try {
@@ -624,7 +624,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // frisch. Frisch erstellt oder beigetreten (intro) gibt es keinen.
   const cacheName = `comp:${initialCompetition.id}`;
   const [boot] = useState(() => {
-    const b = intro ? null : PTBootCache.read(me, cacheName);
+    const cached = intro ? null : PTBootCache.read(me, cacheName);
+    const b = cached ? PTData.sportsOnlyBundle(cached) : null;
     if (!b) return null;
     PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
     PTData.annotateWorkouts(b.allSets, b.allChallenges, b.categories);
@@ -669,7 +670,6 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const celebratedRef = React.useRef(false);
 
   const sides = useMemo(() => buildSides(competition, members, me), [competition, members, me]);
-  const allowWork = !!competition.work_enabled;
   const usePenalties = !!competition.penalties_enabled;
   const useRotation = !!competition.rotation_enabled;
 
@@ -831,6 +831,18 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   layerRef.current = layer;
   const memberIdsRef = React.useRef(null);
 
+  // ── Werbung (www/ads.js, nur in der iOS-App) ─────────────────────────────
+  // Erst nach dem Onboarding: nicht in der Demo (dort verlässt nichts das Gerät),
+  // nicht während Einstiegs-Ebenen und bei neuen Leuten erst nach dem ersten Satz.
+  // checkConsent() fragt dann nur still den Stand ab. Das Einwilligungsformular
+  // kommt frühestens, wenn Feed oder Stats das Banner wollen.
+  const adsOk = api?.mode !== 'demo' && !intro && !layer && (!newcomer || !!obState.firstLog);
+  useEffect(() => { if (adsOk) window.PTAds?.checkConsent(); }, [adsOk]);
+  useEffect(() => {
+    window.PTAds?.setBannerWanted(adsOk && (tab === 'feed' || tab === 'history'));
+  }, [adsOk, tab]);
+  useEffect(() => () => window.PTAds?.setBannerWanted(false), []);
+
   const weekTemplate = useMemo(() => {
     if (!useRotation || !rotationConfig || !planSlots.length) return [];
     return PTData.weekTemplateFor({ weekStart, slots: planSlots, config: rotationConfig });
@@ -842,13 +854,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const prevWeekTemplate = useMemo(() => {
     if (useRotation || currentChallenges.length || !window.PTStats?.weekTemplateFromPrevious) return [];
     const prevWeek = PTData.addDays(weekStart, -7);
-    const usable = new Set(categories.filter(c => allowWork || (c.kind || 'sports') !== 'work').map(c => c.id));
+    const usable = new Set(categories.filter(c => (c.kind || 'sports') !== 'work').map(c => c.id));
     const prev = allChallenges.filter(c => c.week_start === prevWeek && usable.has(c.category_id));
     if (!prev.length) return [];
     return PTStats.weekTemplateFromPrevious(prev, {
       fullWeekFactor: (ch) => PTStats.fullWeekFactor({ weekStart: prevWeek, startDate: competition.start_date, createdAt: ch.created_at }),
     });
-  }, [useRotation, currentChallenges, weekStart, categories, allowWork, allChallenges, competition.start_date]);
+  }, [useRotation, currentChallenges, weekStart, categories, allChallenges, competition.start_date]);
   const fixTemplate = weekTemplate.length ? weekTemplate : prevWeekTemplate;
   const fixFromPrev = !weekTemplate.length && prevWeekTemplate.length > 0;
 
@@ -963,7 +975,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const loadOnce = async () => {
     const seq = ++reloadSeq.current;
     try {
-      const [comp, mems, cats, challs, feedData, allSetsData, slots, cfg, pens, cls, openCls, pys, projTags, toolTagsData] = await Promise.all([
+      const [comp, mems, rawCats, rawChalls, rawFeed, rawSets, rawSlots, cfg, pens, cls, openCls, pys, projTags, toolTagsData] = await Promise.all([
         capi.getCompetition(),
         capi.getMembers(),
         capi.getCategories(),
@@ -980,6 +992,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         capi.getToolTags(),
       ]);
       if (seq !== reloadSeq.current) return; // veraltet
+      const { categories: cats, allChallenges: challs, feed: feedData, allSets: allSetsData, planSlots: slots } = PTData.sportsOnlyBundle({
+        categories: rawCats, allChallenges: rawChalls, feed: rawFeed, allSets: rawSets, planSlots: rawSlots,
+      });
       // Pflicht-Workouts markieren, damit Summen sie erkennen (PTData.setValue).
       PTData.annotateWorkouts(allSetsData, challs, cats);
       PTData.annotateWorkouts(feedData, challs, cats);
@@ -1243,7 +1258,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     };
   }, [reload]);
 
-  const setupCategories = allowWork ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
+  const setupCategories = categories.filter(c => (c.kind || 'sports') !== 'work');
   // Badge = Personen mit offenem Saldo (Strafen minus Einzahlungen), wie im Strafkonto.
   const openPenaltyCount = usePenalties ? (window.penaltySummary?.(penalties, payouts).openPeople ?? 0) : 0;
 
@@ -1450,7 +1465,6 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           api={capi}
           me={me}
           categories={setupCategories}
-          allowWork={allowWork}
           weekStart={weekStart}
           existing={setupForChallenge?.id ? setupForChallenge : null}
           usedCategoryIds={currentChallenges.filter(c => c.id !== setupForChallenge?.id).map(c => c.category_id)}

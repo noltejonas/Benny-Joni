@@ -10,6 +10,25 @@
 (function() {
   const PAGE = 1000;
 
+  // Release app supports sports only. Filter views without deleting stored Work history.
+  // Accept both cached competition bundles and cross-challenge stats bundles.
+  function sportsOnlyBundle(bundle) {
+    const workCategories = new Set((bundle.categories || []).filter(c => c.kind === 'work').map(c => c.id));
+    const workChallenges = new Set([...(bundle.challenges || []), ...(bundle.allChallenges || [])]
+      .filter(ch => workCategories.has(ch.category_id) || ch.category?.kind === 'work').map(ch => ch.id));
+    const result = { ...bundle };
+    if (bundle.categories) result.categories = bundle.categories.filter(c => c.kind !== 'work');
+    for (const key of ['challenges', 'allChallenges', 'planSlots']) {
+      if (Array.isArray(bundle[key])) result[key] = bundle[key]
+        .filter(ch => !workCategories.has(ch.category_id) && ch.category?.kind !== 'work');
+    }
+    for (const key of ['sets', 'allSets', 'feed']) {
+      if (Array.isArray(bundle[key])) result[key] = bundle[key].filter(s => s.duration_minutes == null
+        && !workChallenges.has(s.challenge_id) && s.category?.kind !== 'work' && s.challenge?.category?.kind !== 'work');
+    }
+    return result;
+  }
+
   function mondayOf(date) {
     const d = new Date(date);
     const day = d.getDay(); // 0..6 (Sun..Sat)
@@ -545,10 +564,10 @@
           .order('joined_at'));
         return rows || [];
       },
-      async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+      async createCompetition({ name, emoji, mode, rotation, penalties, startDate, endDate }) {
         return check(await client.rpc('create_competition', {
           p_name: name, p_emoji: emoji, p_mode: mode,
-          p_rotation: !!rotation, p_penalties: !!penalties, p_work: !!work,
+          p_rotation: !!rotation, p_penalties: !!penalties, p_work: false,
           p_start_date: startDate || isoDate(new Date()), p_end_date: endDate || null,
         }));
       },
@@ -559,7 +578,7 @@
         return check(await client.rpc('join_competition', { p_code: code, p_team: team }));
       },
       async updateCompetition(id, patch) {
-        return check(await client.from('competitions').update(patch).eq('id', id).select().single());
+        return check(await client.from('competitions').update({ ...patch, work_enabled: false }).eq('id', id).select().single());
       },
       async setMemberTeam(competitionId, userId, team) {
         check(await client.rpc('set_member_team', { p_competition: competitionId, p_user: userId, p_team: team }));
@@ -588,12 +607,12 @@
             .in('competition_id', competitionIds).order('created_at', { ascending: false })),
           selectAll(() => client.from('categories').select('*').order('created_at')),
         ]);
-        return {
+        return sportsOnlyBundle({
           members,
           challenges: challenges.map(normChallenge),
           sets: sets.map(withAthlete),
           categories: categories.map(localizeCategory),
-        };
+        });
       },
 
       // ── Rangliste ────────────────────────────────────────────────────
@@ -745,9 +764,9 @@
           .order('created_at'));
         return (rows || []).map(localizeCategory);
       },
-      async addCategory(name, emoji='💪', kind='sports') {
+      async addCategory(name, emoji='💪') {
         const data = check(await client.from('categories')
-          .insert({ name, emoji, kind, competition_id: cid, created_by: uid() }).select().single());
+          .insert({ name, emoji, kind: 'sports', competition_id: cid, created_by: uid() }).select().single());
         emit();
         return data;
       },
@@ -999,11 +1018,12 @@
           const data = check(await client.from('sets').select('*').in('challenge_id', chIds));
           wkSets = (data || []).map(normSet);
         }
-        annotateWorkouts(wkSets, chs, cats);
+        const sports = sportsOnlyBundle({ categories: cats, challenges: chs, sets: wkSets });
+        annotateWorkouts(sports.sets, sports.challenges, sports.categories);
         const participants = participantsFor(members, weekStart);
         const pens = [];
         for (const m of participants) {
-          pens.push(...computePenalties(chs, wkSets, m.user_id, cfg, participants.length));
+          pens.push(...computePenalties(sports.challenges, sports.sets, m.user_id, cfg, participants.length));
         }
         return { penalties: pens, cfg };
       },
@@ -1202,6 +1222,6 @@
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
     isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, workoutPeopleDone,
-    friendlyError, appError, clearLocalData, localizeCategory,
+    friendlyError, appError, clearLocalData, localizeCategory, sportsOnlyBundle,
   };
 })();

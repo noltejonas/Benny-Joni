@@ -6,7 +6,7 @@
 #   bundle exec fastlane verify_auth          # nur den App-Store-Connect-Zugang prüfen
 #   bundle exec fastlane beta                 # Web-Assets syncen, bauen, zu TestFlight hochladen
 #   bundle exec fastlane release              # bauen, Build + Store-Texte hochladen, NICHT einreichen
-#   bundle exec fastlane release submit:true  # dasselbe und direkt zur Prüfung einreichen
+#   bundle exec fastlane store_metadata       # Texte und Screenshots ohne Build hochladen
 #
 # Zugangsdaten stehen in ios/App/fastlane/.env (gitignored), siehe .env.example.
 
@@ -63,7 +63,7 @@ METADATA_LIMITS = {
 REVIEW_NOTES_LIMIT = 4000
 
 # Kontakt und Login für die App-Prüfung. Nur wenn ALLE gesetzt sind, lädt
-# release Review-Daten hoch. Sonst bliebe „Anmeldung erforderlich“ in App
+# release Review-Daten hoch. Sonst bliebe Anmeldung erforderlich in App
 # Store Connect ohne Login zurück.
 REVIEW_ENV = %w[REVIEW_FIRST_NAME REVIEW_LAST_NAME REVIEW_EMAIL REVIEW_PHONE REVIEW_USER REVIEW_PASSWORD].freeze
 
@@ -116,6 +116,24 @@ def check_metadata!
   end
   UI.user_error!("Store-Texte noch nicht bereit:\n- #{problems.join("\n- ")}") unless problems.empty?
   UI.success("Store-Texte geprüft: keine Platzhalter, alle Limits eingehalten")
+end
+
+# Werbung (www/ads.js, docs/launch/ADMOB.md): Ein App-Store-Build darf keine
+# Google-Testanzeigen ausliefern. tests/ads-config.test.cjs prüft mit
+# ADS_REQUIRE_LIVE=1 zusätzlich: Ist ADS_ENABLED an, stehen echte IDs in
+# www/ads.js und Info.plist und passen zusammen. TestFlight (beta) prüft das
+# bewusst nicht, dort sind Testanzeigen richtig.
+def check_ads_live!
+  ok = Dir.chdir(REPO_ROOT) do
+    Bundler.with_unbundled_env do
+      system({ "ADS_REQUIRE_LIVE" => "1" }, "node", "--test", "tests/ads-config.test.cjs")
+    end
+  end
+  unless ok
+    UI.user_error!("Werbung nicht bereit für den App Store: echte AdMob-IDs fehlen oder passen nicht " \
+                   "(docs/launch/ADMOB.md, Auf echte IDs umstellen). Release ohne Werbung: ADS_ENABLED = false in www/ads.js.")
+  end
+  UI.success("Werbe-Konfiguration geprüft")
 end
 
 # Englischer Notizen-Block aus docs/launch/REVIEW_NOTES.md, mit dem
@@ -252,16 +270,18 @@ platform :ios do
 
   desc "Wie beta bauen, dann Build und Store-Texte (fastlane/metadata) zu App Store Connect hochladen"
   desc "Standard: nur hochladen, nicht einreichen. Veröffentlichung nach Freigabe immer manuell."
-  desc "Optionen: submit:true reicht danach zur Prüfung ein, metadata_only:true lädt ohne Build nur Texte"
-  desc "und Review-Daten hoch, build_number:<n> wie bei beta"
-  desc "Altersfreigabe, App-Datenschutz und Screenshots bleiben Handarbeit (docs/launch/STORE_LISTING.md)"
+  desc "Optionen: metadata_only:true ohne Build, screenshots:false nur Texte, build_number:<n> wie bei beta"
+  desc "Lädt die vorbereiteten Screenshots mit hoch. Einreichung erfolgt anschließend im Store."
   lane :release do |options|
-    submit = options[:submit] == true
+    UI.user_error!("Automatische Einreichung ist deaktiviert. Den fertigen Entwurf in App Store Connect prüfen und dort einreichen.") if options[:submit] == true
     metadata_only = options[:metadata_only] == true
+    screenshots = options[:screenshots] != false
 
     # Erst prüfen, dann bauen: ein Platzhalter soll nicht erst nach 15 Minuten
     # Archivieren auffallen.
     check_metadata!
+    check_store_bundle!("ios", screenshots: screenshots)
+    check_ads_live! unless metadata_only
     review_info = app_review_information
     api_key = asc_api_key
 
@@ -275,7 +295,7 @@ platform :ios do
       build_number = build[:build_number]
     end
 
-    upload_to_app_store(
+    upload_options = {
       api_key: api_key,
       app_identifier: APP_IDENTIFIER,
       # Legt die Version an oder benennt die vorbereitete um (z. B. 1.0 → 1.4).
@@ -284,7 +304,8 @@ platform :ios do
       skip_binary_upload: metadata_only,
       build_number: build_number&.to_s,
       metadata_path: METADATA_DIR,
-      skip_screenshots: true,
+      skip_screenshots: !screenshots,
+      overwrite_screenshots: false,
       app_review_information: review_info,
       submission_information: {
         export_compliance_uses_encryption: false,
@@ -292,20 +313,24 @@ platform :ios do
         # die Nutzungsbedingungen.
         content_rights_contains_third_party_content: true
       },
-      submit_for_review: submit,
+      submit_for_review: false,
       # Nie automatisch live gehen: Den Zeitpunkt bestimmt ihr nach der Freigabe.
       automatic_release: false,
       phased_release: false,
-      # Nur beim Einreichen eine noch wartende Einreichung zurückziehen.
-      reject_if_possible: submit,
+      reject_if_possible: false,
       precheck_include_in_app_purchases: false,
       force: true
-    )
+    }
 
-    if submit
-      UI.success("Version #{version} eingereicht. Veröffentlichung nach der Freigabe von Hand in App Store Connect.")
+    if screenshots
+      with_store_screenshots do |dir|
+        upload_to_app_store(**upload_options.merge(screenshots_path: dir))
+      end
     else
-      UI.success("Version #{version} hochgeladen, NICHT eingereicht. Rest in App Store Connect, dann „Zur Prüfung einreichen“.")
+      upload_to_app_store(**upload_options)
     end
+    UI.success("Version #{version} als Entwurf hochgeladen. In App Store Connect prüfen und dort einreichen; Veröffentlichung bleibt manuell.")
   end
 end
+
+import "Storefile"

@@ -1,3 +1,4 @@
 /* Texte der iOS-Rückfragen (Englisch). Deutsch: de.lproj/InfoPlist.strings */
 "NSCameraUsageDescription" = "So you can take a photo for your profile picture.";
 "NSPhotoLibraryUsageDescription" = "So you can pick a photo from your library as your profile picture.";
+"NSUserTrackingUsageDescription" = "So Google can show you more relevant ads. The app works without your consent too.";

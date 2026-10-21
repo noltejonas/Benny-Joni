@@ -137,7 +137,7 @@
       window.PTPreferencesReady = Promise.resolve(P.Preferences ? { Preferences: P.Preferences } : null);
       // Einladungslinks (projektterminator://join/<CODE>), nur nativ.
       window.PTAppReady = Promise.resolve(P.App ? { App: P.App } : null);
-      window.PTPushNotifications = P.PushNotifications ? { PushNotifications: P.PushNotifications } : null;
+      window.PTPushNotifications = P.PushNotifications && C.getPlatform?.() !== 'android' ? { PushNotifications: P.PushNotifications } : null;
       // Haptik: die native Seite erwartet genau diese Strings (HapticsPlugin.swift).
       window.PTCelebrationHaptics = P.Haptics ? {
         Haptics: P.Haptics,
@@ -167,6 +167,9 @@
   <script src="onboarding-model.js"></script>
   <script src="boot-cache.js"></script>
   <script src="figures/manifest.js"></script>
+
+  <!-- Werbung (AdMob, nur in der iOS-App; Plugin über window.Capacitor.Plugins wie oben) -->
+  <script src="ads.js"></script>
 
   <!-- Tweaks shell -->
   <script type="text/babel" src="tweaks-panel.jsx"></script>

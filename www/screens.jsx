@@ -295,22 +295,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   openClosures = [], onCloseWeek,
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false, celebrate = true }) {
-  const [timerRunning, setTimerRunning] = React.useState(() => {
-    const v = localStorage.getItem('pt_work_timer_start');
-    const parsed = v ? parseInt(v) : null;
-    return Number.isFinite(parsed) && parsed > 0 && Date.now() - parsed < 86_400_000;
-  });
-  // Re-check on focus (user may have started/stopped timer elsewhere)
-  React.useEffect(() => {
-    const check = () => {
-      const v = localStorage.getItem('pt_work_timer_start');
-      const parsed = v ? parseInt(v) : null;
-      setTimerRunning(Number.isFinite(parsed) && parsed > 0 && Date.now() - parsed < 86_400_000);
-    };
-    window.addEventListener('focus', check);
-    window.addEventListener('pt:timer-changed', check);
-    return () => { window.removeEventListener('focus', check); window.removeEventListener('pt:timer-changed', check); };
-  }, []);
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const tabChallenges = challenges.filter(ch => {
     const cat = catById[ch.category_id];
@@ -400,8 +384,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     return { days: current, today: days.includes(today) };
   }, [allSets, me]);
 
-  // Laufender Work-Timer gehört zur Work-Challenge der Woche (falls es eine gibt).
-  const workChallenge = challenges.find(ch => catById[ch.category_id]?.kind === 'work');
   const finishedCount = rows.filter(r => r.meFinished).length;
   const chosenByLabel = (id) => id === me ? tr('gewählt von dir') : tr('gewählt von {name}', { name: PTPeople.firstNameOf(id) });
 
@@ -425,18 +407,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
 
   return (
     <>
-      {timerRunning && (workChallenge && onLogChallenge ? (
-        <button type="button" className="timer-banner" onClick={() => onLogChallenge(workChallenge)}>
-          <span className="timer-banner-dot" />
-          <span>{tr('Timer läuft · tippe zum Loggen')}</span>
-        </button>
-      ) : (
-        <div className="timer-banner is-static" role="status">
-          <span className="timer-banner-dot" />
-          <span>{tr('Timer läuft')}</span>
-        </div>
-      ))}
-
       {sides.length >= 2 && (
         <DuelCard entries={duelEntries}
           title={twoSided
@@ -624,7 +594,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
 
 // usedCategoryIds: Übungen, die diese Woche schon ein Ziel haben (ohne das
 // gerade bearbeitete). Sie sind nicht wählbar; vorausgewählt ist die erste freie.
-function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing, usedCategoryIds = [], onClose, onSaved, onDeleted, onAddCategory }) {
+function SetupSheet({ api, me, categories, weekStart, existing, usedCategoryIds = [], onClose, onSaved, onDeleted, onAddCategory }) {
   const used = new Set(usedCategoryIds);
   const isUsed = (id) => used.has(id) && id !== existing?.category_id;
   const firstFree = (skipId) => [
@@ -637,7 +607,6 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatEmoji, setNewCatEmoji] = useState('💪');
-  const [newCatKind, setNewCatKind] = useState('sports');
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -692,12 +661,11 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   async function addNewCat() {
     if (!newCatName.trim()) return;
     try {
-      const cat = await api.addCategory(newCatName.trim(), newCatEmoji, newCatKind);
+      const cat = await api.addCategory(newCatName.trim(), newCatEmoji);
       onAddCategory();
       setCatId(cat.id);
       setShowNewCat(false);
       setNewCatName('');
-      setNewCatKind('sports');
       setNewCatEmoji('💪');
     } catch (e) {
       alert(e.message);
@@ -733,7 +701,6 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
       <div className="cat-grid">
         {(() => {
           const sports = categories.filter(c => (c.kind || 'sports') === 'sports');
-          const work   = categories.filter(c => c.kind === 'work');
           const card = (c) => {
             const taken = isUsed(c.id);
             return (
@@ -758,12 +725,6 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
           return (
             <>
               {sports.map(card)}
-              {work.length > 0 && (
-                <>
-                  <div className="cat-grid-divider">{tr('💻 Work')}</div>
-                  {work.map(card)}
-                </>
-              )}
               <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
                 onClick={() => {setShowNewCat((s) => !s);setEditingCat(null);}}>
                 <div className="emoji">＋</div>
@@ -796,12 +757,6 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
           <input className="input" placeholder={tr('Name (z.B. Dips)')} autoFocus
             value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
-          {allowWork && (
-            <div className="segmented" style={{ flexShrink: 0 }}>
-              <button className={newCatKind === 'sports' ? 'active' : ''} onClick={() => setNewCatKind('sports')}>🏋️</button>
-              <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
-            </div>
-          )}
           <button className="new-cat-add" onClick={addNewCat} aria-label={tr('Hinzufügen')}>✓</button>
         </div>
       }

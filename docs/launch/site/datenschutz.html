@@ -73,9 +73,10 @@
       <strong>Kurz gesagt</strong>
       <ul>
         <li>Wir speichern nur, was die App zum Funktionieren braucht: dein Konto, dein Profil und deine Trainingsdaten.</li>
-        <li>Keine Werbung, kein Tracking, keine Analyse-Tools. Wir verkaufen keine Daten und geben sie nicht an Werbepartner.</li>
-        <li>Die App lädt keine Schriften oder Skripte von Google oder anderen Fremdservern nach. Alles dafür steckt in der App.</li>
-        <li>Dein Profil und deine Sätze sehen nur die Leute, die mit dir in einer Challenge sind.</li>
+        <li>Wir verkaufen keine Daten. Neben technischen Fehlerberichten verarbeitet das Werbe-SDK Anzeigen- und Diagnosedaten, wie in Abschnitt 2.11 beschrieben.</li>
+        <li>Ab Version 1.4.1 zeigt die App im Feed und in den Stats Werbebanner von Google: nur nicht personalisiert und erst nach deiner Auswahl im Einwilligungsdialog (Abschnitt 2.11). Deine Trainingsdaten bekommt Google nicht.</li>
+        <li>Die App lädt keine Schriften oder Skripte von Fremdservern nach. Mit Google verbindet sie sich nur für die Werbung.</li>
+        <li>Deine Challenge-Daten sehen die Mitglieder deiner Challenge. Wenn du der Rangliste zustimmst, sehen andere App-Nutzer außerdem deinen Anzeigenamen, dein Foto und deine gewerteten Trainingsergebnisse (Abschnitt 2.12).</li>
         <li>Du kannst dein Konto jederzeit in der App löschen. Dann löschen wir deine Daten.</li>
       </ul>
     </div>
@@ -108,7 +109,7 @@
     <p>
       Anzeigename, Farbe und Foto sehen die Mitglieder deiner Challenges.
       Das Profilfoto wird auf deinem Gerät verkleinert und in einem Dateispeicher abgelegt, dessen Dateien über eine Internetadresse abrufbar sind.
-      Die App zeigt diese Adresse nur Mitgliedern deiner Challenges. Wer sie kennt, kann das Bild aber auch ohne Anmeldung öffnen.
+      Die App zeigt diese Adresse Mitgliedern deiner Challenges und bei freiwilliger Ranglisten-Teilnahme auch anderen App-Nutzern. Wer sie kennt, kann das Bild aber auch ohne Anmeldung öffnen.
       Lade deshalb nur ein Foto hoch, das du so zeigen möchtest.
       Für die Auswahl fragt iOS dich nach Zugriff auf Kamera oder Fotos. Die App liest nur das Foto, das du auswählst.
     </p>
@@ -119,7 +120,7 @@
       <li>Mitgliedschaft: Rolle, Team, Beitritts- und Austrittsdatum.</li>
       <li>Wochenziele und selbst angelegte Übungen.</li>
       <li>Sätze: Übung, Anzahl der Wiederholungen (bei Workouts Zeit oder Runden), Zeitpunkt und eine optionale Notiz.</li>
-      <li>Work-Tracking, falls in der Challenge eingeschaltet: Minuten sowie Projekt- und Tool-Schlagworte.</li>
+      <li>Aus früheren App-Versionen können noch Arbeitszeiteinträge mit Minuten sowie Projekt- und Tool-Schlagworten gespeichert sein. Work-Tracking ist in der aktuellen App nicht aktivierbar.</li>
       <li>Reaktionen: Emojis, die du auf Sätze anderer setzt.</li>
     </ul>
     <p>
@@ -136,7 +137,7 @@
     <h3>2.5 Push-Mitteilungen</h3>
     <p>
       Nur wenn du Mitteilungen in iOS erlaubst, speichern wir eine Gerätekennung für Mitteilungen (Push-Token), die Plattform und wann das Gerät zuletzt aktiv war.
-      Außerdem protokollieren wir, welche Art von Mitteilung du an welchem Tag zu welcher Challenge bekommen hast. So bekommst du höchstens eine Mitteilung pro Tag und Challenge.
+      Außerdem protokollieren wir, welche Art von Mitteilung du an welchem Tag zu welcher Challenge bekommen hast, um doppelte Mitteilungen zu vermeiden. Für die Rangliste gibt es zusätzlich Hinweise, etwa zum Monatsabschluss.
     </p>
     <p>
       Zugestellt werden Mitteilungen über den Apple Push Notification service (APNs) von Apple.
@@ -149,8 +150,9 @@
     <h3>2.6 Daten nur auf deinem Gerät</h3>
     <p>
       Die App speichert auf deinem Gerät deine Anmeldung (Sitzung), das Farbschema, die gewählte Sprache, deinen Fortschritt beim Einstieg, zuletzt geöffnete Ansichten, deine Blockliste,
-      eine noch offene Einladung (höchstens 7 Tage), deine Schnellsatz-Werte, die Mitteilungs-Einstellung samt Push-Token und einen laufenden Arbeitszeit-Timer.
+      eine noch offene Einladung (höchstens 7 Tage), deine Schnellsatz-Werte und die Mitteilungs-Einstellung samt Push-Token. Daten eines Arbeitszeit-Timers aus früheren Versionen können noch vorhanden sein; der Work-Modus ist nicht mehr aktivierbar.
       Diese Daten bleiben auf dem Gerät. Sie sind unbedingt nötig, damit die App so funktioniert, wie du sie nutzt (§ 25 Abs. 2 Nr. 2 TDDDG).
+      Ab Version 1.4.1 speichert der Einwilligungsdialog von Google dort außerdem deine Auswahl zur Werbung (Abschnitt 2.11).
     </p>
 
     <h3>2.7 Server- und Sicherheitsprotokolle</h3>
@@ -182,6 +184,65 @@
       Werbe-E-Mails verschicken wir nicht.
     </p>
 
+    <h3>2.11 Werbung (Google AdMob, ab Version 1.4.1)</h3>
+    <p>
+      <mark class="todo">[BITTE AUSFÜLLEN: Abschnitt 2.11 rechtlich prüfen lassen, dann diese Markierung löschen]</mark>
+    </p>
+    <p>
+      Ab Version 1.4.1 zeigt die App in den Bereichen „Feed“ und „Stats“ ein Werbebanner. Auf „Heute“, im Strafkonto, in den Einstellungen,
+      während des Einstiegs und in der Demo gibt es keine Werbung, Vollbild- oder Videowerbung gar nicht.
+      Die Anzeigen liefert Google AdMob. Anbieter ist die Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland („Google“).
+      Google verarbeitet die Daten für die Werbung in eigener Verantwortung (Google Ads Controller-Controller Data Protection Terms).
+    </p>
+    <p>
+      <strong>Nur nicht personalisierte Anzeigen.</strong> Die App fordert bei Google ausschließlich nicht personalisierte Anzeigen an.
+      Google wählt sie nach dem Umfeld und dem ungefähren Standort aus, nicht nach einem Profil von dir.
+      Deine Trainingsdaten, dein Profil, deine Challenges und deine Nutzer-ID gibt die App nicht an Google weiter.
+      Die App fragt nicht nach App-Tracking-Transparenz. Die Werbe-ID (IDFA) deines iPhones bleibt damit für die App und für Google gesperrt.
+    </p>
+    <p><strong>Was Google dabei verarbeitet:</strong></p>
+    <ul>
+      <li>IP-Adresse und daraus abgeleitet ein ungefährer Standort (Land, Region)</li>
+      <li>Geräte- und App-Angaben, z.&nbsp;B. Gerätemodell, iOS-Version, Sprache und App-Version, sowie Kennungen, die Google für diese App auf deinem Gerät speichert oder ausliest</li>
+      <li>Interaktionen mit Anzeigen: welche Anzeige gezeigt wurde und ob du sie angetippt hast</li>
+      <li>Diagnose- und Leistungsdaten des Werbe-SDKs, z.&nbsp;B. Ladezeiten und Abstürze</li>
+    </ul>
+    <p>
+      Google nutzt diese Daten, um Anzeigen auszuliefern, ihre Häufigkeit zu begrenzen, sie zu messen und abzurechnen und um Betrug und Missbrauch zu verhindern.
+      Mehr dazu: <a href="https://policies.google.com/technologies/partner-sites">Wie Google Daten aus Apps von Partnern nutzt</a> und
+      <a href="https://policies.google.com/privacy">Datenschutzerklärung von Google</a>.
+    </p>
+    <p>
+      <strong>Einwilligung.</strong> Bevor Werbung geladen wird, fragt die App beim ersten Öffnen von „Feed“ oder „Stats“ mit dem Einwilligungsdialog von Google
+      (User Messaging Platform, IAB Transparency &amp; Consent Framework) nach deiner Einwilligung.
+      Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, für das Speichern und Auslesen auf deinem Gerät § 25 Abs. 1 TDDDG).
+      Lehnst du ab, kannst du die App ganz normal weiter nutzen. Welche Anzeigen noch zulässig sind, bestimmt das Google-SDK anhand deiner Auswahl.
+      Bei eingeschränkten Anzeigen („Limited Ads“) kann Google für die Erkennung ungültiger Zugriffe weiterhin lokalen Speicher verwenden. Eine Ablehnung bedeutet deshalb nicht pauschal, dass keinerlei Datenverarbeitung stattfindet.
+      Einzelne Verarbeitungen, etwa zur Messung und Betrugsabwehr, erläutert Google im Dialog. Weitere Einzelheiten findest du in <a href="https://support.google.com/admob/answer/10105530?hl=de">Googles Beschreibung eingeschränkter Anzeigen</a>.
+    </p>
+    <p>
+      <strong>Ändern und widerrufen:</strong> jederzeit in der App unter Einstellungen (dein Profilbild oben rechts) → „Werbe-Einwilligung“. Der Widerruf gilt für die Zukunft.
+      Deine Auswahl speichert der Dialog auf deinem Gerät, bis du sie änderst oder die App löschst.
+    </p>
+    <p>
+      <strong>Übermittlung in die USA.</strong> Google kann Daten auch an die Google LLC in den USA übermitteln.
+      Die Google LLC ist nach dem EU-US Data Privacy Framework zertifiziert (Angemessenheitsbeschluss, Art. 45 DSGVO); daneben gelten EU-Standardvertragsklauseln.
+      Wie lange Google die Daten speichert, regelt Google selbst (siehe Links oben).
+    </p>
+
+    <h3>2.12 Freiwillige Rangliste und Moderation</h3>
+    <p>
+      In der Monatsrangliste und den daraus berechneten Saison- und Gesamtwertungen kannst du dich mit anderen Personen in der App vergleichen.
+      Erst wenn du „In der Rangliste erscheinen“ einschaltest, werden dein Anzeigename, dein Profilfoto und deine Werte bei den gewerteten Grundübungen für andere angemeldete App-Nutzer sichtbar.
+      Deine E-Mail-Adresse, privaten Challenge-Namen und Notizen werden dort nicht veröffentlicht. Die Entscheidung kannst du jederzeit in den Einstellungen ändern.
+      Monatsabschlüsse, Punkte und Medaillen werden gespeichert, damit vergangene Wertungen nachvollziehbar bleiben.
+    </p>
+    <p>
+      Bei Meldungen in der Rangliste speichern wir, wer den Eintrag gemeldet hat, die betroffene Person oder Übung, den Meldegrund, den Monat und den Bearbeitungsstatus.
+      Berechtigte Moderatoren können diese Meldungen prüfen und problematische Inhalte oder Profile aus der Rangliste entfernen.
+      Die Ranglisten-Blockliste wird deinem Konto zugeordnet; sie blendet Namen und Profilbild blockierter Personen für dich aus. Die Blockliste im Challenge-Feed bleibt auf dem jeweiligen Gerät.
+    </p>
+
     <h2>3. Dienstleister und Empfänger</h2>
     <ul>
       <li>
@@ -201,8 +262,11 @@
       <li>
         <strong>GitHub</strong> (GitHub, Inc., USA) stellt diese Website bereit, siehe Abschnitt 4.
       </li>
+      <li>
+        <strong>Google</strong> (Google Ireland Limited, Irland, und Google LLC, USA) liefert ab Version 1.4.1 die Werbung aus, in eigener Verantwortung, siehe 2.11.
+      </li>
     </ul>
-    <p>Andere Nutzer sehen nur, was unter 2.2 bis 2.4 als sichtbar beschrieben ist. Darüber hinaus geben wir Daten nur weiter, wenn uns ein Gesetz dazu verpflichtet.</p>
+    <p>Andere Nutzer sehen, was unter 2.2 bis 2.4 und bei freiwilliger Ranglisten-Teilnahme unter 2.12 als sichtbar beschrieben ist. Darüber hinaus geben wir Daten nur weiter, wenn uns ein Gesetz dazu verpflichtet.</p>
 
     <h2>4. Diese Website</h2>
     <p>
@@ -216,6 +280,8 @@
     <ul>
       <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertrag): Konto, Profil, Challenges, Trainingsdaten, Strafkonto, Push-Mitteilungen und Support. Ohne diese Daten können wir dir die App nicht anbieten.</li>
       <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> (berechtigtes Interesse): Server- und Sicherheitsprotokolle, Fehlerberichte, die Prüfung von Meldungen und der Schutz anderer Nutzer sowie diese Website.</li>
+      <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> (Einwilligung): freiwillige Veröffentlichung in der Rangliste (Abschnitt 2.12), jederzeit in den Einstellungen ausschaltbar.</li>
+      <li><strong>Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG</strong> (Einwilligung): Werbung ab Version 1.4.1 (Abschnitt 2.11). Widerruf jederzeit unter Einstellungen → „Werbe-Einwilligung“, sofern Google diesen Eintrag verlangt.</li>
       <li><strong>Art. 6 Abs. 1 lit. c DSGVO</strong> (rechtliche Pflicht): wenn uns ein Gesetz zur Aufbewahrung oder Herausgabe verpflichtet.</li>
       <li><strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong>: Speichern auf deinem Gerät (Abschnitt 2.6).</li>
     </ul>
@@ -251,7 +317,7 @@
     <p>Die App richtet sich an Personen ab 16 Jahren (siehe <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>).</p>
 
     <h2>9. Keine automatisierten Entscheidungen</h2>
-    <p>Wir treffen keine automatisierten Entscheidungen und erstellen keine Profile im Sinne von Art. 22 DSGVO. Statistiken und Vergleiche in der App zählen nur eure eingetragenen Sätze zusammen.</p>
+    <p>Wir treffen keine automatisierten Entscheidungen und erstellen keine Profile im Sinne von Art. 22 DSGVO. Statistiken und Vergleiche in der App zählen nur eure eingetragenen Sätze zusammen. Auch für die Werbung fordert die App nur nicht personalisierte Anzeigen an.</p>
 
     <h2>10. Änderungen</h2>
     <p>Ändert sich die App, passen wir diese Erklärung an. Die aktuelle Fassung steht immer auf dieser Seite und ist in der App unter Einstellungen verlinkt.</p>

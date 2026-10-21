@@ -144,7 +144,8 @@ function build() {
     window.PTPreferencesReady = Promise.resolve(native ? window.capacitorPreferences : null);
     window.PTAppReady = Promise.resolve(native ? window.capacitorApp : null);
     window.PTCelebrationHaptics = window.capacitorHaptics || null;
-    window.PTPushNotifications = native ? window.capacitorPushNotifications : null;
+    // Der Server sendet APNs. Android bleibt bis zur FCM-Einrichtung ohne Push-Registrierung.
+    window.PTPushNotifications = native && window.Capacitor.getPlatform() === 'ios' ? window.capacitorPushNotifications : null;
     })();
     </script>
     <script src="vendor/react.js"></script>

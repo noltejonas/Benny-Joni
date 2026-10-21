@@ -1,5 +1,10 @@
 # Launch-Morgen 21.10.2026 – was ihr tun müsst
 
+> Historischer Ablaufplan. Die aktuellen Upload-Befehle, Store-Unterlagen
+> und noch offenen Einrichtungen stehen in [FASTLANE_STORES.md](FASTLANE_STORES.md),
+> [ADMOB.md](ADMOB.md) und [ANDROID.md](ANDROID.md). Zeitangaben unten sind
+> keine aktuelle Freigabe- oder Veröffentlichungsschätzung.
+
 Ziel: **bis 09:00 eingereicht**, um 12:00 veröffentlichen, **falls** Apple
 bis dahin freigegeben hat. Erst-Einreichungen dauern meist 24–48 h. Eine
 Freigabe bis 12:00 klappt nur mit Glück und beschleunigter Prüfung. Deshalb:
@@ -503,7 +508,7 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `www/i18n.js` | `LANGUAGES` / `FALLBACK` | Deutsch, Englisch / Englisch | nur bei neuer Sprache | – |
 | `ios/App/App.xcodeproj` | `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | `1.4` / `20` | Build +1 bei jedem neuen Upload | Schritt 9 |
 | `www/index.html`, `www/manifest.webmanifest` | Titel, Name | `Benny & Joni` | – | – |
-| `www/ads.js` (nur Branch `claude/admob-1.4.1`) | `ADS_ENABLED`, `PROD` | aus / Test-IDs | echte AdMob-IDs | 1.4.1 |
+| `www/ads.js` (nur Branch `claude/admob-1.4.1`) | `ADS_ENABLED`, `PROD` | an / `PROD` leer = Testmodus mit Google-Test-IDs | echte AdMob-IDs (`docs/launch/ADMOB.md`) | 1.4.1 |
 | URL-Schema | `projektterminator://` | bleibt | technisch, nicht sichtbar | – |
 
 ### Rechtstexte (`docs/launch/site/`) – alle `[BITTE AUSFÜLLEN]`

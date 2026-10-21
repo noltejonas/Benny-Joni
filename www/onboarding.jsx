@@ -605,7 +605,6 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
   const [extrasOpen, setExtrasOpen] = React.useState(false);
   const [penalties, setPenalties] = React.useState(false);
   const [rotation, setRotation] = React.useState(false);
-  const [work, setWork] = React.useState(false);
   const [startDate, setStartDate] = React.useState(() => PTData.isoDate(new Date()));
   const [endDate, setEndDate] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -613,14 +612,14 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
 
   const current = OB_MODES.find(m => m.id === mode);
   const pickMode = (m) => { setMode(m.id); if (!emojiTouched) setEmoji(m.emoji); };
-  const on = [penalties && tr('Strafkonto'), rotation && tr('Wochenplan'), work && tr('Work-Tracking')].filter(Boolean);
+  const on = [penalties && tr('Strafkonto'), rotation && tr('Wochenplan')].filter(Boolean);
 
   async function create() {
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
     setError(''); setBusy(true);
     try {
       const c = await api.createCompetition({
-        name: (name.trim() || current.name).slice(0, 40), emoji, mode, rotation, penalties, work,
+        name: (name.trim() || current.name).slice(0, 40), emoji, mode, rotation, penalties,
         startDate, endDate: endDate || null,
       });
       onCreated(c);
@@ -679,7 +678,6 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
         <div className="ob-extras-body">
           {toggle(tr('Strafkonto'), tr('Wer seinen Wochenteil nicht schafft, zahlt {amount} in die Kasse.', { amount: PTi18n.euro(500) }), penalties, setPenalties)}
           {toggle(tr('Wochenplan'), tr('Ihr legt Übungen fest, die jede Woche wiederkommen.'), rotation, setRotation)}
-          {toggle(tr('Work-Tracking'), tr('Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.'), work, setWork)}
           <div className="ob-dates">
             <label>{tr('Start')}<input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value || PTData.isoDate(new Date()))} /></label>
             <label>{tr('Ende (optional)')}<input className="input" type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} /></label>

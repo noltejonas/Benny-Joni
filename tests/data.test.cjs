@@ -323,3 +323,47 @@ test('localizeCategory: Standard-Übungen auf Englisch, eigene bleiben', () => {
   // Deutsch: Name unverändert
   assert.equal(load().D.localizeCategory({ name: '20-Min-AMRAP', competition_id: null }).name, '20-Min-AMRAP');
 });
+
+
+test('Wochenabschluss wertet nur Sport: versteckte Work-Ziele erzeugen und tilgen keine Strafen', async () => {
+  const historical = { id: 'old-work-penalty', user_id: 'u1', challenge_id: 'work-ch', amount_cents: 500, paid: true };
+  const inserted = [];
+  const mutations = [];
+  const { api } = await signedInApi({
+    respond(table, ops) {
+      const write = ops.find(o => ['insert', 'update', 'delete'].includes(o.name));
+      if (write) {
+        mutations.push({ table, name: write.name });
+        if (table === 'penalties' && write.name === 'insert') inserted.push(...write.args[0]);
+        return { data: null, error: null };
+      }
+      const rows = {
+        penalty_config: { enabled: true, rule_mode: 'per_week_aggregate', amount_cents: 500 },
+        categories: [{ id: 'push', kind: 'sports' }, { id: 'work', kind: 'work' }],
+        weekly_challenges: [
+          { id: 'sport-ch', category_id: 'push', target_reps: 100, week_start: '2026-10-19' },
+          { id: 'work-ch', category_id: 'work', target_reps: 600, week_start: '2026-10-19' },
+        ],
+        competition_members: [{ user_id: 'u1' }, { user_id: 'u2' }],
+        sets: [
+          { user_id: 'u1', challenge_id: 'sport-ch', reps: 50 },
+          { user_id: 'u2', challenge_id: 'sport-ch', reps: 25 },
+          { user_id: 'u2', challenge_id: 'work-ch', duration_minutes: 600 },
+        ],
+        penalties: [{ ...historical }],
+      };
+      return { data: rows[table] ?? null, error: null };
+    },
+  });
+  const capi = api.forCompetition('c1');
+  const before = await capi.listPenalties();
+  const preview = await capi.previewWeekClose('2026-10-19');
+  assert.deepEqual(Array.from(preview.penalties, p => p.athlete), ['u2']);
+  await capi.closeWeek('2026-10-19');
+  assert.equal(inserted.length, 1);
+  assert.equal(inserted[0].user_id, 'u2');
+  assert.equal(inserted[0].challenge_id, null);
+  assert.equal(inserted[0].amount_cents, 500);
+  assert.deepEqual(await capi.listPenalties(), before, 'bestehende Strafe bleibt unverändert');
+  assert.ok(!mutations.some(m => m.table === 'penalties' && m.name !== 'insert'));
+});

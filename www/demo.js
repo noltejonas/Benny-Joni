@@ -102,7 +102,7 @@
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
     const comp = (cid, name, emoji, mode, code, mods, weeksBack, owner) => ({
       id: cid, name, emoji, mode, invite_code: code,
-      rotation_enabled: !!mods.rotation, penalties_enabled: !!mods.penalties, work_enabled: !!mods.work,
+      rotation_enabled: !!mods.rotation, penalties_enabled: !!mods.penalties, work_enabled: false,
       start_date: startOf(weeksBack), end_date: null, archived_at: null,
       created_by: owner, created_at: startOf(weeksBack) + 'T08:00:00Z',
     });
@@ -311,6 +311,7 @@
   let db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch (e) { db = null; }
   db = db ? upgrade(db) : seed();
+  for (const competition of db.competitions) competition.work_enabled = false;
   // Nach „Konto löschen“ nichts mehr zurückschreiben (Timer laufen bis zum Neuladen).
   let wiped = false;
   const save = () => { if (wiped) return; try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} };
@@ -446,11 +447,11 @@
           .filter(c => c.id && (includeSolo || c.mode !== 'solo')).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
       },
       async getMembers(cid) { return later(membersOf(cid)); },
-      async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+      async createCompetition({ name, emoji, mode, rotation, penalties, startDate, endDate }) {
         await later(null);
         const start = startDate || isoDate(new Date());
         const c = { id: newId('c'), name, emoji, mode, invite_code: code6(), rotation_enabled: !!rotation, penalties_enabled: !!penalties,
-          work_enabled: !!work, start_date: start, end_date: endDate || null, archived_at: null,
+          work_enabled: false, start_date: start, end_date: endDate || null, archived_at: null,
           created_by: uid(), created_at: new Date().toISOString() };
         db.competitions.push(c);
         db.members.push({ competition_id: c.id, user_id: uid(), role: 'owner', team: mode === '2v2' ? 'A' : null, joined_at: c.created_at, left_at: null });
@@ -493,7 +494,7 @@
         return c.id;
       },
       async updateCompetition(cid, patch) {
-        const c = db.competitions.find(x => x.id === cid); Object.assign(c, patch);
+        const c = db.competitions.find(x => x.id === cid); Object.assign(c, patch, { work_enabled: false });
         if ('penalties_enabled' in patch) { const pc = db.penalty_config.find(x => x.competition_id === cid); if (pc) pc.enabled = patch.penalties_enabled; }
         save(); emitAll(); return later(c);
       },
@@ -504,12 +505,12 @@
 
       async getStatsBundle(ids) {
         const set = new Set(ids);
-        return later({
+        return later(window.PTData.sportsOnlyBundle({
           members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
           challenges: db.weekly_challenges.filter(c => set.has(c.competition_id)).map(normCh),
           sets: db.sets.filter(s => set.has(s.competition_id)).map(withAthlete),
           categories: db.categories.map(localizeCategory),
-        });
+        }));
       },
       async upsertDeviceToken() { return null; },
       async deleteDeviceToken() {},
@@ -731,8 +732,8 @@
       async getMembers() { return later(membersOf(cid)); },
 
       async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid).map(localizeCategory)); },
-      async addCategory(name, emoji = '💪', kind = 'sports') {
-        const c = { id: newId('cat'), name, emoji, kind, challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
+      async addCategory(name, emoji = '💪') {
+        const c = { id: newId('cat'), name, emoji, kind: 'sports', challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
         db.categories.push(c); emit(); return later(c);
       },
       async updateCategory(id, patch) {
@@ -846,10 +847,11 @@
         if (!cfg.enabled) return { penalties: [], cfg };
         const chs = mine('weekly_challenges').filter(c => c.week_start === ws);
         const ss = db.sets.filter(s => chs.some(c => c.id === s.challenge_id)).map(withAthlete);
-        annotateWorkouts(ss, chs, db.categories);
+        const sports = window.PTData.sportsOnlyBundle({ categories: db.categories, challenges: chs, sets: ss });
+        annotateWorkouts(sports.sets, sports.challenges, sports.categories);
         const parts = participantsFor(membersOf(cid), ws);
         const pens = [];
-        for (const m of parts) pens.push(...computePenalties(chs, ss, m.user_id, cfg, parts.length));
+        for (const m of parts) pens.push(...computePenalties(sports.challenges, sports.sets, m.user_id, cfg, parts.length));
         return { penalties: pens, cfg };
       },
       async closeWeek(ws) {
@@ -998,7 +1000,8 @@
     el.addEventListener('click', () => { if (confirm(tr('Demo beenden und eigene Challenge starten?'))) leaveDemo(); });
     el.setAttribute('style', 'position:fixed;left:50%;transform:translateX(-50%);z-index:60;' +
       // Tab-Leiste endet 84 px über dem Rand, .app-main hat 120 px Luft: dazwischen passt der Knopf.
-      'bottom:calc(env(safe-area-inset-bottom,0px) + 88px);height:28px;padding:0 14px;border:none;border-radius:999px;' +
+      // --pt-ad-h: Höhe eines AdMob-Banners über der Tab-Leiste (www/ads.js), sonst 0.
+      'bottom:calc(env(safe-area-inset-bottom,0px) + 88px + var(--pt-ad-h,0px));height:28px;padding:0 14px;border:none;border-radius:999px;' +
       'background:var(--grad,#1C1B2E);color:#fff;font:700 13px/28px system-ui,sans-serif;white-space:nowrap;' +
       'box-shadow:0 8px 24px rgba(28,27,46,.28);cursor:pointer;-webkit-tap-highlight-color:transparent');
     document.body.appendChild(el);

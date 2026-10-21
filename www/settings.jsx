@@ -225,9 +225,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   if (page === 'penalties') {
     return <SettingsPenaltyPage {...moduleProps} cfg={penaltyCfg} onCfgChanged={loadPenalty} />;
   }
-  if (page === 'work') {
-    return <SettingsWorkPage {...moduleProps} projectTags={projectTags} toolTags={toolTags} />;
-  }
   if (page === 'language') {
     return <SettingsLanguagePage onBack={back} />;
   }
@@ -257,9 +254,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   const penaltySub = !competition.penalties_enabled || !penaltyCfg ? null
     : !penaltyCfg.enabled ? tr('Pausiert')
     : tr('{amount} pro Strafe', { amount: formatEuro(penaltyCfg.amount_cents) }) + (rule ? ` · ${rule.name}` : '');
-  const tagCount = projectTags.length + toolTags.length;
-  const workSub = !competition.work_enabled ? null
-    : tagCount ? trn(tagCount, '{n} Tag', '{n} Tags') : tr('Keine Tags');
   const isMain = profile?.main_competition_id === competition.id;
 
   return (
@@ -293,8 +287,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
           onClick={() => go('plan')} chevron />
         <SettingsRow icon="wallet" title={tr('Strafkonto')} subtitle={penaltySub} value={onOff(competition.penalties_enabled)}
           onClick={() => go('penalties')} chevron />
-        <SettingsRow icon="laptop" title={tr('Work-Tracking')} subtitle={workSub} value={onOff(competition.work_enabled)}
-          onClick={() => go('work')} chevron />
       </SettingsGroup>
 
       <SettingsGroup title={tr('Rangliste')}>
@@ -493,6 +485,16 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, notificati
     window.dispatchEvent(new CustomEvent('pt:push-permission', { detail: result }));
   }
 
+  // Google verlangt in EU/EWR, UK und der Schweiz einen Weg zurück zur
+  // Werbe-Einwilligung (www/ads.js meldet das über pt:ads-change).
+  const [adsPrivacy, setAdsPrivacy] = useState(() => !!window.PTAds?.privacyOptionsRequired());
+  useEffect(() => {
+    const onChange = () => setAdsPrivacy(!!window.PTAds?.privacyOptionsRequired());
+    onChange();
+    window.addEventListener('pt:ads-change', onChange);
+    return () => window.removeEventListener('pt:ads-change', onChange);
+  }, []);
+
   return (
     <SettingsGroup title={tr('App')}
       footer={pushBlocked ? (native ? tr('In den iOS-Einstellungen ausgeschaltet.') : tr('Im Browser blockiert.')) : null}>
@@ -515,6 +517,10 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, notificati
         checked={notificationsEnabled} onChange={setPush} />
       {pushBlocked && native && (
         <SettingsRow icon="settings" title={tr('iOS-Einstellungen öffnen')} tone="accent" onClick={() => window.PTPush.openSettings()} />
+      )}
+      {adsPrivacy && (
+        <SettingsRow icon="shield" title={tr('Werbe-Einwilligung')} subtitle={tr('Auswahl ändern oder widerrufen')}
+          onClick={() => window.PTAds?.showPrivacyOptions()} />
       )}
     </SettingsGroup>
   );
@@ -774,8 +780,7 @@ function SettingsPlanPage({ api, competition, categories, planSlots, rotationCon
     return t[0]?.week_in_cycle ?? null;
   }, [rotationConfig, planSlots, weekStart]);
 
-  // Work-Kategorien nur, wenn Work-Tracking an ist.
-  const pickable = competition.work_enabled ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
+  const pickable = categories.filter(c => (c.kind || 'sports') !== 'work');
 
   // Änderungen lösen über api.onChange ein Neuladen in CompetitionApp aus.
   const call = async (fn) => { try { await fn(); } catch (e) { alert(e.message); } };
@@ -1009,86 +1014,6 @@ function SettingsPenaltyPage({ api, competition, cfg, isOwner, ownerName, busyMo
   );
 }
 
-// ─── Unterseite: Work-Tracking ──────────────────────────────────────────────
-function SettingsWorkPage({ api, competition, projectTags, toolTags, isOwner, ownerName, busyModule, onModule, onBack }) {
-  const enabled = !!competition.work_enabled;
-  return (
-    <div className="st-screen">
-      <SettingsPageHeader title={tr('Work-Tracking')} onBack={onBack} />
-
-      <SettingsGroup footer={isOwner ? null : tr('Nur {name} kann das ändern.', { name: ownerName })}>
-        <SettingsSwitchRow icon="laptop" title={tr('Work-Tracking verwenden')} checked={enabled}
-          disabled={!isOwner || busyModule} onChange={v => onModule('work_enabled', v)} />
-      </SettingsGroup>
-
-      {enabled && <>
-        <TagList title={tr('Projekte')} addLabel={tr('Projekt hinzufügen')} defaultEmoji="📁" tags={projectTags}
-          onAdd={(n, e) => api.addProjectTag(n, e)}
-          onUpdate={(id, p) => api.updateProjectTag(id, p)}
-          onDelete={(id) => api.deleteProjectTag(id)} />
-        <TagList title={tr('Tools')} addLabel={tr('Tool hinzufügen')} defaultEmoji="🔧" tags={toolTags}
-          onAdd={(n, e) => api.addToolTag(n, e)}
-          onUpdate={(id, p) => api.updateToolTag(id, p)}
-          onDelete={(id) => api.deleteToolTag(id)} />
-      </>}
-    </div>
-  );
-}
-
-// Tags anlegen, umbenennen, löschen. Ein Tipp auf die Zeile öffnet die Bearbeitung.
-function TagList({ title, tags, addLabel, defaultEmoji, onAdd, onUpdate, onDelete }) {
-  const [editingId, setEditingId] = useState(null); // Tag-ID, 'new' oder null
-  const [draftName, setDraftName] = useState('');
-  const [draftEmoji, setDraftEmoji] = useState(defaultEmoji);
-  const [busy, setBusy] = useState(false);
-
-  const startEdit = (t) => { setEditingId(t.id); setDraftName(t.name); setDraftEmoji(t.emoji); };
-  const startNew = () => { setEditingId('new'); setDraftName(''); setDraftEmoji(defaultEmoji); };
-
-  async function run(fn) {
-    setBusy(true);
-    try { await fn(); setEditingId(null); }
-    catch (e) { alert(e.message); }
-    finally { setBusy(false); }
-  }
-  const commit = () => {
-    const name = draftName.trim();
-    if (!name) return;
-    const emoji = stFirstGrapheme(draftEmoji) || defaultEmoji;
-    run(() => editingId === 'new' ? onAdd(name, emoji) : onUpdate(editingId, { name, emoji }));
-  };
-  const remove = () => {
-    const tag = tags.find(t => t.id === editingId);
-    if (tag && confirm(tr('„{name}“ löschen?', { name: tag.name }))) run(() => onDelete(tag.id));
-  };
-
-  const form = (
-    <div className="st-row st-tag-form" key={`form-${editingId}`}>
-      <input className="input st-emoji-input" aria-label={tr('Emoji')} value={draftEmoji} maxLength={8}
-        onChange={e => setDraftEmoji(e.target.value)} />
-      <input className="input" aria-label={tr('Name')} placeholder={tr('Name')} autoFocus value={draftName}
-        onChange={e => setDraftName(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditingId(null); }} />
-      <SettingsIconButton icon="check" label={tr('Speichern')} tone="primary" disabled={busy || !draftName.trim()} onClick={commit} />
-      {editingId !== 'new' && <SettingsIconButton icon="trash" label={tr('Löschen')} tone="danger" disabled={busy} onClick={remove} />}
-      <SettingsIconButton icon="close" label={tr('Abbrechen')} disabled={busy} onClick={() => setEditingId(null)} />
-    </div>
-  );
-
-  return (
-    <SettingsGroup title={title}>
-      {tags.map(t => editingId === t.id ? form : (
-        <SettingsRow key={t.id} emoji={t.emoji} title={t.name} onClick={() => startEdit(t)} chevron={false}>
-          <span className="st-chev"><Icon name="edit" size={16} /></span>
-        </SettingsRow>
-      ))}
-      {editingId === 'new'
-        ? form
-        : <SettingsRow icon="plus" tone="accent" title={addLabel} onClick={startNew} chevron={false} />}
-    </SettingsGroup>
-  );
-}
-
 // Card on Home: the first person of the week picks the reps for every exercise.
 // Default = base_reps, range = [base_reps, base_reps + bonus_max].
 function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub }) {
@@ -1171,4 +1096,4 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub })
   );
 }
 
-Object.assign(window, { SettingsScreen, PlanSlotRow, TagList, WeekFixCard });
+Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard });
