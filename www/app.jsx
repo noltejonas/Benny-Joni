@@ -94,7 +94,9 @@ class PTErrorBoundary extends React.Component {
     const actions = (
       <>
         <button className="btn" onClick={() => location.reload()}>Neu laden</button>
-        <button className="btn-link" onClick={this.reset}>Zur Übersicht</button>
+        {/* Nur die Karte: Um <App/> würde reset die App neu mounten und einen
+            zweiten Supabase-Client anlegen, während der alte weiterläuft. */}
+        {this.props.variant === 'card' && <button className="btn-link" onClick={this.reset}>Zur Übersicht</button>}
       </>
     );
     if (this.props.variant === 'card') {
@@ -555,6 +557,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   });
   useEffect(() => {
     try { sessionStorage.setItem(TAB_KEY, tab); } catch {}
+    // Neuer Tab beginnt oben, nicht auf der Scrollhöhe des vorigen.
+    try { window.scrollTo(0, 0); } catch {}
   }, [tab]);
   // reload() ist memoisiert; notify() braucht trotzdem den aktuellen Tab.
   const tabRef = React.useRef(tab);

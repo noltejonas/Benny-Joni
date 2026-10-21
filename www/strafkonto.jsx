@@ -20,7 +20,7 @@ function reasonText(p) {
     case 'per_challenge':      return 'einzelne Challenge verfehlt';
     case 'per_week_any':       return 'min. 1 Challenge verfehlt';
     case 'per_week_all':       return 'alle Challenges verfehlt';
-    case 'per_week_aggregate': return 'aggregiert verfehlt';
+    case 'per_week_aggregate': return 'Wochensumme verfehlt';
     default:                   return p.rule_mode;
   }
 }

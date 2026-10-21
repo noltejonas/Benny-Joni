@@ -1864,11 +1864,13 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
   const selectedChallenge = challenges.find(c => c.id === challengeId);
   const selectedCat = catById[selectedChallenge?.category_id];
   const isWork = selectedCat?.kind === 'work';
+  // Pflicht-Workouts zählen Sekunden bzw. Runden: keine Wiederholungs-Rückfrage.
+  const isWorkout = PTData.isWorkoutType(selectedCat?.challenge_type);
 
   async function save() {
     if (!challengeId) return;
     if (isWork ? durationMinutes <= 0 : reps <= 0) return;
-    if (!isWork && !confirmReps(reps)) return;
+    if (!isWork && !isWorkout && !confirmReps(reps)) return;
     setSaving(true);
     try {
       const [y, m, d] = dateIso.split('-').map(Number);
