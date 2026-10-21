@@ -1,4 +1,4 @@
-/* global React */
+/* global React, ObDuo, obFigTall */
 /* eslint-disable no-unused-vars */
 
 // Hook: detect unseen goal crossings + provide persistent style.
@@ -315,6 +315,11 @@ function CelebrationOverlay({ category, targetReps, onDone }) {
           <span className="cel-counter-of">/ {targetFormatted} {category?.name || 'Reps'}</span>
         </div>
         <div className="cel-subtext">{category?.emoji || '🏆'} {targetFormatted} {category?.name || 'Reps'} geknackt</div>
+        {window.ObDuo && (
+          <div className="cel-duo">
+            <ObDuo benny="cheer" joni="cheer" tall={window.obFigTall ? obFigTall(150) : 150} enter />
+          </div>
+        )}
       </div>
 
       <div className="cel-skip-hint">tap zum Überspringen</div>

@@ -59,4 +59,20 @@ function ObDuo({ benny = 'idle', joni = 'idle', tall = 160, tap = false, enter =
   );
 }
 
-Object.assign(window, { ObFigure, ObDuo, OB_FIG_POSES });
+// Auf kleinen iPhones (SE, mini) etwas kleiner, damit die Aktion unten erreichbar bleibt.
+function obFigTall(base) {
+  return window.innerHeight < 720 ? Math.round(base * 0.8) : base;
+}
+
+// Guide mit Sprechblase: einer der beiden sagt den Hinweis des Schritts.
+// Wie im Duell steht Benny links und Joni rechts; so zeigen beide zur Mitte.
+function ObGuide({ who = 'benny', pose = 'idle', side = who === 'joni' ? 'right' : 'left', tall = 96, children }) {
+  return (
+    <div className={`ob-guide is-${side}`}>
+      <ObFigure who={who} pose={pose} tall={obFigTall(tall)} tap enter />
+      <div className="ob-guide-bubble">{children}</div>
+    </div>
+  );
+}
+
+Object.assign(window, { ObFigure, ObDuo, ObGuide, obFigTall, OB_FIG_POSES });

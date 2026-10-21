@@ -1,4 +1,4 @@
-/* global React, PTData, PTOnboarding, Icon, Avatar, Sheet, modeLabel */
+/* global React, PTData, PTOnboarding, Icon, Avatar, Sheet, modeLabel, ObFigure, ObGuide, obFigTall */
 // Onboarding vor der Challenge: Willkommen, Konto, Profil, Start, Erstellen,
 // Beitreten. Welcher Bildschirm dran ist, entscheidet PTOnboarding.entryRoute
 // (onboarding-model.js); die Ebenen in der Challenge liegen in onboarding-intro.jsx.
@@ -93,7 +93,7 @@ function obSetDemo(on) {
 }
 
 // ─── Willkommen ─────────────────────────────────────────────────────────────
-// Zählt einmalig von 0 hoch (CountUp aus components.jsx zeigt zuerst den Endwert).
+// Benny und Joni im Beispiel-Duell (onboarding-figures.jsx). Zählt einmalig von 0 hoch (CountUp aus components.jsx zeigt zuerst den Endwert).
 function useObCount(target, duration = 1100, delay = 250) {
   const [v, setV] = React.useState(0);
   React.useEffect(() => {
@@ -115,14 +115,15 @@ function useObCount(target, duration = 1100, delay = 250) {
 
 function ObHeroDuel() {
   const mine = useObCount(120), theirs = useObCount(95);
+  const tall = obFigTall(124);
   const kw = window.weekNumber ? window.weekNumber(PTData.isoDate(PTData.mondayOf(new Date()))) : '';
   return (
-    <div className="ob-hero" role="img" aria-label="Beispiel: Du gegen Jonas, 120 zu 95 Liegestütze diese Woche">
+    <div className="ob-hero" role="img" aria-label="Beispiel: Benny gegen Joni, 120 zu 95 Liegestütze diese Woche">
       <div className="ob-hero-head"><span>KW {kw} · Duell</span><span className="ob-hero-live">Live</span></div>
       <div className="ob-hero-main">
-        <div className="ob-hero-player"><span className="ob-hero-avatar" style={{ '--sc': 'var(--player-1)' }}>D</span>Du</div>
+        <div className="ob-hero-player"><ObFigure who="benny" pose="wave" tall={tall} enter />Benny</div>
         <div className="ob-hero-score">{mine} : {theirs}</div>
-        <div className="ob-hero-player"><span className="ob-hero-avatar" style={{ '--sc': 'var(--player-2)' }}>J</span>Jonas</div>
+        <div className="ob-hero-player"><ObFigure who="joni" pose="wave" tall={tall} enter />Joni</div>
       </div>
       <div className="ob-hero-split">
         <span style={{ width: '56%', '--sc': 'var(--player-1)' }} />
@@ -130,7 +131,7 @@ function ObHeroDuel() {
       </div>
       <div className="ob-hero-feed">
         <span aria-hidden="true">🔥</span>
-        <span><strong>Jonas</strong> · Liegestütze · gerade eben</span>
+        <span><strong>Joni</strong> · Liegestütze · gerade eben</span>
         <span className="ob-hero-plus">+20</span>
       </div>
     </div>
@@ -321,7 +322,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
           onClick={() => { onInvite?.(PTOnboarding.normalizeCode(code)); go('signup'); }}>Weiter</button>
       }>
         <h1 className="ob-title">Hast du einen Code?</h1>
-        <p className="ob-sub">Steht in der Einladung. Danach legst du kurz ein Konto an und bist drin.</p>
+        <ObGuide who="joni" pose="point">Steht in der Einladung. Danach legst du kurz ein Konto an und bist drin.</ObGuide>
         <ObCodeField value={code} onChange={setCode} autoFocus onPasteFail={(m) => setInfo(m)} />
         <ObMessage error={error} info={info} />
       </ObScreen>
@@ -335,7 +336,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
         <button type="button" className="btn-link" onClick={() => go('login')}>Schon ein Konto? Anmelden</button>
       </>}>
         <h1 className="ob-title">Konto erstellen</h1>
-        <p className="ob-sub">{invite ? 'Danach bist du direkt in der Challenge.' : 'Dauert keine Minute.'}</p>
+        <ObGuide who="benny" pose="wave">{invite ? 'Danach bist du direkt in der Challenge.' : 'Dauert keine Minute.'}</ObGuide>
         {isDemo && <div className="ob-hint">Demo: Jede Adresse funktioniert, nichts verlässt dein Gerät.</div>}
         <form id="ob-signup" className="ob-fields" onSubmit={submitOn(signup)} noValidate>
           {emailInput}
@@ -353,7 +354,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
         <button type="button" className="btn-link" onClick={() => go('signup')}>Neu hier? Konto erstellen</button>
       </>}>
         <h1 className="ob-title">Willkommen zurück</h1>
-        <p className="ob-sub">{isDemo ? 'Demo: Jede Adresse funktioniert.' : 'Schön, dass du da bist.'}</p>
+        <ObGuide who="joni" pose="wave">{isDemo ? 'Demo: Jede Adresse funktioniert.' : 'Schön, dass du da bist.'}</ObGuide>
         <form id="ob-login" className="ob-fields" onSubmit={submitOn(login)} noValidate>
           {emailInput}
           {passwordInput('Passwort', 'current-password')}
@@ -387,18 +388,17 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
 
   // view === 'confirm'
   return (
-    <ObScreen onBack={() => go('signup')} stepKey="confirm" center foot={<>
+    <ObScreen onBack={() => go('signup')} stepKey="confirm" foot={<>
       <button type="button" className="btn" disabled={busy} onClick={confirmed}>{label('Ich hab bestätigt')}</button>
       <button type="button" className="btn btn-secondary" disabled={busy || cooldown > 0} onClick={resend}>
         {cooldown > 0 ? `Nochmal senden in ${cooldown} s` : 'Mail nochmal senden'}
       </button>
       <button type="button" className="btn-link" onClick={() => go('signup')}>Andere E-Mail</button>
     </>}>
-      <div className="ob-trophy" aria-hidden="true">📬</div>
-      <h1 className="ob-title" style={{ textAlign: 'center' }}>Check deine Mails</h1>
-      <p className="ob-sub" style={{ textAlign: 'center' }}>
+      <h1 className="ob-title">Check deine Mails 📬</h1>
+      <ObGuide who="benny" pose="point">
         Wir haben dir einen Link an <strong>{email.trim()}</strong> geschickt. Tipp ihn an und komm dann hierher zurück.
-      </p>
+      </ObGuide>
       <ObMessage error={error} info={info} />
     </ObScreen>
   );
@@ -450,7 +450,7 @@ function ObProfile({ api, profile, email, onSaved, onDone, onSignOut }) {
       left={onSignOut && <button type="button" className="btn-link ob-top-link" onClick={onSignOut}>Abmelden</button>}
       foot={<button type="button" className="btn" disabled={busy || uploading || !name.trim()} onClick={next}>{busy ? '…' : 'Weiter'}</button>}>
       <h1 className="ob-title">Wie sollen dich die anderen sehen?</h1>
-      <p className="ob-sub">So erscheinst du in Feed und Rangliste.</p>
+      <ObGuide who="joni" pose="idle">So erscheinst du in Feed und Rangliste.</ObGuide>
       <button type="button" className={`ob-avatar-pick${uploading ? ' is-busy' : ''}`} disabled={uploading}
         onClick={() => fileRef.current?.click()} aria-label={profile.avatar_url ? 'Foto ändern' : 'Foto wählen'}>
         <Avatar profile={preview} size={120} />
@@ -478,7 +478,7 @@ function ObStart({ profile, onCreate, onJoin, onProfile, onDemo, onArchived }) {
         <button type="button" className="btn-link" onClick={onDemo}>Erst mal die Demo ansehen</button>
       </>}>
       <h1 className="ob-title">Hi {first} 👋</h1>
-      <p className="ob-sub">Wie startest du?</p>
+      <ObGuide who="benny" pose="wave">Wie startest du?</ObGuide>
       <div className="ob-choices">
         <button type="button" className="ob-choice is-primary" onClick={onCreate}>
           <span className="ob-choice-icon" aria-hidden="true">🏁</span>
@@ -639,6 +639,7 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
   return (
     <ObScreen onBack={onCancel} stepKey="create" foot={cta}>
       <h1 className="ob-title">Neue Challenge</h1>
+      <ObGuide who="joni" pose="flex">Kurz einrichten, dann lädst du deine Leute ein.</ObGuide>
       {body}
     </ObScreen>
   );
@@ -762,7 +763,7 @@ function JoinPanel({ api, initialCode = '', variant = 'screen', onJoined, onCanc
       {onSkip && <button type="button" className="btn-link" onClick={onSkip}>Ohne Code weiter</button>}
     </>}>
       <h1 className="ob-title">{preview ? 'Bist du dabei?' : 'Challenge beitreten'}</h1>
-      {!preview && <p className="ob-sub">Gib den Code aus der Einladung ein. Ganze Nachricht einfügen geht auch.</p>}
+      {!preview && <ObGuide who="joni" pose="point">Gib den Code aus der Einladung ein. Ganze Nachricht einfügen geht auch.</ObGuide>}
       {preview ? previewBody : codeBody}
     </ObScreen>
   );
