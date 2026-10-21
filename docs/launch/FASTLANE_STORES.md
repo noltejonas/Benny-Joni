@@ -23,8 +23,9 @@ tools/fastlane.sh android store_metadata
 Der Wrapper verwendet die ignorierte `ios/App/fastlane/.env`. Der bestehende
 Apple-Team-Key und die Review-Angaben sind lokal hinterlegt;
 `ios verify_auth` war erfolgreich. Die private `.p8` liegt nicht versioniert
-unter `.local/release/apple/` mit Dateirechten `0600`. Der Google-Play-Zugang
-wird separat eingerichtet; die Apple-Zugangsdaten ersetzen ihn nicht.
+unter `.local/release/apple/` mit Dateirechten `0600`. Der separate
+Google-Play-Zugang ist ebenfalls eingerichtet; `android verify_auth`
+bestätigt Version Code 1 im internen Track.
 
 Die Gem-Versionen sind in `ios/App/Gemfile.lock` festgelegt. Auf einem
 anderen Mac werden sie vor dem ersten Aufruf mit `bundle install` installiert.
@@ -140,7 +141,11 @@ Neuladen leer. Der bestehende DSA-Trader-Status wurde nicht geändert;
 eine neue Verifizierung ist nicht belegt. Bei einem Build mit AdMob gehören die Daten des
 Google-SDKs in die Datenschutzangaben und Werbung in die Altersfreigabe.
 Auch die öffentliche Monatsrangliste muss bei Nutzerinhalten berücksichtigt
-werden. Konkrete Datenschutzantworten stehen in
+werden.
+Die aktualisierte Apple Developer Program License Agreement wurde nach
+ausdrücklicher kontoweiter Nutzerzustimmung akzeptiert. Neuladen bestätigt
+Ausgabe 14. Oktober 2026 und Annahme 21. Oktober 2026; das Warnbanner ist entfernt.
+Konkrete Datenschutzantworten stehen in
 [STORE_PRIVACY_ANSWERS.md](STORE_PRIVACY_ANSWERS.md). Anschließend zur Prüfung
 einreichen. Der aktuelle Entwurf wurde noch nicht eingereicht; die
 Veröffentlichung bleibt manuell.
@@ -167,11 +172,35 @@ SHA-256 `5745afb5…`) ist hochgeladen; die Console zeigt ein App Bundle und
 `1 (1.4.1)`. Der interne Entwurf **1.4.1 – Initial internal test** ist mit
 Neuerungen in Deutsch und Englisch (2/2) gespeichert. Kein Rollout und keine
 Testerbenachrichtigung.
+Die Produktionsländer sind auf Deutschland, Österreich und Schweiz begrenzt;
+UI-Readback „Ausgerichtet (3)“. Der Produktionstrack ist inaktiv, kein
+Produktionsrelease erstellt oder veröffentlicht.
 
-Fastlane braucht zusätzlich einen eigenen Google-Play-API-Zugang; der
-Apple-Key funktioniert hier nicht. Google Play Developer API aktivieren
-und einem Dienstkonto Zugriff auf diese App geben. Einen JSON-Schlüssel außerhalb des Repos speichern und
-in der `.env` dessen Pfad hinterlegen:
+Der separate Play-API-Zugang im Cloudprojekt `benny-joni-fastlane` ist
+eingerichtet und die API als aktiviert bestätigt. Das Servicekonto hat
+Zugriff ausschließlich auf Benny & Joni: Read, Manage Store Presence und
+Release to Testing Tracks. Google hat Quality Read und Manage Policy
+Declarations als automatisch gesetzte Abhängigkeiten ergänzt. Kontoweite
+Play-Rechte, Cloud-IAM-Rollen und Impersonators sind nicht vergeben.
+Der lokale JSON-Schlüssel liegt ausschließlich ignoriert unter
+`.local/release/google-play/service-account.json` (`0600`, Ordner `0700`);
+sein Pfad ist in der privaten `.env` gesetzt. `tools/fastlane.sh android
+verify_auth` ist erfolgreich und liest Version Code 1 im internen Track.
+`android store_metadata screenshots:false validate:true` wurde zweimal
+ausgeführt: Die DE-/EN-Texte wurden im temporären API-Edit angenommen,
+das abschließende `edits.validate` scheiterte jeweils mit HTTP 403
+(`caller permission`). Es gab keinen Commit. Ein unabhängiger leerer Edit
+ließ sich dagegen anlegen, validieren und löschen; Authentifizierung,
+Leserechte und grundlegender Validate-Zugriff funktionieren. Das Fehlerbild
+ist inzwischen eingegrenzt: Serveridentische PUT/PATCHs validieren, echte
+Titeländerungen scheitern reproduzierbar mit 403. Die in Play gespeicherten
+Titel lauten in beiden Sprachen **Benny & Joni** (12 Zeichen); die längeren
+lokalen Titel wären tatsächliche Änderungen. Keine Titeländerung wurde
+committed. Eine zusätzliche Nutzerfreigabe für das ausschließlich auf diese
+App begrenzte Recht zum Bearbeiten/Löschen von Entwürfen ist angefragt;
+die Entscheidung steht aus. Es wurden keine weiteren Rechte vergeben und
+das Problem ist nicht gelöst. Die UI-Listings bleiben der bestätigte Stand.
+Beispielvariablen:
 
 ```dotenv
 PLAY_JSON_KEY_PATH=
@@ -238,6 +267,10 @@ wurden, kann der Produktionszugang erst nach dem vorgeschriebenen
 geschlossenen Test beantragt werden: mindestens zwölf Tester, die
 durchgehend mindestens vierzehn Tage angemeldet bleiben. Interne Tests
 erfüllen diese Voraussetzung nicht.
+
+Der vorbereitete Passwort-E-Mail-Versand über das bestehende Gmail-Konto
+steht in [SMTP.md](SMTP.md); Nutzerübergabe und erfolgreicher Zustelltest
+stehen noch aus.
 
 ## Quellen
 

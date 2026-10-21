@@ -75,6 +75,9 @@ Alkohol ist wegen der vom Nutzer bestätigten „Bier-Runde“ selten.
 Die Inhaltsrechte-Erklärung („erforderliche Rechte vorhanden“) und
 „kein reguliertes Medizinprodukt“ sind gespeichert. Der bestehende
 DSA-Trader-Status bleibt unverändert; eine neue Verifizierung ist nicht belegt.
+Die aktualisierte Apple Developer Program License Agreement ist nach
+ausdrücklicher kontoweiter Nutzerzustimmung akzeptiert; Neuladen bestätigt
+Ausgabe 14. Oktober und Annahme 21. Oktober 2026, das Warnbanner ist entfernt.
 Die vollständigen gespeicherten Antworten stehen in
 [STORE_PRIVACY_ANSWERS.md](STORE_PRIVACY_ANSWERS.md).
 
@@ -115,14 +118,22 @@ vollständig gesetzt und nach ausdrücklicher Nutzerzustimmung veröffentlicht:
 15 Datentypen, davon 13 verknüpft und zwei nicht verknüpft, keine
 Tracking-Daten; die Datenschutz-URL ist im UI-Readback korrekt. Die
 Veröffentlichung der Datenschutzangaben reicht die App-Version nicht ein.
+Die Play-Produktionsländer sind auf Deutschland, Österreich und Schweiz
+ausgerichtet, UI-Readback „Ausgerichtet (3)“. Der Produktionstrack bleibt
+inaktiv; ein Produktionsrelease wurde weder erstellt noch veröffentlicht.
+Die tatsächlich gespeicherten Play-Titel lauten in beiden Sprachen
+**Benny & Joni** (12 Zeichen). Die längeren lokalen Titel sind noch nicht
+übernommen: Ihre temporäre API-Validierung scheitert mit 403, während
+serveridentische PUT/PATCHs validieren. Kein Titel-Commit. Die angefragte
+zusätzliche App-Entwurfsberechtigung wartet auf Nutzerentscheidung.
 
 ## Was aktuell noch fehlt
 
 - AdMob-Zahlungsprofil (auf Wunsch vorerst offen), Store-Verknüpfung und Googles Bestätigung von `app-ads.txt`. Beide Apps/Banner und die UMP-Nachricht sind eingerichtet; die Datei ist am Domain-Stamm erreichbar.
-- Produktions-E-Mail-Versand und verbleibende Betriebsfakten aus `LEGAL_FACTS.md` überprüfen. Anbieter-/Supportdaten sind eingesetzt und die fünf App-/Rechtsseiten öffentlich erreichbar.
+- Produktions-E-Mail-Versand und verbleibende Betriebsfakten aus `LEGAL_FACTS.md` überprüfen. Im vorbereiteten Gmail-SMTP-Formular sind fünf Felder befüllt; Passwort leer, nicht gespeichert. Die Nutzerübergabe für App-Passwort und Save wartet auf Antwort; siehe [SMTP.md](SMTP.md). SMTP ist produktiv unverändert. Anbieter-/Supportdaten sind eingesetzt und die fünf App-/Rechtsseiten öffentlich erreichbar.
 - Apple: abschließende Prüfung der Abläufe im hochgeladenen Build sowie gegebenenfalls noch im Konto angezeigte Anforderungen. App Privacy ist mit allen 15 Datentypen veröffentlicht; Build 25 ist zugeordnet. Altersfreigabe 16+, Inhaltsrechte, Medizinprodukt-Antwort Nein, kostenlose Preise und ausschließliche DACH-Verfügbarkeit sind gespeichert. Mac/Apple Vision sind ausgeschlossen. Beide isolierten Review-Logins sind gegen Supabase Auth bestätigt. Der bestehende Trader-Status ist keine hier neu geprüfte DSA-Verifizierung.
-- Google Play: Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist hochgeladen und als interner Entwurf **1.4.1 – Initial internal test** mit DE-/EN-Neuerungen (2/2) gespeichert. Kein Rollout und keine Testerbenachrichtigung. Für Fastlane zusätzlich eigenen API-Zugang einrichten. Alle elf Einrichtungsschritte einschließlich IARC, Data safety und DE-/EN-Listing sind abgeschlossen. Der Apple-Key ist für Play nicht verwendbar.
-- Für Android: externes Backup des lokal erstellten Upload-Keys sowie vollständige Funktionstests und AdMob-/UMP-Geräteprüfung. Kaltstart, Feed-Reproduktion und der Export von acht echten Screenshots sind bestanden.
+- Google Play: Das finale AAB (1.4.1, Version Code 1, SHA-256 `5745afb5…`) ist hochgeladen und als interner Entwurf **1.4.1 – Initial internal test** mit DE-/EN-Neuerungen (2/2) gespeichert. Kein Rollout und keine Testerbenachrichtigung. `android verify_auth` bestätigt Version Code 1. Leerer Edit und serveridentische Änderungen validieren; echte Titeländerungen scheitern reproduzierbar mit 403, kein Commit. Gespeicherte Titel weiterhin „Benny & Joni“. Eine zusätzliche, auf diese App begrenzte Entwurfsberechtigung ist angefragt, noch nicht genehmigt/vergeben. Alle elf Einrichtungsschritte und die UI-Listings sind abgeschlossen.
+- Für Android: externes Backup des lokal erstellten Upload-Keys sowie vollständige Funktionstests, EWR-Dialogwahl/Widerruf und tatsächliche Anzeigenauslieferung. Kaltstart, Review-Login, Feed-Reproduktion und acht echte Screenshots sind geprüft. Der Emulator verifiziert UMP-Freigabe → SDK → native Datenschutzbestätigung → `npa: true`-Anfragen; Feed/Stats jeweils `NO_FILL`, keine Anzeigen oder Leerfläche, keine finalen Laufzeitfehler. Details/Beleg in [ADMOB.md](ADMOB.md). Beide Store-Bereitschaftschecks sind bestanden; keine vollständige Geräte-QA behauptet.
 
 Die Release-Sperren stoppen bei Test-Anzeigenkennungen oder unvollständigen
 Unterlagen. Die vollständigen Befehle stehen in

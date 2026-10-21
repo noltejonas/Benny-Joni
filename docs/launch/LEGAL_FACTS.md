@@ -40,6 +40,14 @@ Die bestehende Supabase Management API bestätigt für das aktive Projekt am
 SMTP-Server konfiguriert; das Standardlimit beträgt zwei E-Mails pro Stunde,
 und automatische E-Mail-Bestätigung ist aktiviert. Produktionsfähiger
 Passwort-Reset-Versand ist damit noch nicht nachgewiesen.
+Der aktuelle Readback bestätigt `{{ .Token }}` in der Recovery-Vorlage,
+keinen Bestätigungslink und eine OTP-Länge von acht Ziffern. Die App
+akzeptiert diese Länge; ein neuer Build ist dafür nicht erforderlich.
+Der Gmail-SMTP-Weg mit notwendiger Nutzerübergabe ist in [SMTP.md](SMTP.md)
+vorbereitet; dabei wurden weder Auth-Einstellungen geändert noch E-Mails versendet.
+Die längenneutrale Recovery-Anleitung auf der öffentlichen Supportseite ist
+veröffentlicht und bytegleich geprüft (HTTP 200; Root-Pages-Commit
+`9b55f30aa335f51d22de554c3749f8af8371a3fd`, nur `Benny-Joni/support.html`).
 
 Diese Punkte werden auf den öffentlichen Seiten nicht durch erfundene
 Anbieter-, Regions- oder Tagesangaben ersetzt:

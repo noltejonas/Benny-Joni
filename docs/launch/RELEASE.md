@@ -35,6 +35,16 @@ bewusst übersprungenen Release-Check (221 insgesamt). Webbuild, beide
 Capacitor-Syncs, Android-Debug- und Release-Build sowie der iOS-Release-
 Simulatorbuild waren erfolgreich. Der Android-Release-Build führte den
 zusätzlichen Check für produktive AdMob-IDs erfolgreich aus.
+Beide Bereitschaftsprüfungen mit `--ready --screenshots` sind für iOS und
+Android bestanden. Im finalen Android-Lauf sind Review-Login und die
+Reihenfolge UMP `NOT_REQUIRED`/`canRequestAds: true` → `initialize` →
+native Bestätigung `disabled: true` → Banneranfrage verifiziert. Feed/Stats
+setzen `npa: true`, beide enden mit Code 3 / `NO_FILL`, ohne leere Anzeigenlücke.
+Keine geladene Anzeige, kein Ad-Klick und nach Host-GPU-Wiederherstellung
+keine ANR/FATAL-Exception oder ungefangenen JavaScript-/Datenschutzfehler.
+Das SDK erkennt den Emulator als Testgerät. EWR-Dialogwahl/Widerruf und
+tatsächliche Auslieferung bleiben offen. Beleg:
+`.local/qa/android-ads-review-20261021/recovered/summary.json`.
 
 Vom Repo-Root aus lokal prüfen:
 
@@ -110,6 +120,24 @@ Basisland Deutschland und die ausschließliche Verfügbarkeit in Deutschland,
 Neuladen ausgeschlossen. Der vorhandene Trader-Status bleibt unverändert;
 eine neue DSA-Verifizierung ist nicht belegt. Die App-Version wurde nicht
 eingereicht oder veröffentlicht.
+Die aktualisierte Apple Developer Program License Agreement ist nach
+ausdrücklicher kontoweiter Nutzerzustimmung akzeptiert. Neuladen bestätigt
+Ausgabe 14. Oktober und Annahme 21. Oktober 2026; das Warnbanner ist entfernt.
+Play-Produktionsländer: Deutschland, Österreich und Schweiz, bestätigt als
+„Ausgerichtet (3)“. Produktionstrack inaktiv, kein Produktionsrelease erstellt
+oder veröffentlicht. Der separate API-Zugang im Cloudprojekt
+`benny-joni-fastlane` ist eingerichtet, mit aktivierter API und auf diese App
+begrenztem Servicekonto. `android verify_auth` bestätigt Version Code 1 im
+internen Track. Der private JSON-Schlüssel bleibt im ignorierten lokalen
+Release-Ordner. Zwei Metadaten-Probeläufe akzeptierten DE-/EN-Texte im
+temporären Edit, scheiterten aber beim abschließenden `edits.validate` mit
+HTTP 403 (`caller permission`); kein Commit. Ein leerer Edit besteht
+insert → validate → delete. Das Fehlerbild ist eingegrenzt: Serveridentische PUT/PATCHs
+validieren, echte Änderungen der längeren lokalen Titel scheitern reproduzierbar
+mit 403. Beide gespeicherten Play-Titel sind „Benny & Joni“ (12 Zeichen).
+Keine Titeländerung wurde committed. Die zusätzliche Nutzerfreigabe für
+auf diese App begrenztes Bearbeiten/Löschen von Entwürfen ist angefragt und
+noch nicht entschieden; keine weiteren Rechte vergeben, keine Lösung behauptet.
 Die Play-Vorschau zeigt keine Fehler und drei Warnungen: keine internen
 Tester, kein R8-Mapping bei `minifyEnabled=false` und fehlende native
 SDK-Debugsymbole. „Save and publish“ wurde nicht betätigt.
@@ -122,9 +150,14 @@ lokale Upload-Keystore und das signierte Release-Bundle
 Der Kaltstart und die Feed-Reproduktion mit Live-Updates und Abwärtswischen
 im API-36-Emulator sind bestanden. Je vier echte Android-Screenshots für
 Deutsch und Englisch sind exportiert und geprüft. Vor einer Einführung
-fehlen das externe Schlüssel-Backup, vollständige Funktionstests und die
-AdMob-/UMP-Geräteprüfung. Artefakt-
+fehlen das externe Schlüssel-Backup, vollständige Funktionstests,
+EWR-Dialogwahl/Widerruf und tatsächliche Anzeigenauslieferung. Artefakt-
 Hashes und Details stehen in [ANDROID.md](ANDROID.md).
+Die Vorbereitung für Gmail-SMTP steht in [SMTP.md](SMTP.md): fünf
+Konfigurationsfelder sind im ungespeicherten Formular korrekt befüllt,
+das Passwortfeld ist leer. App-Passwort-Eingabe und Speichern sind an den
+Nutzer übergeben; dessen Antwort und der Zustelltest stehen noch aus.
+Die produktiven Auth-Einstellungen sind unverändert.
 Eventuell vorgeschriebene geschlossene Tests bleiben Kontoschritte. Die Play-Lanes
 senden keine Änderung zur Prüfung und veröffentlichen keine Version.
 

@@ -6,8 +6,10 @@ sind eingerichtet. Die aktuelle AdMob-Konfiguration steht in
 [ADMOB.md](ADMOB.md). Debug-APK und signiertes Release-AAB wurden am
 21. Oktober 2026 erfolgreich gebaut. Der Kaltstart der aktuellen APK wurde
 im Android-Emulator bis zur vollständigen Willkommensoberfläche geprüft,
-ohne neuen nativen Absturz oder JavaScript-/WebView-Fehler. Vollständige
-Funktionstests und die Prüfung von AdMob/UMP auf einem Gerät bleiben offen.
+ohne neuen nativen Absturz oder JavaScript-/WebView-Fehler. Mit dem isolierten
+Reviewkonto sind außerdem UMP-Freigabe, native Publisher-ID-Deaktivierung
+und nicht personalisierte Banneranfragen geprüft. Vollständige Funktionstests,
+EWR-Dialogwahl/Widerruf und tatsächlich gelieferte Anzeigen bleiben offen.
 Der zuvor sichtbare Feed-Zeichenfehler ist ebenfalls im Emulator geprüft:
 Nach dem Tabwechsel, zwei natürlichen Live-Updatezyklen und demselben
 Abwärtswischen bleiben Kopfzeile und Feed sauber. Dafür verwenden die
@@ -64,6 +66,26 @@ SHA-256 von `android/app/build/outputs/apk/debug/app-debug.apk`:
 Unveränderte Vorher-Belege liegen unter
 `.local/screenshots/android/{de-DE,en-GB}/03-feed.png`; die bestandene
 Vergleichsfolge liegt unter `.local/screenshots/android/feed-after-tabbar/`.
+
+## Android-Laufzeitprüfung der Werbung
+
+Im abschließenden Lauf nach Host-GPU-Wiederherstellung funktionierten normaler
+Review-Login und Kaltstart. UMP: `NOT_REQUIRED`, kein Formular,
+`canRequestAds: true`, Datenschutzoptionen `NOT_REQUIRED`. Die strenge
+Reihenfolge UMP-Freigabe → SDK-Initialisierung → native Bestätigung
+`disabled: true` → `showBanner` ist im Laufzeitlog verifiziert.
+Feed und Stats setzen `npa: true`; beide Anfragen liefern Code 3 / `NO_FILL`.
+Es wurden keine Anzeigen geladen oder angeklickt; eine leere Anzeigenlücke
+blieb nicht stehen. Google erkennt den Emulator als Testgerät. Der finale
+Lauf enthält keine ANR/FATAL-Exception oder ungefangenen JavaScript-/
+Datenschutzfehler. EWR-Auswahl, Widerruf und echte Auslieferung wurden nicht geprüft.
+
+Beleg: `.local/qa/android-ads-review-20261021/recovered/summary.json`;
+Einzelheiten und Logreferenzen stehen in [ADMOB.md](ADMOB.md). Nur der
+Fortschrittsmarker des ersten Satzes wurde an der isolierten Fixture aus
+einem vorhandenen synthetischen Satz ergänzt. Sonstige Profil-/Onboarding-,
+Terms-/Consent-Felder und Trainingszeilen blieben unverändert; private
+Vorher-/Nachherstände und abgesicherte Wiederherstellung liegen bereit.
 
 ## Signierter Release
 

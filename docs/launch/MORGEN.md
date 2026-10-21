@@ -269,7 +269,7 @@ Dashboard: https://supabase.com/dashboard/project/jczyyupxxqrdgbeifcwe
    weicht bei 42501 automatisch auf die Function aus.
 5. **Authentication → Emails → Templates → „Reset Password“**: Betreff
    „Dein Code für Benny & Joni / Your Benny & Joni code“, Text auf Deutsch mit
-   `{{ .Token }}` als 6-stelligem Code, darunter derselbe Satz auf Englisch
+   `{{ .Token }}` als Code, darunter derselbe Satz auf Englisch
    (die Vorlage kennt die App-Sprache nicht), **kein Link** (die App erwartet
    einen Code; 5 min). Zum Beispiel:
    ```html

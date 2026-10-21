@@ -26,6 +26,8 @@ Die Console bestätigte die folgenden Eingaben mit „Saved“:
 | App access | Eingeschränkter Zugang, ausdrücklich freigegebener isolierter Review-Login, englische Anleitung mit 393 Zeichen und gesetzte Checkbox für vollständigen Prüferzugriff. Zugangsdaten bleiben ausschließlich in den privaten Feldern/Dateien. |
 | Optionale Partnertests | Ausgeschaltet. |
 | Target audience | 16–17 sowie 18 and over. |
+| Produktionsländer | Ausschließlich Deutschland, Österreich und Schweiz; UI-Readback „Ausgerichtet (3)“. Produktionstrack inaktiv, kein Produktionsrelease erstellt oder veröffentlicht. |
+| Fastlane-Zugang | Separate aktivierte Play-API und auf diese App begrenztes Servicekonto eingerichtet; `android verify_auth` bestätigt Version Code 1. Leerer Edit und serveridentische PUT/PATCHs validieren; echte Titeländerungen scheitern reproduzierbar mit 403, kein Commit. Beide gespeicherten Titel weiter „Benny & Joni“. Zusätzliche appbezogene Entwurfsberechtigung angefragt, Entscheidung offen; keine weiteren Rechte vergeben. Privater JSON-Schlüssel ausschließlich im ignorierten lokalen Release-Ordner. |
 | Data safety | Alle zwölf Datentypen der folgenden Play-Tabelle einschließlich Erhebung, Weitergabe, Pflicht/Optional und Zwecken gespeichert. Bei App interactions und Diagnostics ist App functionality ausschließlich Erhebungszweck der eigenen Funktionsdaten, kein Weitergabezweck der Google-SDK-Daten. Eigene Crash logs: collected, required, nicht shared. |
 | IARC | Abgeschlossen und gespeichert: Other app; Fitness/UGC als primäre Inhalte; Melden/Blockieren vorhanden, keine Chatmoderation, Zugang per Einladung. Kein externer Content, keine altersbeschränkten Waren, GPS-Freigabe, Käufe, Auszahlungen, Browser- oder Nachrichtenfunktion. Ergebnis: USK 12, ESRB Teen, PEGI Parental Guidance. Die ausgewählte Zielgruppe bleibt 16+. |
 | Store-Listing | Deutsch und Englisch vollständig gespeichert, Status „Bereit für Überprüfung“; je vier echte Android-Screenshots, ein Icon und zwei lokalisierte Feature-Grafiken. |
@@ -53,6 +55,7 @@ sind inzwischen gespeichert und in der Oberfläche zurückgelesen.
 | Verfügbarkeit | Ausschließlich **Deutschland, Österreich und Schweiz**, jeweils „Verfügbar bei App-Veröffentlichung“. UI: drei Länder; andere Länder nicht verfügbar. |
 | Weitere Plattformen | Verfügbarkeit auf Mac und Apple Vision ausgeschaltet; beide Auswahlkästchen nach Neuladen nicht gesetzt. Diese Plattformen wurden nicht getestet. |
 | DSA | Bestehende Einstufung dieser App als Trader unverändert. Kein neu geprüfter oder abgeschlossener Verifikationsstatus behauptet. |
+| Apple Developer Program License Agreement | Aktualisierung nach ausdrücklicher kontoweiter Nutzerzustimmung akzeptiert. Nach Neuladen bestätigt: ausgegeben am 14. Oktober 2026, akzeptiert am 21. Oktober 2026; Warnbanner entfernt. |
 
 Die App-Version ist weiterhin nicht zur Prüfung eingereicht oder veröffentlicht.
 

@@ -12,9 +12,10 @@ Publisher: `pub-8393455800337394`.
 Die Werte stimmen zwischen `www/ads.js` und der jeweiligen nativen
 App-Konfiguration (`Info.plist` bzw. `AndroidManifest.xml`) überein.
 Das Zahlungsprofil bleibt auf Wunsch des Betreibers vorerst offen.
-Store-Verknüpfung, Googles app-ads.txt-Verifizierung und Tests von
-Anzeigen und Einwilligung auf einem Gerät
-stehen noch aus. Die eingetragenen IDs allein bestätigen keine Anzeigenfreigabe.
+Store-Verknüpfung, Googles app-ads.txt-Verifizierung, tatsächliche
+Anzeigenauslieferung und EWR-Einwilligungswahl/Widerruf stehen noch aus.
+Der Android-Anfrageablauf und die Behandlung von NO_FILL sind im Emulator
+geprüft, siehe unten. Die eingetragenen IDs allein bestätigen keine Anzeigenfreigabe.
 Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
 
 ## Bereits umgesetzt
@@ -59,9 +60,38 @@ Ein TestFlight- oder interner Testbuild darf Testanzeigen enthalten.
   Die produktive App-ID und Banner-ID wurden im APK-Inhalt geprüft.
   Der Kaltstart im API-36-Pixel-2-Emulator ist ohne nativen Absturz oder
   JavaScript-/WebView-Fehler bestanden; `AdPrivacy` ist nativ registriert.
-  Anzeigen- und Einwilligungstests auf einem Android-Gerät stehen noch aus;
+  Review-Login, UMP-Freigabe, native Datenschutzbestätigung und nicht
+  personalisierte Banneranfragen sind im Emulator geprüft. EWR-Dialogwahl,
+  Widerruf und tatsächlich gelieferte Anzeigen bleiben ungeprüft;
   Build-Details stehen in [ANDROID.md](ANDROID.md).
   Android-Push bleibt bis zur separaten FCM-Einrichtung deaktiviert.
+
+## Tatsächlich geprüfter Android-Anzeigenablauf
+
+Die finale APK wurde im lokalen API-36-Pixel-2-Emulator nach der
+Host-GPU-Wiederherstellung mit dem isolierten Reviewkonto normal angemeldet
+und kalt gestartet. UMP meldet `NOT_REQUIRED`, `canRequestAds: true`,
+kein verfügbares Einwilligungsformular und Datenschutzoptionen
+`NOT_REQUIRED`, ohne Debug-Geografie. Die Logreihenfolge ist geprüft:
+Einwilligungsabfrage → Freigabe → `initialize` → native
+`disablePublisherFirstPartyId` → `disabled: true` → erst dann `showBanner`.
+
+Feed und Stats fordern jeweils mit `npa: true` an. Beide Anfragen enden mit
+SDK-Code 3 / `NO_FILL`; keine Anzeige wurde geladen oder angeklickt und es
+bleibt keine reservierte Leerfläche. Das SDK erkennt den Emulator als
+Testgerät. Im abschließenden Lauf wurden keine FATAL-Exception, ANR,
+ungefangenen JavaScript- oder Datenschutzfehler gefunden. Das belegt den
+sicheren Anfrage-/Fehlerablauf, keine vollständige Geräte-QA oder Auslieferung.
+
+Geheimnisfreier lokaler Bericht:
+`.local/qa/android-ads-review-20261021/recovered/summary.json`.
+Er referenziert im privaten finalen Laufzeitlog die Zeilen 266, 278, 281,
+287, 289, 324 und 344 für die obige Reihenfolge. Die privaten Auth-Dateien
+und Logs gehören nicht ins Repository. Für die Review-Fixture wurde nur
+der Fortschrittsmarker des ersten Satzes anhand eines vorhandenen
+synthetischen Satzes ergänzt; alle übrigen Profil-/Onboardingfelder,
+Einwilligungen und Trainingszeilen blieben gleich. Vorher-/Nachherstand
+und abgesicherte Wiederherstellung sind privat abgelegt.
 
 ## Konto und IDs einrichten
 
