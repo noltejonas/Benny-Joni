@@ -74,6 +74,17 @@ function loggedToast(value, name, count = 1) {
 const HOME_VIEW_KEY = 'pt:home-view'; // „Heute“: 'dashboard' (alle Challenges) | 'challenge'
 function writeHomeView(v) { try { sessionStorage.setItem(HOME_VIEW_KEY, v); } catch (e) {} }
 
+// Beim allerersten Dashboard auf diesem Gerät: schon geknackte Gruppenziele
+// nicht nacheinander als Vollbild feiern, nur was ab jetzt geknackt wird.
+function seedDashCelebrations(me, bundle) {
+  const key = `pt_dash_seeded_v1:${me}`;
+  try { if (localStorage.getItem(key)) return; } catch (e) { return; }
+  const total = (id) => bundle.sets.filter(x => x.challenge_id === id).reduce((a, x) => a + (x.reps ?? x.duration_minutes ?? 0), 0);
+  const reached = bundle.challenges.filter(ch => ch.target_reps > 0 && !ch.workout && total(ch.id) >= ch.target_reps);
+  markCelebrated(me, reached.map(ch => ch.id));
+  try { localStorage.setItem(key, '1'); } catch (e) {}
+}
+
 // Daten fürs Dashboard „Heute“: alle laufenden Challenges, laufende und letzte
 // Woche (letzte für die Wochenabschluss-Feier). Startwert: Stand vom letzten
 // Öffnen (PTBootCache), Realtime lädt bei Änderungen neu.
@@ -95,6 +106,7 @@ function useDashboardData(api, competitions, me) {
       const b = await api.getDashboard(ids.split(','), fromWeek);
       PTData.annotateWorkouts(b.sets, b.challenges, b.categories);
       PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
+      seedDashCelebrations(me, b);
       setState({ me, bundle: b, fresh: true });
       PTBootCache.write(me, 'dash', b);
     } catch (e) { console.warn('getDashboard failed', e); }
