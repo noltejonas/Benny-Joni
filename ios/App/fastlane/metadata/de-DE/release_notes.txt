@@ -1,1 +1,9 @@
-Gemeinsame Wochenziele, Fitness-Duelle, Live-Feed, Statistiken und eine optionale Monatsrangliste. Werbung ist zunächst serverseitig ausgeschaltet. Erst nach späterer Freischaltung sind nicht personalisierte Banner in Feed und Stats mit dem erforderlichen Einwilligungsablauf vorgesehen.
+Neu in 1.5.0:
+• Heute über alle Challenges: einmal eintragen, zählt in jeder Challenge mit derselben Übung
+• Fokus-Kacheln mit Schnellsatz, erledigte Übungen mit Haken am Ende
+• Tipp auf eine Challenge öffnet sie direkt
+• Rangliste mit Medaillen pro Woche
+• Eigene Farben: Palette wählen oder jede Farbe selbst festlegen
+• Neue Feier-Sounds mit mehr Bass
+• Aufgeräumter: weniger Text, Strafen pro Woche einklappbar
+• Neue Konten starten direkt ins erste Duell
