@@ -34,9 +34,10 @@ function useCelebration(challenges, allSets, me, categories) {
       if (flags[ch.id]) continue;
       const cat = (categories || []).find(c => c.id === ch.category_id);
       if (PTData.isWorkoutType(cat?.challenge_type)) continue; // Pflicht-Workout: kein Wiederholungsziel
+      // Wiederholungen bzw. Minuten (Zeit-Übungen); eine log_id zählt hier ohnehin pro Challenge
       const total = (allSets || [])
         .filter(s => s.challenge_id === ch.id)
-        .reduce((sum, s) => sum + s.reps, 0);
+        .reduce((sum, s) => sum + (s.reps ?? s.duration_minutes ?? 0), 0);
       if (total >= ch.target_reps && ch.target_reps > 0) {
         return { challenge: ch, category: cat || { name: '', emoji: '🏆' }, total };
       }

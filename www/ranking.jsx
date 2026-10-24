@@ -55,6 +55,16 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const [optInOpen, setOptInOpen] = React.useState(profile?.ranking_opt_in == null);
   const [logCat, setLogCat] = React.useState(null);
   const [card, setCard] = React.useState(null);
+  // „Meine Leute“: alle, mit denen ich gerade in einer laufenden Challenge bin
+  // (api.myPeople). Fehlt die Liste (offline), gilt is_mine vom Server.
+  const [people, setPeople] = React.useState(null);
+  React.useEffect(() => {
+    let off = false;
+    (api.myPeople ? api.myPeople() : Promise.resolve(null))
+      .then(list => { if (!off) setPeople(list); })
+      .catch(() => { if (!off) setPeople(null); });
+    return () => { off = true; };
+  }, [api]);
 
   const reload = () => { setTotals({}); setReloadKey(k => k + 1); };
 
@@ -119,7 +129,13 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const startMonth = settings.start_month;
   const minMonth = startMonth < nowMonth ? startMonth : nowMonth;
   const isLive = month === nowMonth;
+  // Medaillen gibt es erst mit dem Monatsabschluss (2. des Folgemonats, 12 Uhr);
+  // bis dahin sind Plätze und Punkte vorläufig.
+  // Monate vor dem Start (Probelauf) werden nie gewertet.
+  const closed = view !== 'month' || (month >= startMonth && new Date() >= R.closeDeadline(month));
   const loading = view === 'month' ? !monthRows : !totals[view];
+  const peopleIds = people ? new Set(people.map(p => p.id)) : null;
+  const mineOf = (r) => (peopleIds ? r.is_me || peopleIds.has(r.user_id) : r.is_mine);
 
   // ── Zeilen der aktuellen Ansicht ──
   let rows = [];
@@ -130,12 +146,15 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
       rows = counted.filter(r => r.category_id === cat.id).map(r => ({ ...r, score: r.value }));
       myHypo = monthRows.find(r => !r.counted && r.category_id === cat.id) || null;
     } else {
-      rows = R.overall(counted).filter(r => r.points > 0).map(r => ({ ...r, score: r.points }));
+      // Laufender Monat: Punkte zählen, aber noch keine Medaillen
+      rows = R.overall(closed ? counted : counted.map(r => ({ ...r, rank: null, medal: null })))
+        .filter(r => r.points > 0).map(r => ({ ...r, score: r.points }));
     }
   } else if (totals[view]) {
     const base = cat ? totals[view].filter(r => r.category_id === cat.id) : R.overall(totals[view]);
     rows = base.filter(r => r.points > 0).map(r => ({ ...r, score: r.points }));
   }
+  rows = rows.map(r => ({ ...r, is_mine: mineOf(r) }));
   const globalRank = {};
   for (const r of R.rankBy(rows, 'score')) globalRank[r.user_id] = r.rank;
   const shown = filter === 'mine' ? rows.filter(r => r.is_mine) : rows;
@@ -175,6 +194,10 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
     : tr('Punkte gibt es, sobald ein Monat abgeschlossen ist (am 2. des Folgemonats, erstmals am {date}).', { date: rkDate(R.closeDeadline(startMonth)) });
 
   const onOpenRow = (r) => setCard({ ...r, category_id: cat?.id || null });
+  // Wer gehört zu meinen Leuten, macht aber nicht mit?
+  const others = (people || []).filter(p => p.id !== me);
+  const notIn = others.filter(p => p.ranking_opt_in === false || p.ranking_opt_in == null);
+  const liveFor = (userId) => (view === 'month' && !closed && monthRows ? monthRows.filter(r => r.user_id === userId && r.counted) : []);
 
   return (
     <div className="rk">
@@ -220,6 +243,23 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         </div>
       </div>
 
+      {view === 'month' && !closed && month >= startMonth && (
+        <div className="rk-note"><Icon name="timer" size={16} />
+          <span>{tr('Läuft noch: Plätze und Punkte sind vorläufig. Medaillen gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(R.closeDeadline(month)), time: PTi18n.time(R.closeDeadline(month)) })}</span>
+        </div>
+      )}
+
+      {filter === 'mine' && (
+        <div className="rk-note is-people"><Icon name="users" size={16} />
+          <span>
+            {people
+              ? trn(others.length, 'Meine Leute: du und {n} Person, mit der du gerade in einer Challenge bist.', 'Meine Leute: du und {n} Personen, mit denen du gerade in einer Challenge bist.')
+              : tr('Meine Leute: alle, mit denen du gerade in einer Challenge bist.')}
+            {notIn.length > 0 && ` ${tr('Nicht in der Rangliste: {names}.', { names: notIn.map(p => p.display_name.split(/\s+/)[0]).join(', ') })}`}
+          </span>
+        </div>
+      )}
+
       {view === 'all' && (
         <div className="segmented rk-sort">
           <button className={sortBy === 'points' ? 'active' : ''} onClick={() => setSortBy('points')}>{tr('Punkte')}</button>
@@ -258,7 +298,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         ) : (
           <ol className="rk-rows">
             {ranked.map(r => (
-              <RankingRow key={r.user_id} r={r} cat={cat} view={view}
+              <RankingRow key={r.user_id} r={r} cat={cat} view={view} closed={closed}
                 globalRank={filter === 'mine' ? globalRank[r.user_id] : null}
                 onOpen={() => onOpenRow(r)} />
             ))}
@@ -286,7 +326,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
 
       <Sheet open={!!card} onClose={() => setCard(null)}>
         {card && <RankingCardSheet api={api} me={me} row={card} cats={cats} champions={champions}
-          month={view === 'month' ? month : null}
+          month={view === 'month' ? month : null} live={liveFor(card.user_id)} liveMonth={month}
           onClose={() => setCard(null)}
           onChanged={(msg) => { setCard(null); reload(); if (msg) onToast?.(msg); }}
           onToast={onToast} />}
@@ -295,20 +335,22 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   );
 }
 
-function RankingRow({ r, cat, view, globalRank, onOpen }) {
-  // Monat mit Übung: nach Wert, sonst nach Punkten mit Medaillen
+function RankingRow({ r, cat, view, closed = true, globalRank, onOpen }) {
+  // Monat mit Übung: nach Wert, sonst nach Punkten mit Medaillen.
+  // Medaillen erst nach dem Monatsabschluss, vorher nur der (vorläufige) Platz.
   const byValue = view === 'month' && !!cat;
   return (
     <li className={`rk-row ${r.is_me ? 'is-me' : ''}`} data-me={r.is_me ? '1' : undefined}>
       <button className="rk-row-btn" onClick={onOpen}>
-        <span className={`rk-rank ${r.rank <= 3 ? `top top-${r.rank}` : ''}`}>{(byValue && RK_MEDAL[r.rank]) || r.rank}</span>
+        <span className={`rk-rank ${r.rank <= 3 ? `top top-${r.rank}` : ''}${closed ? '' : ' is-live'}`}>{(byValue && closed && RK_MEDAL[r.rank]) || r.rank}</span>
         <RankingAvatar row={r} size={36} />
         <span className="rk-who">
           <span className="rk-name">{r.is_me ? tr('Du') : rkName(r)}</span>
-          {(globalRank || !byValue) && (
+          {(globalRank || !byValue || !closed) && (
             <span className="rk-sub">
               {globalRank ? <span>{tr('#{rank} gesamt', { rank: globalRank })}</span> : null}
-              {!byValue && <RankingMedals row={r} />}
+              {!byValue && closed && <RankingMedals row={r} />}
+              {!closed && <span className="rk-live">{tr('vorläufig')}</span>}
             </span>
           )}
         </span>
@@ -434,7 +476,10 @@ function RankingLogSheet({ api, cat, onClose, onLogged }) {
 }
 
 // ─── Profilkarte ────────────────────────────────────────────────────────────
-function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, onChanged, onToast }) {
+// Trophäenschrank: Medaillen und Punkte aus abgeschlossenen Monaten (dieselben
+// Zahlen wie Saison und Ewig), nach Monat gruppiert, dazu Pokale. live: Zeilen
+// dieser Person im laufenden Monat, nur als „vorläufig“ (noch keine Medaille).
+function RankingCardSheet({ api, me, row, cats, champions = [], month, live = [], liveMonth, onClose, onChanged, onToast }) {
   const [medals, setMedals] = React.useState(null);
   const [reportOpen, setReportOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -478,7 +523,7 @@ function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, 
         <RankingAvatar row={row} size={64} />
         <div>
           <div className="rk-card-name">{isMe ? tr('{name} (du)', { name: row.display_name }) : rkName(row)}</div>
-          <div className="rk-card-sub">{medals ? tr('{points} gesamt', { points: rkPts(total) }) : '…'}</div>
+          <div className="rk-card-sub">{medals ? tr('{points} aus abgeschlossenen Monaten', { points: rkPts(total) }) : '…'}</div>
         </div>
       </div>
 
@@ -498,25 +543,59 @@ function RankingCardSheet({ api, me, row, cats, champions = [], month, onClose, 
         </ul>
       )}
 
-      <div className="label rk-card-label">{tr('Trophäenschrank')}</div>
-      {medals === null ? <div className="rk-empty">…</div>
-        : medals.length === 0 ? <div className="rk-empty">{isMe ? tr('Noch keine Punkte. Der erste abgeschlossene Monat bringt welche.') : tr('Noch keine Punkte.')}</div>
-        : (
-          <ul className="rk-trophies">
-            {medals.map((m, i) => {
+      {live.length > 0 && (
+        <>
+          <div className="label rk-card-label">{tr('{month} · läuft noch', { month: PTRanking.monthLabel(liveMonth, false) })}</div>
+          <ul className="rk-trophies is-live">
+            {[...live].sort((a, b) => a.rank - b.rank).map(m => {
               const c = catById[m.category_id];
               return (
-                <li key={`${m.month}-${m.category_id}-${i}`}>
-                  <span className="rk-trophy-medal">{RK_MEDAL[m.rank] || `${m.rank}.`}</span>
+                <li key={`live-${m.category_id}`}>
+                  <span className="rk-trophy-medal is-live">{m.rank}.</span>
                   <span className="rk-trophy-text">
                     <b>{c ? `${c.emoji} ${c.name}` : tr('Übung')}</b>
-                    <span>{PTRanking.monthLabel(m.month)} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
+                    <span>{tr('vorläufig')} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
                   </span>
                   <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>
                 </li>
               );
             })}
           </ul>
+        </>
+      )}
+
+      <div className="label rk-card-label">{tr('Trophäenschrank')}</div>
+      {medals === null ? <div className="rk-empty">…</div>
+        : medals.length === 0 ? <div className="rk-empty">{isMe ? tr('Noch keine Punkte. Der erste abgeschlossene Monat bringt welche.') : tr('Noch keine Punkte.')}</div>
+        : (
+          <div className="rk-shelves">
+            {[...new Set(medals.map(m => m.month))].map(mon => {
+              const items = medals.filter(m => m.month === mon).sort((a, b) => a.rank - b.rank);
+              return (
+                <div key={mon} className="rk-shelf">
+                  <div className="rk-shelf-head">
+                    <b>{PTRanking.monthLabel(mon)}</b>
+                    <span className="mono">{items.filter(m => m.rank <= 3).map(m => RK_MEDAL[m.rank]).join('')} {rkPts(items.reduce((a, m) => a + (m.points || 0), 0))}</span>
+                  </div>
+                  <ul className="rk-trophies">
+                    {items.map((m, i) => {
+                      const c = catById[m.category_id];
+                      return (
+                        <li key={`${m.month}-${m.category_id}-${i}`}>
+                          <span className="rk-trophy-medal">{RK_MEDAL[m.rank] || `${m.rank}.`}</span>
+                          <span className="rk-trophy-text">
+                            <b>{c ? `${c.emoji} ${c.name}` : tr('Übung')}</b>
+                            <span>{tr('Platz {rank}', { rank: m.rank })} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
+                          </span>
+                          <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         )}
 
       {!isMe && (

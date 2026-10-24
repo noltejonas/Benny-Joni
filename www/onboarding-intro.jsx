@@ -131,7 +131,8 @@ function obGoalCategories(categories) {
   return categories.filter(c => (c.kind || 'sports') === 'sports' && (c.challenge_type || 'standard') === 'standard');
 }
 
-function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = tr('Euer erstes Wochenziel'), onDone, onSkip }) {
+// onMore: volle Einstellungen (eigene Übung, Minuten, Details) statt dieser Kurzfassung.
+function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = tr('Euer erstes Wochenziel'), onDone, onSkip, onMore }) {
   const online = useObOnline();
   const cats = obGoalCategories(categories);
   const [showAll, setShowAll] = React.useState(false);
@@ -177,6 +178,7 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
           ))}
         </div>
         {!showAll && cats.length > 6 && <button type="button" className="btn-link ob-more" onClick={() => setShowAll(true)}>{tr('Mehr Übungen')}</button>}
+        {onMore && <button type="button" className="btn-link ob-more" onClick={onMore}>{tr('Eigene Übung, Minuten & mehr')}</button>}
         {cat && (
           <ObAmount value={amount} onChange={setAmount} unit={tr('pro Person bis Sonntag')}
             choices={PTOnboarding.goalChoices(def)}

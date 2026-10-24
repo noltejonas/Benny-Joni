@@ -42,7 +42,8 @@
   const SEED_IDS = ['u-benny', 'u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim'];
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
   // 3: Monatsrangliste (Welt-Leute, Freies Training, Monatsergebnisse, log_id)
-  const DB_VERSION = 3;
+  // 4: Zeit-Übung „Bibellesen“ (Minuten) in zwei Challenges
+  const DB_VERSION = 4;
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -94,6 +95,9 @@
       cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']), // i18n-ignore
       cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up', ['best', 204, 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.']), // i18n-ignore
       cat('cat-vibe', 'Vibe Coding', '💻', 'work'), // i18n-ignore: Übungsname
+      // Eigene Zeit-Übung, in zwei Challenges gleich benannt (zählt für beide)
+      { ...cat('cat-bible-bj', 'Bibellesen', '📖', 'time'), competition_id: 'c-bj' }, // i18n-ignore: Übungsname
+      { ...cat('cat-bible-ffa', 'Bibellesen', '📖', 'time'), competition_id: 'c-ffa' }, // i18n-ignore: Übungsname
     ];
 
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
@@ -122,9 +126,9 @@
     ];
 
     const plans = {
-      'c-bj': [['cat-push', 280], ['cat-pull', 60], ['cat-dips', 60], ['cat-legs', 80], ['cat-hspu', 40], ['cat-th', 1], ['cat-bsu', 1]],
+      'c-bj': [['cat-push', 280], ['cat-pull', 60], ['cat-dips', 60], ['cat-legs', 80], ['cat-hspu', 40], ['cat-th', 1], ['cat-bsu', 1], ['cat-bible-bj', 240]],
       'c-team': [['cat-push', 400], ['cat-sit', 300], ['cat-pull', 120]],
-      'c-ffa': [['cat-push', 500], ['cat-dips', 250], ['cat-legs', 300], ['cat-th', 1]],
+      'c-ffa': [['cat-push', 500], ['cat-dips', 250], ['cat-legs', 300], ['cat-th', 1], ['cat-bible-ffa', 600]],
       'c-run': [['cat-sit', 200]],
     };
     const weekly_challenges = [], sets = [], reactions = [];
@@ -142,9 +146,18 @@
             chosen_by_user: chooser, chosen_by: chooser, created_at: ws + 'T07:00:00Z',
           });
           const share = Math.ceil(target / ms.length);
-          const type = categories.find(x => x.id === catId).challenge_type;
+          const { challenge_type: type, kind } = categories.find(x => x.id === catId);
           for (const m of ms) {
             const drive = 0.55 + r() * 0.7; // wie fleißig diese Person diese Woche ist
+            if (kind === 'time') {
+              for (let day = 0; day < 7; day++) {
+                if (r() < 0.35) continue;
+                const t = new Date(ws + 'T00:00:00'); t.setDate(t.getDate() + day); t.setHours(rint(6, 22), rint(0, 59));
+                if (t.getTime() < nowMs) sets.push({ id: id('s'), challenge_id: chId, competition_id: c.id, user_id: m.user_id, log_id: id('log'),
+                  reps: null, duration_minutes: Math.max(5, Math.round((share * drive) / 5 / 5) * 5), note: null, created_at: t.toISOString() });
+              }
+              continue;
+            }
             if (type !== 'standard') {
               if (r() < 0.8) {
                 const day = rint(0, 6);
@@ -291,7 +304,7 @@
   // Demo-Daten werden neu erzeugt.
   function upgrade(d) {
     if ((d.v || 1) >= DB_VERSION) return d;
-    if ((d.v || 1) < 3) return seed();
+    if ((d.v || 1) < 4) return seed();
     d.accounts = d.accounts || [{ email: 'benny@demo.local', user_id: ME }];
     const old = addDays(isoDate(mondayOf(new Date())), -60) + 'T08:00:00Z';
     for (const p of d.profiles) {
@@ -477,6 +490,56 @@
           categories: db.categories.map(localizeCategory),
         });
       },
+      async getDashboard(ids, fromWeek) {
+        const set = new Set(ids);
+        const challenges = db.weekly_challenges.filter(c => set.has(c.competition_id) && c.week_start >= fromWeek);
+        const chIds = new Set(challenges.map(c => c.id));
+        return later({
+          members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
+          challenges: challenges.map(normCh),
+          sets: db.sets.filter(s => chIds.has(s.challenge_id)).map(withAthlete),
+          categories: db.categories.map(localizeCategory),
+        });
+      },
+      onCompetitionsChange(ids, fn) {
+        let timer = null;
+        const ping = () => { clearTimeout(timer); timer = setTimeout(fn, 120); };
+        for (const cid of ids) {
+          if (!compListeners.has(cid)) compListeners.set(cid, new Set());
+          compListeners.get(cid).add(ping);
+        }
+        return () => { clearTimeout(timer); for (const cid of ids) compListeners.get(cid)?.delete(ping); };
+      },
+      // Wie data.js: eine Zeile pro Wochenziel, alle mit derselben log_id
+      async logEverywhere({ targets, values, note = null, createdAt = null }) {
+        const me = uid();
+        if (!targets.length) throw fail('invalid_value');
+        if (values.duration_minutes == null && !(values.reps > 0)) throw fail('invalid_value');
+        const log = newId('log');
+        const at = createdAt || new Date().toISOString();
+        const rows = targets.map((t, i) => {
+          const row = { id: newId('s'), challenge_id: t.challenge_id, competition_id: t.competition_id, user_id: me, log_id: log,
+            reps: values.reps ?? null, duration_minutes: values.duration_minutes ?? null,
+            note: note && String(note).trim() ? String(note).trim() : null, created_at: at };
+          if (i === 0 && values.project_tag_id) Object.assign(row, { project_tag_id: values.project_tag_id, tool_tag_id: values.tool_tag_id ?? null });
+          db.sets.push(row);
+          return row;
+        });
+        save(); emitAll();
+        return later(withAthlete(rows[0]));
+      },
+      async myPeople() {
+        const me = uid();
+        const comps = db.members.filter(m => m.user_id === me && !m.left_at)
+          .map(m => db.competitions.find(c => c.id === m.competition_id))
+          .filter(c => c && c.mode !== 'solo' && !c.archived_at);
+        const byId = {};
+        for (const c of comps) for (const m of activeMembers(c.id)) {
+          const e = byId[m.user_id] ||= { ...profileOf(m.user_id), ranking_opt_in: db.profiles.find(x => x.id === m.user_id)?.ranking_opt_in ?? null, competitionIds: [] };
+          e.competitionIds.push(c.id);
+        }
+        return later(Object.values(byId));
+      },
       async upsertDeviceToken() { return null; },
       async deleteDeviceToken() {},
       forCompetition(cid) { return competitionAPI(cid, uid); },
@@ -604,10 +667,12 @@
     const open = rs.filter(r => r.reason === 'values' && !r.resolved_at && r.category_id === categoryId && r.month === month);
     return new Set(open.map(r => r.reporter)).size >= 3;
   }
+  // „Meine Leute“: gerade gemeinsam in einer laufenden Challenge (beide aktiv)
   function shares(me, other) {
     if (me === other) return true;
-    const mine = new Set(db.members.filter(m => m.user_id === me).map(m => m.competition_id));
-    return db.members.some(m => m.user_id === other && mine.has(m.competition_id));
+    const live = (cid) => { const c = db.competitions.find(x => x.id === cid); return c && c.mode !== 'solo' && !c.archived_at; };
+    const mine = new Set(db.members.filter(m => m.user_id === me && !m.left_at && live(m.competition_id)).map(m => m.competition_id));
+    return db.members.some(m => m.user_id === other && !m.left_at && mine.has(m.competition_id));
   }
   function profileFields(me, userId) {
     const p = db.profiles.find(x => x.id === userId) || {};
@@ -748,7 +813,7 @@
       async updateSet(id, patch) {
         const { athlete, ...rest } = patch; const s = db.sets.find(x => x.id === id); Object.assign(s, rest);
         const shared = {};
-        for (const k of ['reps', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
+        for (const k of ['reps', 'duration_minutes', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
         for (const x of db.sets) if (x.log_id === s.log_id && x.user_id === s.user_id && x.id !== s.id) Object.assign(x, shared);
         emit(); emitAll(); return later(withAthlete(s));
       },

@@ -55,22 +55,34 @@
     return P.participantsFor(pool, ch.week_start);
   }
 
-  const isSportCh = (catById) => (ch) => (catById[ch.category_id]?.kind || 'sports') === 'sports';
+  // kinds: welche Übungsarten zählen ('sports' = Wiederholungen, 'time'/'work' = Minuten)
+  const isKindCh = (catById, kinds) => (ch) => kinds.includes(catById[ch.category_id]?.kind || 'sports');
 
   // ── Challenge / Duell ────────────────────────────────────────────────
   // sides: [{ userIds, statUserIds? }], Index 0 = eigene Seite.
-  function challengeStats({ sides, challenges, categories, sets, members = [], today = P.isoDate(new Date()) }) {
+  function challengeStats({ sides, challenges, categories, sets, members = [], today = P.isoDate(new Date()), kinds = ['sports'] }) {
     const catById = Object.fromEntries(categories.map(c => [c.id, c]));
     const idsOf = (side) => side.statUserIds || side.userIds;
     const sideOf = {};
     sides.forEach((side, i) => idsOf(side).forEach(id => { sideOf[id] = i; }));
     const zeros = () => sides.map(() => 0);
 
-    const chs = challenges.filter(isSportCh(catById));
+    const chs = challenges.filter(isKindCh(catById, kinds));
     const chById = Object.fromEntries(chs.map(ch => [ch.id, ch]));
     const own = sets.filter(s => chById[s.challenge_id] && sideOf[s.athlete] != null);
     const setsByCh = {};
     for (const s of own) (setsByCh[s.challenge_id] ||= []).push(s);
+    // Ein Satz, der in mehreren Challenges zählt (gleiche log_id, z. B. im
+    // Duell über mehrere Challenges), geht nur einmal in Summen und Bestwerte.
+    const seenLogs = new Set();
+    const uniq = own.filter(s => {
+      if (!s.log_id) return true;
+      const k = `${s.athlete}|${s.log_id}`;
+      if (seenLogs.has(k)) return false;
+      seenLogs.add(k);
+      return true;
+    });
+    const weekOf = (s) => chById[s.challenge_id].week_start;
 
     const currentWeek = mondayIso(today);
 
@@ -100,11 +112,11 @@
           return { value, goal, hit: goal > 0 && value >= goal, sets: mine, owing };
         });
         perSide.forEach((p, i) => {
-          if (!ch.workout) totals[i] += p.value;
           if (p.goal > 0) { goals[i]++; if (p.hit) goalsHit[i]++; }
         });
         return { ch, cat: catById[ch.category_id], share, perSide };
       });
+      for (const s of uniq) if (!s.workout && weekOf(s) === ws) totals[sideOf[s.athlete]] += P.setValue(s);
       const done = ws < currentWeek;
       // Wochen ohne Reps (nur Workouts oder gar nichts) werden nicht gewertet
       const active = totals.some(v => v > 0);
@@ -125,7 +137,7 @@
     }
 
     // Tagesreihen ab Challenge-Start bis heute
-    const repSets = own.filter(s => !s.workout);
+    const repSets = uniq.filter(s => !s.workout);
     const firstDay = [
       ...chs.map(ch => ch.week_start),
       ...own.map(s => dayOf(s.created_at)),
@@ -140,21 +152,24 @@
     }
     const totals = daily.map(arr => arr.reduce((a, v) => a + v, 0));
 
-    // Kategorien (ohne Pflicht-Workouts)
+    // Übungen (ohne Pflicht-Workouts), gleiche Übung aus mehreren Challenges zusammen
     const catTotals = {};
     for (const s of repSets) {
-      const cid = chById[s.challenge_id].category_id;
-      (catTotals[cid] ||= zeros())[sideOf[s.athlete]] += P.setValue(s);
+      const ch = chById[s.challenge_id];
+      const cat = catById[ch.category_id];
+      const key = P.exerciseKey(cat, ch.competition_id) || ch.category_id;
+      const e = catTotals[key] ||= { key, cat, vals: zeros() };
+      e.vals[sideOf[s.athlete]] += P.setValue(s);
     }
-    const categoriesOut = Object.entries(catTotals)
-      .map(([cid, vals]) => ({ cat: catById[cid], vals, total: vals.reduce((a, v) => a + v, 0), leader: leaderIndex(vals) }))
+    const categoriesOut = Object.values(catTotals)
+      .map(({ key, cat, vals }) => ({ key, cat, vals, total: vals.reduce((a, v) => a + v, 0), leader: leaderIndex(vals) }))
       .sort((a, b) => b.total - a.total);
 
     // Bestwerte pro Seite
     const activeDays = sides.map(() => new Set());
     const byDay = sides.map(() => ({}));
     const maxSet = zeros();
-    for (const s of own) {
+    for (const s of uniq) {
       const i = sideOf[s.athlete];
       const d = dayOf(s.created_at);
       activeDays[i].add(d);
@@ -169,7 +184,7 @@
       sides.forEach((_, i) => { goalsAll[i] += w.goals[i]; goalsHitAll[i] += w.goalsHit[i]; });
     }
     const workoutBest = {};
-    for (const s of own) {
+    for (const s of uniq) {
       if (!s.workout) continue;
       const cid = chById[s.challenge_id].category_id;
       const e = workoutBest[cid] ||= { cat: catById[cid], type: s.workout, best: sides.map(() => null), runs: zeros() };
@@ -203,7 +218,7 @@
 
   // ── Ich (alle Challenges) ────────────────────────────────────────────
   // sidesByComp: { [competitionId]: sides } aus buildSides, eigene Seite = Index 0.
-  function personalStats({ me, comps, sidesByComp, bundle, today = P.isoDate(new Date()) }) {
+  function personalStats({ me, comps, sidesByComp, bundle, today = P.isoDate(new Date()), kinds = ['sports'] }) {
     const catById = Object.fromEntries(bundle.categories.map(c => [c.id, c]));
     const chById = Object.fromEntries(bundle.challenges.map(ch => [ch.id, ch]));
     const kindOf = (s) => catById[chById[s.challenge_id]?.category_id]?.kind || 'sports';
@@ -216,7 +231,7 @@
       seenLogs.add(s.log_id);
       return true;
     });
-    const sport = mine.filter(s => kindOf(s) === 'sports');
+    const sport = mine.filter(s => kinds.includes(kindOf(s)));
 
     // Tageswerte (Reps); Workout-Tage zählen als aktiv
     const repsByDay = {};
@@ -234,7 +249,7 @@
     for (const s of mine) {
       const cid = chById[s.challenge_id].category_id;
       const cat = catById[cid];
-      const isWork = cat?.kind === 'work';
+      const isWork = P.usesMinutes(cat); // Minuten (Zeit und Work)
       const e = perCat[cid] ||= { cat, kind: isWork ? 'work' : s.workout ? 'workout' : 'reps', total: 0, maxSet: 0, bestDay: 0 };
       const v = s.workout ? (s.reps ?? 0) : (s.reps ?? s.duration_minutes ?? 0);
       e.maxSet = Math.max(e.maxSet, v);
@@ -260,7 +275,7 @@
         categories: bundle.categories,
         sets: bundle.sets.filter(s => s.competition_id === c.id),
         members: bundle.members.filter(m => m.competition_id === c.id),
-        today,
+        today, kinds,
       });
       const myIdx = sides.findIndex(s => (s.statUserIds || s.userIds).includes(me));
       if (myIdx < 0) continue;
@@ -308,7 +323,50 @@
     };
   }
 
+  // ── Filter nach Übungen ──────────────────────────────────────────────
+  // Übungen einer Auswahl von Wochenzielen als Filter-Chips, gleiche Übungen
+  // aus mehreren Challenges zusammengefasst (PTData.exerciseKey). Pflicht-
+  // Workouts haben keine Menge und fehlen hier.
+  function exerciseOptions(challenges, categories) {
+    const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+    const out = new Map();
+    for (const ch of challenges) {
+      const cat = catById[ch.category_id];
+      if (!cat || P.isWorkoutType(cat.challenge_type)) continue;
+      const key = P.exerciseKey(cat, ch.competition_id);
+      if (!out.has(key)) out.set(key, { key, cat, minutes: P.usesMinutes(cat), count: 0 });
+      out.get(key).count++;
+    }
+    return [...out.values()].sort((a, b) => a.minutes - b.minutes || b.count - a.count);
+  }
+
+  // Auswahl anwenden. keys leer = alle Übungen mit Wiederholungen (gibt es
+  // keine, alle mit Minuten). Liefert die passenden Wochenziele und Sätze,
+  // die Einheit und die Übungsarten für challengeStats/personalStats.
+  function applyExerciseFilter({ challenges, sets, categories, keys = [] }) {
+    const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+    const opts = exerciseOptions(challenges, categories);
+    const keyOf = (ch) => P.exerciseKey(catById[ch.category_id], ch.competition_id);
+    let unit;
+    let picked;
+    if (keys.length) {
+      const chosen = opts.filter(o => keys.includes(o.key));
+      unit = chosen.length && chosen.every(o => o.minutes) ? 'min' : 'reps';
+      const want = new Set(chosen.filter(o => (unit === 'min') === o.minutes).map(o => o.key));
+      picked = challenges.filter(ch => want.has(keyOf(ch)));
+    } else {
+      unit = opts.some(o => !o.minutes) || !opts.length ? 'reps' : 'min';
+      picked = unit === 'min' ? challenges.filter(ch => P.usesMinutes(catById[ch.category_id])) : challenges;
+    }
+    const ids = new Set(picked.map(ch => ch.id));
+    return {
+      challenges: picked, sets: sets.filter(s => ids.has(s.challenge_id)),
+      unit, kinds: unit === 'min' ? ['time', 'work'] : ['sports'], options: opts, filtered: keys.length > 0,
+    };
+  }
+
   window.PTStats = {
     leaderIndex, streaks, challengeStats, cumulative, gapSeries, personalStats, intensityLevels,
+    exerciseOptions, applyExerciseFilter,
   };
 })();

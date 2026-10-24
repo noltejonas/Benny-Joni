@@ -824,7 +824,7 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
           <span className="st-row-sub">{tr('Pflicht-Workout')}</span>
         ) : (
           <div className="st-range">
-            {cat?.kind === 'work' ? tr('{from} bis {to} min', range) : tr('{from} bis {to} Reps', range)}
+            {PTData.usesMinutes(cat) ? tr('{from} bis {to} min', range) : tr('{from} bis {to} Reps', range)}
           </div>
         )}
       </div>

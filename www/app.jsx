@@ -1,4 +1,4 @@
-/* global React, ReactDOM, PTData, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
+/* global React, ReactDOM, useCelebration, PTData, PTDashboard, DashboardScreen, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -65,8 +65,44 @@ function Loader({ text = tr('Lade Daten…') }) {
 }
 
 // Toast nach dem Loggen; value ist schon formatiert („+12“, „+30 min“, „1h 30m“).
-function loggedToast(value, name) {
-  return name ? tr('{value} {name} geloggt', { value, name }) : tr('{value} geloggt', { value });
+// count: in wie vielen Challenges der Eintrag zählt.
+function loggedToast(value, name, count = 1) {
+  const base = name ? tr('{value} {name} geloggt', { value, name }) : tr('{value} geloggt', { value });
+  return count > 1 ? `${base} · ${trn(count, 'zählt für {n} Challenge', 'zählt für {n} Challenges')}` : base;
+}
+
+const HOME_VIEW_KEY = 'pt:home-view'; // „Heute“: 'dashboard' (alle Challenges) | 'challenge'
+function writeHomeView(v) { try { sessionStorage.setItem(HOME_VIEW_KEY, v); } catch (e) {} }
+
+// Daten fürs Dashboard „Heute“: alle laufenden Challenges, laufende und letzte
+// Woche (letzte für die Wochenabschluss-Feier). Startwert: Stand vom letzten
+// Öffnen (PTBootCache), Realtime lädt bei Änderungen neu.
+function useDashboardData(api, competitions, me) {
+  const live = useMemo(() => (competitions || []).filter(c => !c.archived_at && c.mode !== 'solo'), [competitions]);
+  const ids = live.map(c => c.id).join(',');
+  const fromWeek = PTData.addDays(PTData.isoDate(PTData.mondayOf(new Date())), -7);
+  const [state, setState] = useState(() => {
+    const cached = me ? PTBootCache.read(me, 'dash') : null;
+    if (cached?.members) PTPeople.set(cached.members.map(m => m.profile).filter(Boolean));
+    return { me, bundle: cached?.members ? cached : null, fresh: false };
+  });
+  const load = useCallback(async () => {
+    if (!api || !me || !ids || !api.getDashboard) return;
+    try {
+      const b = await api.getDashboard(ids.split(','), fromWeek);
+      PTData.annotateWorkouts(b.sets, b.challenges, b.categories);
+      PTPeople.set(b.members.map(m => m.profile).filter(Boolean));
+      setState({ me, bundle: b, fresh: true });
+      PTBootCache.write(me, 'dash', b);
+    } catch (e) { console.warn('getDashboard failed', e); }
+  }, [api, me, ids, fromWeek]);
+  useEffect(() => {
+    load();
+    if (!api?.onCompetitionsChange || !ids) return;
+    return api.onCompetitionsChange(ids.split(','), load);
+  }, [api, ids, load]);
+  const mine = state.me === me;
+  return { live, bundle: mine ? state.bundle : null, fresh: mine && state.fresh, reload: load };
 }
 
 // ─── Hülle: Session, Profil, Challenge-Auswahl ──────────────────────────────
@@ -328,6 +364,10 @@ function App() {
     } catch (e) { alert(e.message); }
   }
 
+  // Rangliste, Stats & Co. bleiben bei der aktiven Challenge; „Heute“ zeigt alle.
+  const dash = useDashboardData(api, userId ? competitions : null, userId);
+  const openCompetition = useCallback((id) => { writeHomeView('challenge'); setActiveId(id); }, []);
+
   if (!api) {
     return (
       <ObScreen center foot={<button className="btn" onClick={() => location.reload()}>{tr('Erneut versuchen')}</button>}>
@@ -372,7 +412,11 @@ function App() {
     <>
       <ChallengeSwitcherSheet open={sheet === 'switcher'} onClose={() => setSheet(null)}
         profile={profile} competitions={competitions} activeId={activeId}
-        onSelect={(id) => { setActiveId(id); setSheet(null); }}
+        onSelect={(id) => {
+          writeHomeView('challenge');
+          if (id === activeId) window.dispatchEvent(new CustomEvent('pt:challenge-view'));
+          setActiveId(id); setSheet(null);
+        }}
         onSetMain={setMain}
         onCreate={() => setSheet('create')}
         onJoin={() => setSheet('join')}
@@ -414,6 +458,7 @@ function App() {
         api={api} competition={active} profile={profile} me={profile.id}
         email={session.user?.email}
         competitions={competitions}
+        dash={dash} onOpenCompetition={openCompetition}
         t={t} setTweak={setTweak}
         themePref={themePref} onSetThemePref={setThemePref}
         notificationsOn={notificationsOn} onSetNotifications={setNotificationsOn}
@@ -449,7 +494,7 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
     const participants = PTData.participantsFor(members, ws);
     const challStats = challs.map(ch => {
       const cat = catById[ch.category_id];
-      const isWorkCh = (cat?.kind || 'sports') === 'work';
+      const isWorkCh = PTData.usesMinutes(cat);
       // Pflicht-Workouts fließen nicht in die Wiederholungs-Wertung; erreicht = jede Person ein Durchgang.
       const workout = PTData.isWorkoutType(cat?.challenge_type) ? cat.challenge_type : null;
       const val = (s) => workout ? 0 : isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
@@ -464,7 +509,9 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
       const fairShare = workout ? 1 : PTData.fairShareOf(ch.target_reps, participants.length || sides.length);
       return { ch, cat, total, doneBySide, countBySide, hitBySide, hit: hitBySide.every(Boolean), isWorkCh, workout, val, fairShare };
     });
-    const totals = sides.map((_, i) => challStats.reduce((s, x) => s + x.doneBySide[i], 0));
+    // Wochensieg nach Wiederholungen; Minuten zählen nur in reinen Minuten-Wochen
+    const repWeek = challStats.some(c => !c.isWorkCh && !c.workout);
+    const totals = sides.map((_, i) => challStats.filter(c => !repWeek || !c.isWorkCh).reduce((s, x) => s + x.doneBySide[i], 0));
     const sumAll = totals.reduce((a, x) => a + x, 0);
     const winnerIdx = uniqueMaxIndex(totals);
     const ranked = totals.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
@@ -521,6 +568,7 @@ function markCelebrated(me, challengeIds) {
 }
 
 function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
+  competitions = [], dash = { live: [], bundle: null, reload: () => {} }, onOpenCompetition,
   themePref, onSetThemePref, notificationsOn, onSetNotifications,
   onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft,
   intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
@@ -537,6 +585,18 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     try { sessionStorage.setItem('pt:tab', tab); } catch {}
   }, [tab]);
+  // „Heute“ bei mehreren Challenges: Dashboard über alle oder diese Challenge.
+  const [homeView, setHomeView] = useState(() => {
+    if (intro) return 'challenge';
+    try { return sessionStorage.getItem(HOME_VIEW_KEY) || 'dashboard'; } catch { return 'dashboard'; }
+  });
+  useEffect(() => { writeHomeView(homeView); }, [homeView]);
+  // Dieselbe Challenge im Switcher gewählt: Challenge-Ansicht statt Dashboard
+  useEffect(() => {
+    const onView = () => { setHomeView('challenge'); setTab('home'); };
+    window.addEventListener('pt:challenge-view', onView);
+    return () => window.removeEventListener('pt:challenge-view', onView);
+  }, []);
   // reload() ist memoisiert; notify() braucht trotzdem den aktuellen Tab.
   const tabRef = React.useRef(tab);
   tabRef.current = tab;
@@ -587,6 +647,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // UI state
   const [setupForChallenge, setSetupForChallenge] = useState(null); // null=closed, {} = new, {id, ...} = edit
   const [logForChallenge, setLogForChallenge] = useState(null); // null=closed, {challenge}=open
+  // Eintragen aus dem Dashboard (auch für andere Challenges): { ex, entry }
+  const [dashLog, setDashLog] = useState(null);
+  const [quickCard, setQuickCard] = useState(null); // Schnellansicht einer Challenge (Dashboard)
+  const [dashFocus, setDashFocus] = useState(null);
+  const logCountRef = React.useRef(1);
   const [pickerForSet, setPickerForSet] = useState(null); // null=closed, set object = emoji picker open
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [toast, setToast] = useState('');
@@ -730,6 +795,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     const summary = PTOnboarding.weekOneSummary({ weekStart: first, me, sides, sets: allSets,
       challenges: allChallenges, categories, participantCount: people });
     setTab('home');
+    markFinaleSeen(me, competition.id, first); // der Rückblick ersetzt hier die große Feier
     setLayer({ kind: 'week1', summary, first });
   }, [synced, intro, newcomer, myMembership, competition, obState, members, me, sides, allSets, allChallenges, categories]);
 
@@ -805,6 +871,115 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     })();
     return () => { off = true; };
   }, [api, memberKey, me]);
+
+  // ── Dashboard über alle Challenges ──────────────────────────────────────
+  const dashComps = useMemo(() => {
+    if (!dash.bundle) return [];
+    const mainId = profile.main_competition_id;
+    const order = [...dash.live].sort((a, b) => (b.id === mainId) - (a.id === mainId));
+    return order.map(c => {
+      const ms = dash.bundle.members.filter(m => m.competition_id === c.id);
+      const parts = PTData.participantsFor(ms, weekStart).length;
+      return { c, members: ms, sides: buildSides(c, ms, me), participantCount: PTOnboarding.expectedPeople(c.mode, parts) };
+    });
+  }, [dash.bundle, dash.live, me, weekStart, profile.main_competition_id]);
+  const dashModel = useMemo(
+    () => (dash.bundle && dashComps.length ? PTDashboard.buildDashboard({ me, comps: dashComps, bundle: dash.bundle, weekStart }) : null),
+    [dash.bundle, dashComps, me, weekStart]
+  );
+  const multi = dash.live.length >= 2;
+  const showDashboard = tab === 'home' && multi && homeView === 'dashboard' && !!dashModel;
+  // Gruppenziel geknackt: auch im Dashboard feiern (gleiche Merker wie in der Challenge)
+  const dashWeekChallenges = useMemo(
+    () => (dash.bundle ? dash.bundle.challenges.filter(ch => ch.week_start === weekStart && dash.live.some(c => c.id === ch.competition_id)) : []),
+    [dash.bundle, dash.live, weekStart]
+  );
+  const dashCelebration = useCelebration(showDashboard ? dashWeekChallenges : [], dash.bundle?.sets || [], me, dash.bundle?.categories || []);
+  const daysLeftNow = 7 - PTDashboard.dayIndexInWeek(weekStart);
+
+  // ── Wochenabschluss-Feier ───────────────────────────────────────────────
+  // Beim ersten Öffnen nach Sonntag für jede Challenge, in der ich letzte Woche
+  // dabei war (einmal pro Challenge und Woche), dazu nach „Woche abschließen“.
+  const lastWeek = PTData.addDays(weekStart, -7);
+  const [finaleDone, setFinaleDone] = useState(false);
+  const [forcedFinale, setForcedFinale] = useState(null);
+  const weekResultFor = useCallback((x, ws) => {
+    const chs = dash.bundle.challenges.filter(ch => ch.competition_id === x.c.id && ch.week_start === ws);
+    if (!chs.length) return null;
+    const parts = PTData.participantsFor(x.members, ws);
+    if (!parts.some(m => m.user_id === me)) return null;
+    return PTDashboard.weekResult({ me, c: x.c, sides: x.sides, challenges: chs, categories: dash.bundle.categories,
+      sets: dash.bundle.sets, participantCount: parts.length, weekStart: ws });
+  }, [dash.bundle, me]);
+  const finales = useMemo(() => {
+    if (!dash.fresh || !dash.bundle || finaleDone) return [];
+    return dashComps.map(x => (finaleSeen(me, x.c.id, lastWeek) ? null : weekResultFor(x, lastWeek)))
+      .filter(r => r?.active);
+  }, [dash.fresh, dash.bundle, dashComps, me, lastWeek, finaleDone, weekResultFor]);
+  const finaleShown = forcedFinale ? [forcedFinale] : (!layer && !medalCelebration && !intro && !loading ? finales : []);
+  function closeFinale() {
+    for (const r of finaleShown) markFinaleSeen(me, r.c.id, r.weekStart);
+    setForcedFinale(null);
+    setFinaleDone(true);
+  }
+  // Nach „Woche abschließen“ im Strafkonto: Feier für genau diese Woche
+  function finaleForWeek(ws) {
+    const parts = PTData.participantsFor(members, ws);
+    const res = PTDashboard.weekResult({ me, c: competition, sides, challenges: allChallenges.filter(ch => ch.week_start === ws),
+      categories, sets: allSets, participantCount: parts.length || sides.length, weekStart: ws });
+    return res?.active ? res : null;
+  }
+
+  // Für „Auch anlegen in“ beim Wochenziel: die anderen laufenden Challenges
+  const otherCompsForSetup = useMemo(() => {
+    if (!dash.bundle) return [];
+    const catById = Object.fromEntries(dash.bundle.categories.map(c => [c.id, c]));
+    return dashComps.filter(x => x.c.id !== competition.id).map(x => ({
+      c: x.c, participantCount: x.participantCount,
+      challenges: dash.bundle.challenges.filter(ch => ch.competition_id === x.c.id),
+      categories: dash.bundle.categories.filter(cat => cat.competition_id === x.c.id),
+      categoryOf: (id) => catById[id],
+    }));
+  }, [dash.bundle, dashComps, competition.id]);
+
+  // Andere eigene Challenges mit derselben Übung diese Woche („zählt auch für“)
+  const otherTargets = useCallback(
+    (ch, cat) => PTDashboard.matchingTargets({ bundle: dash.bundle, comps: dash.live, ch, cat, competitionId: competition.id }),
+    [dash.bundle, dash.live, competition.id]
+  );
+
+  // Ein Eintrag für alle Challenges mit dieser Übung (api.logEverywhere).
+  async function logEverywhere({ targets, values, note = null, skip = [], createdAt = null }) {
+    const chosen = targets.filter(t => !skip.includes(t.competition_id));
+    await api.logEverywhere({ targets: chosen, values, note, skip, createdAt });
+    if (chosen.some(t => t.competition_id === competition.id)) reload();
+    dash.reload();
+    return chosen.length;
+  }
+  const valueLabel = (cat, v) => `+${PTData.usesMinutes(cat) ? (window.formatDuration?.(v) ?? `${v}m`) : v}`;
+  function logFailed(e) {
+    if (e?.code === 'offline') setToast(tr('Keine Verbindung. Satz nicht gespeichert.'));
+    else alert(e.message);
+  }
+
+  // Schnellsatz auf der Fokus-Karte einer zusammengeführten Übung
+  async function dashQuickLog(ex, v) {
+    try {
+      const n = await logEverywhere({ targets: ex.targets, values: ex.minutes ? { duration_minutes: v } : { reps: v } });
+      PTHaptics.tap();
+      setToast(loggedToast(valueLabel(ex.cat, v), ex.cat?.name, n));
+      maybePushPrimer();
+    } catch (e) { logFailed(e); }
+  }
+  function dashOpenLog(ex) {
+    const entry = ex.entries[0];
+    setDashLog({ ex, entry });
+  }
+  function dashOpenChallenge(id) {
+    setQuickCard(null);
+    if (id === competition.id) { setHomeView('challenge'); setTab('home'); window.scrollTo?.(0, 0); }
+    else onOpenCompetition?.(id);
+  }
 
   const feedItems = useMemo(() => {
     // Past-week sets are represented by their WeekRecap card — drop the
@@ -915,7 +1090,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }, [capi, me, notificationsOn, cacheName]);
 
   function notify(set) {
-    const isWork = set.category?.kind === 'work';
+    const isWork = PTData.usesMinutes(set.category);
     const who = PTPeople.firstNameOf(set.athlete);
     const valStr = isWork ? window.formatDuration?.(set.duration_minutes) ?? `${set.duration_minutes}m` : `+${set.reps}`;
     // Im offenen Feed erscheint der Satz ohnehin live; dort keinen Toast doppelt.
@@ -1013,7 +1188,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {PTi18n.date(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
           <span className="greeting">
-            <span className="app-header-name">{competition.name}</span>
+            <span className="app-header-name">{showDashboard ? tr('Alle Challenges') : competition.name}</span>
             <Icon name="chevron" size={20} strokeWidth={2.5} />
           </span>
         </button>
@@ -1025,7 +1200,21 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       </header>
 
       <main className="app-main">
-        {loading ? <Loader /> : (<>
+        {showDashboard && (
+          <DashboardScreen me={me} model={dashModel} weekStart={weekStart} daysLeft={daysLeftNow}
+            focusKey={dashFocus} onFocus={setDashFocus}
+            onOpenCard={(card) => setQuickCard(card)}
+            onQuickLog={dashQuickLog}
+            onOpenLog={dashOpenLog}
+            onStartWorkout={dashOpenLog}
+            onAddGoal={() => setSetupForChallenge({})} />
+        )}
+        {!showDashboard && tab === 'home' && multi && (
+          <button type="button" className="db-back" onClick={() => setHomeView('dashboard')}>
+            <Icon name="chevron" size={16} strokeWidth={2.5} /> {tr('Alle Challenges')}
+          </button>
+        )}
+        {showDashboard ? null : loading ? <Loader /> : (<>
         {tab === 'home' && starterVisible && (
           <ObStarterCard items={starterItems} daysLeft={PTOnboarding.weekProgress().daysLeft}
             midWeek={PTOnboarding.joinedMidWeek({ joinedAt: myMembership?.joined_at })}
@@ -1052,8 +1241,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
-          celebrate={synced}
+          celebrate={synced && !finaleShown.length}
           layout={t.layout}
+          competitionId={competition.id}
+          otherTargets={otherTargets}
           weekStart={weekStart}
           nextWeekStart={nextWeekStart}
           nextWeekChallenges={nextWeekChallenges}
@@ -1067,20 +1258,17 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onQuickLog={async (ch, val) => {
             try {
               const cat = categories.find(c => c.id === ch.category_id);
-              const isWork = cat?.kind === 'work';
-              const first = isFirstLog && !isWork;
-              const payload = isWork
-                ? { challenge_id: ch.id, reps: null, duration_minutes: parseInt(val), note: null }
-                : { challenge_id: ch.id, reps: parseInt(val), note: null };
-              await capi.addSet(payload);
+              const minutes = PTData.usesMinutes(cat);
+              const first = isFirstLog && !minutes;
+              const v = parseInt(val);
+              const n = await logEverywhere({
+                targets: [{ challenge_id: ch.id, competition_id: competition.id }, ...otherTargets(ch, cat)],
+                values: minutes ? { duration_minutes: v } : { reps: v },
+              });
               PTHaptics.tap();
-              if (first) celebrateFirst(parseInt(val), ch, cat);
-              else { setToast(loggedToast(`+${val}${isWork ? ' min' : ''}`, cat?.name)); maybePushPrimer(); }
-              reload();
-            } catch (e) {
-              if (e?.code === 'offline') setToast(tr('Keine Verbindung. Satz nicht gespeichert.'));
-              else alert(e.message);
-            }
+              if (first) celebrateFirst(v, ch, cat);
+              else { setToast(loggedToast(valueLabel(cat, v), cat?.name, n)); maybePushPrimer(); }
+            } catch (e) { logFailed(e); }
           }} />
         }
 
@@ -1161,7 +1349,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           ].map(t => (
             <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`}
               aria-current={tab === t.id ? 'page' : undefined}
-              onClick={() => setTab(t.id)}>
+              onClick={() => {
+                // „Heute“ nochmal antippen: zurück zum Dashboard über alle Challenges
+                if (t.id === 'home' && tab === 'home' && multi && homeView === 'challenge') setHomeView('dashboard');
+                setTab(t.id);
+              }}>
               <span className="tab-icon">
                 <Icon name={t.icon} size={22} />
                 {t.badge > 0 && <span className="tab-badge" aria-label={trn(t.badge, '{n} offene Strafe', '{n} offene Strafen')}>{t.badge}</span>}
@@ -1175,23 +1367,29 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {closingWeek && (
         <WeekCloseSheet weekStart={closingWeek} api={capi} me={me}
           onClose={() => setClosingWeek(null)}
-          onDone={() => { setClosingWeek(null); setToast(tr('Woche abgeschlossen')); reload(); }} />
+          onDone={() => { const res = finaleForWeek(closingWeek); setClosingWeek(null); if (res) setForcedFinale(res); else setToast(tr('Woche abgeschlossen')); reload(); }} />
       )}
 
       <Sheet open={!!setupForChallenge} onClose={() => setSetupForChallenge(null)}>
         <SetupSheet
           api={capi}
+          baseApi={api}
           me={me}
           categories={setupCategories}
           allowWork={allowWork}
           weekStart={weekStart}
+          participantCount={peopleForShare}
+          competitionName={multi ? competition.name : ''}
           existing={setupForChallenge?.id ? setupForChallenge : null}
           usedCategoryIds={currentChallenges.filter(c => c.id !== setupForChallenge?.id).map(c => c.category_id)}
-          projectTags={projectTags}
-          toolTags={toolTags}
+          otherComps={otherCompsForSetup}
           onClose={() => setSetupForChallenge(null)}
-          onSaved={() => {setSetupForChallenge(null);setToast(tr('Ziel gespeichert'));reload();}}
-          onDeleted={() => {setSetupForChallenge(null);setToast(tr('Ziel gelöscht'));reload();}}
+          onSaved={(copied) => {
+            setSetupForChallenge(null);
+            setToast(copied ? trn(copied, 'Ziel gespeichert, auch in {n} weiteren Challenge', 'Ziel gespeichert, auch in {n} weiteren Challenges') : tr('Ziel gespeichert'));
+            reload(); dash.reload();
+          }}
+          onDeleted={() => {setSetupForChallenge(null);setToast(tr('Ziel gelöscht'));reload(); dash.reload();}}
           onAddCategory={reload} />
       </Sheet>
 
@@ -1214,7 +1412,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                   setToast(catName
                     ? trn(rounds, '{n} Runde {name} geloggt', '{n} Runden {name} geloggt', { name: catName })
                     : trn(rounds, '{n} Runde geloggt', '{n} Runden geloggt'));
-                  reload();
+                  reload(); dash.reload();
                 }} />
             );
           }
@@ -1230,7 +1428,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                   setLogForChallenge(null);
                   const m = Math.floor(val/60), s = val%60;
                   setToast(val >= 204 ? tr('Bring Sally Up geschafft!') : loggedToast(`${m}:${String(s).padStart(2,'0')}`, catName));
-                  reload();
+                  reload(); dash.reload();
                 }} />
             );
           }
@@ -1242,6 +1440,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               category={logCat}
               projectTags={projectTags}
               toolTags={toolTags}
+              others={otherTargets(logForChallenge, logCat)}
+              onSubmit={async ({ values, note, skip }) => {
+                logCountRef.current = await logEverywhere({ values, note, skip,
+                  targets: [{ challenge_id: logForChallenge.id, competition_id: competition.id }, ...otherTargets(logForChallenge, logCat)] });
+              }}
               onClose={() => setLogForChallenge(null)}
               onLogged={(r, isWork) => {
                 const ch = logForChallenge;
@@ -1249,8 +1452,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
                 PTHaptics.tap();
                 const valStr = isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`;
                 if (isFirstLog && !isWork) celebrateFirst(r, ch, logCat);
-                else { setToast(loggedToast(valStr, catName)); maybePushPrimer(); }
-                reload();
+                else { setToast(loggedToast(valStr, catName, logCountRef.current)); maybePushPrimer(); }
               }} />
           );
         })()}
@@ -1264,8 +1466,52 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           categories={categories}
           projectTags={projectTags}
           toolTags={toolTags}
+          onSubmit={({ challenge, category, values, createdAt }) => logEverywhere({ values, createdAt,
+            targets: [{ challenge_id: challenge.id, competition_id: competition.id }, ...otherTargets(challenge, category)] })}
           onClose={() => setBackfillOpen(false)}
-          onSaved={(r) => {setBackfillOpen(false);setToast(tr('+{n} nachgetragen', { n: r }));reload();}} />
+          onSaved={(r, isWork) => {setBackfillOpen(false);setToast(isWork ? tr('{value} nachgetragen', { value: window.formatDuration?.(r) ?? `${r}m` }) : tr('+{n} nachgetragen', { n: r }));}} />
+      </Sheet>
+
+      {/* Eintragen aus dem Dashboard: zählt für alle Challenges mit dieser Übung */}
+      <Sheet open={!!dashLog} onClose={() => setDashLog(null)}>
+        {dashLog && (() => {
+          const { ex, entry } = dashLog;
+          const cid = entry.card.c.id;
+          const entryApi = cid === competition.id ? capi : api.forCompetition(cid);
+          const close = () => setDashLog(null);
+          const done = (text) => { close(); setToast(text); reload(); dash.reload(); };
+          if (ex.catType === 'tom_holland') {
+            return <TomHollandSheet api={entryApi} me={me} challenge={entry.row.ch} allSets={dash.bundle?.sets || []} onClose={close}
+              onLogged={(rounds) => done(trn(rounds, '{n} Runde {name} geloggt', '{n} Runden {name} geloggt', { name: ex.cat?.name || '' }))} />;
+          }
+          if (ex.catType === 'bring_sally_up') {
+            return <BringSallySheet api={entryApi} me={me} challenge={entry.row.ch} allSets={dash.bundle?.sets || []} onClose={close}
+              onLogged={(val) => done(val >= 204 ? tr('Bring Sally Up geschafft!') : loggedToast(`${Math.floor(val / 60)}:${String(val % 60).padStart(2, '0')}`, ex.cat?.name))} />;
+          }
+          return (
+            <LogSheet api={entryApi} me={me} challenge={entry.row.ch} category={ex.cat}
+              projectTags={cid === competition.id ? projectTags : []} toolTags={cid === competition.id ? toolTags : []}
+              others={ex.entries.slice(1).map(e => ({ competition_id: e.card.c.id, name: e.card.c.name, emoji: e.card.c.emoji }))}
+              onSubmit={async ({ values, note, skip }) => { logCountRef.current = await logEverywhere({ targets: ex.targets, values, note, skip }); }}
+              onClose={close}
+              onLogged={(r, isWork) => {
+                close();
+                PTHaptics.tap();
+                setToast(loggedToast(isWork ? (window.formatDuration?.(r) ?? `${r}m`) : `+${r}`, ex.cat?.name, logCountRef.current));
+                maybePushPrimer();
+              }} />
+          );
+        })()}
+      </Sheet>
+
+      <Sheet open={!!quickCard} onClose={() => setQuickCard(null)}>
+        {quickCard && (
+          <ChallengeQuickSheet
+            card={dashModel?.cards.find(x => x.c.id === quickCard.c.id) || quickCard}
+            weekStart={weekStart} daysLeft={daysLeftNow}
+            onClose={() => setQuickCard(null)}
+            onOpen={() => dashOpenChallenge(quickCard.c.id)} />
+        )}
       </Sheet>
 
       <Sheet open={!!pickerForSet} onClose={() => setPickerForSet(null)}>
@@ -1288,8 +1534,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       {layer?.kind === 'goal' && (
         <ObGoalLayer api={capi} competition={competition} categories={categories} me={me}
           activeCount={participantsNow.length} weekStart={weekStart} title={layer.title}
-          onDone={(ch) => { reload(); advance({ goals: 1, data: { extra: [ch] } }); }}
-          onSkip={() => advance({ goals: live.current.goals })} />
+          onDone={(ch) => { reload(); dash.reload(); advance({ goals: 1, data: { extra: [ch] } }); }}
+          onSkip={() => advance({ goals: live.current.goals })}
+          onMore={() => { layerQueue.current = []; setLayer(null); onIntroDone?.(); setSetupForChallenge({}); }} />
       )}
       {layer?.kind === 'log' && (
         <ObFirstLogLayer api={capi} categories={categories} people={peopleForShare}
@@ -1320,6 +1567,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       )}
 
       <Toast message={toast} onDone={() => setToast('')} />
+
+      {finaleShown.length > 0 && <WeekFinale results={finaleShown} onDone={closeFinale} />}
+      {showDashboard && dash.fresh && !finaleShown.length && dashCelebration.pendingCelebration && (
+        <CelebrationOverlay
+          category={dashCelebration.pendingCelebration.category}
+          targetReps={dashCelebration.pendingCelebration.challenge.target_reps}
+          onDone={dashCelebration.dismissCurrent} />
+      )}
 
       {medalCelebration && (
         <CelebrationOverlay targetReps={medalCelebration.points}
