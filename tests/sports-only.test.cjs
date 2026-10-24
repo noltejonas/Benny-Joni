@@ -46,6 +46,21 @@ test('alte Work-Daten erscheinen weder in Live- noch Cache-Bundles; Sport-Workou
   assert.equal(JSON.stringify(bundle), original, 'gespeicherte Historie bleibt unverändert');
 });
 
+test('Minuten-Übungen (time) bleiben, verwaiste Minuten ohne Challenge fliegen raus', () => {
+  const D = load();
+  const categories = [{ id: 'bible', kind: 'time' }, { id: 'push', kind: 'sports' }];
+  const challenges = [{ id: 'ch-bible', category_id: 'bible' }, { id: 'ch-push', category_id: 'push' }];
+  const sets = [
+    { id: 'bible-set', challenge_id: 'ch-bible', duration_minutes: 15 },
+    { id: 'push-set', challenge_id: 'ch-push', reps: 10 },
+    { id: 'orphan', challenge_id: 'gone', duration_minutes: 20 },
+    { id: 'feed-time', challenge_id: 'other', duration_minutes: 10, category: { kind: 'time' } },
+  ];
+  const result = D.sportsOnlyBundle({ categories, challenges, sets });
+  assert.deepEqual(ids(result.categories), ['bible', 'push']);
+  assert.deepEqual(ids(result.sets), ['bible-set', 'push-set', 'feed-time']);
+});
+
 test('API kann Work weder beim Erstellen noch durch ein Modul-Update aktivieren', async () => {
   let createArgs;
   let updatePatch;
@@ -74,4 +89,6 @@ test('API kann Work weder beim Erstellen noch durch ein Modul-Update aktivieren'
   await api.forCompetition('c1').addCategory('Eigene Übung', '💪', 'work');
   assert.equal(insertedCategory.kind, 'sports', 'altes drittes Argument aktiviert kein Work mehr');
   assert.equal(insertedCategory.name, 'Eigene Übung');
+  await api.forCompetition('c1').addCategory('Bibellesen', '💪', 'time');
+  assert.equal(insertedCategory.kind, 'time', 'Minuten-Übungen bleiben möglich');
 });

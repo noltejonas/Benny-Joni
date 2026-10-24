@@ -591,7 +591,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
 const GOAL_INPUT_KEY = 'pt:goal-input'; // 'person' | 'total'
 const UNIT_KIND = { reps: 'sports', minutes: 'time', work: 'work' };
 
-function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart, existing, participantCount = 2,
+function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart, existing, participantCount = 2,
   competitionName = '', usedCategoryIds = [], otherComps = [], onClose, onSaved, onDeleted, onAddCategory }) {
   const people = Math.max(1, participantCount);
   const [catId, setCatId] = useState(existing?.category_id || categories.find(c => !usedCategoryIds.includes(c.id))?.id || categories[0]?.id || '');

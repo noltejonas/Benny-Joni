@@ -549,12 +549,12 @@
         const set = new Set(ids);
         const challenges = db.weekly_challenges.filter(c => set.has(c.competition_id) && c.week_start >= fromWeek);
         const chIds = new Set(challenges.map(c => c.id));
-        return later({
+        return later(window.PTData.sportsOnlyBundle({
           members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
           challenges: challenges.map(normCh),
           sets: db.sets.filter(s => chIds.has(s.challenge_id)).map(withAthlete),
           categories: db.categories.map(localizeCategory),
-        });
+        }));
       },
       onCompetitionsChange(ids, fn) {
         let timer = null;
@@ -872,8 +872,8 @@
       async getMembers() { return later(membersOf(cid)); },
 
       async getCategories() { return later(db.categories.filter(c => !c.competition_id || c.competition_id === cid).map(localizeCategory)); },
-      async addCategory(name, emoji = '💪') {
-        const c = { id: newId('cat'), name, emoji, kind: 'sports', challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
+      async addCategory(name, emoji = '💪', kind = 'sports') {
+        const c = { id: newId('cat'), name, emoji, kind: kind === 'time' ? 'time' : 'sports', challenge_type: 'standard', competition_id: cid, created_by: uid(), created_at: new Date().toISOString() };
         db.categories.push(c); emit(); return later(c);
       },
       async updateCategory(id, patch) {

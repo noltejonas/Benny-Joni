@@ -14,8 +14,16 @@
   // Accept both cached competition bundles and cross-challenge stats bundles.
   function sportsOnlyBundle(bundle) {
     const workCategories = new Set((bundle.categories || []).filter(c => c.kind === 'work').map(c => c.id));
-    const workChallenges = new Set([...(bundle.challenges || []), ...(bundle.allChallenges || [])]
+    const allChallenges = [...(bundle.challenges || []), ...(bundle.allChallenges || [])];
+    const workChallenges = new Set(allChallenges
       .filter(ch => workCategories.has(ch.category_id) || ch.category?.kind === 'work').map(ch => ch.id));
+    // Minuten gehören zu Zeit-Übungen (bleiben) oder zu Work (fliegt raus). Ohne
+    // bekannte Challenge und ohne Zeit-Kategorie gilt ein Minuten-Satz als Work.
+    const knownChallenges = new Set(allChallenges.map(ch => ch.id));
+    const isTime = (s) => s.category?.kind === 'time' || s.challenge?.category?.kind === 'time';
+    const isWorkSet = (s) => workChallenges.has(s.challenge_id) || s.category?.kind === 'work'
+      || s.challenge?.category?.kind === 'work'
+      || (s.duration_minutes != null && !knownChallenges.has(s.challenge_id) && !isTime(s));
     const result = { ...bundle };
     if (bundle.categories) result.categories = bundle.categories.filter(c => c.kind !== 'work');
     for (const key of ['challenges', 'allChallenges', 'planSlots']) {
@@ -23,8 +31,7 @@
         .filter(ch => !workCategories.has(ch.category_id) && ch.category?.kind !== 'work');
     }
     for (const key of ['sets', 'allSets', 'feed']) {
-      if (Array.isArray(bundle[key])) result[key] = bundle[key].filter(s => s.duration_minutes == null
-        && !workChallenges.has(s.challenge_id) && s.category?.kind !== 'work' && s.challenge?.category?.kind !== 'work');
+      if (Array.isArray(bundle[key])) result[key] = bundle[key].filter(s => !isWorkSet(s));
     }
     return result;
   }
@@ -673,12 +680,12 @@
         const sets = (await Promise.all(chunks.map(part => selectAll(() => client.from('sets')
           .select('id, challenge_id, competition_id, user_id, reps, duration_minutes, note, created_at, log_id')
           .in('challenge_id', part).order('created_at', { ascending: false }))))).flat();
-        return {
+        return sportsOnlyBundle({
           members,
           challenges: challenges.map(normChallenge),
           sets: sets.map(withAthlete),
           categories: categories.map(localizeCategory),
-        };
+        });
       },
       // Live-Änderungen an Sätzen und Wochenzielen dieser Challenges
       onCompetitionsChange(competitionIds, fn) {
@@ -931,9 +938,10 @@
           .order('created_at'));
         return (rows || []).map(localizeCategory);
       },
-      async addCategory(name, emoji='💪') {
+      // kind: 'time' (Minuten) oder Sport; Work gibt es nicht mehr (Sport-Launch)
+      async addCategory(name, emoji='💪', kind='sports') {
         const data = check(await client.from('categories')
-          .insert({ name, emoji, kind: 'sports', competition_id: cid, created_by: uid() }).select().single());
+          .insert({ name, emoji, kind: kind === 'time' ? 'time' : 'sports', competition_id: cid, created_by: uid() }).select().single());
         emit();
         return data;
       },
