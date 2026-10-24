@@ -62,6 +62,15 @@ interface Category { id: string; name: string; challenge_type: string; metric: s
 interface LiveRow { category_id: string; user_id: string; value: number; rank: number; points: number }
 interface ResultRow { category_id: string; user_id: string; rank: number; points: number; medal: string | null }
 
+// Vergleich in konstanter Zeit, damit die Antwortzeit nichts über das Secret verrät
+function sameSecret(given: string, expected: string): boolean {
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(expected);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < b.length; i++) diff |= (a[i] ?? 0) ^ b[i];
+  return diff === 0;
+}
+
 // Datum und Stunde in Berlin
 function berlinNow() {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("de-DE", {
@@ -110,7 +119,8 @@ async function languagesOf(supabase: SupabaseClient, userIds: string[]) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
-  if (WEBHOOK_SECRET && req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
+  // Ohne gesetztes Secret bleibt die Funktion zu (JWT-Prüfung ist aus).
+  if (!WEBHOOK_SECRET || !sameSecret(req.headers.get("x-webhook-secret") ?? "", WEBHOOK_SECRET)) {
     return new Response("unauthorized", { status: 401 });
   }
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
