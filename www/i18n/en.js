@@ -931,6 +931,8 @@ PTi18n.add('en', {
   'Satz eintragen': 'Log a set',
   'Schnellansicht: {name}': 'Quick view: {name}',
   'Farben': 'Colours',
+  'So funktioniert die Rangliste': 'How the leaderboard works',
+  'Verstanden': 'Got it',
   'Vorschau': 'Preview',
   'Paletten': 'Palettes',
   'Eigene Farben': 'Custom colours',

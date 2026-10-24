@@ -217,6 +217,18 @@
 }
 .rk-note svg { flex-shrink: 0; margin-top: 1px; color: var(--primary-ink); }
 .rk-note.is-people { background: var(--primary-tint); box-shadow: none; }
+/* Erklärungen der Rangliste im ⓘ-Sheet statt im Screen */
+.rk-head-actions { display: inline-flex; align-items: center; gap: 10px; }
+.rk-info-btn {
+  width: 34px; height: 34px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--surface); color: var(--text-2); box-shadow: var(--shadow);
+  display: inline-flex; align-items: center; justify-content: center; position: relative;
+}
+.rk-info-btn::before { content: ''; position: absolute; inset: -5px; }
+.rk-info { display: flex; flex-direction: column; gap: 14px; }
+.rk-info-item { display: flex; gap: 12px; font-size: 15px; line-height: 22px; color: var(--text-2); }
+.rk-info-item svg { flex-shrink: 0; margin-top: 2px; color: var(--primary-ink); }
+.rk-info-item b { color: var(--text); }
 .rk-live {
   display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px;
   background: var(--surface-2); color: var(--text-3); font-size: 11px; font-weight: 700;

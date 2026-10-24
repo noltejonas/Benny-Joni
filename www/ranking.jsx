@@ -63,6 +63,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const [optInOpen, setOptInOpen] = React.useState(profile?.ranking_opt_in == null);
   const [logCat, setLogCat] = React.useState(null);
   const [card, setCard] = React.useState(null);
+  const [infoOpen, setInfoOpen] = React.useState(false); // Erklärungen hinter ⓘ statt im Screen
   // „Meine Leute“: alle, mit denen ich gerade in einer laufenden Challenge bin
   // (api.myPeople). Fehlt die Liste (offline), gilt is_mine vom Server.
   const [people, setPeople] = React.useState(null);
@@ -244,8 +245,13 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
     <div className="rk">
       <div className="rd-section-head rk-head">
         <h2>{tr('Rangliste')}</h2>
-        <button className="btn-link" onClick={() => setCard({ user_id: me, display_name: profile.display_name,
-          avatar_url: profile.avatar_url, color: profile.color, is_me: true })}>{tr('Meine Medaillen')}</button>
+        <span className="rk-head-actions">
+          <button type="button" className="rk-info-btn" aria-label={tr('So funktioniert die Rangliste')} onClick={() => setInfoOpen(true)}>
+            <Icon name="info" size={18} />
+          </button>
+          <button className="btn-link" onClick={() => setCard({ user_id: me, display_name: profile.display_name,
+            avatar_url: profile.avatar_url, color: profile.color, is_me: true })}>{tr('Meine Medaillen')}</button>
+        </span>
       </div>
 
       <div className="segmented rk-views">
@@ -295,29 +301,6 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         </div>
       </div>
 
-      {isLive && !closed && counts && (
-        <div className="rk-note"><Icon name="timer" size={16} />
-          <span>{weekly
-            ? tr('Läuft noch: Plätze und Punkte sind vorläufig. Die Medaillen der Woche gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })
-            : tr('Läuft noch: Plätze und Punkte sind vorläufig. Medaillen gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })}</span>
-        </div>
-      )}
-      {weekly && !isLive && (
-        <div className="rk-note"><Icon name="trophy" size={16} />
-          <span>{tr('Jede Woche gibt es pro Übung Medaillen für die Plätze 1–3 und Punkte für die Top 10. Hier stehen die abgeschlossenen Wochen zusammengezählt.')}</span>
-        </div>
-      )}
-
-      {filter === 'mine' && (
-        <div className="rk-note is-people"><Icon name="users" size={16} />
-          <span>
-            {people
-              ? trn(others.length, 'Meine Leute: du und {n} Person, mit der du gerade in einer Challenge bist.', 'Meine Leute: du und {n} Personen, mit denen du gerade in einer Challenge bist.')
-              : tr('Meine Leute: alle, mit denen du gerade in einer Challenge bist.')}
-            {notIn.length > 0 && ` ${tr('Nicht in der Rangliste: {names}.', { names: notIn.map(p => p.display_name.split(/\s+/)[0]).join(', ') })}`}
-          </span>
-        </div>
-      )}
 
       {!isLive && view !== 'month' && (
         <div className="segmented rk-sort">
@@ -337,13 +320,6 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         </div>
       )}
 
-      {cat && isLive && (
-        <div className="rk-rule">
-          <span className="label">{tr('So zählt’s')}</span>
-          <span>{cat.rule || tr('Saubere Wiederholungen.')}{cat.metric === 'volume' && cat.max_per_day
-            ? ` ${tr('Pro Tag zählen höchstens {n}.', { n: PTi18n.number(cat.max_per_day) })}` : ''}{cat.metric === 'best' ? ` ${tr('Es zählt dein bester Durchgang.')}` : ''}</span>
-        </div>
-      )}
 
       {myLine && rows.some(r => r.is_me) && (
         <div className="rk-me-line"><Icon name="trophy" size={16} /> {myLine}</div>
@@ -390,6 +366,39 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
           onClose={() => setCard(null)}
           onChanged={(msg) => { setCard(null); reload(); if (msg) onToast?.(msg); }}
           onToast={onToast} />}
+      </Sheet>
+
+      <Sheet open={infoOpen} onClose={() => setInfoOpen(false)}>
+        <h2 className="title" style={{ marginBottom: 16 }}>{tr('So funktioniert die Rangliste')}</h2>
+        <div className="rk-info">
+          {isLive && !closed && counts && (
+            <div className="rk-info-item"><Icon name="timer" size={18} />
+              <span>{weekly
+                ? tr('Läuft noch: Plätze und Punkte sind vorläufig. Die Medaillen der Woche gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })
+                : tr('Läuft noch: Plätze und Punkte sind vorläufig. Medaillen gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })}</span>
+            </div>
+          )}
+          {weekly && !isLive && (
+            <div className="rk-info-item"><Icon name="trophy" size={18} />
+              <span>{tr('Jede Woche gibt es pro Übung Medaillen für die Plätze 1–3 und Punkte für die Top 10. Hier stehen die abgeschlossenen Wochen zusammengezählt.')}</span>
+            </div>
+          )}
+          <div className="rk-info-item"><Icon name="users" size={18} />
+            <span>
+              {people
+                ? trn(others.length, 'Meine Leute: du und {n} Person, mit der du gerade in einer Challenge bist.', 'Meine Leute: du und {n} Personen, mit denen du gerade in einer Challenge bist.')
+                : tr('Meine Leute: alle, mit denen du gerade in einer Challenge bist.')}
+              {notIn.length > 0 && ` ${tr('Nicht in der Rangliste: {names}.', { names: notIn.map(p => p.display_name.split(/\s+/)[0]).join(', ') })}`}
+            </span>
+          </div>
+          {cat && (
+            <div className="rk-info-item"><Icon name="check" size={18} />
+              <span><b>{tr('So zählt’s')}</b> {cat.rule || tr('Saubere Wiederholungen.')}{cat.metric === 'volume' && cat.max_per_day
+                ? ` ${tr('Pro Tag zählen höchstens {n}.', { n: PTi18n.number(cat.max_per_day) })}` : ''}{cat.metric === 'best' ? ` ${tr('Es zählt dein bester Durchgang.')}` : ''}</span>
+            </div>
+          )}
+        </div>
+        <button type="button" className="btn" style={{ width: '100%', marginTop: 20 }} onClick={() => setInfoOpen(false)}>{tr('Verstanden')}</button>
       </Sheet>
     </div>
   );
