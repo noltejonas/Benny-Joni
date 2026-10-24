@@ -104,9 +104,10 @@ function finaleHaptics(strong) {
   return () => ts.forEach(clearTimeout);
 }
 
-function finaleSound() {
+// Sieg (Saltos): eigener Sound mit zwei Drops, sonst der vom Wochenziel
+function finaleSound(big) {
   try {
-    const audio = new Audio('sounds/goal-reached.wav');
+    const audio = new Audio(big ? 'sounds/victory.wav' : 'sounds/goal-reached.wav');
     audio.volume = 0.9;
     audio.play().catch(() => {});
     return () => { audio.pause(); };
@@ -146,7 +147,7 @@ function FinaleStage({ res, isLast, total, index, onNext }) {
     if (phase === 'race') { const t = setTimeout(() => setPhase('reveal'), 2900); return () => clearTimeout(t); }
     if (phase === 'reveal') {
       const stopH = finaleHaptics(big);
-      const stopS = finaleSound();
+      const stopS = finaleSound(big);
       return () => { stopH(); stopS(); };
     }
   }, [phase, big]);
