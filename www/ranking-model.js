@@ -7,6 +7,10 @@
 //   max_per_day; best = bester Durchgang, höchstens max_per_day.
 // - Platz: Gleichstand teilt den Platz, der nächste wird übersprungen (1, 1, 3).
 // - Punkte nach F1-Schema für die Plätze 1–10, Medaillen für 1–3.
+//
+// Wochenwertung (Migration weekly_ranking): Dieselben Regeln pro Woche
+// (Montag bis Sonntag), Abschluss Montag 12:00. Eine Woche zählt im Monat ihres
+// Donnerstags; Monat, Saison und Ewig summieren die abgeschlossenen Wochen.
 
 (function () {
   const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
@@ -45,6 +49,56 @@
     return last - now.getDate() + 1;
   }
   const inMonth = (iso, month) => monthOf(iso) === month;
+
+  // ── Wochen ('YYYY-MM-DD', Montag) ────────────────────────────────────
+  const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+  function weekOf(date) {
+    const d = date instanceof Date ? new Date(date) : new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return isoDay(d);
+  }
+  function addWeeks(week, n) {
+    const d = parseDay(week);
+    d.setDate(d.getDate() + 7 * n);
+    return isoDay(d);
+  }
+  // Monat der Woche: der ihres Donnerstags
+  const weekMonth = (week) => monthOf(addDaysIso(week, 3));
+  function addDaysIso(iso, n) { const d = parseDay(iso); d.setDate(d.getDate() + n); return isoDay(d); }
+  // Abschluss: Montag nach der Woche, 12:00 (Gerätezeit, in Deutschland = Berlin)
+  function weekCloseDeadline(week) {
+    const d = parseDay(addWeeks(week, 1));
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
+  // Verbleibende Tage inklusive heute; 0 = Woche vorbei
+  function weekDaysLeft(week, now = new Date()) {
+    const cur = weekOf(now);
+    if (cur !== week) return cur > week ? 0 : 7;
+    return 7 - ((now.getDay() + 6) % 7);
+  }
+  // Erste gewertete Woche: Donnerstag ab start_month
+  function startWeek(startMonth) {
+    const w = weekOf(parseDay(startMonth));
+    return weekMonth(w) < startMonth ? addWeeks(w, 1) : w;
+  }
+  // „KW 43“ (ISO-Kalenderwoche)
+  function weekNumberOf(week) {
+    const t = parseDay(addDaysIso(week, 3));
+    const jan4 = new Date(t.getFullYear(), 0, 4);
+    return 1 + Math.round(((t - jan4) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7);
+  }
+  // „KW 43 · 19.–25.10.“
+  function weekLabel(week) {
+    const a = parseDay(week), b = parseDay(addDaysIso(week, 6));
+    const fmt = new Intl.DateTimeFormat(PTi18n.locale, { day: 'numeric', month: 'numeric' });
+    const range = a.getMonth() === b.getMonth() && fmt.formatRange
+      ? fmt.formatRange(a, b).replace(/\s*–\s*/, '–')
+      : `${fmt.format(a)}–${fmt.format(b)}`;
+    return `${tr('KW {week}', { week: weekNumberOf(week) })} · ${range}`;
+  }
   const dayOf = (iso) => {
     const d = new Date(iso);
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -54,11 +108,17 @@
   // sets: [{ user_id, log_id, reps, created_at, category_id }]
   // categories: Katalog mit ranked, metric, max_per_day
   function monthValues({ sets, categories, month, excludeLog = null }) {
+    return periodValues({ sets, categories, excludeLog, inPeriod: (iso) => inMonth(iso, month) });
+  }
+  function weekValues({ sets, categories, week, excludeLog = null }) {
+    return periodValues({ sets, categories, excludeLog, inPeriod: (iso) => weekOf(new Date(iso)) === week });
+  }
+  function periodValues({ sets, categories, inPeriod, excludeLog = null }) {
     const catById = {};
     for (const c of categories || []) if (c.ranked && !c.competition_id) catById[c.id] = c;
     const seen = new Set();
     const logs = [...(sets || [])]
-      .filter((s) => catById[s.category_id] && s.reps > 0 && inMonth(s.created_at, month) && s.log_id !== excludeLog)
+      .filter((s) => catById[s.category_id] && s.reps > 0 && inPeriod(s.created_at) && s.log_id !== excludeLog)
       .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
       .filter((s) => {
         const k = `${s.user_id}|${s.log_id}`;
@@ -122,10 +182,12 @@
 
   // ── Saison & Ewig ────────────────────────────────────────────────────
   // results: monthly_results-Zeilen { month, category_id, user_id, points, medal }
+  // Zeilen mit `week` (Wochenwertung) zählen im Monat ihres Donnerstags.
   function totals(results, { from = null, to = null } = {}) {
     const out = {};
     for (const r of results || []) {
-      if ((from && r.month < from) || (to && r.month > to)) continue;
+      const month = r.month || weekMonth(r.week);
+      if ((from && month < from) || (to && month > to)) continue;
       const k = `${r.category_id}|${r.user_id}`;
       const e = out[k] ||= { category_id: r.category_id, user_id: r.user_id, points: 0, gold: 0, silver: 0, bronze: 0, months: 0 };
       e.points += r.points || 0;
@@ -175,7 +237,7 @@
   // abgeschlossen ist. closedMonths: Liste 'YYYY-MM-01'.
   function seasonChampions(results, closedMonths) {
     const closed = new Set(closedMonths || []);
-    const years = [...new Set((results || []).map((r) => Number(r.month.slice(0, 4))))]
+    const years = [...new Set((results || []).map((r) => Number((r.month || weekMonth(r.week)).slice(0, 4))))]
       .filter((y) => closed.has(`${y}-12-01`));
     const out = [];
     for (const y of years) {
@@ -204,10 +266,19 @@
     return `${PTi18n.number(need)} ${cat?.name || tr('Reps')}`;
   }
 
+  // Ist das Jahr für die Saisonsieger fertig? Letzte Woche des Dezembers
+  // (Wochenwertung) abgeschlossen. Liefert Monate wie seasonChampions sie braucht.
+  function closedMonthsFromWeeks(closedWeeks) {
+    const out = new Set();
+    for (const w of closedWeeks || []) if (weekMonth(w).endsWith('-12-01') && weekMonth(addWeeks(w, 1)) !== weekMonth(w)) out.add(weekMonth(w));
+    return [...out];
+  }
+
   window.PTRanking = {
     POINTS, MEDAL_EMOJI, pointsFor, medalFor,
     monthOf, addMonths, monthLabel, closeDeadline, daysLeft,
-    monthValues, rankBy, board, hypotheticalRank, gapAbove,
+    weekOf, addWeeks, weekMonth, weekCloseDeadline, weekDaysLeft, startWeek, weekNumberOf, weekLabel, closedMonthsFromWeeks,
+    monthValues, weekValues, rankBy, board, hypotheticalRank, gapAbove,
     totals, overall, pointsTable, medalTable, seasonChampions,
     formatValue, formatNeed,
   };

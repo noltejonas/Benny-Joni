@@ -651,6 +651,28 @@
       async seasonChampions() {
         return check(await client.rpc('season_champions')) || [];
       },
+      // ── Wochenwertung (Migration weekly_ranking) ─────────────────────
+      // Ohne Migration liefern rankingWeek und Co. null, die App bleibt dann
+      // bei der Monatswertung.
+      async rankingWeek(week) {
+        const { data, error } = await client.rpc('ranking_week', { p_week: week });
+        if (error) { if (missingRpc(error)) return null; throw friendlyError(error); }
+        return data || [];
+      },
+      async rankingClosedWeeks() {
+        const { data, error } = await client.rpc('ranking_closed_weeks');
+        if (error) { if (missingRpc(error)) return null; throw friendlyError(error); }
+        return (data || []).map(r => r.week);
+      },
+      async rankingProfileWeeks(userId) {
+        const { data, error } = await client.rpc('ranking_profile_weeks', { p_user: userId });
+        if (error) { if (missingRpc(error)) return null; throw friendlyError(error); }
+        return data || [];
+      },
+      async closeDueWeeks() {
+        const { data } = await client.rpc('close_due_weeks');
+        return data || 0;
+      },
       // Fällige Monate abschließen (idempotent, läuft sonst per pg_cron)
       async closeDueMonths() {
         const { data } = await client.rpc('close_due_months');

@@ -846,9 +846,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     [allChallenges, allSets, categories, penalties, sides, members]
   );
 
-/* global PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, CelebrationOverlay */
-  // Rangliste: Ergebnis des letzten abgeschlossenen Monats für die Feed-Karte
-  // und die Feier, wenn ich eine Medaille geholt habe.
+/* global PTRanking, RankingScreen, MonthRecapCard, lastClosedMonth, lastClosedWeek, CelebrationOverlay */
+  // Rangliste: Ergebnis der letzten abgeschlossenen Woche (bzw. des Monats ohne
+  // Wochenwertung) für die Feed-Karte und die Feier, wenn ich eine Medaille geholt habe.
   const [monthRecap, setMonthRecap] = useState(null);
   const [medalCelebration, setMedalCelebration] = useState(null);
   const memberKey = members.filter(m => !m.left_at).map(m => m.user_id).sort().join(',');
@@ -857,27 +857,39 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     let off = false;
     (async () => {
       try {
-        await api.closeDueMonths().catch(() => 0);
-        const month = lastClosedMonth(await api.getRankingSettings());
-        if (!month) return;
-        const [rows, cats] = await Promise.all([api.rankingMonth(month), api.getRankedCategories()]);
-        if (off) return;
+        const R = PTRanking;
+        if (api.closeDueWeeks) await api.closeDueWeeks().catch(() => 0);
+        const closedWeeks = api.rankingClosedWeeks ? await api.rankingClosedWeeks().catch(() => null) : null;
+        const weekly = closedWeeks !== null;
+        if (!weekly) await api.closeDueMonths().catch(() => 0);
+        const settings = await api.getRankingSettings();
+        // Wochenwertung: nur die zuletzt fällige Woche feiern, nicht eine ältere
+        const week = weekly ? lastClosedWeek(settings) : null;
+        const month = weekly ? null : lastClosedMonth(settings);
+        if (weekly ? !week || !closedWeeks.includes(week) : !month) return;
+        const [rows, cats] = await Promise.all([weekly ? api.rankingWeek(week) : api.rankingMonth(month), api.getRankedCategories()]);
+        if (off || !rows) return;
         const ids = new Set(memberKey.split(','));
         const mine = rows.filter(r => r.counted && r.points > 0 && ids.has(r.user_id));
-        setMonthRecap(mine.length ? { kind: 'month', id: `month-${month}`, month, rows: mine, cats,
-          created_at: PTRanking.closeDeadline(month).toISOString() } : null);
+        setMonthRecap(!mine.length ? null : weekly
+          ? { kind: 'month', id: `week-${week}`, month: R.weekMonth(week), label: R.weekLabel(week), rows: mine, cats,
+            created_at: R.weekCloseDeadline(week).toISOString() }
+          : { kind: 'month', id: `month-${month}`, month, rows: mine, cats, created_at: R.closeDeadline(month).toISOString() });
         const medals = mine.filter(r => r.user_id === me && r.rank <= 3).sort((a, b) => a.rank - b.rank);
-        const key = `pt_month_celebrated_${month}_${me}`;
+        const key = weekly ? `pt_week_medal_celebrated_${week}_${me}` : `pt_month_celebrated_${month}_${me}`;
         let seen = false;
         try { seen = localStorage.getItem(key) === '1'; } catch (e) {}
         if (medals.length && !seen) {
           const catById = Object.fromEntries(cats.map(c => [c.id, c]));
           const emoji = { 1: '🥇', 2: '🥈', 3: '🥉' };
+          const gold = medals[0].rank === 1;
           setMedalCelebration({
             key,
-            hero: medals[0].rank === 1 ? tr('MONATS{br}SIEG', { br: <br/> }) : tr('PODIUM'),
+            hero: weekly ? (gold ? tr('WOCHEN{br}GOLD', { br: <br/> }) : tr('PODIUM'))
+              : (gold ? tr('MONATS{br}SIEG', { br: <br/> }) : tr('PODIUM')),
             points: rows.filter(r => r.user_id === me && r.counted).reduce((a, r) => a + r.points, 0),
-            counterLabel: tr('Punkte im {month}', { month: PTRanking.monthLabel(month, false) }),
+            counterLabel: weekly ? tr('Punkte in KW {week}', { week: R.weekNumberOf(week) })
+              : tr('Punkte im {month}', { month: R.monthLabel(month, false) }),
             subtext: medals.slice(0, 3).map(r => `${emoji[r.rank]} ${catById[r.category_id]?.name || ''}`).join(' · ')
               + (medals.length > 3 ? ` · +${medals.length - 3}` : ''),
           });
@@ -1167,7 +1179,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
           const data = action?.notification?.data || {};
           // Rangliste-Pushes (überholt, letzter Tag, Monatsabschluss) öffnen den Rangliste-Tab
-          if (/^(rank_|month_)/.test(data.kind || '')) { window.dispatchEvent(new CustomEvent('pt:nav-ranking')); return; }
+          if (/^(rank_|month_|week_)/.test(data.kind || '')) { window.dispatchEvent(new CustomEvent('pt:nav-ranking')); return; }
           if (data.competition_id) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId: data.competition_id } }));
           window.dispatchEvent(new CustomEvent('pt:nav-feed'));
         });
@@ -1260,7 +1272,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           challenges={currentChallenges}
           categories={categories}
           allSets={allSets}
-          celebrate={synced && !finaleShown.length}
+          celebrate={synced && !finaleShown.length && !medalCelebration}
           layout={t.layout}
           competitionId={competition.id}
           otherTargets={otherTargets}
@@ -1588,7 +1600,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       <Toast message={toast} onDone={() => setToast('')} />
 
       {finaleShown.length > 0 && <WeekFinale results={finaleShown} onDone={closeFinale} />}
-      {showDashboard && dash.fresh && !finaleShown.length && dashCelebration.pendingCelebration && (
+      {/* Immer nur eine Feier gleichzeitig (CelebrationOverlay sucht sein Element per Klasse) */}
+      {showDashboard && dash.fresh && !finaleShown.length && !medalCelebration && dashCelebration.pendingCelebration && (
         <CelebrationOverlay
           category={dashCelebration.pendingCelebration.category}
           targetReps={dashCelebration.pendingCelebration.challenge.target_reps}

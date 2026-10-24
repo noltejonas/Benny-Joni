@@ -150,3 +150,43 @@ test('Werte anzeigen', () => {
   assert.equal(R.formatValue(cats[2], 1), '1 Runde');
   assert.equal(R.formatNeed(cats[0], 42), '42 Liegestütze');
 });
+
+test('Wochen: Montag, Wechsel, Monat des Donnerstags, Abschluss, Resttage', () => {
+  assert.equal(R.weekOf(new Date(2026, 9, 25, 23)), '2026-10-19');   // Sonntag
+  assert.equal(R.weekOf(new Date(2026, 9, 26, 0, 5)), '2026-10-26'); // Montag
+  assert.equal(R.addWeeks('2026-12-28', 1), '2027-01-04');
+  assert.equal(R.addWeeks('2026-10-26', -1), '2026-10-19');
+  // 28.9.–4.10.: Donnerstag 1.10. → Oktober; 26.10.–1.11.: Donnerstag 29.10. → Oktober
+  assert.equal(R.weekMonth('2026-09-28'), '2026-10-01');
+  assert.equal(R.weekMonth('2026-10-26'), '2026-10-01');
+  assert.equal(R.weekMonth('2026-12-28'), '2026-12-01');
+  assert.equal(R.weekCloseDeadline('2026-10-19').getTime(), new Date(2026, 9, 26, 12).getTime());
+  assert.equal(R.weekDaysLeft('2026-10-19', new Date(2026, 9, 24, 9)), 2);  // Samstag
+  assert.equal(R.weekDaysLeft('2026-10-12', new Date(2026, 9, 24)), 0);
+  assert.equal(R.startWeek('2026-11-01'), '2026-11-02');
+  assert.equal(R.startWeek('2026-10-01'), '2026-09-28');
+  assert.equal(R.weekNumberOf('2026-10-19'), 43);
+  assert.equal(R.weekNumberOf('2026-12-28'), 53);
+  assert.equal(R.weekNumberOf('2027-01-04'), 1);
+  assert.equal(R.weekLabel('2026-10-19'), 'KW 43 · 19.–25.10.');
+  assert.equal(R.weekLabel('2026-10-26'), 'KW 44 · 26.10.–1.11.');
+});
+
+test('Wochenwert und Summen aus Wochen nach Monat', () => {
+  const sets = [
+    set('a', 'push', 50, 19), set('a', 'push', 30, 25, 'w1', 23), set('a', 'push', 30, 25, 'w1', 23),
+    set('b', 'push', 70, 26),   // Folgewoche
+  ];
+  const v = plain(R.weekValues({ sets, categories: cats, week: '2026-10-19' }));
+  assert.deepEqual(v.map((r) => [r.user_id, r.value]), [['a', 80]]);
+  const results = [
+    { week: '2026-10-19', category_id: 'push', user_id: 'a', points: 25, medal: 'gold' },
+    { week: '2026-10-26', category_id: 'push', user_id: 'a', points: 18, medal: 'silver' },
+    { week: '2026-11-02', category_id: 'push', user_id: 'a', points: 25, medal: 'gold' },
+  ];
+  const oct = plain(R.totals(results, { from: OCT, to: OCT }));
+  assert.deepEqual([oct[0].points, oct[0].gold, oct[0].silver, oct[0].months], [43, 1, 1, 2]);
+  assert.equal(R.totals(results)[0].points, 68);
+  assert.deepEqual(plain(R.closedMonthsFromWeeks(['2026-12-21', '2026-12-28'])), ['2026-12-01']);
+  assert.deepEqual(plain(R.closedMonthsFromWeeks(['2026-12-21'])), []);
+});

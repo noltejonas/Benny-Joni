@@ -43,7 +43,8 @@
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
   // 3: Monatsrangliste (Welt-Leute, Freies Training, Monatsergebnisse, log_id)
   // 4: Zeit-Übung „Bibellesen“ (Minuten) in zwei Challenges
-  const DB_VERSION = 4;
+  // 5: Wochenwertung (weekly_results, ranking_week_closures)
+  const DB_VERSION = 5;
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -239,6 +240,23 @@
         for (const b of PTRanking.board(field)) monthly_results.push({ month, ...b });
       }
     }
+    // Wochenwertung: abgeschlossene Wochen ab der ersten gewerteten. Für die
+    // letzten Wochen aus den Beispielsätzen gerechnet, davor ausgedacht.
+    const weekly_results = [], ranking_week_closures = [];
+    const chCat = Object.fromEntries(weekly_challenges.map(w => [w.id, w.category_id]));
+    const ranked = sets.map(x => ({ ...x, category_id: chCat[x.challenge_id] }));
+    const dataFrom = PTRanking.weekOf(new Date(addDays(monday, -7 * 8) + 'T00:00:00'));
+    for (let w = PTRanking.startWeek(ranking_settings.start_month); PTRanking.weekCloseDeadline(w) <= now; w = PTRanking.addWeeks(w, 1)) {
+      ranking_week_closures.push({ week: w, closed_at: PTRanking.weekCloseDeadline(w).toISOString() });
+      const values = w >= dataFrom
+        ? PTRanking.weekValues({ sets: ranked, categories, week: w })
+        : rankedIds.flatMap(catId => [...optedIn, ME].filter(() => r() < 0.6)
+          .map(u => ({ category_id: catId, user_id: u, value: catId === 'cat-bsu' ? rint(130, 204) : catId === 'cat-th' ? rint(6, 15) : rint(20, 600) })));
+      const counted = values.filter(v => v.user_id !== 'u-sara' && (v.user_id !== ME || w >= dataFrom || r() < 0.8));
+      for (const b of PTRanking.board(counted, v => profiles.find(p => p.id === v.user_id)?.ranking_opt_in !== false)) {
+        weekly_results.push({ week: w, ...b });
+      }
+    }
     const ranking_reports = [{ id: id('rr'), reporter: 'u-jonas', user_id: 'u-w3', reason: 'values', category_id: 'cat-push',
       month: thisMonth, resolution: null, resolved_by: null, resolved_at: null, created_at: now.toISOString() }];
 
@@ -290,7 +308,7 @@
       // i18n-ignore: Projekt- und Tool-Namen
       project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: 'Terminator', emoji: '📁', created_at: monday }],
       tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }], // i18n-ignore: Tool-Name
-      ranking_settings, monthly_results, month_closures, ranking_reports,
+      ranking_settings, monthly_results, month_closures, ranking_reports, weekly_results, ranking_week_closures,
       user_blocks: [], ranking_admins: [ME],
       accounts: [{ email: 'benny@demo.local', user_id: ME }],
       v: DB_VERSION,
@@ -304,7 +322,7 @@
   // Demo-Daten werden neu erzeugt.
   function upgrade(d) {
     if ((d.v || 1) >= DB_VERSION) return d;
-    if ((d.v || 1) < 4) return seed();
+    if ((d.v || 1) < 5) return seed();
     d.accounts = d.accounts || [{ email: 'benny@demo.local', user_id: ME }];
     const old = addDays(isoDate(mondayOf(new Date())), -60) + 'T08:00:00Z';
     for (const p of d.profiles) {
@@ -559,10 +577,28 @@
       async getRankingSettings() { return later(db.ranking_settings); },
       async getRankedCategories() { return later(db.categories.filter(c => c.ranked && !c.competition_id).map(localizeCategory)); },
       async rankingMonth(month) { return later(rankingMonth(uid(), month)); },
+      // Wie die Migration weekly_ranking: Summen aus den abgeschlossenen Wochen
       async rankingTotals({ from = null, to = null } = {}) {
         const me = uid();
-        const rows = PTRanking.totals(visibleResults(me), { from, to });
+        const rows = PTRanking.totals(visibleWeekResults(me), { from, to });
         return later(rows.map(r => ({ ...r, ...profileFields(me, r.user_id) })));
+      },
+      async rankingWeek(week) { return later(rankingWeek(uid(), week)); },
+      async rankingClosedWeeks() { return later(db.ranking_week_closures.map(c => c.week).sort().reverse()); },
+      async rankingProfileWeeks(userId) {
+        const me = uid();
+        return later(visibleWeekResults(me).filter(r => r.user_id === userId && r.points > 0)
+          .sort((a, b) => b.week.localeCompare(a.week) || a.rank - b.rank));
+      },
+      async closeDueWeeks() {
+        let n = 0;
+        for (let w = PTRanking.startWeek(db.ranking_settings.start_month); PTRanking.weekCloseDeadline(w) <= new Date(); w = PTRanking.addWeeks(w, 1)) {
+          if (db.ranking_week_closures.some(x => x.week === w)) continue;
+          db.ranking_week_closures.push({ week: w, closed_at: new Date().toISOString() });
+          for (const b of liveBoardWeek(w)) { db.weekly_results.push({ week: w, ...b }); n++; }
+        }
+        if (n) save();
+        return later(n);
       },
       async rankingProfile(userId) {
         const me = uid();
@@ -570,7 +606,7 @@
           .sort((a, b) => b.month.localeCompare(a.month) || a.rank - b.rank));
       },
       async seasonChampions() {
-        return later(PTRanking.seasonChampions(visibleResults(uid()), db.month_closures.map(m => m.month)));
+        return later(PTRanking.seasonChampions(visibleWeekResults(uid()), PTRanking.closedMonthsFromWeeks(db.ranking_week_closures.map(c => c.week))));
       },
       async closeDueMonths() {
         let n = 0;
@@ -714,6 +750,32 @@
       }
     }
     return rows;
+  }
+  function liveBoardWeek(week) {
+    const values = PTRanking.weekValues({ sets: rankedSets(), categories: db.categories, week });
+    return PTRanking.board(values, v => optedIn(v.user_id) && !rankingHidden(v.user_id, v.category_id, PTRanking.weekMonth(week)));
+  }
+  function rankingWeek(me, week) {
+    const month = PTRanking.weekMonth(week);
+    const closed = db.ranking_week_closures.some(c => c.week === week);
+    const board = closed
+      ? db.weekly_results.filter(r => r.week === week && optedIn(r.user_id) && !rankingHidden(r.user_id, r.category_id, month))
+      : liveBoardWeek(week).map(b => ({ ...b, medal: null }));
+    const rows = board.map(b => ({ category_id: b.category_id, user_id: b.user_id, value: b.value, rank: b.rank,
+      points: b.points, medal: closed ? b.medal : null, counted: true, ...profileFields(me, b.user_id) }));
+    if (!closed) {
+      const mine = PTRanking.weekValues({ sets: rankedSets(), categories: db.categories, week })
+        .filter(v => v.user_id === me && v.value > 0 && !board.some(b => b.user_id === me && b.category_id === v.category_id));
+      for (const v of mine) {
+        rows.push({ ...v, rank: PTRanking.hypotheticalRank(board.filter(b => b.category_id === v.category_id), v.value),
+          points: 0, medal: null, counted: false, ...profileFields(me, me) });
+      }
+    }
+    return rows;
+  }
+  function visibleWeekResults(me) {
+    return (db.weekly_results || []).filter(r => (optedIn(r.user_id) || r.user_id === me)
+      && !rankingHidden(r.user_id, r.category_id, PTRanking.weekMonth(r.week)));
   }
   function visibleResults(me) {
     return db.monthly_results.filter(r => (optedIn(r.user_id) || r.user_id === me) && !rankingHidden(r.user_id, r.category_id, r.month));
