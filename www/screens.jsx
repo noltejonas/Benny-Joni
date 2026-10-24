@@ -22,7 +22,8 @@ function setQuickSets(athlete, catId, arr) {
 
 // `coach`: Tipp für den allerersten Satz (Onboarding), bis er geloggt ist.
 // `minutes`: Zeit-Übung, die Chips sind Minuten.
-function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onLog, coach }) {
+// `compact`: ohne Kopfzeile, mittlerer Wert hervorgehoben, „+“ am Ende öffnet das Log-Sheet.
+function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onLog, coach, compact = false }) {
   const [values, setValues] = useState(() => getQuickSets(me, catId, { legacyId, minutes }));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(values);
@@ -74,6 +75,22 @@ function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onL
         <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:10}}>
           <button className="btn-ghost-sm" onClick={() => { setDraft(values); setEditing(false); }}>{tr('Abbrechen')}</button>
           <button className="btn-ghost-sm primary" onClick={() => commit(draft)}>{tr('Speichern')}</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (compact && values.length > 0) {
+    const main = values.length >= 3 ? 1 : 0;
+    return (
+      <div className="quick-row is-compact">
+        <div className={`quick-chips${values.length > 4 ? ' is-many' : ''}`}>
+          {values.map((v, i) => (
+            <button key={i} className={`quick-chip mono${i === main ? ' is-main' : ''}`} aria-label={chipAria(v)} onClick={() => onQuick(v)}>+{v}</button>
+          ))}
+          {onLog && (
+            <button className="quick-chip-more" aria-label={minutes ? tr('Zeit eintragen') : tr('Satz eintragen')} onClick={onLog}>＋</button>
+          )}
         </div>
       </div>
     );

@@ -16,6 +16,24 @@
 /* Alle Karten so hoch wie die höchste, Eintragen bzw. Start sitzt unten */
 .fc-slide > .rd-focus { flex: 1; min-width: 0; }
 .fc-slide > .rd-focus > :last-child { margin-top: auto; }
+
+/* Kompakte Fokus-Karte („Alle Challenges“): Übung, Anteil, eine Reihe Schnellsatz */
+.rd-focus.fc-compact { gap: 18px; padding: 22px; }
+.fc-compact .rd-focus-sub { font-size: 14px; font-weight: 700; }
+.fc-compact .rd-focus-title { overflow-wrap: normal; hyphens: auto; -webkit-hyphens: auto; }
+.fc-pct {
+  width: 64px; height: 64px; flex-shrink: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800;
+}
+.rd-focus .quick-row.is-compact .quick-chip { height: 54px; font-size: 19px; background: rgba(255, 255, 255, 0.2); }
+.rd-focus .quick-row.is-compact .quick-chip.is-main { background: #fff; color: #4338CA; }
+.rd-focus.fc-card.is-done .quick-row.is-compact .quick-chip.is-main { color: #137A55; }
+.quick-chip-more {
+  flex: 0 0 54px; height: 54px; border: none; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.2); color: #fff; font: inherit; font-size: 22px; font-weight: 800;
+}
 .fc-slide.is-off > .rd-focus { opacity: .82; transform: scale(.97); }
 .fc-slide > .rd-focus { transition: opacity .25s var(--ease), transform .25s var(--ease); }
 .rd-focus.fc-card.is-done { background: linear-gradient(135deg, #22A06B 0%, #137A55 100%); box-shadow: 0 12px 32px rgba(19, 122, 85, .28); }

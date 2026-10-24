@@ -222,40 +222,24 @@ function CompCard({ card, onOpen }) {
   );
 }
 
-// Fokus-Karte einer zusammengeführten Übung (zählt für alle ihre Challenges)
+// Fokus-Karte einer zusammengeführten Übung (zählt für alle ihre Challenges).
+// Kompakt: Übung, Anteil und eine Reihe Schnellsatz; den Stand pro Challenge
+// zeigt die Challenge selbst.
 function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
   const fmt = (v) => fmtAmount(ex.minutes, v);
   return (
-    <div className={`rd-focus fc-card${ex.finished ? ' is-done' : ''}`}>
+    <div className={`rd-focus fc-card fc-compact${ex.finished ? ' is-done' : ''}`}>
       <div className="rd-focus-top">
         <div className="rd-focus-text">
-          <h2 className="rd-focus-title">{ex.cat?.name}</h2>
           <div className="rd-focus-sub">
             {ex.isObligatory
               ? (ex.finished ? tr('erledigt') : tr('einmal diese Woche'))
               : ex.finished ? tr('überall erledigt')
               : ex.todayLeft > 0 ? tr('heute noch {amount}', { amount: fmt(ex.todayLeft) }) : tr('du bist auf Kurs')}
           </div>
+          <h2 className="rd-focus-title">{ex.cat?.name}</h2>
         </div>
-        <MiniRing pct={ex.pct} size={64} stroke={6} color="#fff" track="rgba(255,255,255,0.22)">
-          {Math.round(ex.pct * 100)}%
-        </MiniRing>
-      </div>
-
-      <div className="fc-entries">
-        {ex.entries.map(({ card, row }) => (
-          <div key={row.ch.id} className="fc-entry">
-            <div className="fc-entry-head">
-              <span className="fc-entry-name">{card.c.emoji} {card.c.name}</span>
-              <span className="fc-entry-mine mono">
-                {row.isObligatory ? (row.meFinished ? '✓' : '0/1') : `${fmt(row.myDone)}/${fmt(row.share)}`}
-              </span>
-            </div>
-            {!row.isObligatory && card.sides.length > 0 && (
-              <TugBar sides={card.sides} values={row.doneBySide} goals={row.sideGoals} minutes={row.minutes} onDark compact />
-            )}
-          </div>
-        ))}
+        <span className="fc-pct mono">{Math.round(ex.pct * 100)}%</span>
       </div>
 
       {ex.isObligatory ? (
@@ -264,7 +248,7 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
           {ex.catType === 'tom_holland' ? tr('Workout starten') : tr('Bring Sally Up starten')}
         </button>
       ) : (
-        <QuickLogRow me={me} catId={ex.key} legacyId={ex.cat?.id} minutes={ex.minutes} onQuick={onQuick} onLog={onLog} />
+        <QuickLogRow me={me} catId={ex.key} legacyId={ex.cat?.id} minutes={ex.minutes} onQuick={onQuick} onLog={onLog} compact />
       )}
     </div>
   );

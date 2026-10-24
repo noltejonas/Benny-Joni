@@ -928,6 +928,7 @@ PTi18n.add('en', {
   'Zählt für die Monatsrangliste.': 'Counts for the monthly leaderboard.',
   'Eigene Übung: zählt in euren Challenges, nicht in der Rangliste.': 'Own exercise: counts in your challenges, not in the leaderboard.',
   'Zeit eintragen': 'Log time',
+  'Satz eintragen': 'Log a set',
   'Nach Übung filtern': 'Filter by exercise',
   'Minuten kumuliert': 'Minutes, cumulative',
   'Minuten im Verlauf': 'Minutes over time',
