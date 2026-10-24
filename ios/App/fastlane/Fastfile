@@ -302,7 +302,8 @@ platform :ios do
       app_version: version,
       ipa: ipa,
       skip_binary_upload: metadata_only,
-      build_number: build_number&.to_s,
+      # deliver erlaubt build_number nicht zusammen mit ipa; die IPA trägt die Nummer selbst.
+      build_number: ipa ? nil : build_number&.to_s,
       metadata_path: METADATA_DIR,
       skip_screenshots: !screenshots,
       overwrite_screenshots: false,
