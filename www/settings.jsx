@@ -533,7 +533,7 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, 
 // die App hört auf „pt:colors“ und setzt auch die Statusleistenfarbe.
 const ST_PALETTE_NAMES = {
   violett: tr('Violett'), graphit: tr('Graphit & Grün'), mitternacht: tr('Mitternacht & Lime'), ozean: tr('Ozean'),
-  sonnenuntergang: tr('Sonnenuntergang'), kreide: tr('Kreide'), ruhig: tr('Violett ruhig'),
+  sonnenuntergang: tr('Sonnenuntergang'), kreide: tr('Kreide'), ruhig: tr('Violett ruhig'), girly: tr('Girly'),
 };
 const ST_COLOR_FIELDS = {
   bg: tr('Hintergrund'), surface: tr('Flächen'), text: tr('Text'), accent: tr('Akzent'),

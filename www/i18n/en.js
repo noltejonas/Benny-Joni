@@ -1046,6 +1046,7 @@ PTi18n.add('en', {
   'Sonnenuntergang': 'Sunset',
   'Kreide': 'Chalk',
   'Violett ruhig': 'Calm violet',
+  'Girly': 'Girly',
   'Hintergrund': 'Background',
   'Flächen': 'Surfaces',
   'Text': 'Text',
