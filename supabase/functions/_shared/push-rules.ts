@@ -22,14 +22,18 @@ export const MAX_NUDGES_PER_USER_PER_RUN = 1;
 // Beitritt und Reaktion lösen nur frisch einen Push aus (schützt vor nachgespielten Aufrufen).
 export const SOCIAL_MAX_AGE_MINUTES = 15;
 
-// Werte für push_log.kind. Über alle Arten gilt: höchstens eine Mitteilung pro
-// Nutzer, Challenge und Tag.
+// Werte für push_log.kind. Höchstens eine Mitteilung pro Nutzer, Challenge,
+// Art und Tag; push_log.ref grenzt feiner ein (Überholen: je Übung, Reaktion:
+// je reagierender Person, 100 %: je Person, die fertig ist).
+// Migration 20261024150000_push_events.sql.
 export const PUSH_KIND = {
   rival: "rival",
   daily: "daily",
   lastCall: "last_call",
   join: "join",
   reaction: "reaction",
+  overtake: "overtake",
+  goal: "goal",
 } as const;
 export type PushKind = typeof PUSH_KIND[keyof typeof PUSH_KIND];
 export type NudgeKind = "daily" | "last_call";
@@ -129,6 +133,25 @@ export function flagFromEnv(raw: string | null | undefined, fallback: boolean): 
 // Ab der Schwelle (einschließlich): „Rivalen-Push ab 10 Wiederholungen am Tag“.
 export function rivalReached(senderToday: number | null | undefined, threshold: number): boolean {
   return (senderToday ?? 0) >= threshold;
+}
+
+// Überholen: Wer lag vor diesem Eintrag gleichauf oder vorn und liegt jetzt
+// dahinter? Seiten bei 0 zählen nicht (das wäre nur der erste Satz der Woche).
+export function overtakenSides<T extends { value: number }>(before: number, after: number, sides: T[]): T[] {
+  return sides.filter((s) => s.value > 0 && before <= s.value && after > s.value);
+}
+
+export interface GoalProgress {
+  share: number; // Anteil der Person am Wochenziel (Pflicht-Workout: 1)
+  value: number; // Stand nach diesem Eintrag
+  added: number; // Beitrag dieses Eintrags
+}
+
+// 100 %: alle Wochenziele der Challenge erreicht, und erst durch diesen Eintrag.
+export function completesAll(goals: GoalProgress[]): boolean {
+  return goals.length > 0 &&
+    goals.every((g) => g.value >= g.share) &&
+    goals.some((g) => g.value - g.added < g.share);
 }
 
 export function isFresh(createdAt: string | null | undefined, now: Date = new Date(), maxMinutes = SOCIAL_MAX_AGE_MINUTES): boolean {
@@ -246,6 +269,12 @@ interface PushTexts {
   joinBodyGroup: string;
   reactionAmount: (who: string, amount: number, unit: string) => string;
   reactionSet: (who: string) => string;
+  overtakeTitle: (name: string) => string;
+  overtakeTeamTitle: (name: string) => string;
+  overtakeBody: (unit: string, theirs: number, mine: number) => string;
+  overtakeTeamBody: (unit: string, theirs: number, ours: number) => string;
+  goalTitle: (name: string) => string;
+  goalBody: string;
 }
 
 // Gleiche Wortwahl wie in der App (www/i18n/en.js: British English, typografischer
@@ -269,6 +298,12 @@ export const PUSH_TEXT: Record<PushLang, PushTexts> = {
     joinBodyGroup: "Die Challenge läuft. Leg los!",
     reactionAmount: (who, amount, unit) => `${who} hat auf deine ${amount} ${unit} reagiert.`,
     reactionSet: (who) => `${who} hat auf deinen Satz reagiert.`,
+    overtakeTitle: (name) => `⚡ ${name} hat dich überholt`,
+    overtakeTeamTitle: (name) => `⚡ ${name} hat euch überholt`,
+    overtakeBody: (unit, theirs, mine) => `${unit}: ${theirs} zu ${mine}. Hol dir die Führung zurück!`,
+    overtakeTeamBody: (unit, theirs, ours) => `${unit}: ${theirs} zu ${ours}. Holt euch die Führung zurück!`,
+    goalTitle: (name) => `🏁 ${name} hat 100 % geschafft`,
+    goalBody: "Alle Wochenziele erledigt. Und du?",
   },
   en: {
     someone: "Someone",
@@ -288,6 +323,12 @@ export const PUSH_TEXT: Record<PushLang, PushTexts> = {
     joinBodyGroup: "The challenge is on. Let’s go!",
     reactionAmount: (who, amount, unit) => `${who} reacted to your ${amount} ${unit}.`,
     reactionSet: (who) => `${who} reacted to your set.`,
+    overtakeTitle: (name) => `⚡ ${name} overtook you`,
+    overtakeTeamTitle: (name) => `⚡ ${name} overtook your team`,
+    overtakeBody: (unit, theirs, mine) => `${unit}: ${theirs} to ${mine}. Take the lead back!`,
+    overtakeTeamBody: (unit, theirs, ours) => `${unit}: ${theirs} to ${ours}. Take the lead back together!`,
+    goalTitle: (name) => `🏁 ${name} hit 100%`,
+    goalBody: "Every weekly goal done. Your turn?",
   },
 };
 
@@ -381,6 +422,27 @@ export function reactionAlert(o: CompText & { reactorName: string; emoji: string
     title: `${cleanText(o.emoji, 8, "👏")} ${who}`,
     subtitle: compLine(o),
     body: amount > 1 && unit ? t.reactionAmount(who, amount, unit) : t.reactionSet(who),
+  };
+}
+
+// unitName ist schon in der Sprache der Empfänger (localizedCategoryName).
+export function overtakeAlert(o: CompText & { senderName: string; unitName: string; theirs: number; mine: number; team?: boolean }): Alert {
+  const t = textFor(o.lang);
+  const who = cleanText(o.senderName, 30, t.someone);
+  const unit = cleanText(o.unitName, 30, t.reps);
+  return {
+    title: o.team ? t.overtakeTeamTitle(who) : t.overtakeTitle(who),
+    subtitle: compLine(o),
+    body: o.team ? t.overtakeTeamBody(unit, o.theirs, o.mine) : t.overtakeBody(unit, o.theirs, o.mine),
+  };
+}
+
+export function goalAlert(o: CompText & { name: string }): Alert {
+  const t = textFor(o.lang);
+  return {
+    title: t.goalTitle(cleanText(o.name, 30, t.someone)),
+    subtitle: compLine(o),
+    body: t.goalBody,
   };
 }
 

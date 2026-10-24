@@ -425,10 +425,15 @@ test('sendToDevices: zählt Zustellungen und sammelt tote Tokens', async () => {
 
 // ── Code-Regeln der Functions (statisch, Deno läuft hier nicht) ─────────────
 
-test('notify-set: Schwelle aus Env, Antwort ohne Empfänger und Tageswert', () => {
+test('notify-set: Überholen statt Tagesschwelle, Antwort ohne Empfänger und Tageswert', () => {
   const src = readFileSync(fn('notify-set/index.ts'), 'utf8');
-  assert.doesNotMatch(src, /RIVAL_THRESHOLD = 100/);
-  assert.match(src, /thresholdFromEnv\(Deno\.env\.get\("RIVAL_THRESHOLD"\)\)/);
+  assert.doesNotMatch(src, /RIVAL_THRESHOLD/);
+  assert.match(src, /overtakenSides\(after - added, after, others\)/);
+  assert.match(src, /completesAll\(progress\)/);
+  // Secret: ohne gesetztes Secret zu, Vergleich in konstanter Zeit
+  assert.match(src, /if \(!WEBHOOK_SECRET \|\| !sameSecret\(/);
+  // Obergrenze je Art und ref über den Unique-Index, keine Sperre über alle Arten
+  assert.match(src, /ref: job\.ref \?\? null/);
   for (const m of src.matchAll(/Response\.json\(([\s\S]*?)\);/g)) {
     assert.doesNotMatch(m[1], /recipients|senderToday/, `Antwort verrät Daten: ${m[1]}`);
   }
@@ -437,7 +442,7 @@ test('notify-set: Schwelle aus Env, Antwort ohne Empfänger und Tageswert', () =
   // Texte je Empfänger in dessen Sprache, mit Ausweichweg ohne Spalte profiles.language
   assert.match(src, /fetchMembers\("display_name, language"\)/);
   assert.match(src, /fetchMembers\("display_name"\)/);
-  assert.match(src, /alert: job\.alert\(lang\)/);
+  assert.match(src, /alert: job\.alert\(lang, userId\)/);
   assert.doesNotMatch(src, /"Jemand"/);
 });
 
@@ -460,4 +465,42 @@ test('daily-nudge: im DRY_RUN kein Versand und kein push_log', () => {
   assert.match(src, /flagFromEnv\(Deno\.env\.get\("DRY_RUN"\), true\)/);
   // NUDGE_SECRET fail closed
   assert.match(src, /if \(!NUDGE_SECRET\)/);
+});
+
+// ── Überholt und 100 % (notify-set) ──────────────────────────────────────────
+
+test('overtakenSides: nur wer vorher gleichauf oder vorn lag und jetzt dahinter liegt', () => {
+  const sides = [{ id: 'a', value: 50 }, { id: 'b', value: 70 }, { id: 'c', value: 0 }, { id: 'd', value: 45 }];
+  // 45 → 60: überholt a (50); b (70) bleibt vorn, d (45) lag schon dahinter... gleichauf zählt
+  assert.deepEqual(R.overtakenSides(45, 60, sides).map((s) => s.id), ['a', 'd']);
+  // 50 → 50 ändert nichts
+  assert.deepEqual(R.overtakenSides(50, 50, sides), []);
+  // Seiten bei 0 lösen nichts aus (erster Satz der Woche)
+  assert.deepEqual(R.overtakenSides(0, 10, [{ id: 'c', value: 0 }]), []);
+  // schon vorher vorn: kein neues Überholen
+  assert.deepEqual(R.overtakenSides(80, 90, sides), []);
+});
+
+test('completesAll: erst der Eintrag, der die letzte Lücke schließt', () => {
+  assert.equal(R.completesAll([{ share: 50, value: 50, added: 10 }, { share: 30, value: 40, added: 0 }]), true);
+  // schon vorher fertig
+  assert.equal(R.completesAll([{ share: 50, value: 70, added: 10 }, { share: 30, value: 40, added: 0 }]), false);
+  // noch nicht fertig
+  assert.equal(R.completesAll([{ share: 50, value: 49, added: 10 }, { share: 30, value: 40, added: 0 }]), false);
+  // Pflicht-Workout: erster Durchgang schließt
+  assert.equal(R.completesAll([{ share: 1, value: 1, added: 1 }]), true);
+  assert.equal(R.completesAll([]), false);
+});
+
+test('overtakeAlert und goalAlert: Texte in Deutsch und Englisch', () => {
+  const de = R.overtakeAlert({ senderName: 'Benny', unitName: 'Liegestütze', theirs: 120, mine: 110, compName: 'Duell', compEmoji: '⚔️' });
+  assert.deepEqual(de, { title: '⚡ Benny hat dich überholt', subtitle: '⚔️ Duell', body: 'Liegestütze: 120 zu 110. Hol dir die Führung zurück!' });
+  const team = R.overtakeAlert({ lang: 'en', senderName: 'Aline', unitName: 'Push-ups', theirs: 200, mine: 190, team: true, compName: 'Alinny', compEmoji: '🏆' });
+  assert.equal(team.title, '⚡ Aline overtook your team');
+  assert.equal(team.body, 'Push-ups: 200 to 190. Take the lead back together!');
+  const goal = R.goalAlert({ name: 'Jonas', compName: 'Bis einer heult', compEmoji: '🔥' });
+  assert.deepEqual(goal, { title: '🏁 Jonas hat 100 % geschafft', subtitle: '🔥 Bis einer heult', body: 'Alle Wochenziele erledigt. Und du?' });
+  assert.equal(R.goalAlert({ lang: 'en', name: 'Jonas', compName: 'X' }).title, '🏁 Jonas hit 100%');
+  assert.equal(R.PUSH_KIND.overtake, 'overtake');
+  assert.equal(R.PUSH_KIND.goal, 'goal');
 });

@@ -36,14 +36,8 @@ exception when others then
   raise notice 'cron-Rechte nicht gesetzt (%), vermutlich schon vorhanden', sqlerrm;
 end $$;
 
--- Höchstens eine Mitteilung pro Nutzer, Challenge und Tag, egal welcher Art.
--- push_log_scope_idx (Migration A) enthält kind und verhindert nur Doppel
--- derselben Art; dieser Index macht die Obergrenze atomar. Nur Zeilen der
--- Multi-User-Version (athlete is null), alte Benny/Jonas-Zeilen bleiben außen vor.
--- Steht identisch auch in 20261021002000_social_push.sql.
-create unique index if not exists push_log_one_per_day_idx
-  on public.push_log (user_id, competition_id, day)
-  where user_id is not null and competition_id is not null and athlete is null;
+-- Die Obergrenze (eine Erinnerung pro Nutzer, Challenge und Tag) sichert
+-- push_log_scope_ref_idx aus 20261024150000_push_events.sql.
 
 select cron.schedule(
   'daily-nudge',
