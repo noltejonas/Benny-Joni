@@ -1,4 +1,4 @@
-/* Projekt Terminator — Redesign-Ebene
+/* Benny & Joni — Redesign-Ebene
    Wird nach styles.css geladen. Enthält die Design-Tokens (hell als Standard,
    dunkel als zweites Theme), die neuen rd-*-Komponenten und Overrides für
    bestehende Klassen. Spielerfarben laufen über --side0/--side1 bzw. später
@@ -146,8 +146,9 @@ button, input, select, textarea { font-family: inherit; }
 .avatar-btn:active { transform: scale(0.94); }
 .avatar-btn.is-active .rd-avatar { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--primary); }
 
+/* --pt-ad-h: Höhe des AdMob-Banners über der Tab-Leiste, sonst 0 (www/ads.js). */
 .app-main {
-  padding: 24px 16px calc(120px + var(--safe-bot));
+  padding: 24px 16px calc(120px + var(--safe-bot) + var(--pt-ad-h, 0px));
   display: flex; flex-direction: column; gap: 24px;
 }
 /* `clip` schneidet wie `hidden` ab, macht .app-main aber nicht zum
@@ -175,6 +176,10 @@ button, input, select, textarea { font-family: inherit; }
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   box-shadow: var(--shadow-float);
+}
+.app:has(.rd-feed.lf) .tabbar-inner {
+  background: var(--surface);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 .tab-btn {
   position: relative;
@@ -266,7 +271,7 @@ button, input, select, textarea { font-family: inherit; }
    Toast über den ganzen Bildschirm. Nach dem Einfahren zieht einmal ein
    heller Glanzstreifen darüber. */
 .toast {
-  top: auto; bottom: calc(104px + var(--safe-bot));
+  top: auto; bottom: calc(104px + var(--safe-bot) + var(--pt-ad-h, 0px));
   width: max-content; max-width: calc(100vw - 48px);
   padding: 14px 22px; text-align: center;
   background: var(--grad);
@@ -591,8 +596,7 @@ button, input, select, textarea { font-family: inherit; }
   position: sticky; top: calc(var(--safe-top) + 8px); z-index: 6;
   align-self: flex-start; margin: 10px 0 2px 4px; padding: 5px 10px;
   border-radius: 999px; background: var(--bg);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 
 .lf-row { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
@@ -1150,6 +1154,35 @@ button.st-row:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .mu-recap-podium-row.win { box-shadow: 0 0 0 2px var(--sc); }
 .penalty-row.payout { background: transparent; }
 
+/* ─── Launch: Serie, Übung hinzufügen, Melden/Blockieren, Teilen ──────── */
+/* Serie auf „Heute“ (Fokus-Karte): Tage in Folge, offen = heute noch kein Satz */
+.rd-chip-streak { white-space: nowrap; }
+.rd-chip-streak.is-open { white-space: normal; background: rgba(255, 255, 255, 0.24); }
+.rd-chip-streak-note { font-weight: 500; }
+
+/* „+ Übung hinzufügen“ am Ende von „Deine Übungen“ */
+.rd-row-add { min-height: 56px; }
+.rd-row-add .rd-tile { background: transparent; border: 1.5px dashed var(--text-4); color: var(--primary-ink); }
+.rd-row-add .rd-row-name { color: var(--primary-ink); }
+
+/* Timer-Banner ohne Work-Challenge: nur Anzeige */
+.timer-banner.is-static { cursor: default; }
+
+/* Wochenziel-Sheet: Übung hat diese Woche schon ein Ziel */
+.cat-card-note { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--text-3); }
+
+/* „Ergebnis teilen“ im Wochenabschluss und in Woche 1 */
+.recap-share { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; }
+.recap-share .share-result-btn { width: 100%; }
+.share-result-btn svg { flex-shrink: 0; }
+.share-result-info { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-3); text-align: center; }
+
+/* Feed: Melden und Blockieren im aufgeklappten Eintrag */
+.lf-mod { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--line); }
+.lf-mod-hint { font-size: 13px; line-height: 18px; color: var(--text-3); }
+.lf-mod-actions { display: flex; justify-content: flex-end; gap: 4px; }
+.lf-mod-btn { min-height: 36px; padding: 6px 10px; color: var(--text-2); font-size: 13px; }
+.lf-row.is-blocked .lf-avatar { opacity: 0.6; }
 /* ─── Rangliste (rk-*) ─────────────────────────────────────────────────── */
 /* Tab-Bar mit 4 oder 5 Reitern (Strafkonto optional) */
 .tabbar-inner { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }

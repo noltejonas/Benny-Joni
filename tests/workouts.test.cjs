@@ -111,7 +111,7 @@ test('per_week_aggregate: Sally-Sekunden zählen nicht als Wiederholungen', () =
   P.annotateWorkouts(sets, challenges, cats);
   const pens = P.computePenalties(challenges, sets, 'u1', cfg('per_week_aggregate'), 2);
   assert.equal(pens.length, 1);
-  assert.match(pens[0].reason, /unter fairShare/);
+  assert.match(pens[0].reason, /unter dem eigenen Anteil/);
 });
 
 test('per_week_aggregate: alles erledigt ergibt keine Strafe', () => {

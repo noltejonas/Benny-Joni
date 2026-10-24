@@ -1,5 +1,9 @@
 # TestFlight-Builds mit fastlane
 
+> **App-Store-Einreichung:** Build ohne fastlane (Xcode Archive) und die Lane
+> `release` stehen in [`docs/launch/RELEASE.md`](launch/RELEASE.md). Dort steht
+> auch, wie fastlane auf einem Mac mit System-Ruby 2.6 läuft (Homebrew-Ruby).
+
 Ein Befehl baut die App aus dem aktuellen Stand und lädt sie zu TestFlight hoch:
 
 ```bash

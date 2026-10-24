@@ -206,3 +206,64 @@ test('intensityLevels: Quartile der aktiven Tage, Workout-Tag ist Stufe 1', () =
   assert.equal(level(10, true), 1);
   assert.equal(level(80, true), 4);
 });
+
+test('sharePeople: tatsächliche Teilnehmer ab 2 Aktiven, sonst volle Besetzung', () => {
+  assert.equal(S.SHARE_BASIS, 'actual');
+  // 2 vs 2 mit 3 Leuten: Home teilt wie Stats und Strafe durch 3
+  assert.equal(S.sharePeople({ active: 3, expected: 4 }), 3);
+  assert.equal(S.sharePeople({ active: 2, expected: 2 }), 2);
+  // allein in 1 vs 1 bzw. 2 vs 2: volle Besetzung
+  assert.equal(S.sharePeople({ active: 1, expected: 2 }), 2);
+  assert.equal(S.sharePeople({ active: 1, expected: 4 }), 4);
+  assert.equal(S.sharePeople({ active: 0, expected: 0 }), 1);
+  // alter Stand: immer volle Besetzung
+  assert.equal(S.sharePeople({ active: 3, expected: 4, basis: 'expected' }), 4);
+  // Home-Anteil = Anteil im Stats-Modell, sobald 3 aktiv sind
+  assert.equal(P.fairShareOf(120, S.sharePeople({ active: 3, expected: 4 })), 40);
+});
+
+test('fullWeekFactor: nur eine angebrochene erste Woche wird hochgerechnet', () => {
+  // Challenge-Start am Donnerstag der Vorwoche: 4 Tage → 7/4
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK, startDate: '2026-10-08' }), 7 / 4);
+  // Ziel erst am Samstag angelegt: 2 Tage → 7/2
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK, startDate: '2026-10-08', createdAt: at('2026-10-10') }), 7 / 2);
+  // Ziel vor dem Start angelegt zählt ab Start
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK, startDate: '2026-10-08', createdAt: at('2026-10-06') }), 7 / 4);
+  // Start am Montag, vor der Woche, danach oder ohne Startdatum: volle Woche
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK, startDate: LAST_WEEK }), 1);
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK, startDate: '2026-09-01', createdAt: at('2026-10-09') }), 1);
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK, startDate: THIS_WEEK }), 1);
+  assert.equal(S.fullWeekFactor({ weekStart: LAST_WEEK }), 1);
+});
+
+test('weekTemplateFromPrevious: Ziele der Vorwoche als Vorlage', () => {
+  const prev = [
+    { id: 'w1', category_id: 'push', week_start: LAST_WEEK, target_reps: 200 },
+    { id: 'w1p', category_id: 'pull', week_start: LAST_WEEK, target_reps: 60 },
+    { id: 'w1x', category_id: 'push', week_start: LAST_WEEK, target_reps: 999 },
+  ];
+  const t = S.weekTemplateFromPrevious(prev);
+  assert.deepEqual([...t.map(x => [x.category_id, x.base_reps, x.bonus_max])], [['push', 200, 0], ['pull', 60, 0]]);
+  // eindeutige slot_id pro Übung (WeekFixCard merkt sich die Werte darüber)
+  assert.equal(new Set(t.map(x => x.slot_id)).size, 2);
+  assert.equal(S.weekTemplateFromPrevious([]).length, 0);
+  assert.equal(S.weekTemplateFromPrevious(undefined).length, 0);
+});
+
+test('weekTemplateFromPrevious: angebrochene Woche auf 7 Tage hochrechnen, Workouts bleiben', () => {
+  const prev = [
+    { id: 'w1', category_id: 'push', week_start: LAST_WEEK, target_reps: 60 },
+    { id: 'w1p', category_id: 'pull', week_start: LAST_WEEK, target_reps: 7 },
+    { id: 'w1th', category_id: 'th', week_start: LAST_WEEK, target_reps: 1 },
+  ];
+  P.annotateWorkouts([], prev, cats);
+  const t = S.weekTemplateFromPrevious(prev, { fullWeekFactor: 7 / 4 });
+  // 60 · 7/4 = 105; 7 · 7/4 = 12,25 → 12 (unter 20 nicht auf 5 gerundet); Tom Holland bleibt
+  assert.deepEqual([...t.map(x => x.base_reps)], [105, 12, 1]);
+  // Faktor pro Ziel, höchstens 7-fach; 7 · 1,1 = 7,7 → 8
+  const perCh = S.weekTemplateFromPrevious(prev, { fullWeekFactor: (ch) => (ch.id === 'w1' ? 100 : 1.1) });
+  assert.deepEqual([...perCh.map(x => x.base_reps)], [420, 8, 1]);
+  // Faktor ≤ 1 oder ungültig ändert nichts
+  const same = S.weekTemplateFromPrevious(prev, { fullWeekFactor: () => NaN });
+  assert.deepEqual([...same.map(x => x.base_reps)], [60, 7, 1]);
+});

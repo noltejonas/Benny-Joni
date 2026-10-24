@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Impressum · Benny &amp; Joni</title>
+  <!-- Keine externen Ressourcen: keine Schriften, Skripte oder Bilder von fremden Servern. -->
+  <style>
+    :root {
+      --bg: #f4f3f8; --card: #ffffff; --text: #1c1c1e; --text-2: #5b5b63; --line: #e3e2e8;
+      --accent: #1f8f3a; --todo-bg: #fff1a8; --todo-text: #4d3a00; --draft-bg: #fff4e5; --draft-line: #e8a33d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000; --card: #1c1c1e; --text: #f2f2f7; --text-2: #a1a1aa; --line: #2c2c30;
+        --accent: #32d74b; --todo-bg: #5c4500; --todo-text: #fff1a8; --draft-bg: #2b2111; --draft-line: #a8752a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+    header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-bottom: 20px; }
+    .brand { font-weight: 800; font-size: 20px; color: var(--text); text-decoration: none; }
+    nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; }
+    nav a { color: var(--text-2); text-decoration: none; }
+    nav a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+    main { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; }
+    h2 { font-size: 20px; margin: 32px 0 8px; }
+    h3 { font-size: 17px; margin: 22px 0 6px; }
+    p, ul { margin: 0 0 12px; }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    a { color: var(--accent); }
+    .meta { color: var(--text-2); font-size: 14px; margin-bottom: 20px; }
+    .box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+    footer { color: var(--text-2); font-size: 14px; margin-top: 24px; text-align: center; }
+    footer a { color: var(--text-2); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="index.html">Benny &amp; Joni</a>
+    <nav aria-label="Rechtliches">
+      <a href="datenschutz.html">Datenschutz</a>
+      <a href="impressum.html" aria-current="page">Impressum</a>
+      <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>
+      <a href="support.html">Support</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Impressum</h1>
+    <p class="meta">Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG) für die App „Benny &amp; Joni“ und diese Website</p>
+
+    <h2>Anbieter</h2>
+    <p>
+      Jonas Nolte und Benjamin Frey<br />
+      Furtbachstraße 16A<br />
+      70178 Stuttgart<br />
+      Deutschland
+    </p>
+
+    <h2>Kontakt</h2>
+    <p>
+      E-Mail: <a href="mailto:bennyundjoni@gmail.com">bennyundjoni@gmail.com</a><br />
+      Telefon: <a href="tel:+491781479821">+49 178 1479821</a> (Jonas Nolte)
+    </p>
+
+    <h2>Verbraucherstreitbeilegung</h2>
+    <p>Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+
+    <h2>Links auf andere Seiten</h2>
+    <p>Für Inhalte fremder Seiten, auf die wir verlinken, sind deren Betreiber verantwortlich. Erfahren wir von Rechtsverstößen, entfernen wir den Link umgehend.</p>
+  </main>
+
+  <footer>
+    <a href="index.html">Start</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="support.html">Support</a>
+  </footer>
+</div>
+</body>
+</html>

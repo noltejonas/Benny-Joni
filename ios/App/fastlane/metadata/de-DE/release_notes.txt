@@ -1,0 +1,1 @@
+Gemeinsame Wochenziele, Fitness-Duelle, Live-Feed, Statistiken und eine optionale Monatsrangliste. Werbung ist zunächst serverseitig ausgeschaltet. Erst nach späterer Freischaltung sind nicht personalisierte Banner in Feed und Stats mit dem erforderlichen Einwilligungsablauf vorgesehen.

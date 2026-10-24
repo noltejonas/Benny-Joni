@@ -1,0 +1,1 @@
+Shared weekly goals, fitness duels, a live feed, statistics and an optional monthly leaderboard. Ads are initially disabled by a server switch. Only after later activation may non-personalised banners appear in Feed and Stats, with the required consent flow.
