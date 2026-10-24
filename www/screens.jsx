@@ -543,7 +543,6 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
   const chosenBy = existing?.chosen_by || me;
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
-  const [newCatEmoji, setNewCatEmoji] = useState('💪');
   const [newCatUnit, setNewCatUnit] = useState('reps');
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
@@ -621,14 +620,13 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
   async function addNewCat() {
     if (!newCatName.trim()) return;
     try {
-      const cat = await api.addCategory(newCatName.trim(), newCatEmoji, UNIT_KIND[newCatUnit] || 'sports');
+      const cat = await api.addCategory(newCatName.trim(), '💪', UNIT_KIND[newCatUnit] || 'sports');
       onAddCategory();
       setCatId(cat.id);
       if (!touched) setAmount(defaultAmount(cat));
       setShowNewCat(false);
       setNewCatName('');
       setNewCatUnit('reps');
-      setNewCatEmoji('💪');
     } catch (e) {
       alert(e.message);
     }
@@ -712,8 +710,6 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
 
       {editingCat &&
         <div className="new-cat-row">
-          <input className="input new-cat-emoji" value={editingCat.emoji} maxLength={2}
-            onChange={(e) => setEditingCat({ ...editingCat, emoji: e.target.value })} />
           <input className="input" value={editingCat.name} autoFocus
             onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && saveEdit()} />
@@ -725,7 +721,6 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
       {showNewCat &&
         <div className="goal-new">
           <div className="new-cat-row" style={{ marginTop: 0 }}>
-            <input className="input new-cat-emoji" value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} maxLength={2} />
             <input className="input" placeholder={tr('Name (z.B. Bibellesen, Planks)')} autoFocus
               value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
