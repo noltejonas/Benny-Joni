@@ -87,6 +87,25 @@ function FocusCarousel({ items, activeKey, onActive, render, label }) {
 
   const leftOf = (el, slide) => slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2;
 
+  // Karten folgen dem Finger: pro Frame der Abstand jeder Karte zur Mitte als
+  // --fc-p (0 = Mitte, 1 = eine Karte daneben), daraus Größe und Deckkraft im
+  // CSS. Ohne Re-Render; nur die Punkte wechseln sofort mit (liveIdx).
+  const [liveIdx, setLiveIdx] = React.useState(index);
+  const liveRef = React.useRef(index);
+  React.useEffect(() => { liveRef.current = index; setLiveIdx(index); }, [index]);
+  const paint = React.useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const mid = el.scrollLeft + el.clientWidth / 2;
+    let best = 0, dist = Infinity;
+    [...el.children].forEach((sl, i) => {
+      const d = Math.abs(sl.offsetLeft + sl.offsetWidth / 2 - mid);
+      if (d < dist) { dist = d; best = i; }
+      sl.style.setProperty('--fc-p', Math.min(1, d / (sl.offsetWidth || 1)).toFixed(3));
+    });
+    if (best !== liveRef.current) { liveRef.current = best; setLiveIdx(best); }
+  }, []);
+
   // Gemeldet wird erst, wenn das Scrollen zur Ruhe gekommen ist. So springt
   // ein Wischen nicht mittendrin und eine Auswahl von außen wird nicht vom
   // ersten Scroll-Frame wieder zurückgesetzt.
@@ -94,6 +113,7 @@ function FocusCarousel({ items, activeKey, onActive, render, label }) {
     const el = trackRef.current;
     if (!el) return;
     let timer = 0;
+    let raf = 0;
     const settle = () => {
       const slides = [...el.children];
       if (!slides.length) return;
@@ -110,10 +130,19 @@ function FocusCarousel({ items, activeKey, onActive, render, label }) {
         onActiveRef.current?.(key);
       }
     };
-    const onScroll = () => { clearTimeout(timer); timer = setTimeout(settle, 120); };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; paint(); });
+      clearTimeout(timer); timer = setTimeout(settle, 120);
+    };
+    // scrollend (wo vorhanden) meldet ohne die 120 ms Wartezeit
+    const onEnd = () => { clearTimeout(timer); settle(); };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => { el.removeEventListener('scroll', onScroll); clearTimeout(timer); };
-  }, []);
+    el.addEventListener('scrollend', onEnd);
+    return () => {
+      el.removeEventListener('scroll', onScroll); el.removeEventListener('scrollend', onEnd);
+      clearTimeout(timer); cancelAnimationFrame(raf);
+    };
+  }, [paint]);
 
   // Auswahl von außen (Liste angetippt): zur Karte scrollen
   React.useEffect(() => {
@@ -137,6 +166,7 @@ function FocusCarousel({ items, activeKey, onActive, render, label }) {
     const el = trackRef.current;
     const slide = el?.children[index];
     if (slide && !targetRef.current) el.scrollLeft = leftOf(el, slide);
+    paint();
   }, [keysSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (i) => {
@@ -151,15 +181,15 @@ function FocusCarousel({ items, activeKey, onActive, render, label }) {
     <section className="fc" aria-label={label} aria-roledescription={tr('Karussell')}>
       <div className={`fc-track${items.length === 1 ? ' is-single' : ''}`} ref={trackRef}>
         {items.map((it, i) => (
-          <div key={it.key} className={`fc-slide${i === index ? '' : ' is-off'}`}>{render(it, i === index)}</div>
+          <div key={it.key} className={`fc-slide${i === liveIdx ? '' : ' is-off'}`}>{render(it, i === index)}</div>
         ))}
       </div>
       {items.length > 1 && (
         <div className="fc-dots" role="tablist" aria-label={tr('Übung wählen')}>
           {items.map((it, i) => (
-            <button key={it.key} type="button" role="tab" aria-selected={i === index}
+            <button key={it.key} type="button" role="tab" aria-selected={i === liveIdx}
               aria-label={tr('Karte {n} von {total}', { n: i + 1, total: items.length })}
-              className={`fc-dot${i === index ? ' is-on' : ''}${it.done ? ' is-done' : ''}`} onClick={() => go(i)} />
+              className={`fc-dot${i === liveIdx ? ' is-on' : ''}${it.done ? ' is-done' : ''}`} onClick={() => go(i)} />
           ))}
         </div>
       )}

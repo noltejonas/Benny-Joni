@@ -34,8 +34,13 @@
   flex: 0 0 54px; height: 54px; border: none; border-radius: 999px; cursor: pointer;
   background: rgba(255, 255, 255, 0.2); color: #fff; font: inherit; font-size: 22px; font-weight: 800;
 }
-.fc-slide.is-off > .rd-focus { opacity: .82; transform: scale(.97); }
-.fc-slide > .rd-focus { transition: opacity .25s var(--ease), transform .25s var(--ease); }
+.fc-slide { --fc-p: 0; }
+/* Größe und Deckkraft folgen dem Wischen (--fc-p aus FocusCarousel), ohne Übergang */
+.fc-slide > .rd-focus {
+  transform: scale(calc(1 - 0.04 * var(--fc-p)));
+  opacity: calc(1 - 0.22 * var(--fc-p));
+  will-change: transform, opacity;
+}
 .rd-focus.fc-card.is-done { background: linear-gradient(135deg, #22A06B 0%, #137A55 100%); box-shadow: 0 12px 32px rgba(19, 122, 85, .28); }
 .rd-focus.fc-card.is-done .rd-btn-white,
 .rd-focus.fc-card.is-done .quick-chip-open { color: #137A55; }
@@ -169,7 +174,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tw.lead-0 .tw-fill.is-0, .tw.lead-1 .tw-fill.is-1 { animation: none; }
-  .fc-slide > .rd-focus { transition: none; }
+  .fc-slide > .rd-focus { transform: none; }
 }
 
 /* ─── Wochenziel festlegen ─────────────────────────────────────────────── */
