@@ -1,22 +1,30 @@
-/* global React, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
+/* global React, PTData, PTDashboard, PTOnboarding, ObAmount, TugBar, FocusCarousel, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo } = React;
 
-// Per-athlete-per-category quick-log values, stored locally.
-function getQuickSets(athlete, catId) {
+// Schnellsatz-Werte pro Person und Übung, lokal gespeichert. Schlüssel ist
+// PTData.exerciseKey (gleiche Übung in mehreren Challenges teilt sich die Werte),
+// legacyId die Kategorie-ID, unter der frühere Versionen gespeichert haben.
+const QUICK_DEFAULTS = { reps: [5, 10, 15], minutes: [10, 15, 30] };
+function getQuickSets(athlete, catId, { legacyId = null, minutes = false } = {}) {
+  const fallback = minutes ? QUICK_DEFAULTS.minutes : QUICK_DEFAULTS.reps;
   try {
     const all = JSON.parse(localStorage.getItem('quickSets') || '{}');
-    return all[`${athlete}:${catId}`] || [5, 10, 15];
-  } catch { return [5, 10, 15]; }
+    return all[`${athlete}:${catId}`] || (legacyId && all[`${athlete}:${legacyId}`]) || fallback;
+  } catch { return fallback; }
 }
 function setQuickSets(athlete, catId, arr) {
-  const all = JSON.parse(localStorage.getItem('quickSets') || '{}');
-  all[`${athlete}:${catId}`] = arr;
-  localStorage.setItem('quickSets', JSON.stringify(all));
+  try {
+    const all = JSON.parse(localStorage.getItem('quickSets') || '{}');
+    all[`${athlete}:${catId}`] = arr;
+    localStorage.setItem('quickSets', JSON.stringify(all));
+  } catch (e) {}
 }
 
 // `coach`: Tipp für den allerersten Satz (Onboarding), bis er geloggt ist.
-function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
-  const [values, setValues] = useState(() => getQuickSets(me, catId));
+// `minutes`: Zeit-Übung, die Chips sind Minuten.
+// `compact`: ohne Kopfzeile, mittlerer Wert hervorgehoben, „+“ am Ende öffnet das Log-Sheet.
+function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onLog, coach, compact = false }) {
+  const [values, setValues] = useState(() => getQuickSets(me, catId, { legacyId, minutes }));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(values);
   // Pfeil des Tipps zeigt auf die Mitte des ersten Zahl-Chips.
@@ -30,7 +38,9 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
     setArrowX(Math.round(b.left - a.left + b.width / 2));
   }, [coach, editing, values]);
 
-  useEffect(() => { setValues(getQuickSets(me, catId)); setEditing(false); }, [me, catId]);
+  useEffect(() => { setValues(getQuickSets(me, catId, { legacyId, minutes })); setEditing(false); }, [me, catId, legacyId, minutes]);
+  // Einheit steht bei Minuten in der Überschrift, die Chips bleiben kurz (eine Reihe)
+  const chipAria = (v) => (minutes ? tr('+{n} min', { n: v }) : undefined);
 
   function commit(next) {
     const clean = next.filter(n => Number.isFinite(n) && n > 0).slice(0, 6);
@@ -59,7 +69,7 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
             </div>
           ))}
           {draft.length < 6 && (
-            <button className="quick-chip-add" aria-label={tr('Wert hinzufügen')} onClick={() => setDraft([...draft, 10])}>＋</button>
+            <button className="quick-chip-add" aria-label={tr('Wert hinzufügen')} onClick={() => setDraft([...draft, minutes ? 30 : 10])}>＋</button>
           )}
         </div>
         <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:10}}>
@@ -70,10 +80,26 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
     );
   }
 
+  if (compact && values.length > 0) {
+    const main = values.length >= 3 ? 1 : 0;
+    return (
+      <div className="quick-row is-compact">
+        <div className={`quick-chips${values.length > 4 ? ' is-many' : ''}`}>
+          {values.map((v, i) => (
+            <button key={i} className={`quick-chip mono${i === main ? ' is-main' : ''}`} aria-label={chipAria(v)} onClick={() => onQuick(v)}>+{v}</button>
+          ))}
+          {onLog && (
+            <button className="quick-chip-more" aria-label={minutes ? tr('Zeit eintragen') : tr('Satz eintragen')} onClick={onLog}>＋</button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="quick-row" ref={rowRef}>
       <div className="quick-row-head">
-        <span className="quick-row-label">{tr('Schnellsatz')}</span>
+        <span className="quick-row-label">{minutes ? tr('Minuten eintragen') : tr('Schnellsatz')}</span>
         {values.length > 0 && (
           <button className="quick-edit-btn" aria-label={tr('Schnellsatz bearbeiten')} onClick={() => { setDraft(values); setEditing(true); }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -85,16 +111,16 @@ function QuickLogRow({ me, catId, onQuick, onLog, coach }) {
           {tr('Satz gemacht? Tipp hier.')}
         </div>
       )}
-      <div className="quick-chips">
+      <div className={`quick-chips${values.length > 4 ? ' is-many' : ''}`}>
         {onLog && (
-          <button className="quick-chip-open" onClick={onLog}>{tr('+ Satz')}</button>
+          <button className="quick-chip-open" onClick={onLog}>{minutes ? tr('+ Zeit') : tr('+ Satz')}</button>
         )}
         {values.length === 0 ? (
-          <button className="quick-chip-setup" onClick={() => { setDraft([5, 10, 15]); setEditing(true); }}>
+          <button className="quick-chip-setup" onClick={() => { setDraft(minutes ? QUICK_DEFAULTS.minutes : QUICK_DEFAULTS.reps); setEditing(true); }}>
             {tr('Schnellsatz festlegen')}
           </button>
         ) : values.map((v, i) => (
-          <button key={i} className={`quick-chip mono${coach && i === 0 ? ' ob-pulse' : ''}`} onClick={() => onQuick(v)}>+{v}</button>
+          <button key={i} className={`quick-chip mono${coach && i === 0 ? ' ob-pulse' : ''}`} aria-label={chipAria(v)} onClick={() => onQuick(v)}>+{v}</button>
         ))}
       </div>
     </div>
@@ -109,21 +135,6 @@ function localDateOf(input) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-function dayIndexInWeek(weekStart, today = new Date()) {
-  const ws = new Date(weekStart + 'T00:00:00');
-  const t = new Date(today); t.setHours(0, 0, 0, 0);
-  const diff = Math.floor((t - ws) / 86400000) + 1;
-  return Math.max(1, Math.min(7, diff));
-}
-
-// athletes: eine User-ID oder eine Liste (Team).
-function repsOnLocalDate(sets, athletes, dateStr) {
-  const ids = Array.isArray(athletes) ? athletes : [athletes];
-  return sets
-    .filter(s => ids.includes(s.athlete) && localDateOf(s.created_at) === dateStr)
-    .reduce((sum, s) => sum + PTData.setValue(s), 0);
 }
 
 // Mo-first weekly breakdown per group (Liste von User-ID-Listen) → day.vals[i].
@@ -210,11 +221,11 @@ function DuelCard({ entries, title, meta }) {
   const lead = a.wins - b.wins;
   const line = total === 0 ? tr('Noch nichts geloggt. Wer legt vor?')
     : lead > 0 ? (we
-      ? trn(lead, 'Ihr liegt eine Challenge vorne.', 'Ihr liegt {n} Challenges vorne.')
-      : trn(lead, 'Du liegst eine Challenge vorne.', 'Du liegst {n} Challenges vorne.'))
+      ? trn(lead, 'Ihr liegt bei einer Übung vorne.', 'Ihr liegt bei {n} Übungen vorne.')
+      : trn(lead, 'Du liegst bei einer Übung vorne.', 'Du liegst bei {n} Übungen vorne.'))
     : lead < 0 ? (b.side.userIds.length > 1
-      ? trn(-lead, '{name} liegen eine Challenge vorne.', '{name} liegen {n} Challenges vorne.', { name: b.side.label })
-      : trn(-lead, '{name} liegt eine Challenge vorne.', '{name} liegt {n} Challenges vorne.', { name: b.side.label }))
+      ? trn(-lead, '{name} liegen bei einer Übung vorne.', '{name} liegen bei {n} Übungen vorne.', { name: b.side.label })
+      : trn(-lead, '{name} liegt bei einer Übung vorne.', '{name} liegt bei {n} Übungen vorne.', { name: b.side.label }))
     : tr('Gleichstand. Jetzt zählt jeder Satz.');
   const aShare = total ? Math.round((a.reps / total) * 100) : 50;
   return (
@@ -229,7 +240,7 @@ function DuelCard({ entries, title, meta }) {
         ) : (
           <div key="score" className="rd-duel-score">
             <div className="rd-duel-num"><CountUp value={a.wins} /> : <CountUp value={b.wins} /></div>
-            <div className="rd-duel-cap">{tr('Challenges vorne')}</div>
+            <div className="rd-duel-cap">{tr('Übungen vorne')}</div>
           </div>
         ))}
       </div>
@@ -247,7 +258,7 @@ function DuelCard({ entries, title, meta }) {
 }
 
 function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = [], categories = [], allSets = [], layout,
-  weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
+  competitionId = null, weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
   openClosures = [], onCloseWeek,
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false, celebrate = true }) {
   const [timerRunning, setTimerRunning] = React.useState(() => {
@@ -267,46 +278,15 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     return () => { window.removeEventListener('focus', check); window.removeEventListener('pt:timer-changed', check); };
   }, []);
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
-  const tabChallenges = challenges.filter(ch => {
-    const cat = catById[ch.category_id];
-    return (cat?.kind || 'sports') === 'sports';
-  });
+  const tabChallenges = challenges;
   const celebration = useCelebration(challenges, allSets, me, categories);
-  const focusRef = React.useRef(null);
   const [selectedId, setSelectedId] = React.useState(null);
 
-  // Kennzahlen pro Wochenziel einmal berechnen; Liste, Fokus-Karte und Duell lesen daraus.
-  const rows = React.useMemo(() => tabChallenges.map(ch => {
-    const cat = catById[ch.category_id];
-    const isWork = cat?.kind === 'work';
-    const catType = cat?.challenge_type || 'standard';
-    // Pflicht-Workout: jeder Eintrag ist ein Durchgang, Ziel ist einer pro Person.
-    const isObligatory = PTData.isWorkoutType(catType);
-    const val = (x) => isWork ? (x.duration_minutes ?? 0) : (x.reps ?? 0);
-    const csets = allSets.filter(x => x.challenge_id === ch.id);
-    const doneBySide = isObligatory
-      ? sides.map(side => PTData.workoutPeopleDone(csets, side.statUserIds || side.userIds))
-      : totalsBySide(csets, sides, val);
-    const total = isObligatory
-      ? doneBySide.reduce((a, x) => a + x, 0)
-      : csets.reduce((a, x) => a + val(x), 0);
-    const people = participantCount || sides.length || 1;
-    // Fairer Anteil pro Person (Ziel / aktive Teilnehmer)
-    const share = isObligatory ? 1 : PTData.fairShareOf(ch.target_reps, people);
-    const goal = isObligatory ? people : ch.target_reps;
-    const expectedByEod = Math.ceil(share * dayIndexInWeek(ch.week_start) / 7);
-    const mine = csets.filter(x => x.athlete === me);
-    const myDone = isObligatory ? mine.length : mine.reduce((a, x) => a + val(x), 0);
-    const meFinished = myDone >= share;
-    return {
-      ch, cat, isWork, catType, isObligatory, total, goal, doneBySide, share,
-      leader: isObligatory ? null : uniqueMaxIndex(doneBySide),
-      myDone, meFinished,
-      mySummary: isObligatory ? PTData.workoutSummary(catType, mine) : '',
-      myTodayLeft: Math.max(0, expectedByEod - myDone),
-      fmt: (v) => isWork ? formatDuration(v) : v,
-    };
-  }), [tabChallenges, allSets, me, sides, participantCount]);
+  // Kennzahlen pro Wochenziel einmal berechnen; Karten, Liste und Duell lesen daraus.
+  const rows = React.useMemo(
+    () => PTDashboard.challengeRows({ challenges: tabChallenges, categories, sets: allSets, sides, me, participantCount }),
+    [tabChallenges, categories, allSets, me, sides, participantCount]
+  );
 
   const orderedRows = React.useMemo(
     () => [...rows.filter(r => !r.meFinished), ...rows.filter(r => r.meFinished)],
@@ -315,26 +295,25 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const focus = rows.find(r => r.ch.id === selectedId)
     || orderedRows.find(r => r.isObligatory && !r.meFinished)
     || orderedRows[0];
+  // Fokus-Karten in fester Reihenfolge, damit eine fertige Übung nicht wegspringt
+  const slides = React.useMemo(() => rows.map(r => ({ key: r.ch.id, done: r.meFinished, row: r })), [rows]);
+  const onSlide = React.useCallback((id) => setSelectedId(id), []);
 
-  const duelEntries = React.useMemo(() => sides.map((side, i) => ({
-    side,
-    wins: rows.filter(r => r.leader === i).length,
-    reps: rows.reduce((a, r) => a + (r.isWork || r.isObligatory ? 0 : r.doneBySide[i]), 0),
-  })), [rows, sides]);
+  const duelEntries = React.useMemo(() => PTDashboard.duelOf(rows, sides), [rows, sides]);
 
-  // Tagesbalken: bei mehr als zwei Seiten „Du vs. Ø der anderen“
+  // Tagesbalken (nur Wiederholungen): bei mehr als zwei Seiten „Du vs. Ø der anderen“
   const twoSided = sides.length === 2;
   const othersCount = Math.max(1, sides.length - 1);
   const week = React.useMemo(() => {
     const groups = twoSided || sides.length < 2
       ? sides.map(s => s.statUserIds || s.userIds)
       : [sides[0].statUserIds, sides.slice(1).flatMap(s => s.statUserIds)];
-    const ids = new Set(tabChallenges.map(c => c.id));
+    const ids = new Set(rows.filter(r => !r.minutes).map(r => r.ch.id));
     const ws = tabChallenges[0]?.week_start || weekStart;
     const days = dailyBreakdownFor(ws, allSets.filter(x => ids.has(x.challenge_id)), groups);
     if (!twoSided && sides.length > 2) for (const d of days) d.vals[1] = Math.round(d.vals[1] / othersCount);
     return days;
-  }, [tabChallenges, allSets, weekStart, sides]);
+  }, [rows, tabChallenges, allSets, weekStart, sides]);
   const weekSeries = twoSided || sides.length < 2
     ? sides.map(s => ({ key: s.key, label: s.isMine && s.userIds.length === 1 ? tr('Du') : s.label, style: sideStyle(s) }))
     : [{ key: 'me', label: tr('Du'), style: sideStyle(sides[0]) }, { key: 'avg', label: tr('Ø andere'), style: { '--sc': 'var(--text-4)' } }];
@@ -342,11 +321,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const daysLeft = week.filter(d => d.isFuture).length;
   const finishedCount = rows.filter(r => r.meFinished).length;
   const chosenByLabel = (id) => id === me ? tr('gewählt von dir') : tr('gewählt von {name}', { name: PTPeople.firstNameOf(id) });
-
-  const pick = (id) => {
-    setSelectedId(id);
-    focusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
+  const fmtOf = (r) => (v) => (r.minutes ? formatDuration(v) : v);
 
   // Rules of Hooks: this early return must come AFTER all hooks above.
   if (!tabChallenges.length) {
@@ -359,7 +334,56 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
     );
   }
 
-  const fPct = focus ? Math.min(1, focus.total / Math.max(1, focus.goal)) : 0;
+  const renderSlide = ({ row: f }) => {
+    const fmt = fmtOf(f);
+    const pct = Math.min(1, f.total / Math.max(1, f.goal));
+    return (
+      <div className={`rd-focus fc-card${f.meFinished ? ' is-done' : ''}`} aria-label={f.isObligatory ? tr('Pflicht-Challenge') : tr('Wochenziel im Fokus')}>
+        <div className="rd-focus-top">
+          <div className="rd-focus-text">
+            {f.isObligatory && <div className="rd-overline">{tr('Pflicht-Challenge')}</div>}
+            <h2 className="rd-focus-title">{f.cat?.name}</h2>
+            {f.ch.chosen_by && <div className="rd-focus-sub">{chosenByLabel(f.ch.chosen_by)}</div>}
+          </div>
+          <MiniRing pct={pct} size={72} stroke={7} color="#fff" track="rgba(255,255,255,0.22)">
+            {Math.round(pct * 100)}%
+          </MiniRing>
+        </div>
+        {!f.isObligatory && sides.length >= 1 && (
+          <div className="fc-tug">
+            <TugBar sides={sides} values={f.doneBySide} goals={f.sideGoals} minutes={f.minutes} onDark />
+          </div>
+        )}
+        <div className="rd-focus-chips">
+          <span className="rd-chip-glass">
+            {f.isObligatory
+              ? tr('{done} von {total} erledigt', { done: f.total, total: f.goal })
+              : f.minutes
+                ? <>{fmt(f.total)} / {fmt(f.ch.target_reps)}</>
+                : tr('{done} / {target} Reps', { done: fmt(f.total), target: fmt(f.ch.target_reps) })}
+          </span>
+          <span className="rd-chip-glass">
+            {f.isObligatory ? (f.meFinished ? tr('du: {summary}', { summary: f.mySummary }) : tr('einmal diese Woche'))
+              : f.meFinished ? tr('dein Teil ist erledigt')
+              : f.myTodayLeft > 0 ? tr('heute noch {amount}', { amount: fmt(f.myTodayLeft) }) : tr('du bist auf Kurs')}
+          </span>
+          <button className="rd-icon-glass" aria-label={tr('{name} bearbeiten', { name: f.cat?.name })} onClick={() => onEditChallenge(f.ch)}>
+            <Icon name="edit" size={16} />
+          </button>
+        </div>
+        {f.isObligatory ? (
+          <button className="rd-btn-white" onClick={() => onLogChallenge(f.ch)}>
+            <Icon name="play" size={18} />
+            {f.catType === 'tom_holland' ? tr('Workout starten') : tr('Bring Sally Up starten')}
+          </button>
+        ) : (
+          <QuickLogRow me={me} catId={PTData.exerciseKey(f.cat, competitionId) || f.ch.category_id} legacyId={f.ch.category_id}
+            minutes={f.minutes} coach={coach && f === focus}
+            onQuick={(v) => onQuickLog?.(f.ch, v)} onLog={() => onLogChallenge(f.ch)} />
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -379,69 +403,34 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
       )}
 
       {focus && (
-        <section ref={focusRef} className="rd-focus" aria-label={focus.isObligatory ? tr('Pflicht-Challenge') : tr('Wochenziel im Fokus')}>
-          <div className="rd-focus-top">
-            <div className="rd-focus-text">
-              <div className="rd-overline">{focus.isObligatory ? tr('Pflicht-Challenge') : tr('Im Fokus')}</div>
-              <h2 className="rd-focus-title">{focus.cat?.name}</h2>
-              {focus.ch.chosen_by && <div className="rd-focus-sub">{chosenByLabel(focus.ch.chosen_by)}</div>}
-            </div>
-            <MiniRing pct={fPct} size={72} stroke={7} color="#fff" track="rgba(255,255,255,0.22)">
-              {Math.round(fPct * 100)}%
-            </MiniRing>
-          </div>
-          <div className="rd-focus-chips">
-            <span className="rd-chip-glass">
-              {focus.isObligatory
-                ? tr('{done} von {total} erledigt', { done: focus.total, total: focus.goal })
-                : focus.isWork
-                  ? <>{focus.fmt(focus.total)} / {focus.fmt(focus.ch.target_reps)}</>
-                  : tr('{done} / {target} Reps', { done: focus.fmt(focus.total), target: focus.fmt(focus.ch.target_reps) })}
-            </span>
-            <span className="rd-chip-glass">
-              {focus.isObligatory ? (focus.meFinished ? tr('du: {summary}', { summary: focus.mySummary }) : tr('einmal diese Woche'))
-                : focus.meFinished ? tr('dein Teil ist erledigt')
-                : focus.myTodayLeft > 0 ? tr('heute noch {amount}', { amount: focus.fmt(focus.myTodayLeft) }) : tr('du bist auf Kurs')}
-            </span>
-            <button className="rd-icon-glass" aria-label={tr('{name} bearbeiten', { name: focus.cat?.name })} onClick={() => onEditChallenge(focus.ch)}>
-              <Icon name="edit" size={16} />
-            </button>
-          </div>
-          {focus.isObligatory ? (
-            <button className="rd-btn-white" onClick={() => onLogChallenge(focus.ch)}>
-              <Icon name="play" size={18} />
-              {focus.catType === 'tom_holland' ? tr('Workout starten') : tr('Bring Sally Up starten')}
-            </button>
-          ) : (
-            <QuickLogRow me={me} catId={focus.ch.category_id} coach={coach}
-              onQuick={(v) => onQuickLog?.(focus.ch, v)} onLog={() => onLogChallenge(focus.ch)} />
-          )}
-        </section>
+        <FocusCarousel items={slides} activeKey={focus.ch.id} onActive={onSlide}
+          label={tr('Wochenziele im Fokus')} render={renderSlide} />
       )}
 
       <section className="rd-section" aria-label={tr('Deine Übungen')}>
         <div className="rd-section-head">
           <h2>{tr('Deine Übungen')}</h2>
           <span>{tr('{done} von {total} erledigt', { done: finishedCount, total: rows.length })}</span>
+          <button type="button" className="rd-head-btn" onClick={onAddGoal} aria-label={tr('Wochenziel hinzufügen')}>
+            <Icon name="plus" size={16} strokeWidth={2.5} /> {tr('Ziel')}
+          </button>
         </div>
         <ul className="rd-card rd-list">
           {orderedRows.map(r => {
             const isFocus = focus && r.ch.id === focus.ch.id;
-            const progress = { done: r.fmt(r.myDone), total: r.fmt(r.share) };
+            const fmt = fmtOf(r);
+            const progress = { done: fmt(r.myDone), total: fmt(r.share) };
             const sub = r.isObligatory
               ? (r.meFinished ? tr('erledigt · {summary}', { summary: r.mySummary }) : tr('einmal diese Woche'))
               : r.meFinished
                 ? tr('{done} von {total}', progress)
                 : r.myTodayLeft > 0
-                  ? tr('{done} von {total} · heute noch {left}', { ...progress, left: r.fmt(r.myTodayLeft) })
+                  ? tr('{done} von {total} · heute noch {left}', { ...progress, left: fmt(r.myTodayLeft) })
                   : tr('{done} von {total} · auf Kurs', progress);
             return (
               <li key={r.ch.id}>
                 <button type="button" className={`rd-row${r.meFinished ? ' is-done' : ''}${isFocus ? ' is-focus' : ''}`}
-                  aria-pressed={isFocus} onClick={() => pick(r.ch.id)}>
-                  <span className="rd-tile">
-                    <Icon name={r.isObligatory ? 'timer' : r.isWork ? 'laptop' : 'dumbbell'} size={20} />
-                  </span>
+                  aria-pressed={isFocus} onClick={() => setSelectedId(r.ch.id)}>
                   <span className="rd-row-text">
                     <span className="rd-row-name">{r.cat?.name}</span>
                     <span className="rd-row-sub">{sub}</span>
@@ -506,9 +495,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
               return (
                 <li key={ch.id || `p-${i}`}>
                   <div className="rd-row is-static">
-                    <span className="rd-tile">
-                      <Icon name={ctype !== 'standard' ? 'timer' : cat?.kind === 'work' ? 'laptop' : 'dumbbell'} size={20} />
-                    </span>
                     <span className="rd-row-text">
                       <span className="rd-row-name">{cat?.name}</span>
                       <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? chosenByLabel(ch.chosen_by) : tr('noch offen')}</span>
@@ -518,7 +504,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
                         {!isConfirmed && ch.bonus_max > 0
                           ? <>{ch.target_reps}–{ch.target_reps + ch.bonus_max}</>
                           : ch.target_reps}
-                        <small>{trc('Einheit', 'Reps')}</small>
+                        <small>{PTData.usesMinutes(cat) ? 'min' : trc('Einheit', 'Reps')}</small>
                       </>}
                     </span>
                   </div>
@@ -541,29 +527,66 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   );
 }
 
-function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing, onClose, onSaved, onDeleted, onAddCategory }) {
-  const [catId, setCatId] = useState(existing?.category_id || categories[0]?.id || '');
-  const [target, setTarget] = useState(existing?.target_reps || 100);
+// ─── WOCHENZIEL ─────────────────────────────────────────────────────────────
+// Auf einen Blick: Übung und Menge pro Person bis Sonntag. Unter „Details“:
+// Ziel gesamt statt pro Person, nächste Woche, eigene Übung mit Einheit
+// (Wiederholungen, Minuten oder Work) und dasselbe Ziel in weiteren Challenges.
+// target_reps bleibt das gemeinsame Wochenziel (Minuten bei Zeit-Übungen).
+const GOAL_INPUT_KEY = 'pt:goal-input'; // 'person' | 'total'
+const UNIT_KIND = { reps: 'sports', minutes: 'time', work: 'work' };
+
+function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart, existing, participantCount = 2,
+  competitionName = '', usedCategoryIds = [], otherComps = [], onClose, onSaved, onDeleted, onAddCategory }) {
+  const people = Math.max(1, participantCount);
+  const [catId, setCatId] = useState(existing?.category_id || categories.find(c => !usedCategoryIds.includes(c.id))?.id || categories[0]?.id || '');
+  const selectedCat = categories.find(c => c.id === catId);
+  const minutes = PTData.usesMinutes(selectedCat);
+  const isWorkout = PTData.isWorkoutType(selectedCat?.challenge_type);
+  const [perPerson, setPerPerson] = useState(() => { try { return localStorage.getItem(GOAL_INPUT_KEY) !== 'total'; } catch (e) { return true; } });
+  const defaultAmount = (cat, pp = perPerson) => {
+    const base = cat?.kind === 'work' ? 300 : PTData.usesMinutes(cat) ? 60 : PTOnboarding.goalDefault(cat);
+    return pp ? base : base * people;
+  };
+  const [amount, setAmount] = useState(() => existing?.target_reps
+    ? (perPerson ? Math.max(1, Math.round(existing.target_reps / people)) : existing.target_reps)
+    : defaultAmount(selectedCat));
+  const [touched, setTouched] = useState(!!existing);
+  // Bestehendes Ziel unverändert lassen, solange die Menge nicht angefasst wurde
+  // (100 bei 3 Personen würde sonst über „33 pro Person“ zu 99).
+  const [dirty, setDirty] = useState(false);
+  const [nextWeek, setNextWeek] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [alsoIn, setAlsoIn] = useState([]);
   const chosenBy = existing?.chosen_by || me;
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
-  const [newCatEmoji, setNewCatEmoji] = useState('💪');
-  const [newCatKind, setNewCatKind] = useState('sports');
+  const [newCatUnit, setNewCatUnit] = useState('reps');
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const target = isWorkout ? 1 : existing && !dirty && existing.category_id === catId ? existing.target_reps
+    : perPerson ? amount * people : amount;
+  const ws = existing ? existing.week_start || weekStart : nextWeek ? PTData.addDays(weekStart, 7) : weekStart;
 
-  const selectedCat = categories.find(c => c.id === catId);
-  const isWork = selectedCat?.kind === 'work';
-  // For work challenges: target is in hours; stored value = hours * 60
-  const [hoursTarget, setHoursTarget] = useState(
-    existing?.target_reps ? (isWork ? existing.target_reps / 60 : null) : null
-  );
-  React.useEffect(() => {
-    if (isWork && existing?.target_reps) {
-      setHoursTarget(existing.target_reps / 60);
-    }
-  }, [isWork]);
+  function pick(c) {
+    setCatId(c.id);
+    if (!touched) setAmount(defaultAmount(c));
+  }
+  function switchInput(pp) {
+    if (pp === perPerson) return;
+    setPerPerson(pp);
+    try { localStorage.setItem(GOAL_INPUT_KEY, pp ? 'person' : 'total'); } catch (e) {}
+    if (existing && !dirty) setAmount(pp ? Math.max(1, Math.round(existing.target_reps / people)) : existing.target_reps);
+    else setAmount(a => (pp ? Math.max(1, Math.round(a / people)) : a * people));
+  }
+
+  // Weitere Challenges: gleiche Übung (Katalog-ID bzw. gleicher Name und Einheit)
+  const key = PTData.exerciseKey(selectedCat);
+  const others = otherComps.map(o => {
+    const has = o.challenges.some(ch => ch.week_start === ws && PTData.exerciseKey(o.categoryOf(ch.category_id), o.c.id) === key);
+    return { ...o, has };
+  });
+  const canCopy = !existing && selectedCat && selectedCat.kind !== 'work' && others.length > 0;
 
   async function deleteChallenge() {
     if (!existing?.id) return;
@@ -585,12 +608,25 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
     setSaving(true);
     try {
       await api.upsertChallenge({
-        ...(existing?.id ? { id: existing.id } : { week_start: weekStart }),
+        ...(existing?.id ? { id: existing.id } : { week_start: ws }),
         category_id: catId,
         chosen_by: chosenBy,
-        target_reps: isWork ? Math.round((hoursTarget || 1) * 60) : target,
+        target_reps: Math.max(1, Math.round(target)),
       });
-      onSaved();
+      // Dasselbe Ziel in den ausgewählten anderen Challenges
+      let copied = 0;
+      for (const o of others.filter(x => alsoIn.includes(x.c.id) && !x.has)) {
+        const capi = baseApi.forCompetition(o.c.id);
+        let otherCat = selectedCat.competition_id == null ? selectedCat
+          : o.categories.find(c => PTData.exerciseKey(c) === key);
+        if (!otherCat) otherCat = await capi.addCategory(selectedCat.name, selectedCat.emoji, selectedCat.kind || 'sports');
+        await capi.upsertChallenge({
+          week_start: ws, category_id: otherCat.id, chosen_by: me,
+          target_reps: isWorkout ? 1 : Math.max(1, Math.round(perPerson ? amount * o.participantCount : amount)),
+        });
+        copied++;
+      }
+      onSaved(copied);
     } catch (e) {
       alert(e.message || tr('Fehler beim Speichern'));
     } finally {
@@ -601,13 +637,13 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
   async function addNewCat() {
     if (!newCatName.trim()) return;
     try {
-      const cat = await api.addCategory(newCatName.trim(), newCatEmoji, newCatKind);
+      const cat = await api.addCategory(newCatName.trim(), '💪', UNIT_KIND[newCatUnit] || 'sports');
       onAddCategory();
       setCatId(cat.id);
+      if (!touched) setAmount(defaultAmount(cat));
       setShowNewCat(false);
       setNewCatName('');
-      setNewCatKind('sports');
-      setNewCatEmoji('💪');
+      setNewCatUnit('reps');
     } catch (e) {
       alert(e.message);
     }
@@ -632,116 +668,154 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
     } catch (e) {alert(e.message);}
   }
 
+  const groups = [
+    { id: 'sports', label: null, items: categories.filter(c => (c.kind || 'sports') === 'sports') },
+    { id: 'time', label: tr('⏱️ Zeit'), items: categories.filter(c => c.kind === 'time') },
+    { id: 'work', label: tr('💻 Work'), items: allowWork ? categories.filter(c => c.kind === 'work') : [] },
+  ];
+  const card = (c) => {
+    const used = !existing && usedCategoryIds.includes(c.id) && !nextWeek;
+    return (
+      <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
+        <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} disabled={used} onClick={() => pick(c)}>
+          <div className="name">{c.name}</div>
+          {used ? <div className="cat-note">{tr('läuft schon')}</div>
+            : PTData.usesMinutes(c) ? <div className="cat-note">{tr('in Minuten')}</div>
+            : c.competition_id && <div className="cat-note">{tr('zählt nicht für die Rangliste')}</div>}
+        </button>
+        {c.competition_id && (
+          <button className="cat-edit" aria-label={tr('Bearbeiten')}
+            onClick={(e) => { e.stopPropagation(); setEditingCat({ ...c }); setShowNewCat(false); }}>
+            ✎
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const unitLabel = minutes
+    ? (perPerson ? tr('Minuten pro Person bis Sonntag') : tr('Minuten zusammen bis Sonntag'))
+    : (perPerson ? tr('Wiederholungen pro Person bis Sonntag') : tr('Wiederholungen zusammen bis Sonntag'));
+  const baseChoices = minutes ? (selectedCat?.kind === 'work' ? [120, 300, 600, 1200] : [30, 60, 120, 300]) : PTOnboarding.goalChoices(defaultAmount(selectedCat, true));
+  const choices = perPerson ? baseChoices : baseChoices.map(v => v * people);
+  const fmtTarget = (v) => (minutes ? formatDuration(v) : PTi18n.number(v));
+  const note = isWorkout ? null : perPerson
+    ? tr('Wochenziel zusammen: {total} ({n} Personen)', { total: fmtTarget(target), n: people })
+    : tr('Pro Person: {share}', { share: fmtTarget(PTData.fairShareOf(target, people)) });
+
   return (
     <>
-      <h2 className="title" style={{ marginBottom: 4 }}>{tr('Wochen-Ziel festlegen')}</h2>
-      <div className="subtitle" style={{ marginBottom: 18, fontSize: 15 }}>{formatWeek(weekStart)}</div>
+      <h2 className="title" style={{ marginBottom: 4 }}>{existing ? tr('Wochenziel bearbeiten') : tr('Wochen-Ziel festlegen')}</h2>
+      <div className="subtitle" style={{ marginBottom: 18, fontSize: 15 }}>
+        {competitionName && <>{competitionName} · </>}{tr('KW {week}', { week: weekNumber(ws) })} · {formatWeek(ws)}
+      </div>
 
-      <div className="label" style={{ marginBottom: 8 }}>{tr('Kategorie')}</div>
-
+      <div className="label" style={{ marginBottom: 8 }}>{tr('Übung')}</div>
       <div className="cat-grid">
-        {(() => {
-          const sports = categories.filter(c => (c.kind || 'sports') === 'sports');
-          const work   = categories.filter(c => c.kind === 'work');
-          return (
-            <>
-              {sports.map((c) => (
-                <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
-                  <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
-                    <div className="emoji">{c.emoji}</div>
-                    <div className="name">{c.name}</div>
-                    {c.competition_id && <div className="cat-note">{tr('zählt nicht für die Rangliste')}</div>}
-                  </button>
-                  {c.competition_id && (
-                    <button className="cat-edit" aria-label={tr('Bearbeiten')}
-                      onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-                      ✎
-                    </button>
-                  )}
-                </div>
-              ))}
-              {work.length > 0 && (
-                <>
-                  <div className="cat-grid-divider">{tr('💻 Work')}</div>
-                  {work.map((c) => (
-                    <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
-                      <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} onClick={() => setCatId(c.id)}>
-                        <div className="emoji">{c.emoji}</div>
-                        <div className="name">{c.name}</div>
-                      </button>
-                      {c.competition_id && (
-                        <button className="cat-edit" aria-label={tr('Bearbeiten')}
-                          onClick={(e) => {e.stopPropagation();setEditingCat({ ...c });setShowNewCat(false);}}>
-                          ✎
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
-              <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
-                onClick={() => {setShowNewCat((s) => !s);setEditingCat(null);}}>
-                <div className="emoji">＋</div>
-                <div className="name">{tr('Neue Kategorie')}</div>
-              </button>
-            </>
-          );
-        })()}
+        {groups.map(g => g.items.length > 0 && (
+          <React.Fragment key={g.id}>
+            {g.label && <div className="cat-grid-divider">{g.label}</div>}
+            {g.items.map(card)}
+          </React.Fragment>
+        ))}
+        <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
+          onClick={() => { setShowNewCat((v) => !v); setEditingCat(null); }}>
+          <div className="emoji">＋</div>
+          <div className="name">{tr('Eigene Übung')}</div>
+        </button>
       </div>
 
       {editingCat &&
-      <div className="new-cat-row">
-          <input className="input new-cat-emoji"
-        value={editingCat.emoji}
-        onChange={(e) => setEditingCat({ ...editingCat, emoji: e.target.value })}
-        maxLength={2} />
-          <input className="input"
-        value={editingCat.name} autoFocus
-        onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
-        onKeyDown={(e) => e.key === 'Enter' && saveEdit()} />
+        <div className="new-cat-row">
+          <input className="input" value={editingCat.name} autoFocus
+            onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && saveEdit()} />
           <button className="new-cat-add new-cat-del" onClick={deleteEdit} aria-label={tr('Löschen')}>🗑️</button>
           <button className="new-cat-add" onClick={saveEdit} aria-label={tr('Speichern')}>✓</button>
         </div>
       }
 
       {showNewCat &&
-        <div className="new-cat-row">
-          <input className="input new-cat-emoji"
-            value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} maxLength={2} />
-          <input className="input" placeholder={tr('Name (z.B. Dips)')} autoFocus
-            value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
-          {allowWork && (
-            <div className="segmented" style={{ flexShrink: 0 }}>
-              <button className={newCatKind === 'sports' ? 'active' : ''} onClick={() => setNewCatKind('sports')}>🏋️</button>
-              <button className={newCatKind === 'work'   ? 'active' : ''} onClick={() => setNewCatKind('work')}>💻</button>
-            </div>
-          )}
-          <button className="new-cat-add" onClick={addNewCat} aria-label={tr('Hinzufügen')}>✓</button>
+        <div className="goal-new">
+          <div className="new-cat-row" style={{ marginTop: 0 }}>
+            <input className="input" placeholder={tr('Name (z.B. Bibellesen, Planks)')} autoFocus
+              value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addNewCat()} />
+          </div>
+          <div className="label" style={{ margin: '12px 0 8px' }}>{tr('Einheit')}</div>
+          <div className="segmented goal-seg" role="radiogroup" aria-label={tr('Einheit')}>
+            <button role="radio" aria-checked={newCatUnit === 'reps'} className={newCatUnit === 'reps' ? 'active' : ''} onClick={() => setNewCatUnit('reps')}>{tr('Wiederholungen')}</button>
+            <button role="radio" aria-checked={newCatUnit === 'minutes'} className={newCatUnit === 'minutes' ? 'active' : ''} onClick={() => setNewCatUnit('minutes')}>{tr('Minuten')}</button>
+            {allowWork && <button role="radio" aria-checked={newCatUnit === 'work'} className={newCatUnit === 'work' ? 'active' : ''} onClick={() => setNewCatUnit('work')}>{tr('Work')}</button>}
+          </div>
+          <div className="goal-hint">
+            {newCatUnit === 'minutes' ? tr('Für alles, was man nach Zeit misst: Lesen, Planks, Laufen, Dehnen.')
+              : newCatUnit === 'work' ? tr('Arbeitszeit mit Projekt und Tool, nur mit Work-Tracking.')
+              : tr('Gezählt wird in Wiederholungen.')}
+          </div>
+          <button className="btn" style={{ marginTop: 12 }} disabled={!newCatName.trim()} onClick={addNewCat}>{tr('Übung anlegen')}</button>
         </div>
       }
 
-      {isWork ? (
-        <>
-          <div className="label" style={{ marginBottom: 0 }}>{tr('Ziel-Stunden / Woche')}</div>
-          <Stepper value={hoursTarget ?? 10} onChange={setHoursTarget} step={1} min={1} />
-          <div className="chip-row" style={{ justifyContent: 'center' }}>
-            {[5, 10, 20, 40].map((v) =>
-              <button key={v} className="chip" onClick={() => setHoursTarget(v)}>{v}h</button> // i18n-ignore: Einheit
-            )}
-          </div>
-        </>
+      {isWorkout ? (
+        <div className="goal-workout">{tr('Pflicht-Workout: jede Person einmal pro Woche.')}</div>
       ) : (
-        <>
-          <div className="label" style={{ marginBottom: 0 }}>{tr('Ziel-Wiederholungen / Woche')}</div>
-          <Stepper value={target} onChange={setTarget} step={target < 30 ? 1 : target < 100 ? 5 : 10} />
-          <div className="chip-row" style={{ justifyContent: 'center' }}>
-            {[15, 25, 40, 60, 80, 100].map((v) =>
-              <button key={v} className="chip" onClick={() => setTarget(v)}>{v}</button>
+        <div style={{ marginTop: 20 }}>
+          <ObAmount value={amount} onChange={(v) => { setTouched(true); setDirty(true); setAmount(v); }} unit={unitLabel}
+            choices={choices} note={note} />
+          {minutes && amount >= 60 && <div className="goal-hint" style={{ textAlign: 'center' }}>{tr('= {time}', { time: formatDuration(amount) })}</div>}
+        </div>
+      )}
+
+      <div className={`ob-extras goal-details${detailsOpen ? ' is-open' : ''}`} style={{ marginTop: 20 }}>
+        <button type="button" className="ob-extras-head" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(v => !v)}>
+          <span className="ob-extras-title">{tr('Details')}</span>
+          <span className="ob-extras-sub">
+            {[perPerson ? tr('pro Person') : tr('gesamt'), nextWeek && tr('nächste Woche'), alsoIn.length > 0 && trn(alsoIn.length, '+{n} Challenge', '+{n} Challenges')].filter(Boolean).join(' · ')}
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+        {detailsOpen && (
+          <div className="ob-extras-body goal-details-body">
+            {!isWorkout && <>
+              <div className="label">{tr('Ziel angeben')}</div>
+              <div className="segmented goal-seg">
+                <button className={perPerson ? 'active' : ''} onClick={() => switchInput(true)}>{tr('pro Person')}</button>
+                <button className={!perPerson ? 'active' : ''} onClick={() => switchInput(false)}>{tr('gesamt')}</button>
+              </div>
+            </>}
+            {!existing && <>
+              <div className="label">{tr('Woche')}</div>
+              <div className="segmented goal-seg">
+                <button className={!nextWeek ? 'active' : ''} onClick={() => setNextWeek(false)}>{tr('Diese (KW {week})', { week: weekNumber(weekStart) })}</button>
+                <button className={nextWeek ? 'active' : ''} onClick={() => setNextWeek(true)}>{tr('Nächste (KW {week})', { week: weekNumber(PTData.addDays(weekStart, 7)) })}</button>
+              </div>
+            </>}
+            {canCopy && <>
+              <div className="label">{tr('Auch anlegen in')}</div>
+              <div className="chip-row goal-also">
+                {others.map(o => {
+                  const on = alsoIn.includes(o.c.id);
+                  return (
+                    <button key={o.c.id} className={`chip ${on || o.has ? 'chip-active' : ''}`} disabled={o.has} aria-pressed={on || o.has}
+                      onClick={() => setAlsoIn(a => on ? a.filter(x => x !== o.c.id) : [...a, o.c.id])}>
+                      {o.c.emoji} {o.c.name}{o.has ? ` · ${tr('schon drin')}` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="goal-hint">{tr('Ein Eintrag zählt dann in allen diesen Challenges.')}</div>
+            </>}
+            {selectedCat && (
+              <div className="goal-hint">
+                {selectedCat.competition_id == null && selectedCat.ranked
+                  ? tr('Zählt für die Monatsrangliste.')
+                  : tr('Eigene Übung: zählt in euren Challenges, nicht in der Rangliste.')}
+              </div>
             )}
           </div>
-        </>
-      )}
+        )}
+      </div>
 
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
@@ -759,27 +833,32 @@ function SetupSheet({ api, me, categories, allowWork = true, weekStart, existing
 }
 
 // ─── LOG SHEET ──────────────────────────────────────────────────────────────
-function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [], onClose, onLogged }) {
-  const isWork = category?.kind === 'work';
+// others: weitere eigene Challenges mit derselben Übung diese Woche
+// ([{ competition_id, name, emoji }], vorausgewählt, einzeln abwählbar).
+// onSubmit({ values, note, skip }) trägt ein (CompetitionApp → api.logEverywhere).
+// Ohne `others` fragt das Sheet bei gewerteten Übungen selbst (log_targets),
+// ohne onSubmit loggt es direkt per api.addSet.
+function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [], others: givenOthers, onSubmit, onClose, onLogged }) {
+  const isWork = PTData.usesMinutes(category);   // Minuten statt Wiederholungen
+  const withTags = category?.kind === 'work';    // Work: Projekt und Tool
   const [reps, setReps] = useState(10);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  // Gewertete Übungen zählen auch in anderen eigenen Challenges mit derselben
-  // Übung dieser Woche; einzelne lassen sich abwählen (skip).
-  const [others, setOthers] = useState([]);
+  const [fetched, setFetched] = useState([]);
   const [skip, setSkip] = useState([]);
   React.useEffect(() => {
-    if (!category?.ranked || !api.logTargets) return;
+    if (givenOthers || !category?.ranked || !api?.logTargets) return;
     let off = false;
     api.logTargets(category.id, challenge.week_start)
-      .then(t => { if (!off) setOthers(t.filter(x => x.competition_id !== challenge.competition_id)); })
+      .then(t => { if (!off) setFetched(t.filter(x => x.competition_id !== challenge.competition_id)); })
       .catch(() => {});
     return () => { off = true; };
-  }, [api, category?.id, category?.ranked, challenge.week_start, challenge.competition_id]);
+  }, [api, givenOthers, category?.id, category?.ranked, challenge.week_start, challenge.competition_id]);
+  const others = givenOthers || fetched;
   const toggleSkip = (id) => setSkip(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
   // Work-mode state
   const TIMER_KEY = 'pt_work_timer_start';
-  const [durationMinutes, setDurationMinutes] = useState(0);
+  const [durationMinutes, setDurationMinutes] = useState(withTags ? 0 : 15);
   const [projectTagId, setProjectTagId] = useState(null);
   const [toolTagId, setToolTagId] = useState(null);
   const [timerStart, setTimerStart] = React.useState(() => {
@@ -828,56 +907,56 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
       : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
 
-  async function save() {
-    if (isWork) {
-      if (durationMinutes <= 0) return;
-      setSaving(true);
-      try {
-        await api.addSet({
-          challenge_id: challenge.id,
-          athlete: me,
-          reps: null,
-          duration_minutes: durationMinutes,
-          project_tag_id: projectTagId || null,
-          tool_tag_id: toolTagId || null,
-          note: note.trim() || null,
-        });
+  async function submit(values, value) {
+    setSaving(true);
+    try {
+      if (onSubmit) await onSubmit({ values, note: note.trim() || null, skip });
+      else await api.addSet({ challenge_id: challenge.id, athlete: me, ...values, note: note.trim() || null, skip });
+      if (isWork) {
         localStorage.removeItem(TIMER_KEY);
         window.dispatchEvent(new Event('pt:timer-changed'));
         setTimerStart(null);
         setElapsedSec(0);
-        onLogged(durationMinutes, true);
-      } catch (e) {
-        alert(e.message || tr('Fehler'));
-      } finally {
-        setSaving(false);
       }
-    } else {
-      if (reps <= 0) return;
-      setSaving(true);
-      try {
-        await api.addSet({
-          challenge_id: challenge.id,
-          athlete: me,
-          reps: parseInt(reps),
-          note: note.trim() || null,
-          skip,
-        });
-        onLogged(reps, false);
-      } catch (e) {
-        alert(e.message || tr('Fehler'));
-      } finally {
-        setSaving(false);
-      }
+      onLogged(value, isWork);
+    } catch (e) {
+      alert(e.message || tr('Fehler'));
+    } finally {
+      setSaving(false);
     }
   }
+
+  function save() {
+    if (isWork) {
+      if (durationMinutes <= 0) return;
+      submit({ reps: null, duration_minutes: durationMinutes,
+        ...(withTags ? { project_tag_id: projectTagId || null, tool_tag_id: toolTagId || null } : {}) }, durationMinutes);
+    } else {
+      if (reps <= 0) return;
+      submit({ reps: parseInt(reps) }, reps);
+    }
+  }
+
+  const alsoFor = others.length > 0 && (
+    <div className="log-also">
+      <div className="label">{tr('Zählt auch für')}</div>
+      <div className="chip-row">
+        {others.map(o => (
+          <button key={o.competition_id} className={`chip ${skip.includes(o.competition_id) ? '' : 'chip-active'}`}
+            aria-pressed={!skip.includes(o.competition_id)} onClick={() => toggleSkip(o.competition_id)}>
+            {o.emoji} {o.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   if (isWork) {
     return (
       <>
-        <h2 className="title" style={{ marginBottom: 4 }}>{tr('Session loggen')}</h2>
+        <h2 className="title" style={{ marginBottom: 4 }}>{withTags ? tr('Session loggen') : tr('Zeit eintragen')}</h2>
         <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-          {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
+          {category?.name} · {PTPeople.firstNameOf(me)}
         </div>
 
         {/* Timer */}
@@ -894,13 +973,14 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
 
         {/* Manual duration input */}
         <div className="label" style={{ marginTop: 16, marginBottom: 0 }}>{tr('Minuten (manuell)')}</div>
-        <Stepper value={durationMinutes} onChange={setDurationMinutes} step={15} min={0} />
-        <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
-          {[30, 60, 90, 120].map((v) =>
+        <Stepper value={durationMinutes} onChange={setDurationMinutes} step={withTags ? 15 : 5} min={0} />
+        <div className="chip-row is-one-line" style={{ marginTop: 8 }}>
+          {(withTags ? [30, 60, 90, 120] : [10, 15, 30, 60]).map((v) =>
             <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button> // i18n-ignore: Einheit
           )}
         </div>
 
+        {withTags && <>
         {/* Project tag picker */}
         <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>{tr('Projekt')}</div>
         {projectTags.length === 0
@@ -930,18 +1010,19 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
               )}
             </div>
         }
+        </>}
 
         <input
           className="input"
-          placeholder={tr('Notiz (optional)')}
+          placeholder={tr('Notiz')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           style={{ marginTop: 16 }} />
+        {alsoFor}
 
         <div className="btn-row" style={{ marginTop: 24 }}>
           <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
-          <button className="btn" onClick={save}
-            disabled={saving || durationMinutes <= 0 || !projectTagId || !toolTagId}>
+          <button className="btn" onClick={save} disabled={saving || durationMinutes <= 0}>
             {saving ? '…' : tr('{n}m loggen', { n: durationMinutes })}
           </button>
         </div>
@@ -954,7 +1035,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>{tr('Satz loggen')}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
+        {category?.name} · {PTPeople.firstNameOf(me)}
       </div>
       <input
         className="input input-lg mono"
@@ -963,30 +1044,18 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         value={reps}
         onChange={(e) => setReps(parseInt(e.target.value) || 0)}
         onFocus={(e) => e.target.select()} />
-      <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+      <div className="chip-row is-one-line" style={{ marginTop: 12 }}>
         {[5, 10, 15, 20, 25, 30].map((v) =>
           <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
         )}
       </div>
       <input
         className="input"
-        placeholder={tr('Notiz (optional, z.B. ‚saubere Form‘)')}
+        placeholder={tr('Notiz')}
         value={note}
         onChange={(e) => setNote(e.target.value)}
         style={{ marginTop: 16 }} />
-      {others.length > 0 && (
-        <div className="log-also">
-          <div className="label">{tr('Zählt auch für')}</div>
-          <div className="chip-row">
-            {others.map(o => (
-              <button key={o.competition_id} className={`chip ${skip.includes(o.competition_id) ? '' : 'chip-active'}`}
-                aria-pressed={!skip.includes(o.competition_id)} onClick={() => toggleSkip(o.competition_id)}>
-                {o.emoji} {o.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {alsoFor}
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
         <button className="btn" onClick={save} disabled={saving || reps <= 0}>
@@ -1279,7 +1348,7 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
 function WeekRecap({ recap, me, sides = [] }) {
   const { week_start, challStats, totals = [], winnerIdx, sumAll, hitCount, totalChallenges, analysis,
     perSide = [], penCentsBySide = [], weekNumber } = recap;
-  const isWorkWeek = challStats.length > 0 && challStats.every(c => c.cat?.kind === 'work');
+  const isWorkWeek = challStats.length > 0 && challStats.every(c => PTData.usesMinutes(c.cat));
   const fmtRecapVal = (v) => isWorkWeek ? formatDuration(v) : v;
   const winner = winnerIdx != null ? sides[winnerIdx] : null;
   const twoSided = sides.length === 2;
@@ -1363,7 +1432,7 @@ function WeekRecap({ recap, me, sides = [] }) {
               <span className="mono mu-rank-pos">{rank + 1}</span>
               <SideAvatar side={sides[i]} size={22} />
               <span className="mu-rank-name">{sides[i].label}</span>
-              <span className="mono mu-recap-podium-v" style={{ color: sides[i].color }}>{fmtRecapVal(totals[i] || 0)}</span>
+              <span className="mono mu-recap-podium-v" style={{ ...sideStyle(sides[i]), color: 'var(--sc)' }}>{fmtRecapVal(totals[i] || 0)}</span>
             </div>
           ))}
         </div>
@@ -1371,7 +1440,6 @@ function WeekRecap({ recap, me, sides = [] }) {
       <div className="recap-challs">
         {challStats.map((c, i) => (
           <div className="recap-chall" key={i}>
-            <span className="recap-chall-emoji">{c.cat?.emoji}</span>
             <span className="recap-chall-name">{c.cat?.name || '—'}</span>
             <span className="recap-chall-tally mono">
               {c.workout ? (twoSided ? <>
@@ -1663,7 +1731,9 @@ function ChartFullscreen({
   );
 }
 
-function BackfillSheet({ api, me, challenges = [], categories = [], projectTags = [], toolTags = [], onClose, onSaved }) {
+// onSubmit({ challenge, category, values, createdAt }): trägt den Satz ein (CompetitionApp
+// schreibt ihn in alle Challenges mit derselben Übung); ohne onSubmit direkt per api.addSet.
+function BackfillSheet({ api, me, challenges = [], categories = [], projectTags = [], toolTags = [], onClose, onSaved, onSubmit }) {
   const today = new Date();
   const monday = PTData.mondayOf(today);
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -1684,7 +1754,8 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
 
   const selectedChallenge = challenges.find(c => c.id === challengeId);
   const selectedCat = catById[selectedChallenge?.category_id];
-  const isWork = selectedCat?.kind === 'work';
+  const isWork = PTData.usesMinutes(selectedCat);
+  const withTags = selectedCat?.kind === 'work';
 
   async function save() {
     if (!challengeId) return;
@@ -1713,7 +1784,10 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
             note: null,
             created_at: created.toISOString(),
           };
-      await api.addSet(payload);
+      if (onSubmit) {
+        const { challenge_id, athlete, note, created_at, ...values } = payload;
+        await onSubmit({ challenge: selectedChallenge, category: selectedCat, values, createdAt: created_at });
+      } else await api.addSet(payload);
       onSaved?.(isWork ? durationMinutes : reps, isWork);
     } catch (e) {
       alert(e.message || tr('Fehler'));
@@ -1781,12 +1855,13 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
       {isWork ? (
         <>
           <div className="label" style={{ marginBottom: 0 }}>{tr('Minuten')}</div>
-          <Stepper value={durationMinutes} onChange={setDurationMinutes} step={15} min={15} />
-          <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
-            {[30, 60, 90, 120].map(v =>
+          <Stepper value={durationMinutes} onChange={setDurationMinutes} step={withTags ? 15 : 5} min={withTags ? 15 : 1} />
+          <div className="chip-row is-one-line" style={{ marginTop: 8 }}>
+            {(withTags ? [30, 60, 90, 120] : [10, 15, 30, 60]).map(v =>
               <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button> // i18n-ignore: Einheit
             )}
           </div>
+          {withTags && <>
           <div className="label" style={{ marginTop: 16, marginBottom: 8 }}>{tr('Projekt')}</div>
           <div className="chip-row" style={{ flexWrap: 'wrap' }}>
             {projectTags.map(t =>
@@ -1807,6 +1882,7 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
               </button>
             )}
           </div>
+          </>}
         </>
       ) : (
         <>
@@ -1819,7 +1895,7 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
             onChange={(e) => setReps(parseInt(e.target.value) || 0)}
             onFocus={(e) => e.target.select()} />
 
-          <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+          <div className="chip-row is-one-line" style={{ marginTop: 12 }}>
             {[5, 10, 15, 20, 25, 30].map((v) =>
               <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
             )}

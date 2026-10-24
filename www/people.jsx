@@ -104,8 +104,11 @@ function buildSides(competition, members, me) {
   }));
 }
 
+// Seite 0 (ich/mein Team) und 1 folgen den Theme-Farben --side0/--side1
+// (Einstellungen → Farben), weitere Seiten ihrer festen Farbe aus SIDE_COLORS.
 function sideStyle(side) {
-  return side ? { '--sc': side.color } : undefined;
+  if (!side) return undefined;
+  return { '--sc': side.cls === 'side-0' ? 'var(--side0)' : side.cls === 'side-1' ? 'var(--side1)' : side.color };
 }
 
 function sideIndexByUser(sides) {

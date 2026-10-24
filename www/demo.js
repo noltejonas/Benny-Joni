@@ -1,7 +1,7 @@
 // Projekt Terminator — lokaler Demo-Modus
 //
 // Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt) oder
-// über „Demo ansehen“ auf dem Willkommen-Bildschirm.
+// über obSetDemo(true). Nur zum Testen; in der App gibt es keinen Einstieg.
 //   ?demo=reset  Beispieldaten neu erzeugen
 //   ?demo=new    Demo abgemeldet starten (Onboarding als neue Person durchspielen)
 //   ?demo=off    zurück auf Supabase
@@ -42,7 +42,9 @@
   const SEED_IDS = ['u-benny', 'u-jonas', 'u-lea', 'u-max', 'u-sara', 'u-tim'];
   const COLORS = ['#2B8A9A', '#E8914A', '#D9667A', '#4A86D9', '#7FA34A', '#9A5BB0'];
   // 3: Monatsrangliste (Welt-Leute, Freies Training, Monatsergebnisse, log_id)
-  const DB_VERSION = 3;
+  // 4: Zeit-Übung „Bibellesen“ (Minuten) in zwei Challenges
+  // 5: Wochenwertung (weekly_results, ranking_week_closures)
+  const DB_VERSION = 5;
 
   // ── Seed ───────────────────────────────────────────────────────────
   function rng(seed) {
@@ -94,6 +96,9 @@
       cat('cat-th', 'Tom Holland', '🦸', 'sports', 'tom_holland', ['best', 40, 'Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.']), // i18n-ignore
       cat('cat-bsu', 'Bring Sally Up', '🌸', 'sports', 'bring_sally_up', ['best', 204, 'Zeit bis zum ersten Absetzen, 3:24 ist das Maximum.']), // i18n-ignore
       cat('cat-vibe', 'Vibe Coding', '💻', 'work'), // i18n-ignore: Übungsname
+      // Eigene Zeit-Übung, in zwei Challenges gleich benannt (zählt für beide)
+      { ...cat('cat-bible-bj', 'Bibellesen', '📖', 'time'), competition_id: 'c-bj' }, // i18n-ignore: Übungsname
+      { ...cat('cat-bible-ffa', 'Bibellesen', '📖', 'time'), competition_id: 'c-ffa' }, // i18n-ignore: Übungsname
     ];
 
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
@@ -122,9 +127,9 @@
     ];
 
     const plans = {
-      'c-bj': [['cat-push', 280], ['cat-pull', 60], ['cat-dips', 60], ['cat-legs', 80], ['cat-hspu', 40], ['cat-th', 1], ['cat-bsu', 1]],
+      'c-bj': [['cat-push', 280], ['cat-pull', 60], ['cat-dips', 60], ['cat-legs', 80], ['cat-hspu', 40], ['cat-th', 1], ['cat-bsu', 1], ['cat-bible-bj', 240]],
       'c-team': [['cat-push', 400], ['cat-sit', 300], ['cat-pull', 120]],
-      'c-ffa': [['cat-push', 500], ['cat-dips', 250], ['cat-legs', 300], ['cat-th', 1]],
+      'c-ffa': [['cat-push', 500], ['cat-dips', 250], ['cat-legs', 300], ['cat-th', 1], ['cat-bible-ffa', 600]],
       'c-run': [['cat-sit', 200]],
     };
     const weekly_challenges = [], sets = [], reactions = [];
@@ -142,9 +147,18 @@
             chosen_by_user: chooser, chosen_by: chooser, created_at: ws + 'T07:00:00Z',
           });
           const share = Math.ceil(target / ms.length);
-          const type = categories.find(x => x.id === catId).challenge_type;
+          const { challenge_type: type, kind } = categories.find(x => x.id === catId);
           for (const m of ms) {
             const drive = 0.55 + r() * 0.7; // wie fleißig diese Person diese Woche ist
+            if (kind === 'time') {
+              for (let day = 0; day < 7; day++) {
+                if (r() < 0.35) continue;
+                const t = new Date(ws + 'T00:00:00'); t.setDate(t.getDate() + day); t.setHours(rint(6, 22), rint(0, 59));
+                if (t.getTime() < nowMs) sets.push({ id: id('s'), challenge_id: chId, competition_id: c.id, user_id: m.user_id, log_id: id('log'),
+                  reps: null, duration_minutes: Math.max(5, Math.round((share * drive) / 5 / 5) * 5), note: null, created_at: t.toISOString() });
+              }
+              continue;
+            }
             if (type !== 'standard') {
               if (r() < 0.8) {
                 const day = rint(0, 6);
@@ -226,6 +240,23 @@
         for (const b of PTRanking.board(field)) monthly_results.push({ month, ...b });
       }
     }
+    // Wochenwertung: abgeschlossene Wochen ab der ersten gewerteten. Für die
+    // letzten Wochen aus den Beispielsätzen gerechnet, davor ausgedacht.
+    const weekly_results = [], ranking_week_closures = [];
+    const chCat = Object.fromEntries(weekly_challenges.map(w => [w.id, w.category_id]));
+    const ranked = sets.map(x => ({ ...x, category_id: chCat[x.challenge_id] }));
+    const dataFrom = PTRanking.weekOf(new Date(addDays(monday, -7 * 8) + 'T00:00:00'));
+    for (let w = PTRanking.startWeek(ranking_settings.start_month); PTRanking.weekCloseDeadline(w) <= now; w = PTRanking.addWeeks(w, 1)) {
+      ranking_week_closures.push({ week: w, closed_at: PTRanking.weekCloseDeadline(w).toISOString() });
+      const values = w >= dataFrom
+        ? PTRanking.weekValues({ sets: ranked, categories, week: w })
+        : rankedIds.flatMap(catId => [...optedIn, ME].filter(() => r() < 0.6)
+          .map(u => ({ category_id: catId, user_id: u, value: catId === 'cat-bsu' ? rint(130, 204) : catId === 'cat-th' ? rint(6, 15) : rint(20, 600) })));
+      const counted = values.filter(v => v.user_id !== 'u-sara' && (v.user_id !== ME || w >= dataFrom || r() < 0.8));
+      for (const b of PTRanking.board(counted, v => profiles.find(p => p.id === v.user_id)?.ranking_opt_in !== false)) {
+        weekly_results.push({ week: w, ...b });
+      }
+    }
     const ranking_reports = [{ id: id('rr'), reporter: 'u-jonas', user_id: 'u-w3', reason: 'values', category_id: 'cat-push',
       month: thisMonth, resolution: null, resolved_by: null, resolved_at: null, created_at: now.toISOString() }];
 
@@ -277,7 +308,7 @@
       // i18n-ignore: Projekt- und Tool-Namen
       project_tags: [{ id: 'pt-1', competition_id: 'c-bj', name: 'Terminator', emoji: '📁', created_at: monday }],
       tool_tags: [{ id: 'tt-1', competition_id: 'c-bj', name: 'Claude Code', emoji: '🤖', created_at: monday }], // i18n-ignore: Tool-Name
-      ranking_settings, monthly_results, month_closures, ranking_reports,
+      ranking_settings, monthly_results, month_closures, ranking_reports, weekly_results, ranking_week_closures,
       user_blocks: [], ranking_admins: [ME],
       accounts: [{ email: 'benny@demo.local', user_id: ME }],
       v: DB_VERSION,
@@ -291,7 +322,7 @@
   // Demo-Daten werden neu erzeugt.
   function upgrade(d) {
     if ((d.v || 1) >= DB_VERSION) return d;
-    if ((d.v || 1) < 3) return seed();
+    if ((d.v || 1) < 5) return seed();
     d.accounts = d.accounts || [{ email: 'benny@demo.local', user_id: ME }];
     const old = addDays(isoDate(mondayOf(new Date())), -60) + 'T08:00:00Z';
     for (const p of d.profiles) {
@@ -477,6 +508,67 @@
           categories: db.categories.map(localizeCategory),
         });
       },
+      async getDashboard(ids, fromWeek) {
+        const set = new Set(ids);
+        const challenges = db.weekly_challenges.filter(c => set.has(c.competition_id) && c.week_start >= fromWeek);
+        const chIds = new Set(challenges.map(c => c.id));
+        return later({
+          members: db.members.filter(m => set.has(m.competition_id)).map(m => ({ ...m, profile: profileOf(m.user_id) })),
+          challenges: challenges.map(normCh),
+          sets: db.sets.filter(s => chIds.has(s.challenge_id)).map(withAthlete),
+          categories: db.categories.map(localizeCategory),
+        });
+      },
+      onCompetitionsChange(ids, fn) {
+        let timer = null;
+        const ping = () => { clearTimeout(timer); timer = setTimeout(fn, 120); };
+        for (const cid of ids) {
+          if (!compListeners.has(cid)) compListeners.set(cid, new Set());
+          compListeners.get(cid).add(ping);
+        }
+        return () => { clearTimeout(timer); for (const cid of ids) compListeners.get(cid)?.delete(ping); };
+      },
+      // Wie data.js: eine Zeile pro Wochenziel, alle mit derselben log_id
+      async logEverywhere({ targets, values, note = null, createdAt = null, skip = [] }) {
+        const me = uid();
+        if (!targets.length) throw fail('invalid_value');
+        if (values.duration_minutes == null && !(values.reps > 0)) throw fail('invalid_value');
+        const log = newId('log');
+        const at = createdAt || new Date().toISOString();
+        // Wie log_set: gewertete Übungen auch in alle anderen eigenen Challenges
+        // mit derselben Übung dieser Woche (außer skip)
+        const all = [...targets];
+        const firstCh = db.weekly_challenges.find(w => w.id === targets[0].challenge_id);
+        const firstCat = firstCh && db.categories.find(c => c.id === firstCh.category_id);
+        if (firstCat?.ranked && values.duration_minutes == null) {
+          for (const t of logTargets(me, firstCh.category_id, firstCh.week_start)) {
+            if (skip.includes(t.competition_id) || all.some(x => x.challenge_id === t.challenge_id)) continue;
+            all.push({ challenge_id: t.challenge_id, competition_id: t.competition_id });
+          }
+        }
+        const rows = all.map((t, i) => {
+          const row = { id: newId('s'), challenge_id: t.challenge_id, competition_id: t.competition_id, user_id: me, log_id: log,
+            reps: values.reps ?? null, duration_minutes: values.duration_minutes ?? null,
+            note: note && String(note).trim() ? String(note).trim() : null, created_at: at };
+          if (i === 0 && values.project_tag_id) Object.assign(row, { project_tag_id: values.project_tag_id, tool_tag_id: values.tool_tag_id ?? null });
+          db.sets.push(row);
+          return row;
+        });
+        save(); emitAll();
+        return later(withAthlete(rows[0]));
+      },
+      async myPeople() {
+        const me = uid();
+        const comps = db.members.filter(m => m.user_id === me && !m.left_at)
+          .map(m => db.competitions.find(c => c.id === m.competition_id))
+          .filter(c => c && c.mode !== 'solo' && !c.archived_at);
+        const byId = {};
+        for (const c of comps) for (const m of activeMembers(c.id)) {
+          const e = byId[m.user_id] ||= { ...profileOf(m.user_id), ranking_opt_in: db.profiles.find(x => x.id === m.user_id)?.ranking_opt_in ?? null, competitionIds: [] };
+          e.competitionIds.push(c.id);
+        }
+        return later(Object.values(byId));
+      },
       async upsertDeviceToken() { return null; },
       async deleteDeviceToken() {},
       forCompetition(cid) { return competitionAPI(cid, uid); },
@@ -485,10 +577,28 @@
       async getRankingSettings() { return later(db.ranking_settings); },
       async getRankedCategories() { return later(db.categories.filter(c => c.ranked && !c.competition_id).map(localizeCategory)); },
       async rankingMonth(month) { return later(rankingMonth(uid(), month)); },
+      // Wie die Migration weekly_ranking: Summen aus den abgeschlossenen Wochen
       async rankingTotals({ from = null, to = null } = {}) {
         const me = uid();
-        const rows = PTRanking.totals(visibleResults(me), { from, to });
+        const rows = PTRanking.totals(visibleWeekResults(me), { from, to });
         return later(rows.map(r => ({ ...r, ...profileFields(me, r.user_id) })));
+      },
+      async rankingWeek(week) { return later(rankingWeek(uid(), week)); },
+      async rankingClosedWeeks() { return later(db.ranking_week_closures.map(c => c.week).sort().reverse()); },
+      async rankingProfileWeeks(userId) {
+        const me = uid();
+        return later(visibleWeekResults(me).filter(r => r.user_id === userId && r.points > 0)
+          .sort((a, b) => b.week.localeCompare(a.week) || a.rank - b.rank));
+      },
+      async closeDueWeeks() {
+        let n = 0;
+        for (let w = PTRanking.startWeek(db.ranking_settings.start_month); PTRanking.weekCloseDeadline(w) <= new Date(); w = PTRanking.addWeeks(w, 1)) {
+          if (db.ranking_week_closures.some(x => x.week === w)) continue;
+          db.ranking_week_closures.push({ week: w, closed_at: new Date().toISOString() });
+          for (const b of liveBoardWeek(w)) { db.weekly_results.push({ week: w, ...b }); n++; }
+        }
+        if (n) save();
+        return later(n);
       },
       async rankingProfile(userId) {
         const me = uid();
@@ -496,7 +606,7 @@
           .sort((a, b) => b.month.localeCompare(a.month) || a.rank - b.rank));
       },
       async seasonChampions() {
-        return later(PTRanking.seasonChampions(visibleResults(uid()), db.month_closures.map(m => m.month)));
+        return later(PTRanking.seasonChampions(visibleWeekResults(uid()), PTRanking.closedMonthsFromWeeks(db.ranking_week_closures.map(c => c.week))));
       },
       async closeDueMonths() {
         let n = 0;
@@ -604,10 +714,12 @@
     const open = rs.filter(r => r.reason === 'values' && !r.resolved_at && r.category_id === categoryId && r.month === month);
     return new Set(open.map(r => r.reporter)).size >= 3;
   }
+  // „Meine Leute“: gerade gemeinsam in einer laufenden Challenge (beide aktiv)
   function shares(me, other) {
     if (me === other) return true;
-    const mine = new Set(db.members.filter(m => m.user_id === me).map(m => m.competition_id));
-    return db.members.some(m => m.user_id === other && mine.has(m.competition_id));
+    const live = (cid) => { const c = db.competitions.find(x => x.id === cid); return c && c.mode !== 'solo' && !c.archived_at; };
+    const mine = new Set(db.members.filter(m => m.user_id === me && !m.left_at && live(m.competition_id)).map(m => m.competition_id));
+    return db.members.some(m => m.user_id === other && !m.left_at && mine.has(m.competition_id));
   }
   function profileFields(me, userId) {
     const p = db.profiles.find(x => x.id === userId) || {};
@@ -638,6 +750,32 @@
       }
     }
     return rows;
+  }
+  function liveBoardWeek(week) {
+    const values = PTRanking.weekValues({ sets: rankedSets(), categories: db.categories, week });
+    return PTRanking.board(values, v => optedIn(v.user_id) && !rankingHidden(v.user_id, v.category_id, PTRanking.weekMonth(week)));
+  }
+  function rankingWeek(me, week) {
+    const month = PTRanking.weekMonth(week);
+    const closed = db.ranking_week_closures.some(c => c.week === week);
+    const board = closed
+      ? db.weekly_results.filter(r => r.week === week && optedIn(r.user_id) && !rankingHidden(r.user_id, r.category_id, month))
+      : liveBoardWeek(week).map(b => ({ ...b, medal: null }));
+    const rows = board.map(b => ({ category_id: b.category_id, user_id: b.user_id, value: b.value, rank: b.rank,
+      points: b.points, medal: closed ? b.medal : null, counted: true, ...profileFields(me, b.user_id) }));
+    if (!closed) {
+      const mine = PTRanking.weekValues({ sets: rankedSets(), categories: db.categories, week })
+        .filter(v => v.user_id === me && v.value > 0 && !board.some(b => b.user_id === me && b.category_id === v.category_id));
+      for (const v of mine) {
+        rows.push({ ...v, rank: PTRanking.hypotheticalRank(board.filter(b => b.category_id === v.category_id), v.value),
+          points: 0, medal: null, counted: false, ...profileFields(me, me) });
+      }
+    }
+    return rows;
+  }
+  function visibleWeekResults(me) {
+    return (db.weekly_results || []).filter(r => (optedIn(r.user_id) || r.user_id === me)
+      && !rankingHidden(r.user_id, r.category_id, PTRanking.weekMonth(r.week)));
   }
   function visibleResults(me) {
     return db.monthly_results.filter(r => (optedIn(r.user_id) || r.user_id === me) && !rankingHidden(r.user_id, r.category_id, r.month));
@@ -748,7 +886,7 @@
       async updateSet(id, patch) {
         const { athlete, ...rest } = patch; const s = db.sets.find(x => x.id === id); Object.assign(s, rest);
         const shared = {};
-        for (const k of ['reps', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
+        for (const k of ['reps', 'duration_minutes', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
         for (const x of db.sets) if (x.log_id === s.log_id && x.user_id === s.user_id && x.id !== s.id) Object.assign(x, shared);
         emit(); emitAll(); return later(withAthlete(s));
       },

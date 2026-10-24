@@ -80,7 +80,8 @@ function ObMessage({ error, info }) {
   return null;
 }
 
-// Demo öffnen (immer als Benny mit fertigen Challenges) bzw. beenden.
+// Demo öffnen (immer als Benny mit fertigen Challenges) bzw. beenden. Nur noch
+// zum Testen (Konsole); Nutzer sehen keinen Einstieg in die Demo.
 function obSetDemo(on) {
   try {
     if (on) { localStorage.setItem('pt_demo', '1'); localStorage.setItem('pt_demo_user', 'u-benny'); }
@@ -141,14 +142,11 @@ function ObHeroDuel() {
   );
 }
 
-function ObWelcome({ invite, onStart, onCode, onDemo, onLogin }) {
+function ObWelcome({ invite, onStart, onCode, onLogin }) {
   return (
     <ObScreen className="ob-welcome" foot={<>
       <button type="button" className="btn" onClick={onStart}>{invite ? tr('Konto erstellen & beitreten') : tr('Los geht’s')}</button>
-      <div className="ob-row2">
-        {!invite && <button type="button" className="btn btn-secondary" onClick={onCode}>{tr('Code eingeben')}</button>}
-        <button type="button" className="btn btn-secondary" onClick={onDemo}>{tr('Demo ansehen')}</button>
-      </div>
+      {!invite && <button type="button" className="btn btn-secondary" onClick={onCode}>{tr('Code eingeben')}</button>}
       <button type="button" className="btn-link" onClick={onLogin}>{tr('Schon dabei? Anmelden')}</button>
     </>}>
       {/* i18n-ignore: Marke */}
@@ -311,8 +309,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
 
   if (view === 'welcome') {
     return <ObWelcome invite={invite}
-      onStart={() => go('signup')} onCode={() => go('code')}
-      onDemo={() => obSetDemo(true)} onLogin={() => go('login')} />;
+      onStart={() => go('signup')} onCode={() => go('code')} onLogin={() => go('login')} />;
   }
 
   const emailInput = (
@@ -491,15 +488,13 @@ function ObProfile({ api, profile, email, onSaved, onDone, onSignOut }) {
 
 // ─── Start (Konto ohne Challenge) ───────────────────────────────────────────
 // `onArchived`: nur archivierte Challenges vorhanden → über den Switcher erreichbar.
-function ObStart({ profile, onCreate, onJoin, onProfile, onDemo, onArchived }) {
+// `error`: das automatische Duell für neue Konten ging nicht (App).
+function ObStart({ profile, onCreate, onJoin, onProfile, onArchived, error }) {
   const first = (profile.display_name || '').split(/\s+/)[0];
   return (
     <ObScreen steps={3} step={3} stepKey="start"
       left={<button type="button" className="ob-corner-avatar" onClick={onProfile} aria-label={tr('Profil')}><Avatar profile={profile} size={40} /></button>}
-      foot={<>
-        {onArchived && <button type="button" className="btn-link" onClick={onArchived}>{tr('Archivierte Challenges')}</button>}
-        <button type="button" className="btn-link" onClick={onDemo}>{tr('Erst mal die Demo ansehen')}</button>
-      </>}>
+      foot={onArchived && <button type="button" className="btn-link" onClick={onArchived}>{tr('Archivierte Challenges')}</button>}>
       <h1 className="ob-title">{tr('Hi {name} 👋', { name: first })}</h1>
       <ObGuide who="benny" pose="wave">{tr('Wie startest du?')}</ObGuide>
       <div className="ob-choices">
@@ -520,6 +515,7 @@ function ObStart({ profile, onCreate, onJoin, onProfile, onDemo, onArchived }) {
           <span className="ob-choice-chev"><Icon name="chevron" size={20} /></span>
         </button>
       </div>
+      <ObMessage error={error} />
     </ObScreen>
   );
 }

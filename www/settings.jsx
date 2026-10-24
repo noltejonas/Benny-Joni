@@ -194,6 +194,9 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   if (page === 'language') {
     return <SettingsLanguagePage onBack={back} />;
   }
+  if (page === 'colors') {
+    return <SettingsColorsPage onBack={back} />;
+  }
   if (page === 'blocks') {
     return <SettingsBlocksPage baseApi={baseApi} onBack={back} onToast={onToast} />;
   }
@@ -275,7 +278,7 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
         {rankingAdmin && <SettingsRow icon="bell" title={tr('Meldungen prüfen')} onClick={() => go('reports')} chevron />}
       </SettingsGroup>
 
-      <SettingsDeviceGroup themePref={themePref} onSetThemePref={onSetThemePref} onLanguage={() => go('language')}
+      <SettingsDeviceGroup themePref={themePref} onSetThemePref={onSetThemePref} onLanguage={() => go('language')} onColors={() => go('colors')}
         notificationsEnabled={notificationsEnabled} onSetNotifications={onSetNotifications} />
 
       {api?.mode === 'demo' && window.PTDemo && (
@@ -379,7 +382,7 @@ function SettingsReportsPage({ baseApi, onBack, onToast }) {
 // ─── App (gerätebezogen) ────────────────────────────────────────────────────
 const ST_THEMES = [['system', tr('System')], ['light', tr('Hell')], ['dark', tr('Dunkel')]];
 
-function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, notificationsEnabled, onSetNotifications }) {
+function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, notificationsEnabled, onSetNotifications }) {
   // Erlaubnis über PTPush (onboarding-intro.jsx); beim Zurückkehren aus den
   // iOS-Einstellungen neu prüfen.
   const [perm, setPerm] = useState('unsupported');
@@ -421,6 +424,7 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, notificati
           ))}
         </div>
       </div>
+      <SettingsRow icon="palette" title={tr('Farben')} value={stPaletteLabel(window.PTTheme?.read())} onClick={onColors} chevron />
       <SettingsRow icon="globe" title={tr('Sprache')} value={stLanguageName(PTi18n.lang)} onClick={onLanguage} chevron />
       <SettingsSwitchRow icon="bell" title={tr('Push-Mitteilungen')}
         checked={notificationsEnabled} onChange={setPush} />
@@ -428,6 +432,94 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, notificati
         <SettingsRow icon="settings" title={tr('iOS-Einstellungen öffnen')} tone="accent" onClick={() => window.PTPush.openSettings()} />
       )}
     </SettingsGroup>
+  );
+}
+
+// ─── Unterseite: Farben ─────────────────────────────────────────────────────
+// Paletten und eigene Farben aus theme.js (PTTheme). Gilt pro Gerät und sofort;
+// die App hört auf „pt:colors“ und setzt auch die Statusleistenfarbe.
+const ST_PALETTE_NAMES = {
+  violett: tr('Violett'), graphit: tr('Graphit & Grün'), mitternacht: tr('Mitternacht & Lime'), ozean: tr('Ozean'),
+  sonnenuntergang: tr('Sonnenuntergang'), kreide: tr('Kreide'), ruhig: tr('Violett ruhig'),
+};
+const ST_COLOR_FIELDS = {
+  bg: tr('Hintergrund'), surface: tr('Flächen'), text: tr('Text'), accent: tr('Akzent'),
+  grad0: tr('Buttons, Verlauf Anfang'), grad1: tr('Buttons, Verlauf Ende'), tile0: tr('Fokus-Kachel'),
+  side0: tr('Ich'), side1: tr('Gegner'),
+};
+function stPaletteLabel(state) {
+  if (!state) return '';
+  return state.palette === 'custom' ? tr('Eigene Farben') : (ST_PALETTE_NAMES[state.palette] || ST_PALETTE_NAMES.violett);
+}
+
+function SettingsColorsPage({ onBack }) {
+  const T = window.PTTheme;
+  const [colors, setColors] = useState(() => T.read());
+  const mode = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const base = T.baseFor(colors, mode);
+  function update(next) {
+    T.write(next); T.apply(next, mode); setColors(next);
+    window.dispatchEvent(new CustomEvent('pt:colors'));
+  }
+  const pickPalette = (id) => update({ palette: id });
+  const setField = (field, value) => update(T.setCustom(colors, mode, field, value));
+  const reset = () => update({ palette: colors.from || T.DEFAULT });
+
+  return (
+    <div className="st-screen">
+      <SettingsPageHeader title={tr('Farben')} onBack={onBack} />
+
+      <div className="st-colors-preview" aria-label={tr('Vorschau')}>
+        <div className="st-colors-tile">
+          <div className="st-colors-tile-top">
+            <span><small>{tr('heute noch {amount}', { amount: 28 })}</small><b>{tr('Liegestütze')}</b></span>
+            <span className="st-colors-pct">58%</span>
+          </div>
+          <div className="st-colors-tug" aria-hidden="true"><i className="a" /><i className="b" /></div>
+          <div className="st-colors-chips" aria-hidden="true"><span>+5</span><span className="is-main">+10</span><span>+15</span></div>
+        </div>
+        <span className="btn st-colors-btn" aria-hidden="true">{tr('+{n} loggen', { n: 10 })}</span>
+      </div>
+
+      <SettingsGroup title={tr('Paletten')}>
+        <div className="st-palettes" role="radiogroup" aria-label={tr('Paletten')}>
+          {T.PALETTES.map(p => {
+            const c = p[mode];
+            const on = colors.palette === p.id;
+            return (
+              <button key={p.id} type="button" role="radio" aria-checked={on} className={`st-palette${on ? ' is-on' : ''}`}
+                onClick={() => pickPalette(p.id)}>
+                <span className="st-palette-swatches" aria-hidden="true">
+                  <i style={{ background: c.bg }} />
+                  <i style={{ background: `linear-gradient(135deg, ${c.tile0}, ${c.tile1})` }} />
+                  <i style={{ background: c.accent }} />
+                  <i style={{ background: c.side0 }} />
+                  <i style={{ background: c.side1 }} />
+                </span>
+                <span className="st-palette-name">{ST_PALETTE_NAMES[p.id]}</span>
+                {on && <span className="st-check" aria-hidden="true"><Icon name="check" size={16} strokeWidth={2.6} /></span>}
+              </button>
+            );
+          })}
+        </div>
+      </SettingsGroup>
+
+      <SettingsGroup title={tr('Eigene Farben')}
+        action={colors.palette === 'custom' ? <button type="button" className="btn-link" onClick={reset}>{tr('Zurücksetzen')}</button> : null}
+        footer={mode === 'dark'
+          ? tr('Gilt für das dunkle Erscheinungsbild, im hellen wählst du extra.')
+          : tr('Gilt für das helle Erscheinungsbild, im dunklen wählst du extra.')}>
+        {T.FIELDS.map(f => (
+          <label key={f} className="st-row st-color-row">
+            <span className="st-row-text"><span className="st-row-title">{ST_COLOR_FIELDS[f]}</span></span>
+            <span className="st-color-swatch" style={{ background: base[f] }}>
+              <input type="color" value={base[f]} aria-label={ST_COLOR_FIELDS[f]}
+                onChange={e => setField(f, e.target.value)} />
+            </span>
+          </label>
+        ))}
+      </SettingsGroup>
+    </div>
   );
 }
 
@@ -809,7 +901,6 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
 
   return (
     <div className="st-row st-slot">
-      <SettingsTile emoji={cat?.emoji || '?'} />
       <div className="st-slot-main">
         <label className="st-select">
           <select value={slot.category_id || ''} aria-label={tr('Übung')} onChange={e => onChange({ category_id: e.target.value })}>
@@ -824,7 +915,7 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
           <span className="st-row-sub">{tr('Pflicht-Workout')}</span>
         ) : (
           <div className="st-range">
-            {cat?.kind === 'work' ? tr('{from} bis {to} min', range) : tr('{from} bis {to} Reps', range)}
+            {PTData.usesMinutes(cat) ? tr('{from} bis {to} min', range) : tr('{from} bis {to} Reps', range)}
           </div>
         )}
       </div>
@@ -1040,7 +1131,6 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
           return (
             <div className="weekfix-item" key={t.slot_id}>
               <div className="weekfix-item-head">
-                <span className="weekfix-item-emoji">{cat?.emoji || '?'}</span>
                 <span className="weekfix-item-name">{cat?.name || tr('Unbekannt')}</span>
                 {isObligatory && <span className="weekfix-pflicht-badge">{tr('PFLICHT')}</span>}
               </div>

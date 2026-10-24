@@ -119,6 +119,31 @@
     return userIds.filter(id => did.has(id)).length;
   }
 
+  // ── Einheiten und gleiche Übungen ───────────────────────────────────
+  // categories.kind: 'sports' zählt Wiederholungen (reps), 'time' Minuten
+  // (z. B. Bibellesen, Planks), 'work' Minuten mit Projekt und Tool. Zeit und
+  // Work speichern duration_minutes statt reps.
+  function usesMinutes(cat) {
+    return cat?.kind === 'time' || cat?.kind === 'work';
+  }
+
+  // „Dieselbe Übung“ über Challenges hinweg: Standard-Übungen über ihre ID,
+  // eigene über Art und Namen (Groß-/Kleinschreibung und Leerzeichen egal).
+  // Work bleibt pro Challenge, weil Projekte und Tools zur Challenge gehören.
+  function exerciseKey(cat, competitionId) {
+    if (!cat) return null;
+    if (cat.kind === 'work') return `work:${competitionId || cat.competition_id}:${cat.id}`;
+    if (cat.competition_id == null) return `cat:${cat.id}`;
+    return `own:${cat.kind || 'sports'}:${String(cat.name || '').trim().toLowerCase().replace(/\s+/g, ' ')}`;
+  }
+
+  // Gemeinsame log_id für einen Satz, der in mehreren Challenges zählt.
+  function newLogId() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    const h = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0');
+    return `${h()}${h()}-${h()}-4${h().slice(1)}-${(8 + Math.floor(Math.random() * 4)).toString(16)}${h().slice(1)}-${h()}${h()}${h()}`;
+  }
+
   // ── Penalty system: pure computation ────────────────────────────────
   // Pflicht-Workouts (ch.workout, s. annotateWorkouts) zählen Durchgänge und
   // verlangen einen pro Person.
@@ -497,6 +522,113 @@
         };
       },
 
+      // ── Dashboard „Heute“ über alle Challenges ───────────────────────
+      // Wochenziele ab fromWeek (Montag, laufende und letzte Woche) mit ihren
+      // Sätzen, dazu Mitglieder und Übungen.
+      async getDashboard(competitionIds, fromWeek) {
+        if (!competitionIds.length) return { members: [], challenges: [], sets: [], categories: [] };
+        const [members, challenges, categories] = await Promise.all([
+          selectAll(() => client.from('competition_members')
+            .select('competition_id, user_id, role, team, joined_at, left_at, profile:user_id(id, display_name, avatar_url, color)')
+            .in('competition_id', competitionIds)),
+          selectAll(() => client.from('weekly_challenges').select('*')
+            .in('competition_id', competitionIds).gte('week_start', fromWeek)
+            .order('week_start', { ascending: false }).order('created_at')),
+          selectAll(() => client.from('categories').select('*').order('created_at')),
+        ]);
+        const ids = challenges.map(c => c.id);
+        const chunks = [];
+        for (let i = 0; i < ids.length; i += 80) chunks.push(ids.slice(i, i + 80));
+        const sets = (await Promise.all(chunks.map(part => selectAll(() => client.from('sets')
+          .select('id, challenge_id, competition_id, user_id, reps, duration_minutes, note, created_at, log_id')
+          .in('challenge_id', part).order('created_at', { ascending: false }))))).flat();
+        return {
+          members,
+          challenges: challenges.map(normChallenge),
+          sets: sets.map(withAthlete),
+          categories: categories.map(localizeCategory),
+        };
+      },
+      // Live-Änderungen an Sätzen und Wochenzielen dieser Challenges
+      onCompetitionsChange(competitionIds, fn) {
+        if (!competitionIds.length) return () => {};
+        let timer = null;
+        const ping = () => { clearTimeout(timer); timer = setTimeout(fn, 250); };
+        const filter = `competition_id=in.(${competitionIds.join(',')})`;
+        const channel = client.channel(`pt-dash-${Math.random().toString(36).slice(2, 8)}`);
+        for (const table of ['sets', 'weekly_challenges', 'competition_members']) {
+          channel.on('postgres_changes', { event: '*', schema: 'public', table, filter }, ping);
+        }
+        channel.subscribe();
+        return () => { clearTimeout(timer); client.removeChannel(channel); };
+      },
+
+      // Ein Satz für mehrere Wochenziele derselben Übung (eine Zeile pro
+      // Challenge, alle mit derselben log_id). Bearbeiten und Löschen wirken
+      // auf alle Zeilen (Trigger sync_log_siblings), Rangliste und „Ich“ zählen
+      // ihn einmal. targets: [{ challenge_id, competition_id }], die erste ist
+      // die Haupt-Challenge. values: { reps } oder { duration_minutes, … }.
+      // skip: abgewählte Challenges. Sport läuft über log_set (Rangliste, Push
+      // „überholt“), das bei gewerteten Übungen selbst Kopien anlegt; fehlende
+      // Ziele (eigene Übungen, Zeit) trägt die App danach mit derselben log_id ein.
+      async logEverywhere({ targets, values, note = null, createdAt = null, skip = [] }) {
+        const [first] = targets;
+        if (!first) throw friendlyError(new Error('invalid_value'));
+        const me = uid();
+        const clean = note && String(note).trim() ? String(note).trim() : null;
+        let row = null;
+        if (values.duration_minutes == null) {
+          const { data, error } = await client.rpc('log_set', {
+            p_challenge: first.challenge_id, p_reps: values.reps, p_note: clean,
+            p_created_at: createdAt, p_skip: skip,
+          });
+          if (!error) row = data;
+          else if (!missingRpc(error)) throw friendlyError(error);
+        }
+        const base = { user_id: me, reps: values.reps ?? null, duration_minutes: values.duration_minutes ?? null,
+          note: clean, created_at: row?.created_at || createdAt || new Date().toISOString(), log_id: row?.log_id || newLogId() };
+        const rowsFor = (list, withTags) => list.map((t, i) => ({
+          ...base, challenge_id: t.challenge_id, competition_id: t.competition_id,
+          // Projekt und Tool (Work) nur an der Haupt-Challenge
+          ...(withTags && i === 0 ? { project_tag_id: values.project_tag_id ?? null, tool_tag_id: values.tool_tag_id ?? null } : {}),
+        }));
+        if (!row) {
+          // Ohne log_set (Minuten, alte Datenbank): alles in einem Insert
+          const inserted = check(await client.from('sets').insert(rowsFor(targets, true)).select());
+          return Object.assign(normSet(inserted[0]), { missing: 0 });
+        }
+        // Der Satz ist gespeichert. Fehlende Kopien nachtragen; scheitert das
+        // (z. B. Netz weg), nicht als „nicht gespeichert“ melden, sondern zählen.
+        let pending = null;
+        try {
+          const have = new Set((check(await client.from('sets').select('challenge_id')
+            .eq('log_id', row.log_id).eq('user_id', me)) || []).map(r => r.challenge_id));
+          pending = targets.filter(t => !have.has(t.challenge_id));
+          if (pending.length) check(await client.from('sets').insert(rowsFor(pending, false)).select('id'));
+          return Object.assign(normSet(row), { missing: 0 });
+        } catch (e) {
+          console.warn('logEverywhere: Kopien fehlen', e);
+          return Object.assign(normSet(row), { missing: pending ? pending.length : Math.max(0, targets.length - 1) });
+        }
+      },
+
+      // „Meine Leute“: alle, mit denen ich gerade in einer laufenden Challenge
+      // bin (beide aktiv, Challenge nicht archiviert, ohne Freies Training).
+      async myPeople() {
+        const comps = (await base.listMyCompetitions()).filter(c => !c.archived_at);
+        if (!comps.length) return [];
+        const rows = check(await client.from('competition_members')
+          .select('competition_id, user_id, left_at, profile:user_id(id, display_name, avatar_url, color, ranking_opt_in)')
+          .in('competition_id', comps.map(c => c.id)).is('left_at', null)) || [];
+        const byId = {};
+        for (const r of rows) {
+          if (!r.profile) continue;
+          const e = byId[r.user_id] ||= { ...r.profile, competitionIds: [] };
+          e.competitionIds.push(r.competition_id);
+        }
+        return Object.values(byId);
+      },
+
       // ── Rangliste ────────────────────────────────────────────────────
       async getRankingSettings() {
         const { data, error } = await client.from('ranking_settings').select('*').eq('id', 1).maybeSingle();
@@ -518,6 +650,28 @@
       },
       async seasonChampions() {
         return check(await client.rpc('season_champions')) || [];
+      },
+      // ── Wochenwertung (Migration weekly_ranking) ─────────────────────
+      // Ohne Migration liefern rankingWeek und Co. null, die App bleibt dann
+      // bei der Monatswertung.
+      async rankingWeek(week) {
+        const { data, error } = await client.rpc('ranking_week', { p_week: week });
+        if (error) { if (missingRpc(error)) return null; throw friendlyError(error); }
+        return data || [];
+      },
+      async rankingClosedWeeks() {
+        const { data, error } = await client.rpc('ranking_closed_weeks');
+        if (error) { if (missingRpc(error)) return null; throw friendlyError(error); }
+        return (data || []).map(r => r.week);
+      },
+      async rankingProfileWeeks(userId) {
+        const { data, error } = await client.rpc('ranking_profile_weeks', { p_user: userId });
+        if (error) { if (missingRpc(error)) return null; throw friendlyError(error); }
+        return data || [];
+      },
+      async closeDueWeeks() {
+        const { data } = await client.rpc('close_due_weeks');
+        return data || 0;
       },
       // Fällige Monate abschließen (idempotent, läuft sonst per pg_cron)
       async closeDueMonths() {
@@ -764,6 +918,13 @@
       async updateSet(id, patch) {
         const { athlete, ...rest } = patch;
         const data = check(await client.from('sets').update(rest).eq('id', id).select().single());
+        // Kopien in anderen Challenges (gleiche log_id) mitziehen. Wiederholungen,
+        // Datum und Notiz macht auch der Trigger sync_log_siblings, Minuten nicht.
+        const shared = {};
+        for (const k of ['reps', 'duration_minutes', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
+        if (data?.log_id && Object.keys(shared).length) {
+          await client.from('sets').update(shared).eq('log_id', data.log_id).eq('user_id', data.user_id).neq('id', id);
+        }
         emit();
         return normSet(data);
       },
@@ -1037,6 +1198,6 @@
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
     isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, workoutPeopleDone,
-    friendlyError, localizeCategory,
+    friendlyError, localizeCategory, usesMinutes, exerciseKey, newLogId,
   };
 })();

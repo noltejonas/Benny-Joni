@@ -36,12 +36,13 @@ function obRuleLine(cfg) {
   }
 }
 
-function StrafkontoScreen({ api, me, members = [], penalties, closures, openClosures, payouts = [], onChange, onOpenSettings }) {
+function StrafkontoScreen({ api, me, members = [], penalties, closures, openClosures, payouts = [], onChange }) {
   const [closing, setClosing] = useState(null);
   const [penaltyEdit, setPenaltyEdit] = useState(null);
   const [reopenWk, setReopenWk] = useState(null);
   const [addPayout, setAddPayout] = useState(false);
   const [payoutEdit, setPayoutEdit] = useState(null);
+  const [showFree, setShowFree] = useState(false); // Straffreie Wochen, eingeklappt
   // Regel für den leeren Zustand (neue Challenge): in einer Zeile, ohne Fachbegriffe.
   const [cfg, setCfg] = useState(null);
   const isEmpty = !penalties.length && !openClosures.length && !closures.length && !payouts.length;
@@ -77,9 +78,6 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
       <div className="strafkonto-screen">
         <div className="strafkonto-header">
           <div className="title">{tr('Strafkonto')}</div>
-          <button className="icon-btn" aria-label={tr('Strafregeln einstellen')} onClick={onOpenSettings}>
-            <Icon name="settings" size={20} />
-          </button>
         </div>
         <div className="rd-empty">
           <div className="rd-empty-title">{tr('Noch sauber.')}</div>
@@ -93,9 +91,6 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
     <div className="strafkonto-screen">
       <div className="strafkonto-header">
         <div className="title">{tr('Strafkonto')}</div>
-        <button className="icon-btn" aria-label={tr('Strafregeln einstellen')} onClick={onOpenSettings}>
-          <Icon name="settings" size={20} />
-        </button>
       </div>
 
       <section className="rd-card rd-balance" aria-label={tr('Kontostand')}>
@@ -141,19 +136,7 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
       {penalties.length > 0 && (
         <div className="strafkonto-section">
           <div className="strafkonto-section-label">{tr('Strafen')}</div>
-          <div className="rd-card rd-list">
-          {penalties.map(p => (
-            <div key={p.id} className="penalty-row" onClick={() => setPenaltyEdit(p)}>
-              <div className="penalty-row-main">
-                <div className="penalty-row-head">{weekLabel(p.week_start)} · {PTPeople.nameOf(p.athlete)}</div>
-                <div className="penalty-row-meta">{reasonText(p)}</div>
-              </div>
-              <div className={`penalty-row-amount mono ${cls(p.athlete)}`}>
-                –{formatEuro(p.amount_cents)}
-              </div>
-            </div>
-          ))}
-          </div>
+          <PenaltyWeeks penalties={penalties} cls={cls} onEdit={setPenaltyEdit} />
         </div>
       )}
 
@@ -180,8 +163,12 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
 
       {closuresWithoutPenalty.length > 0 && (
         <div className="strafkonto-section">
-          <div className="strafkonto-section-label">{tr('Straffreie Wochen')}</div>
-          <div className="rd-card rd-list">
+          <button type="button" className="strafkonto-section-label strafkonto-section-toggle" aria-expanded={showFree}
+            onClick={() => setShowFree(v => !v)}>
+            {tr('Straffreie Wochen')} <span className="strafkonto-section-count">{closuresWithoutPenalty.length}</span>
+            <span className={`penalty-week-chev${showFree ? ' is-open' : ''}`}><Icon name="chevron" size={18} /></span>
+          </button>
+          {showFree && <div className="rd-card rd-list">
           {closuresWithoutPenalty.map(c => (
             <div key={c.week_start} className="penalty-row" onClick={() => setReopenWk(c.week_start)}>
               <div className="penalty-row-main">
@@ -190,7 +177,7 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
               <span className="penalty-row-reopen" aria-label={tr('Woche neu öffnen')}><Icon name="history" size={18} /></span>
             </div>
           ))}
-          </div>
+          </div>}
         </div>
       )}
 
@@ -220,6 +207,47 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
           onClose={() => setPayoutEdit(null)}
           onDone={() => { setPayoutEdit(null); onChange?.(); }}/>
       )}
+    </div>
+  );
+}
+
+// Strafen nach Woche, jede Woche einklappbar; die neueste ist offen.
+function PenaltyWeeks({ penalties, cls, onEdit }) {
+  const byWeek = {};
+  for (const p of penalties) (byWeek[p.week_start] ||= []).push(p);
+  const weeks = Object.keys(byWeek).sort((a, b) => b.localeCompare(a));
+  const [open, setOpen] = useState(() => new Set(weeks.slice(0, 1)));
+  const toggle = (w) => setOpen(s => { const n = new Set(s); if (n.has(w)) n.delete(w); else n.add(w); return n; });
+  return (
+    <div className="rd-card rd-list">
+      {weeks.map(w => {
+        const list = byWeek[w];
+        const isOpen = open.has(w);
+        const sum = list.reduce((a, p) => a + p.amount_cents, 0);
+        return (
+          <React.Fragment key={w}>
+            <button type="button" className="penalty-row penalty-week" aria-expanded={isOpen} onClick={() => toggle(w)}>
+              <span className="penalty-row-main">
+                <span className="penalty-row-head">{weekLabel(w)}</span>
+                <span className="penalty-row-meta">{trn(list.length, '{n} Strafe', '{n} Strafen')}</span>
+              </span>
+              <span className="penalty-row-amount mono">–{formatEuro(sum)}</span>
+              <span className={`penalty-week-chev${isOpen ? ' is-open' : ''}`}><Icon name="chevron" size={18} /></span>
+            </button>
+            {isOpen && list.map(p => (
+              <div key={p.id} className="penalty-row is-nested" onClick={() => onEdit(p)}>
+                <div className="penalty-row-main">
+                  <div className="penalty-row-head">{PTPeople.nameOf(p.athlete)}</div>
+                  <div className="penalty-row-meta">{reasonText(p)}</div>
+                </div>
+                <div className={`penalty-row-amount mono ${cls(p.athlete)}`}>
+                  –{formatEuro(p.amount_cents)}
+                </div>
+              </div>
+            ))}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }

@@ -1,5 +1,7 @@
 # Monatsrangliste einspielen
 
+> **Seit 24.10.2026: Wochenwertung.** Mit `supabase/migrations/20261024130000_weekly_ranking.sql` gibt es Medaillen pro Woche (Abschluss montags 12 Uhr, Cron `ranking-close-weeks`), Monat, Saison und Ewig zählen die Wochen zusammen. Die Schritte unten bleiben die Grundlage, Details in `docs/HEUTE_UPDATE.md`.
+
 Reihenfolge: erst Datenbank, dann Functions, dann App-Build. Die App fällt beim Loggen auf das alte Einfügen zurück, solange die Migration fehlt; der Rangliste-Tab zeigt dann „Rangliste nicht verfügbar“.
 
 Spec: `docs/superpowers/specs/2026-10-20-monatsrangliste-design.md`

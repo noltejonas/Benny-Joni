@@ -89,10 +89,18 @@ function StatsTab({ api, me, profile, competition, sides, members, challenges, c
 // title: Überschrift der Vollbild-Ansicht (z.B. „Du vs. Jonas“)
 // comps: nur im Duell, um gleiche Übungen aus mehreren Challenges zu unterscheiden
 function ChallengeStats({ sides, members = [], challenges, categories, sets, title, comps = [] }) {
-  const st = React.useMemo(
-    () => PTStats.challengeStats({ sides, challenges, categories, sets, members }),
-    [sides, challenges, categories, sets, members],
+  // Filter nach Übungen (leer = alle mit Wiederholungen)
+  const [keys, setKeys] = React.useState([]);
+  const f = React.useMemo(
+    () => PTStats.applyExerciseFilter({ challenges, sets, categories, keys }),
+    [challenges, sets, categories, keys],
   );
+  const st = React.useMemo(
+    () => PTStats.challengeStats({ sides, challenges: f.challenges, categories, sets: f.sets, members, kinds: f.kinds }),
+    [sides, f, categories, members],
+  );
+  const fmtVal = f.unit === 'min' ? (v) => formatDuration(v ?? 0) : fmtNum;
+  const pick = (key) => { setKeys(k => (k.length === 1 && k[0] === key ? [] : [key])); window.scrollTo?.({ top: 0, behavior: 'smooth' }); };
 
   if (!challenges.length || !sides.length) {
     return <div className="rd-empty"><div className="rd-empty-title">{tr('Noch keine Historie')}</div>
@@ -104,12 +112,32 @@ function ChallengeStats({ sides, members = [], challenges, categories, sets, tit
   }
   return (
     <>
-      <ScoreCard st={st} sides={sides} />
-      <TrendCard st={st} sides={sides} title={title} />
-      <WeeksCard st={st} sides={sides} comps={comps} />
-      {st.categories.length > 0 && <CategoryCard st={st} sides={sides} />}
-      <RecordsCard st={st} sides={sides} />
+      <ExerciseChips options={f.options} keys={keys} onChange={setKeys} />
+      <ScoreCard st={st} sides={sides} unit={f.unit} fmtVal={fmtVal} />
+      <TrendCard st={st} sides={sides} title={title} unit={f.unit} fmtVal={fmtVal} />
+      {st.categories.length > (f.filtered ? 0 : 1) && <ExerciseRace st={st} sides={sides} fmtVal={fmtVal} keys={keys} onPick={pick} />}
+      <WeeksCard st={st} sides={sides} comps={comps} fmtVal={fmtVal} />
+      <RecordsCard st={st} sides={sides} fmtVal={fmtVal} />
     </>
+  );
+}
+
+// Filter-Chips: Alle oder einzelne Übungen (mehrere wählbar)
+function ExerciseChips({ options, keys, onChange }) {
+  if (options.length < 2) return null;
+  return (
+    <div className="rk-chips stats-chips" role="group" aria-label={tr('Nach Übung filtern')}>
+      <button className={`rk-chip ${!keys.length ? 'active' : ''}`} aria-pressed={!keys.length} onClick={() => onChange([])}>{tr('Alle')}</button>
+      {options.map(o => {
+        const on = keys.includes(o.key);
+        return (
+          <button key={o.key} className={`rk-chip ${on ? 'active' : ''}`} aria-pressed={on}
+            onClick={() => onChange(on ? keys.filter(k => k !== o.key) : [...keys, o.key])}>
+            {o.cat?.name}{o.minutes ? ' ⏱' : ''}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -125,7 +153,8 @@ function SideLegend({ sides }) {
   );
 }
 
-function ScoreCard({ st, sides }) {
+function ScoreCard({ st, sides, unit = 'reps', fmtVal = fmtNum }) {
+  const amount = (v) => (unit === 'min' ? fmtVal(v) : trn(v, '{n} Rep', '{n} Reps', { n: fmtNum(v) }));
   const meta = st.decided > 0 && <span className="stats-meta">{trn(st.decided, '{n} Woche', '{n} Wochen')}</span>;
 
   if (sides.length === 2) {
@@ -155,7 +184,7 @@ function ScoreCard({ st, sides }) {
             <div className="rd-split-b" style={{ '--sc': sideFill(sides[1]) }} />
           </div>
           <div className="stats-split-legend mono">
-            <span>{trn(a, '{n} Rep', '{n} Reps', { n: fmtNum(a) })}</span><span>{trn(b, '{n} Rep', '{n} Reps', { n: fmtNum(b) })}</span>
+            <span>{amount(a)}</span><span>{amount(b)}</span>
           </div>
         </div>
       </section>
@@ -168,14 +197,14 @@ function ScoreCard({ st, sides }) {
     <section className="card" aria-label={tr('Tabelle')}>
       <CardHead label={tr('Tabelle')}>{meta}</CardHead>
       <table className="stats-table stats-standings">
-        <thead><tr><th className="stats-pos">#</th><th /><th>{tr('Siege')}</th><th>{tr('Reps')}</th></tr></thead>
+        <thead><tr><th className="stats-pos">#</th><th /><th>{tr('Siege')}</th><th>{unit === 'min' ? tr('Minuten') : tr('Reps')}</th></tr></thead>
         <tbody>
           {order.map((i, pos) => (
             <tr key={sides[i].key} className={sides[i].isMine ? 'is-me' : ''}>
               <td className="stats-pos mono">{pos + 1}</td>
               <td><span className="stats-who"><SideAvatar side={sides[i]} size={26} /><span>{sideName(sides[i])}</span></span></td>
               <td className="mono">{st.wins[i]}</td>
-              <td className="mono">{fmtNum(st.totals[i])}</td>
+              <td className="mono">{fmtVal(st.totals[i])}</td>
             </tr>
           ))}
         </tbody>
@@ -184,7 +213,7 @@ function ScoreCard({ st, sides }) {
   );
 }
 
-function TrendCard({ st, sides, title }) {
+function TrendCard({ st, sides, title, unit = 'reps', fmtVal = fmtNum }) {
   const duel = sides.length === 2;
   const [fullscreen, setFullscreen] = React.useState(false);
   const [range, setRange] = React.useState('all');
@@ -212,9 +241,9 @@ function TrendCard({ st, sides, title }) {
           <span className="stats-head-right">
             {duel
               ? (leadSide
-                ? <span className="stats-lead mono" style={{ color: sideInk(leadSide) }}>{sideName(leadSide)} +{fmtNum(Math.abs(last))}</span>
+                ? <span className="stats-lead mono" style={{ color: sideInk(leadSide) }}>{sideName(leadSide)} +{fmtVal(Math.abs(last))}</span>
                 : <span className="stats-meta">{tr('Gleichstand')}</span>)
-              : <span className="stats-meta">{tr('Reps kumuliert')}</span>}
+              : <span className="stats-meta">{unit === 'min' ? tr('Minuten kumuliert') : tr('Reps kumuliert')}</span>}
             <Icon name="expand" size={14} color="var(--text-3)" />
           </span>
         </CardHead>
@@ -224,7 +253,7 @@ function TrendCard({ st, sides, title }) {
       </section>
       {fullscreen && (
         <ChartFullscreen
-          title={title || (duel ? tr('{name1} vs. {name2}', { name1: sideName(sides[0]), name2: sideName(sides[1]) }) : tr('Reps im Verlauf'))}
+          title={title || (duel ? tr('{name1} vs. {name2}', { name1: sideName(sides[0]), name2: sideName(sides[1]) }) : unit === 'min' ? tr('Minuten im Verlauf') : tr('Reps im Verlauf'))}
           series={asSeries(daily)}
           cumSeries={asSeries(PTStats.cumulative(daily))}
           totalDays={dates.length}
@@ -241,7 +270,7 @@ function TrendCard({ st, sides, title }) {
 
 const WEEKS_SHOWN = 6;
 
-function WeeksCard({ st, sides, comps }) {
+function WeeksCard({ st, sides, comps, fmtVal = fmtNum }) {
   const [openWeek, setOpenWeek] = React.useState(null);
   const [showAll, setShowAll] = React.useState(false);
   const weeks = showAll ? st.weeks : st.weeks.slice(0, WEEKS_SHOWN);
@@ -256,7 +285,7 @@ function WeeksCard({ st, sides, comps }) {
             <li key={w.weekStart} className={isOpen ? 'is-open' : ''}>
               <button className="stats-week" aria-expanded={isOpen} onClick={() => setOpenWeek(isOpen ? null : w.weekStart)}>
                 <span className="stats-week-kw"><b>{tr('KW {n}', { n: weekNumber(w.weekStart) })}</b><small>{fmtWeekRange(w.weekStart)}</small></span>
-                <WeekBar w={w} sides={sides} />
+                <WeekBar w={w} sides={sides} fmtVal={fmtVal} />
                 <span className="stats-week-res">
                   {w.current ? <span className="stats-live">{tr('läuft')}</span>
                     : w.winner != null ? <SideAvatar side={sides[w.winner]} size={24} />
@@ -264,7 +293,7 @@ function WeeksCard({ st, sides, comps }) {
                 </span>
                 <span className="stats-chev"><Icon name="chevron" size={16} /></span>
               </button>
-              {isOpen && <WeekDetail w={w} sides={sides} comps={comps} />}
+              {isOpen && <WeekDetail w={w} sides={sides} comps={comps} fmtVal={fmtVal} />}
             </li>
           );
         })}
@@ -278,7 +307,8 @@ function WeeksCard({ st, sides, comps }) {
   );
 }
 
-function WeekBar({ w, sides }) {
+function WeekBar({ w, sides, fmtVal = fmtNum }) {
+  const wide = fmtVal !== fmtNum; // Minuten brauchen mehr Platz („1h 15m“)
   const segs = sides.map((s, i) => ({ s, v: w.totals[i] })).filter(x => x.v > 0);
   const bar = (
     <span className="stats-bar">
@@ -287,15 +317,15 @@ function WeekBar({ w, sides }) {
   );
   if (sides.length !== 2) return <span className="stats-week-bar is-multi">{bar}</span>;
   return (
-    <span className="stats-week-bar">
-      <span className={`mono ${w.winner === 0 ? 'is-win' : ''}`}>{fmtNum(w.totals[0])}</span>
+    <span className={`stats-week-bar${wide ? ' is-wide' : ''}`}>
+      <span className={`mono ${w.winner === 0 ? 'is-win' : ''}`}>{fmtVal(w.totals[0])}</span>
       {bar}
-      <span className={`mono ${w.winner === 1 ? 'is-win' : ''}`}>{fmtNum(w.totals[1])}</span>
+      <span className={`mono ${w.winner === 1 ? 'is-win' : ''}`}>{fmtVal(w.totals[1])}</span>
     </span>
   );
 }
 
-function WeekDetail({ w, sides, comps }) {
+function WeekDetail({ w, sides, comps, fmtVal = fmtNum }) {
   const multiComp = new Set(w.rows.map(r => r.ch.competition_id)).size > 1;
   const compName = (ch) => comps.find(c => c.id === ch.competition_id)?.name;
   return (
@@ -312,7 +342,7 @@ function WeekDetail({ w, sides, comps }) {
         <div className="stats-wd-row" key={ch.id}>
           <div className="stats-wd-name">
             <span>{cat?.name}{multiComp && <span className="stats-muted"> · {compName(ch)}</span>}</span>
-            <small className="mono">{ch.workout ? tr('1× p. P.') : tr('{n} p. P.', { n: fmtNum(share) })}</small>
+            <small className="mono">{ch.workout ? tr('1× p. P.') : tr('{n} p. P.', { n: fmtVal(share) })}</small>
           </div>
           {perSide.map((p, i) => (
             <div className="stats-wd-side" key={sides[i].key}>
@@ -324,7 +354,7 @@ function WeekDetail({ w, sides, comps }) {
                   <span className="stats-wd-track">
                     <i style={{ width: `${p.goal ? Math.min(100, (100 * p.value) / p.goal) : 0}%`, background: sideFill(sides[i]) }} />
                   </span>
-                  <span className="stats-wd-val mono">{fmtNum(p.value)}/{fmtNum(p.goal)}</span>
+                  <span className="stats-wd-val mono">{fmtVal(p.value)}/{fmtVal(p.goal)}</span>
                 </>
               )}
               <span className={`stats-wd-hit ${p.hit ? 'is-hit' : ''}`} aria-label={p.hit ? tr('Ziel erfüllt') : tr('Ziel offen')}>
@@ -338,41 +368,56 @@ function WeekDetail({ w, sides, comps }) {
   );
 }
 
-function CategoryCard({ st, sides }) {
+// Nach Übung: jede Seite mit eigenem Balken, die Balken laufen gegeneinander.
+// Antippen filtert die ganze Ansicht auf diese Übung.
+function ExerciseRace({ st, sides, fmtVal, keys, onPick }) {
   const duel = sides.length === 2;
   return (
-    <section className="card" aria-label={tr('Kategorien')}>
-      <CardHead label={tr('Kategorien')}>{duel && <SideLegend sides={sides} />}</CardHead>
-      <div className="stats-cats">
-        {st.categories.map(({ cat, vals, leader }) => (
-          <div className={`stats-cat ${duel ? '' : 'is-multi'}`} key={cat?.id}>
-            <span className="stats-cat-name">{cat?.name}</span>
-            {duel && <span className={`stats-cat-val mono ${leader === 0 ? 'is-win' : ''}`}>{fmtNum(vals[0])}</span>}
-            <span className="stats-bar">
-              {sides.map((s, i) => vals[i] > 0 && <i key={s.key} style={{ flex: vals[i], background: sideFill(s) }} />)}
-            </span>
-            {duel
-              ? <span className={`stats-cat-val mono ${leader === 1 ? 'is-win' : ''}`}>{fmtNum(vals[1])}</span>
-              : <span className="stats-cat-lead">
-                  {leader != null && <SideAvatar side={sides[leader]} size={20} />}
-                  <span className="mono">{leader != null ? fmtNum(vals[leader]) : '='}</span>
-                </span>}
-          </div>
-        ))}
+    <section className="card" aria-label={tr('Nach Übung')}>
+      <CardHead label={tr('Nach Übung')}>{duel && <SideLegend sides={sides} />}</CardHead>
+      <div className="stats-race">
+        {st.categories.map(({ key, cat, vals, leader }) => {
+          const max = Math.max(1, ...vals);
+          const sorted = [...vals].sort((a, b) => b - a);
+          const diff = sorted[0] - (sorted[1] ?? 0);
+          let order = sides.map((_, i) => i);
+          if (!duel) {
+            order = order.sort((a, b) => vals[b] - vals[a]).slice(0, 4);
+            if (!order.includes(0)) order[order.length - 1] = 0;
+          }
+          const on = keys.length === 1 && keys[0] === key;
+          return (
+            <button type="button" key={key} className={`stats-race-item${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => onPick(key)}>
+              <span className="stats-race-head">
+                <span className="stats-race-name">{cat?.name}</span>
+                {leader != null
+                  ? <span className="stats-race-lead" style={{ color: sideInk(sides[leader]) }}>👑 {sideName(sides[leader])} <span className="mono">+{fmtVal(diff)}</span></span>
+                  : <span className="stats-race-tie">{vals.some(v => v > 0) ? tr('Gleichstand') : '–'}</span>}
+              </span>
+              {order.map(i => (
+                <span key={sides[i].key} className={`stats-race-row${leader === i ? ' is-lead' : leader != null ? ' is-trail' : ''}`}>
+                  <span className="stats-race-who" style={{ color: sideInk(sides[i]) }}>{duel ? sideName(sides[i]) : sides[i].short}</span>
+                  <span className="stats-race-track"><i style={{ width: `${(vals[i] / max) * 100}%`, background: sideFill(sides[i]) }} /></span>
+                  <span className="stats-race-val mono">{fmtVal(vals[i])}</span>
+                </span>
+              ))}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function RecordsCard({ st, sides }) {
+function RecordsCard({ st, sides, fmtVal = fmtNum }) {
   const r = st.records;
   const rows = [
     { label: tr('Ziele erfüllt'), vals: r.goalRate, fmt: fmtPct },
     { label: tr('Aktive Tage'), vals: r.activeDays },
     { label: tr('Längste Serie'), vals: r.longestStreak },
-    { label: tr('Bester Tag'), vals: r.bestDay },
-    { label: tr('Beste Woche'), vals: r.bestWeek },
-    { label: tr('Größter Satz'), vals: r.maxSet },
+    { label: tr('Bester Tag'), vals: r.bestDay, fmt: fmtVal },
+    { label: tr('Beste Woche'), vals: r.bestWeek, fmt: fmtVal },
+    { label: tr('Größter Satz'), vals: r.maxSet, fmt: fmtVal },
     ...r.workouts.map(wk => ({
       label: wk.cat?.name || tr('Workout'), vals: wk.best,
       fmt: (v) => (v == null ? '–' : fmtWorkout(wk.type, v)),
@@ -440,18 +485,25 @@ function RecordsCard({ st, sides }) {
 // ─── Ich (alle Challenges) ──────────────────────────────────────────────────
 function AllTimeStats({ me, profile, bundle, comps }) {
   const today = PTData.isoDate(new Date());
+  const [keys, setKeys] = React.useState([]);
+  const f = React.useMemo(
+    () => PTStats.applyExerciseFilter({ challenges: bundle.challenges, sets: bundle.sets, categories: bundle.categories, keys }),
+    [bundle, keys],
+  );
   const stats = React.useMemo(() => {
     const sidesByComp = {};
     for (const c of comps) sidesByComp[c.id] = buildSides(c, bundle.members.filter(m => m.competition_id === c.id), me);
-    return PTStats.personalStats({ me, comps, sidesByComp, bundle, today });
-  }, [bundle, comps, me, today]);
+    return PTStats.personalStats({ me, comps, sidesByComp, bundle: { ...bundle, challenges: f.challenges, sets: f.sets }, today, kinds: f.kinds });
+  }, [bundle, comps, me, today, f]);
+  const fmtVal = f.unit === 'min' ? (v) => formatDuration(v ?? 0) : fmtNum;
 
-  if (!stats.setCount && !stats.categories.length) {
+  if (!f.filtered && !stats.setCount && !stats.categories.length) {
     return <div className="empty"><div className="title">{tr('Noch keine Daten')}</div><div>{tr('Logge deinen ersten Satz.')}</div></div>;
   }
 
   return (
     <>
+      <ExerciseChips options={f.options} keys={keys} onChange={setKeys} />
       <section className="card stats-me" aria-label={tr('Überblick')}>
         <div className="stats-me-head">
           <Avatar profile={profile} size={48} />
@@ -461,7 +513,7 @@ function AllTimeStats({ me, profile, bundle, comps }) {
           </div>
         </div>
         <div className="stats-kpis">
-          <div><b className="mono">{fmtNum(stats.totalReps)}</b><span>{tr('Reps')}</span></div>
+          <div><b className="mono">{fmtVal(stats.totalReps)}</b><span>{f.unit === 'min' ? tr('Minuten') : tr('Reps')}</span></div>
           <div><b className="mono">{fmtNum(stats.activeDays)}</b><span>{tr('Aktive Tage')}</span></div>
           <div><b className="mono">{fmtPct(stats.goalRate)}</b><span>{tr('Ziele erfüllt')}</span></div>
         </div>
@@ -478,7 +530,6 @@ function AllTimeStats({ me, profile, bundle, comps }) {
       </section>
 
       <section className="card" aria-label={tr('Übungen')}>
-        <CardHead label={tr('Übungen')} />
         <table className="stats-table stats-ex">
           <thead><tr><th /><th>{tr('Gesamt')}</th><th>{tr('Max. Satz')}</th><th>{tr('Max. Tag')}</th></tr></thead>
           <tbody>
@@ -508,7 +559,7 @@ function AllTimeStats({ me, profile, bundle, comps }) {
               <li key={c.id}>
                 <span className="stats-comp-text">
                   <span className="stats-comp-name">{c.name}</span>
-                  <span className="stats-meta">{tr('{wins}/{played} Siege', { wins, played })} · {trn(total, '{n} Rep', '{n} Reps', { n: fmtNum(total) })}</span>
+                  <span className="stats-meta">{tr('{wins}/{played} Siege', { wins, played })} · {f.unit === 'min' ? fmtVal(total) : trn(total, '{n} Rep', '{n} Reps', { n: fmtNum(total) })}</span>
                 </span>
                 <span className="stats-comp-rank"><b className="mono">{tr('{rank}.', { rank })}</b><small>{tr('von {total}', { total: of })}</small></span>
               </li>

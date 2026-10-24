@@ -57,8 +57,6 @@
 .ob-foot .btn-link { align-self: center; padding: 8px 10px; }
 /* Auf dem Seitenhintergrund ist --surface-2 = --bg: Zweitknöpfe als Karte */
 .ob-screen .btn-secondary, .ob-empty-actions .btn-secondary { background: var(--surface); box-shadow: var(--shadow); }
-.ob-row2 { display: flex; gap: 10px; }
-.ob-row2 > .btn { flex: 1; min-width: 0; }
 .ob-foot .btn[aria-busy="true"] { opacity: .7; }
 
 .ob-msg { font-size: 14px; line-height: 20px; font-weight: 600; border-radius: 14px; padding: 10px 14px; }
@@ -153,7 +151,7 @@
 .ob-avatar-pick.is-busy .pt-avatar { opacity: .5; }
 .ob-avatar-badge {
   position: absolute; right: 2px; bottom: 2px; width: 38px; height: 38px; border-radius: 999px;
-  background: var(--grad); color: #fff; box-shadow: 0 0 0 4px var(--bg);
+  background: var(--grad); color: var(--on-grad, #fff); box-shadow: 0 0 0 4px var(--bg);
   display: flex; align-items: center; justify-content: center;
 }
 .ob-avatar-caption { text-align: center; font-size: 14px; font-weight: 700; color: var(--primary-ink); margin-top: -8px; }
@@ -167,7 +165,7 @@
   transition: transform .15s var(--ease);
 }
 .ob-choice:active { transform: scale(.98); }
-.ob-choice.is-primary { background: var(--grad); color: #fff; box-shadow: var(--grad-shadow); }
+.ob-choice.is-primary { background: var(--grad); color: var(--on-grad, #fff); box-shadow: var(--grad-shadow); }
 .ob-choice-icon {
   width: 52px; height: 52px; flex-shrink: 0; border-radius: 16px; font-size: 26px;
   display: flex; align-items: center; justify-content: center; background: var(--surface-2);
@@ -203,7 +201,7 @@
   width: 22px; height: 22px; flex-shrink: 0; border-radius: 999px; border: 2px solid var(--surface-3);
   display: flex; align-items: center; justify-content: center;
 }
-.ob-mode.is-on .ob-radio { border-color: var(--primary); background: var(--primary); color: #fff; }
+.ob-mode.is-on .ob-radio { border-color: var(--primary); background: var(--primary); color: var(--on-primary, #fff); }
 
 .ob-name-row { display: flex; gap: 10px; }
 .ob-name-row .input { flex: 1; min-width: 0; }
@@ -332,17 +330,36 @@
   background: var(--surface-2); color: var(--text); font: inherit; font-size: 15px; font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.ob-chip.is-on { background: var(--primary); color: #fff; }
+.ob-chip.is-on { background: var(--primary); color: var(--on-primary, #fff); }
 /* Chips direkt auf dem Seitenhintergrund (nicht in einer Karte) als kleine Karten */
 .ob-body > .ob-chips .ob-chip:not(.is-on) { background: var(--surface); box-shadow: var(--shadow); }
 .ob-amount-note { font-size: 13px; line-height: 18px; color: var(--text-3); text-align: center; font-weight: 600; }
+
+/* Wochenziel mit mehreren Übungen: eine Zeile pro Übung, Einheit einmal darunter */
+.ob-goals {
+  display: flex; flex-direction: column; gap: 6px; padding: 4px 14px 14px;
+  border-radius: 16px; background: var(--surface); box-shadow: var(--shadow);
+}
+.ob-goals-list { display: flex; flex-direction: column; }
+.ob-goal { display: flex; align-items: center; gap: 6px; min-height: 60px; }
+.ob-goal + .ob-goal { border-top: 1px solid var(--line); }
+.ob-goal-name { flex: 1; min-width: 0; font-size: 15px; line-height: 19px; font-weight: 700; overflow-wrap: anywhere; }
+.ob-goal .ob-step-btn { width: 40px; height: 40px; font-size: 22px; }
+.ob-goal-num {
+  width: 64px; height: 40px; flex-shrink: 0; padding: 0; border: none; border-radius: 14px; background: transparent;
+  color: var(--text); font: inherit; font-size: 24px; font-weight: 800; text-align: center;
+  font-variant-numeric: tabular-nums; outline: none;
+}
+.ob-goal-num:focus { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--primary); }
+.ob-goals-unit { font-size: 13px; line-height: 18px; font-weight: 700; color: var(--text-3); text-align: center; }
+.ob-goals .ob-amount-note { margin-top: -4px; }
 
 /* Feier zum ersten Satz */
 .ob-cele {
   position: fixed; inset: 0; z-index: 170; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
   padding: calc(var(--safe-top) + 24px) 24px calc(var(--safe-bot) + 24px);
-  background: var(--grad); color: #fff; text-align: center;
+  background: var(--grad); color: var(--on-grad, #fff); text-align: center;
   animation: ob-fade .3s ease both;
 }
 .ob-cele-over { font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
@@ -440,7 +457,7 @@
 .ob-coach {
   position: relative; width: fit-content; max-width: 100%; white-space: nowrap;
   margin: -4px 0 4px max(0px, calc(var(--ob-arrow-x, 28px) - 28px));
-  padding: 8px 12px; border-radius: 12px; background: #fff; color: #4338CA;
+  padding: 8px 12px; border-radius: 12px; background: #fff; color: var(--focus-ink, #4338CA);
   font-size: 13px; line-height: 17px; font-weight: 700; box-shadow: 0 6px 18px rgba(28, 27, 46, .18);
   animation: ob-bob 1.8s ease-in-out infinite;
 }

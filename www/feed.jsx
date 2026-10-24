@@ -247,7 +247,7 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
     for (const ch of challenges) out[ch.id] = categories.find((c) => c.id === ch.category_id) || null;
     return out;
   }, [challenges, categories]);
-  const fmtFor = (challengeId) => (v) => (catOfChallenge[challengeId]?.kind === 'work' ? formatDuration(v) : String(v));
+  const fmtFor = (challengeId) => (v) => (PTData.usesMinutes(catOfChallenge[challengeId]) ? formatDuration(v) : String(v));
 
   // Punkt an Einträgen anderer, die seit dem letzten Besuch dazugekommen sind.
   const [lastSeen, setLastSeen] = React.useState('');

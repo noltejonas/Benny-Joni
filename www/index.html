@@ -17,6 +17,8 @@
       document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
     } catch (e) {}
   </script>
+  <!-- Farbpalette aus den Einstellungen vor dem ersten Bild setzen -->
+  <script src="theme.js"></script>
   <!-- build:fonts -->
   <!-- Blöcke von build:… bis /build ersetzt tools/build.cjs für die iOS-App
        (dist/) durch Dateien aus node_modules. Im Browser bleibt alles wie hier. -->
@@ -27,6 +29,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="redesign.css" />
   <link rel="stylesheet" href="onboarding.css" />
+  <link rel="stylesheet" href="dashboard.css" />
 </head>
 <body>
   <!-- Spinner bis React übernimmt, damit der Start nicht weiß bleibt -->
@@ -109,6 +112,7 @@
   <script src="demo.js"></script>
   <script src="stats-model.js"></script>
   <script src="feed-model.js"></script>
+  <script src="dashboard-model.js"></script>
   <script src="onboarding-model.js"></script>
   <script src="boot-cache.js"></script>
   <script src="figures/manifest.js"></script>
@@ -120,9 +124,11 @@
   <script type="text/babel" src="components.jsx"></script>
   <script type="text/babel" src="people.jsx"></script>
   <script type="text/babel" src="celebration.jsx"></script>
+  <script type="text/babel" src="finale.jsx"></script>
 
   <!-- Screens -->
   <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="dashboard.jsx"></script>
   <script type="text/babel" src="feed.jsx"></script>
   <script type="text/babel" data-presets="env,react" src="strafkonto.jsx"></script>
 

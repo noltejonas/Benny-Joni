@@ -85,8 +85,8 @@ function ObInviteLayer({ competition, members, me, fresh, onDone }) {
 // ─── Erstes Wochenziel ──────────────────────────────────────────────────────
 const obStepOf = (n) => (n < 30 ? 1 : n < 100 ? 5 : 10);
 
-function ObAmount({ value, onChange, choices, unit, note }) {
-  // Beim Tippen darf das Feld kurz leer sein; der Wert bleibt der letzte gültige.
+// Beim Tippen darf das Feld kurz leer sein; der Wert bleibt der letzte gültige.
+function useObDraft(onChange) {
   const [draft, setDraft] = React.useState(null);
   const set = (v) => { setDraft(null); onChange(Math.max(1, Math.min(9999, Math.round(v) || 1))); };
   const type = (raw) => {
@@ -95,6 +95,11 @@ function ObAmount({ value, onChange, choices, unit, note }) {
     const n = parseInt(clean, 10);
     if (n > 0) onChange(n);
   };
+  return { draft, setDraft, set, type };
+}
+
+function ObAmount({ value, onChange, choices, unit, note }) {
+  const { draft, setDraft, set, type } = useObDraft(onChange);
   return (
     <div className="ob-amount">
       <div className="ob-amount-row">
@@ -131,57 +136,95 @@ function obGoalCategories(categories) {
   return categories.filter(c => (c.kind || 'sports') === 'sports' && (c.challenge_type || 'standard') === 'standard');
 }
 
-function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = tr('Euer erstes Wochenziel'), onDone, onSkip }) {
+// Eine Mengenzeile pro gewählter Übung: Name, − Zahl +.
+function ObGoalLine({ name, value, onChange }) {
+  const { draft, setDraft, set, type } = useObDraft(onChange);
+  return (
+    <div className="ob-goal" role="group" aria-label={name}>
+      <span className="ob-goal-name" aria-hidden="true">{name}</span>
+      <button type="button" className="ob-step-btn" aria-label={tr('weniger')} disabled={value <= 1}
+        onClick={() => set(value - obStepOf(value - 1))}>−</button>
+      <input className="ob-goal-num" type="text" inputMode="numeric" pattern="[0-9]*" value={draft ?? value}
+        aria-label={tr('pro Person bis Sonntag')}
+        onFocus={e => e.target.select()} onChange={e => type(e.target.value)} onBlur={() => setDraft(null)} />
+      <button type="button" className="ob-step-btn" aria-label={tr('mehr')} onClick={() => set(value + obStepOf(value))}>+</button>
+    </div>
+  );
+}
+
+// Mehrere Übungen möglich, jede mit eigenem Ziel pro Person. Speichert ein
+// Wochenziel pro Übung und meldet alle an onDone (Array).
+// onMore: volle Einstellungen (eigene Übung, Minuten, Details) statt dieser Kurzfassung.
+function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart, title = tr('Euer erstes Wochenziel'), onDone, onSkip, onMore }) {
   const online = useObOnline();
   const cats = obGoalCategories(categories);
   const [showAll, setShowAll] = React.useState(false);
-  const [catId, setCatId] = React.useState(cats[0]?.id || null);
-  const cat = cats.find(c => c.id === catId);
-  const [amount, setAmount] = React.useState(() => PTOnboarding.goalDefault(cats[0]));
+  const [picked, setPicked] = React.useState(() => (cats[0] ? [cats[0].id] : []));
+  const [amounts, setAmounts] = React.useState({}); // pro Person je Übung; fehlt = Vorschlag
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
+  // Schon angelegt: nach einem Fehler mittendrin ändert der zweite Versuch statt doppelt anzulegen.
+  const saved = React.useRef({});
   const people = PTOnboarding.expectedPeople(competition.mode, activeCount);
-  const def = PTOnboarding.goalDefault(cat);
+  const chosen = picked.map(id => cats.find(c => c.id === id)).filter(Boolean);
+  const amountOf = (c) => amounts[c.id] ?? PTOnboarding.goalDefault(c);
   const visible = showAll ? cats : cats.slice(0, 6);
   const daysLeft = PTOnboarding.weekProgress().daysLeft;
 
-  function pick(c) { setCatId(c.id); setAmount(PTOnboarding.goalDefault(c)); }
+  const toggle = (c) => setPicked(ids => (ids.includes(c.id) ? ids.filter(id => id !== c.id) : [...ids, c.id]));
 
   async function save() {
-    if (!cat) return;
+    if (!chosen.length) return;
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
     setError(''); setBusy(true);
     try {
-      const ch = await api.upsertChallenge({ week_start: weekStart, category_id: cat.id, chosen_by: me,
-        target_reps: PTOnboarding.goalTarget(amount, people) });
+      const chs = [];
+      for (const c of chosen) {
+        const ch = await api.upsertChallenge({ id: saved.current[c.id], week_start: weekStart, category_id: c.id, chosen_by: me,
+          target_reps: PTOnboarding.goalTarget(amountOf(c), people) });
+        saved.current[c.id] = ch.id;
+        chs.push(ch);
+      }
       PTHaptics.tap();
-      onDone(ch);
+      onDone(chs);
     } catch (e) { setError(e.message || String(e)); setBusy(false); }
   }
 
   return (
     <ObLayer label={tr('Wochenziel festlegen')}>
       <ObScreen stepKey="goal" foot={<>
-        <button type="button" className="btn" disabled={busy || !cat} onClick={save}>{busy ? '…' : tr('Ziel setzen')}</button>
+        <button type="button" className="btn" disabled={busy || !chosen.length} onClick={save}>
+          {busy ? '…' : chosen.length ? trn(chosen.length, '{n} Ziel setzen', '{n} Ziele setzen') : tr('Übung wählen')}
+        </button>
         <button type="button" className="btn-link" onClick={onSkip}>{tr('Später')}</button>
       </>}>
         <h1 className="ob-title">{title}</h1>
         <ObGuide who="benny" pose="flex">{tr('Was macht ihr bis Sonntag?')}{daysLeft < 7 ? ' ' + trn(daysLeft, 'Noch {n} Tag.', 'Noch {n} Tage.') : ''}</ObGuide>
-        <div className="ob-ex-grid" role="radiogroup" aria-label={tr('Übung')}>
-          {visible.map(c => (
-            <button key={c.id} type="button" role="radio" aria-checked={c.id === catId}
-              className={`ob-ex${c.id === catId ? ' is-on' : ''}`} onClick={() => pick(c)}>
-              <span className="ob-ex-emoji" aria-hidden="true">{c.emoji}</span>
-              <span className="ob-ex-name">{c.name}</span>
-            </button>
-          ))}
+        <div className="ob-ex-grid" role="group" aria-label={tr('Übungen')}>
+          {visible.map(c => {
+            const on = picked.includes(c.id);
+            return (
+              <button key={c.id} type="button" aria-pressed={on} className={`ob-ex${on ? ' is-on' : ''}`} onClick={() => toggle(c)}>
+                <span className="ob-ex-name">{c.name}</span>
+              </button>
+            );
+          })}
         </div>
         {!showAll && cats.length > 6 && <button type="button" className="btn-link ob-more" onClick={() => setShowAll(true)}>{tr('Mehr Übungen')}</button>}
-        {cat && (
-          <ObAmount value={amount} onChange={setAmount} unit={tr('pro Person bis Sonntag')}
-            choices={PTOnboarding.goalChoices(def)}
-            note={obTogetherNote(PTOnboarding.goalTarget(amount, people), people)} />
+        {chosen.length > 0 && (
+          <div className="ob-goals">
+            <div className="ob-goals-list">
+              {chosen.map(c => (
+                <ObGoalLine key={c.id} name={c.name} value={amountOf(c)} onChange={(v) => setAmounts(a => ({ ...a, [c.id]: v }))} />
+              ))}
+            </div>
+            <div className="ob-goals-unit">{tr('pro Person bis Sonntag')}</div>
+            {chosen.length === 1 && (
+              <div className="ob-amount-note">{obTogetherNote(PTOnboarding.goalTarget(amountOf(chosen[0]), people), people)}</div>
+            )}
+          </div>
         )}
+        {onMore && <button type="button" className="btn-link ob-more" onClick={onMore}>{tr('Eigene Übung, Minuten & mehr')}</button>}
         <ObMessage error={error} />
       </ObScreen>
     </ObLayer>
@@ -226,7 +269,7 @@ function ObFirstLogLayer({ api, challenges, categories, people = 2, onLogged, on
             {options.map(o => (
               <button key={o.id} type="button" role="radio" aria-checked={o.id === chId}
                 className={`ob-chip${o.id === chId ? ' is-on' : ''}`} onClick={() => setChId(o.id)}>
-                {catById[o.category_id]?.emoji} {catById[o.category_id]?.name}
+                {catById[o.category_id]?.name}
               </button>
             ))}
           </div>
@@ -288,7 +331,7 @@ function ObCelebrate({ value, category, myDone, share, onDone }) {
   return (
     <div className="ob-cele" role="dialog" aria-modal="true" aria-label={tr('Erster Satz geschafft')}>
       <ObConfetti />
-      <div className="ob-cele-over">{category?.emoji} {category?.name}</div>
+      <div className="ob-cele-over">{category?.name}</div>
       <h1 className="ob-cele-title">{tr('Erster Satz! 💪')}</h1>
       <ObDuo benny="cheer" joni="cheer" tall={obFigTall(118)} enter />
       <div className="ob-cele-num">+{shown}</div>

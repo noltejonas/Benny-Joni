@@ -34,9 +34,10 @@ function useCelebration(challenges, allSets, me, categories) {
       if (flags[ch.id]) continue;
       const cat = (categories || []).find(c => c.id === ch.category_id);
       if (PTData.isWorkoutType(cat?.challenge_type)) continue; // Pflicht-Workout: kein Wiederholungsziel
+      // Wiederholungen bzw. Minuten (Zeit-Übungen); eine log_id zählt hier ohnehin pro Challenge
       const total = (allSets || [])
         .filter(s => s.challenge_id === ch.id)
-        .reduce((sum, s) => sum + s.reps, 0);
+        .reduce((sum, s) => sum + (s.reps ?? s.duration_minutes ?? 0), 0);
       if (total >= ch.target_reps && ch.target_reps > 0) {
         return { challenge: ch, category: cat || { name: '', emoji: '🏆' }, total };
       }
@@ -317,7 +318,7 @@ function CelebrationOverlay({ category, targetReps, onDone, hero, counterLabel, 
           <span className="cel-counter-num" data-target={targetReps}>0</span>
           <span className="cel-counter-of">{counterLabel ?? <>/ {targetFormatted} {unit}</>}</span>
         </div>
-        <div className="cel-subtext">{subtext ?? <>{category?.emoji || '🏆'} {tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</>}</div>
+        <div className="cel-subtext">{subtext ?? tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</div>
         {window.ObDuo && (
           <div className="cel-duo">
             <ObDuo benny="cheer" joni="cheer" tall={window.obFigTall ? obFigTall(150) : 150} enter />
