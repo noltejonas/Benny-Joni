@@ -318,7 +318,7 @@ function CelebrationOverlay({ category, targetReps, onDone, hero, counterLabel, 
           <span className="cel-counter-num" data-target={targetReps}>0</span>
           <span className="cel-counter-of">{counterLabel ?? <>/ {targetFormatted} {unit}</>}</span>
         </div>
-        <div className="cel-subtext">{subtext ?? <>{category?.emoji || '🏆'} {tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</>}</div>
+        <div className="cel-subtext">{subtext ?? tr('{count} {name} geknackt', { count: targetFormatted, name: unit })}</div>
         {window.ObDuo && (
           <div className="cel-duo">
             <ObDuo benny="cheer" joni="cheer" tall={window.obFigTall ? obFigTall(150) : 150} enter />

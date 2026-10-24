@@ -184,7 +184,7 @@ function compStatusLine(card) {
   return tr('Platz {rank} von {total}', { rank: standing.rank, total: standing.of });
 }
 
-function CompCard({ card, daysLeft, onOpen }) {
+function CompCard({ card, onOpen }) {
   const { c, sides, duel, done, total } = card;
   const two = sides.length === 2;
   const reps = duel.map(d => d.reps);
@@ -217,7 +217,6 @@ function CompCard({ card, daysLeft, onOpen }) {
       )}
       <span className="db-comp-meta">
         <span>{total ? tr('{done}/{total} erledigt', { done, total }) : tr('Ziel festlegen')}</span>
-        <span>{daysLeft === 0 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')}</span>
       </span>
     </button>
   );
@@ -226,14 +225,10 @@ function CompCard({ card, daysLeft, onOpen }) {
 // Fokus-Karte einer zusammengeführten Übung (zählt für alle ihre Challenges)
 function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
   const fmt = (v) => fmtAmount(ex.minutes, v);
-  const many = ex.entries.length > 1;
   return (
     <div className={`rd-focus fc-card${ex.finished ? ' is-done' : ''}`}>
       <div className="rd-focus-top">
         <div className="rd-focus-text">
-          <div className="rd-overline">
-            {many ? trn(ex.entries.length, 'Zählt für eine Challenge', 'Zählt für {n} Challenges') : ex.entries[0].card.c.name}
-          </div>
           <h2 className="rd-focus-title">{ex.cat?.name}</h2>
           <div className="rd-focus-sub">
             {ex.isObligatory
@@ -290,7 +285,7 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
         </div>
         <div className="db-comps">
           {cards.map(card => (
-            <CompCard key={card.c.id} card={card} daysLeft={daysLeft} onOpen={() => onOpenCard(card)} />
+            <CompCard key={card.c.id} card={card} onOpen={() => onOpenCard(card)} />
           ))}
         </div>
       </section>
@@ -335,9 +330,6 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
                 <li key={ex.key}>
                   <button type="button" className={`rd-row${ex.finished ? ' is-done' : ''}${isFocus ? ' is-focus' : ''}`}
                     aria-pressed={isFocus} onClick={() => onFocus(ex.key)}>
-                    <span className="rd-tile">
-                      <Icon name={ex.isObligatory ? 'timer' : ex.isWork ? 'laptop' : ex.minutes ? 'timer' : 'dumbbell'} size={20} />
-                    </span>
                     <span className="rd-row-text">
                       <span className="rd-row-name">{ex.cat?.name}</span>
                       <span className="rd-row-sub">{sub}</span>
@@ -384,7 +376,7 @@ function ChallengeQuickSheet({ card, weekStart, daysLeft, onOpen, onClose }) {
           {rows.map(r => (
             <li key={r.ch.id}>
               <div className="db-quick-row-head">
-                <span className="db-quick-name">{r.cat?.emoji} {r.cat?.name}</span>
+                <span className="db-quick-name">{r.cat?.name}</span>
                 <span className="db-quick-mine mono">
                   {r.isObligatory ? (r.meFinished ? tr('erledigt') : tr('offen'))
                     : tr('du {done}/{total}', { done: fmtAmount(r.minutes, r.myDone), total: fmtAmount(r.minutes, r.share) })}

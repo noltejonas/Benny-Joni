@@ -258,7 +258,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
         <button className={`rk-chip ${!cat ? 'active' : ''}`} onClick={() => setCatKey('all')}>🏆 {tr('Gesamt')}</button>
         {cats.map(c => (
           <button key={c.id} className={`rk-chip ${cat?.id === c.id ? 'active' : ''}`} onClick={() => setCatKey(c.id)}>
-            {c.emoji} {c.name}
+            {c.name}
           </button>
         ))}
       </div>
@@ -505,7 +505,7 @@ function RankingLogSheet({ api, cat, onClose, onLogged }) {
   const step = type === 'bring_sally_up' ? 5 : 1;
   return (
     <>
-      <h2 className="title" style={{ marginBottom: 4 }}>{cat.emoji} {cat.name}</h2>
+      <h2 className="title" style={{ marginBottom: 4 }}>{cat.name}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
         {type === 'bring_sally_up' ? tr('Zeit bis zum ersten Absetzen') : type === 'tom_holland' ? tr('Volle Runden in 20 Minuten') : tr('Wiederholungen')}
       </div>
@@ -618,7 +618,7 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
                 <li key={`live-${m.category_id}`}>
                   <span className="rk-trophy-medal is-live">{m.rank}.</span>
                   <span className="rk-trophy-text">
-                    <b>{c ? `${c.emoji} ${c.name}` : tr('Übung')}</b>
+                    <b>{c ? c.name : tr('Übung')}</b>
                     <span>{tr('vorläufig')} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
                   </span>
                   <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>
@@ -650,7 +650,7 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
                         <li key={`${m.week || m.month}-${m.category_id}-${i}`}>
                           <span className="rk-trophy-medal">{RK_MEDAL[m.rank] || `${m.rank}.`}</span>
                           <span className="rk-trophy-text">
-                            <b>{c ? `${c.emoji} ${c.name}` : tr('Übung')}</b>
+                            <b>{c ? c.name : tr('Übung')}</b>
                             <span>{m.week ? `${tr('KW {week}', { week: PTRanking.weekNumberOf(m.week) })} · ` : ''}{tr('Platz {rank}', { rank: m.rank })} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
                           </span>
                           <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>

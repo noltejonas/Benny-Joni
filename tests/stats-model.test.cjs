@@ -178,6 +178,27 @@ test('personalStats: Zielquote am fairen Anteil, Platz nur aus Sport-Reps', () =
   assert.equal(work.total, 500);
 });
 
+test('personalStats: eigene Übung mit gleichem Namen aus zwei Challenges ist eine Zeile', () => {
+  const own = [
+    { id: 'bib1', name: 'Bibellesen', kind: 'time', competition_id: 'c1', challenge_type: 'standard' },
+    { id: 'bib2', name: 'bibellesen ', kind: 'time', competition_id: 'c2', challenge_type: 'standard' },
+  ];
+  const challenges = [
+    { id: 'w1', competition_id: 'c1', category_id: 'bib1', week_start: THIS_WEEK, target_reps: 120 },
+    { id: 'w2', competition_id: 'c2', category_id: 'bib2', week_start: THIS_WEEK, target_reps: 120 },
+  ];
+  const sets = [
+    { challenge_id: 'w1', competition_id: 'c1', athlete: 'a', duration_minutes: 15, log_id: 'L1', created_at: at('2026-10-13') },
+    { challenge_id: 'w2', competition_id: 'c2', athlete: 'a', duration_minutes: 15, log_id: 'L1', created_at: at('2026-10-13') },
+    { challenge_id: 'w2', competition_id: 'c2', athlete: 'a', duration_minutes: 30, log_id: 'L2', created_at: at('2026-10-14') },
+  ];
+  const bundle = { categories: own, challenges, sets, members: [] };
+  const st = S.personalStats({ me: 'a', comps: [], sidesByComp: {}, bundle, today: TODAY, kinds: ['sports', 'time'] });
+  assert.equal(st.categories.length, 1);
+  assert.equal(st.categories[0].total, 45);
+  assert.equal(st.categories[0].bestDay, 30);
+});
+
 test('intensityLevels: Quartile der aktiven Tage, Workout-Tag ist Stufe 1', () => {
   const level = S.intensityLevels([10, 20, 30, 40, 50, 60, 70, 80]);
   assert.equal(level(0, false), 0);

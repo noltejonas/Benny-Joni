@@ -1275,7 +1275,6 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           celebrate={synced && !finaleShown.length && !medalCelebration}
           layout={t.layout}
           competitionId={competition.id}
-          otherTargets={otherTargets}
           weekStart={weekStart}
           nextWeekStart={nextWeekStart}
           nextWeekChallenges={nextWeekChallenges}
@@ -1310,8 +1309,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           closures={closures}
           openClosures={openClosures}
           payouts={payouts}
-          onChange={reload}
-          onOpenSettings={() => openSettings('penalties')} />
+          onChange={reload} />
         }
 
         {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories}

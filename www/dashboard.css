@@ -8,13 +8,14 @@
   overflow-x: auto; overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
   padding: 4px 16px 28px; margin-bottom: -22px;
-  align-items: flex-start;
   scrollbar-width: none;
 }
 .fc-track::-webkit-scrollbar { display: none; }
 .fc-slide { flex: 0 0 calc(100% - 40px); scroll-snap-align: center; scroll-snap-stop: always; display: flex; }
 .fc-track.is-single .fc-slide { flex-basis: 100%; }
+/* Alle Karten so hoch wie die höchste, Eintragen bzw. Start sitzt unten */
 .fc-slide > .rd-focus { flex: 1; min-width: 0; }
+.fc-slide > .rd-focus > :last-child { margin-top: auto; }
 .fc-slide.is-off > .rd-focus { opacity: .82; transform: scale(.97); }
 .fc-slide > .rd-focus { transition: opacity .25s var(--ease), transform .25s var(--ease); }
 .rd-focus.fc-card.is-done { background: linear-gradient(135deg, #22A06B 0%, #137A55 100%); box-shadow: 0 12px 32px rgba(19, 122, 85, .28); }

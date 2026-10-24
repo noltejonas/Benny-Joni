@@ -809,7 +809,6 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
 
   return (
     <div className="st-row st-slot">
-      <SettingsTile emoji={cat?.emoji || '?'} />
       <div className="st-slot-main">
         <label className="st-select">
           <select value={slot.category_id || ''} aria-label={tr('Übung')} onChange={e => onChange({ category_id: e.target.value })}>
@@ -1040,7 +1039,6 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
           return (
             <div className="weekfix-item" key={t.slot_id}>
               <div className="weekfix-item-head">
-                <span className="weekfix-item-emoji">{cat?.emoji || '?'}</span>
                 <span className="weekfix-item-name">{cat?.name || tr('Unbekannt')}</span>
                 {isObligatory && <span className="weekfix-pflicht-badge">{tr('PFLICHT')}</span>}
               </div>

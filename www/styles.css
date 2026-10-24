@@ -738,7 +738,12 @@ body {
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s, color .15s;
 }
 .quick-edit-btn:hover { background: var(--surface-2); color: var(--text); }
-.quick-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-chips { display: flex; gap: 8px; }
+/* Schnellsatz immer in einer Reihe: die Zahl-Chips teilen sich die Breite */
+.quick-chips > .quick-chip { flex: 1 1 0; min-width: 0; padding-inline: 0; text-align: center; white-space: nowrap; }
+.quick-chips > .quick-chip-open, .quick-chips > .quick-chip-setup { flex: 0 0 auto; white-space: nowrap; }
+.quick-chips.is-many > .quick-chip { font-size: 14px; }
+.quick-row-edit .quick-chips { flex-wrap: wrap; }
 .quick-chip {
   background: color-mix(in oklab, var(--accent) 10%, var(--surface-2));
   color: var(--accent);
@@ -1080,6 +1085,9 @@ body {
 
 /* Quick reps chips */
 .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+/* Vorschlagswerte im Log-Sheet: alle in einer Reihe, gleich breit */
+.chip-row.is-one-line { flex-wrap: nowrap; }
+.chip-row.is-one-line > .chip { flex: 1 1 0; min-width: 0; padding-inline: 0; text-align: center; white-space: nowrap; }
 .chip {
   background: var(--surface-2);
   border: none;

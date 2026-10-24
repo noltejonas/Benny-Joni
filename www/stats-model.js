@@ -243,12 +243,14 @@
     const { current, longest } = streaks(days, today);
     const totalReps = sport.reduce((a, s) => a + P.setValue(s), 0);
 
-    // Pro Kategorie: Summe, größter Satz, bester Tag (Workouts: Durchgänge, Bestwert)
+    // Pro Übung: Summe, größter Satz, bester Tag (Workouts: Durchgänge, Bestwert).
+    // Dieselbe Übung aus mehreren Challenges ist eine Zeile (PTData.exerciseKey).
     const perCat = {};
     const catDay = {};
     for (const s of mine) {
-      const cid = chById[s.challenge_id].category_id;
-      const cat = catById[cid];
+      const ch = chById[s.challenge_id];
+      const cat = catById[ch.category_id];
+      const cid = P.exerciseKey(cat, ch.competition_id) || ch.category_id;
       const isWork = P.usesMinutes(cat); // Minuten (Zeit und Work)
       const e = perCat[cid] ||= { cat, kind: isWork ? 'work' : s.workout ? 'workout' : 'reps', total: 0, maxSet: 0, bestDay: 0 };
       const v = s.workout ? (s.reps ?? 0) : (s.reps ?? s.duration_minutes ?? 0);

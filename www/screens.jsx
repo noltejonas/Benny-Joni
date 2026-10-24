@@ -38,7 +38,8 @@ function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onL
   }, [coach, editing, values]);
 
   useEffect(() => { setValues(getQuickSets(me, catId, { legacyId, minutes })); setEditing(false); }, [me, catId, legacyId, minutes]);
-  const chipLabel = (v) => (minutes ? tr('+{n} min', { n: v }) : `+${v}`);
+  // Einheit steht bei Minuten in der Überschrift, die Chips bleiben kurz (eine Reihe)
+  const chipAria = (v) => (minutes ? tr('+{n} min', { n: v }) : undefined);
 
   function commit(next) {
     const clean = next.filter(n => Number.isFinite(n) && n > 0).slice(0, 6);
@@ -81,7 +82,7 @@ function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onL
   return (
     <div className="quick-row" ref={rowRef}>
       <div className="quick-row-head">
-        <span className="quick-row-label">{minutes ? tr('Schnell eintragen') : tr('Schnellsatz')}</span>
+        <span className="quick-row-label">{minutes ? tr('Minuten eintragen') : tr('Schnellsatz')}</span>
         {values.length > 0 && (
           <button className="quick-edit-btn" aria-label={tr('Schnellsatz bearbeiten')} onClick={() => { setDraft(values); setEditing(true); }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -93,7 +94,7 @@ function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onL
           {tr('Satz gemacht? Tipp hier.')}
         </div>
       )}
-      <div className="quick-chips">
+      <div className={`quick-chips${values.length > 4 ? ' is-many' : ''}`}>
         {onLog && (
           <button className="quick-chip-open" onClick={onLog}>{minutes ? tr('+ Zeit') : tr('+ Satz')}</button>
         )}
@@ -102,7 +103,7 @@ function QuickLogRow({ me, catId, legacyId = null, minutes = false, onQuick, onL
             {tr('Schnellsatz festlegen')}
           </button>
         ) : values.map((v, i) => (
-          <button key={i} className={`quick-chip mono${coach && i === 0 ? ' ob-pulse' : ''}`} onClick={() => onQuick(v)}>{chipLabel(v)}</button>
+          <button key={i} className={`quick-chip mono${coach && i === 0 ? ' ob-pulse' : ''}`} aria-label={chipAria(v)} onClick={() => onQuick(v)}>+{v}</button>
         ))}
       </div>
     </div>
@@ -241,7 +242,7 @@ function DuelCard({ entries, title, meta }) {
 
 function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = [], categories = [], allSets = [], layout,
   competitionId = null, weekStart, nextWeekStart, nextWeekChallenges = [], nextWeekProposals = [],
-  openClosures = [], onCloseWeek, otherTargets = () => [],
+  openClosures = [], onCloseWeek,
   onAddGoal, onEditChallenge, onLogChallenge, onQuickLog, coach = false, celebrate = true }) {
   const [timerRunning, setTimerRunning] = React.useState(() => {
     const v = localStorage.getItem('pt_work_timer_start');
@@ -319,12 +320,11 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const renderSlide = ({ row: f }) => {
     const fmt = fmtOf(f);
     const pct = Math.min(1, f.total / Math.max(1, f.goal));
-    const also = otherTargets(f.ch, f.cat) || [];
     return (
       <div className={`rd-focus fc-card${f.meFinished ? ' is-done' : ''}`} aria-label={f.isObligatory ? tr('Pflicht-Challenge') : tr('Wochenziel im Fokus')}>
         <div className="rd-focus-top">
           <div className="rd-focus-text">
-            <div className="rd-overline">{f.isObligatory ? tr('Pflicht-Challenge') : tr('Im Fokus')}</div>
+            {f.isObligatory && <div className="rd-overline">{tr('Pflicht-Challenge')}</div>}
             <h2 className="rd-focus-title">{f.cat?.name}</h2>
             {f.ch.chosen_by && <div className="rd-focus-sub">{chosenByLabel(f.ch.chosen_by)}</div>}
           </div>
@@ -350,11 +350,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
               : f.meFinished ? tr('dein Teil ist erledigt')
               : f.myTodayLeft > 0 ? tr('heute noch {amount}', { amount: fmt(f.myTodayLeft) }) : tr('du bist auf Kurs')}
           </span>
-          {also.length > 0 && (
-            <span className="rd-chip-glass" title={also.map(o => o.name).join(', ')}>
-              {trn(also.length, 'zählt auch für {n} Challenge', 'zählt auch für {n} Challenges')}
-            </span>
-          )}
           <button className="rd-icon-glass" aria-label={tr('{name} bearbeiten', { name: f.cat?.name })} onClick={() => onEditChallenge(f.ch)}>
             <Icon name="edit" size={16} />
           </button>
@@ -419,9 +414,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
               <li key={r.ch.id}>
                 <button type="button" className={`rd-row${r.meFinished ? ' is-done' : ''}${isFocus ? ' is-focus' : ''}`}
                   aria-pressed={isFocus} onClick={() => setSelectedId(r.ch.id)}>
-                  <span className="rd-tile">
-                    <Icon name={r.isObligatory || (r.minutes && !r.isWork) ? 'timer' : r.isWork ? 'laptop' : 'dumbbell'} size={20} />
-                  </span>
                   <span className="rd-row-text">
                     <span className="rd-row-name">{r.cat?.name}</span>
                     <span className="rd-row-sub">{sub}</span>
@@ -486,9 +478,6 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
               return (
                 <li key={ch.id || `p-${i}`}>
                   <div className="rd-row is-static">
-                    <span className="rd-tile">
-                      <Icon name={ctype !== 'standard' || cat?.kind === 'time' ? 'timer' : cat?.kind === 'work' ? 'laptop' : 'dumbbell'} size={20} />
-                    </span>
                     <span className="rd-row-text">
                       <span className="rd-row-name">{cat?.name}</span>
                       <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? chosenByLabel(ch.chosen_by) : tr('noch offen')}</span>
@@ -674,7 +663,6 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
     return (
       <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
         <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} disabled={used} onClick={() => pick(c)}>
-          <div className="emoji">{c.emoji}</div>
           <div className="name">{c.name}</div>
           {used ? <div className="cat-note">{tr('läuft schon')}</div>
             : PTData.usesMinutes(c) ? <div className="cat-note">{tr('in Minuten')}</div>
@@ -956,7 +944,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
       <>
         <h2 className="title" style={{ marginBottom: 4 }}>{withTags ? tr('Session loggen') : tr('Zeit eintragen')}</h2>
         <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-          {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
+          {category?.name} · {PTPeople.firstNameOf(me)}
         </div>
 
         {/* Timer */}
@@ -974,7 +962,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         {/* Manual duration input */}
         <div className="label" style={{ marginTop: 16, marginBottom: 0 }}>{tr('Minuten (manuell)')}</div>
         <Stepper value={durationMinutes} onChange={setDurationMinutes} step={withTags ? 15 : 5} min={0} />
-        <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
+        <div className="chip-row is-one-line" style={{ marginTop: 8 }}>
           {(withTags ? [30, 60, 90, 120] : [10, 15, 30, 60]).map((v) =>
             <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button> // i18n-ignore: Einheit
           )}
@@ -1014,7 +1002,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
 
         <input
           className="input"
-          placeholder={tr('Notiz (optional)')}
+          placeholder={tr('Notiz')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           style={{ marginTop: 16 }} />
@@ -1035,7 +1023,7 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
     <>
       <h2 className="title" style={{ marginBottom: 4 }}>{tr('Satz loggen')}</h2>
       <div className="subtitle" style={{ marginBottom: 20, fontSize: 15 }}>
-        {category?.emoji} {category?.name} · {PTPeople.firstNameOf(me)}
+        {category?.name} · {PTPeople.firstNameOf(me)}
       </div>
       <input
         className="input input-lg mono"
@@ -1044,14 +1032,14 @@ function LogSheet({ api, me, challenge, category, projectTags = [], toolTags = [
         value={reps}
         onChange={(e) => setReps(parseInt(e.target.value) || 0)}
         onFocus={(e) => e.target.select()} />
-      <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+      <div className="chip-row is-one-line" style={{ marginTop: 12 }}>
         {[5, 10, 15, 20, 25, 30].map((v) =>
           <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
         )}
       </div>
       <input
         className="input"
-        placeholder={tr('Notiz (optional, z.B. ‚saubere Form‘)')}
+        placeholder={tr('Notiz')}
         value={note}
         onChange={(e) => setNote(e.target.value)}
         style={{ marginTop: 16 }} />
@@ -1440,7 +1428,6 @@ function WeekRecap({ recap, me, sides = [] }) {
       <div className="recap-challs">
         {challStats.map((c, i) => (
           <div className="recap-chall" key={i}>
-            <span className="recap-chall-emoji">{c.cat?.emoji}</span>
             <span className="recap-chall-name">{c.cat?.name || '—'}</span>
             <span className="recap-chall-tally mono">
               {c.workout ? (twoSided ? <>
@@ -1857,7 +1844,7 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
         <>
           <div className="label" style={{ marginBottom: 0 }}>{tr('Minuten')}</div>
           <Stepper value={durationMinutes} onChange={setDurationMinutes} step={withTags ? 15 : 5} min={withTags ? 15 : 1} />
-          <div className="chip-row" style={{ justifyContent: 'center', marginTop: 8 }}>
+          <div className="chip-row is-one-line" style={{ marginTop: 8 }}>
             {(withTags ? [30, 60, 90, 120] : [10, 15, 30, 60]).map(v =>
               <button key={v} className="chip" onClick={() => setDurationMinutes(v)}>{v}m</button> // i18n-ignore: Einheit
             )}
@@ -1896,7 +1883,7 @@ function BackfillSheet({ api, me, challenges = [], categories = [], projectTags 
             onChange={(e) => setReps(parseInt(e.target.value) || 0)}
             onFocus={(e) => e.target.select()} />
 
-          <div className="chip-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+          <div className="chip-row is-one-line" style={{ marginTop: 12 }}>
             {[5, 10, 15, 20, 25, 30].map((v) =>
               <button key={v} className="chip" onClick={() => setReps(v)}>{v}</button>
             )}

@@ -172,7 +172,6 @@ function ObGoalLayer({ api, competition, categories, me, activeCount, weekStart,
           {visible.map(c => (
             <button key={c.id} type="button" role="radio" aria-checked={c.id === catId}
               className={`ob-ex${c.id === catId ? ' is-on' : ''}`} onClick={() => pick(c)}>
-              <span className="ob-ex-emoji" aria-hidden="true">{c.emoji}</span>
               <span className="ob-ex-name">{c.name}</span>
             </button>
           ))}
@@ -290,7 +289,7 @@ function ObCelebrate({ value, category, myDone, share, onDone }) {
   return (
     <div className="ob-cele" role="dialog" aria-modal="true" aria-label={tr('Erster Satz geschafft')}>
       <ObConfetti />
-      <div className="ob-cele-over">{category?.emoji} {category?.name}</div>
+      <div className="ob-cele-over">{category?.name}</div>
       <h1 className="ob-cele-title">{tr('Erster Satz! 💪')}</h1>
       <ObDuo benny="cheer" joni="cheer" tall={obFigTall(118)} enter />
       <div className="ob-cele-num">+{shown}</div>

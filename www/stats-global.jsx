@@ -133,7 +133,7 @@ function ExerciseChips({ options, keys, onChange }) {
         return (
           <button key={o.key} className={`rk-chip ${on ? 'active' : ''}`} aria-pressed={on}
             onClick={() => onChange(on ? keys.filter(k => k !== o.key) : [...keys, o.key])}>
-            {o.cat?.emoji} {o.cat?.name}{o.minutes ? ' ⏱' : ''}
+            {o.cat?.name}{o.minutes ? ' ⏱' : ''}
           </button>
         );
       })}
@@ -389,7 +389,7 @@ function ExerciseRace({ st, sides, fmtVal, keys, onPick }) {
           return (
             <button type="button" key={key} className={`stats-race-item${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => onPick(key)}>
               <span className="stats-race-head">
-                <span className="stats-race-name">{cat?.emoji} {cat?.name}</span>
+                <span className="stats-race-name">{cat?.name}</span>
                 {leader != null
                   ? <span className="stats-race-lead" style={{ color: sideInk(sides[leader]) }}>👑 {sideName(sides[leader])} <span className="mono">+{fmtVal(diff)}</span></span>
                   : <span className="stats-race-tie">{vals.some(v => v > 0) ? tr('Gleichstand') : '–'}</span>}
@@ -530,7 +530,6 @@ function AllTimeStats({ me, profile, bundle, comps }) {
       </section>
 
       <section className="card" aria-label={tr('Übungen')}>
-        <CardHead label={tr('Übungen')} />
         <table className="stats-table stats-ex">
           <thead><tr><th /><th>{tr('Gesamt')}</th><th>{tr('Max. Satz')}</th><th>{tr('Max. Tag')}</th></tr></thead>
           <tbody>

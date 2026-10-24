@@ -428,13 +428,13 @@ button, input, select, textarea { font-family: inherit; }
 .rd-focus .quick-edit-btn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
 .rd-focus .quick-chips { gap: 8px; }
 .rd-focus .quick-chip {
-  min-width: 64px; height: 48px; padding: 0 16px;
+  height: 48px; padding: 0;
   background: rgba(255, 255, 255, 0.16); color: #fff; border: none;
   font-size: 17px; font-weight: 800;
 }
 .rd-focus .quick-chip:hover { background: rgba(255, 255, 255, 0.24); color: #fff; }
 .rd-focus .quick-chip-open {
-  height: 48px; padding: 0 20px;
+  height: 48px; padding: 0 18px;
   background: #fff; color: #4338CA; border: none; font-weight: 800;
 }
 .rd-focus .quick-chip-setup { color: #fff; border-color: rgba(255, 255, 255, 0.4); }
@@ -730,6 +730,19 @@ button, input, select, textarea { font-family: inherit; }
 .penalty-row.payout .penalty-row-amount { color: var(--text-2); }
 .penalty-row-reopen, .open-closure-chev { color: var(--text-3); display: inline-flex; }
 .open-closure-label { font-size: 15px; font-weight: 700; color: var(--text); flex: 1; }
+/* Strafen pro Woche einklappbar */
+.penalty-week { width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.penalty-week .penalty-row-main { display: flex; flex-direction: column; }
+.penalty-row.is-nested { padding-left: 32px; min-height: 56px; }
+.penalty-row.is-nested .penalty-row-head { font-size: 14px; font-weight: 600; }
+.penalty-week-chev { color: var(--text-3); display: inline-flex; transition: transform .2s var(--ease); }
+.penalty-week-chev.is-open { transform: rotate(90deg); }
+.strafkonto-section-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: transparent; border: none; text-align: left; cursor: pointer;
+}
+.strafkonto-section-count { color: var(--text-3); font-weight: 600; flex: 1; }
+@media (prefers-reduced-motion: reduce) { .penalty-week-chev { transition: none; } }
 
 /* ─── Stats ────────────────────────────────────────────────────────────── */
 /* Karten-Kopf: Label links, Kennzahl oder Legende rechts */
