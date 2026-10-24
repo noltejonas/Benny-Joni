@@ -57,8 +57,6 @@
 .ob-foot .btn-link { align-self: center; padding: 8px 10px; }
 /* Auf dem Seitenhintergrund ist --surface-2 = --bg: Zweitknöpfe als Karte */
 .ob-screen .btn-secondary, .ob-empty-actions .btn-secondary { background: var(--surface); box-shadow: var(--shadow); }
-.ob-row2 { display: flex; gap: 10px; }
-.ob-row2 > .btn { flex: 1; min-width: 0; }
 .ob-foot .btn[aria-busy="true"] { opacity: .7; }
 
 .ob-msg { font-size: 14px; line-height: 20px; font-weight: 600; border-radius: 14px; padding: 10px 14px; }
@@ -336,6 +334,25 @@
 /* Chips direkt auf dem Seitenhintergrund (nicht in einer Karte) als kleine Karten */
 .ob-body > .ob-chips .ob-chip:not(.is-on) { background: var(--surface); box-shadow: var(--shadow); }
 .ob-amount-note { font-size: 13px; line-height: 18px; color: var(--text-3); text-align: center; font-weight: 600; }
+
+/* Wochenziel mit mehreren Übungen: eine Zeile pro Übung, Einheit einmal darunter */
+.ob-goals {
+  display: flex; flex-direction: column; gap: 6px; padding: 4px 14px 14px;
+  border-radius: 16px; background: var(--surface); box-shadow: var(--shadow);
+}
+.ob-goals-list { display: flex; flex-direction: column; }
+.ob-goal { display: flex; align-items: center; gap: 6px; min-height: 60px; }
+.ob-goal + .ob-goal { border-top: 1px solid var(--line); }
+.ob-goal-name { flex: 1; min-width: 0; font-size: 15px; line-height: 19px; font-weight: 700; overflow-wrap: anywhere; }
+.ob-goal .ob-step-btn { width: 40px; height: 40px; font-size: 22px; }
+.ob-goal-num {
+  width: 64px; height: 40px; flex-shrink: 0; padding: 0; border: none; border-radius: 14px; background: transparent;
+  color: var(--text); font: inherit; font-size: 24px; font-weight: 800; text-align: center;
+  font-variant-numeric: tabular-nums; outline: none;
+}
+.ob-goal-num:focus { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--primary); }
+.ob-goals-unit { font-size: 13px; line-height: 18px; font-weight: 700; color: var(--text-3); text-align: center; }
+.ob-goals .ob-amount-note { margin-top: -4px; }
 
 /* Feier zum ersten Satz */
 .ob-cele {

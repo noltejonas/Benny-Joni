@@ -158,6 +158,32 @@ test('isNewcomer: begonnenes Onboarding (30 Tage) oder junges Profil (14 Tage)',
   assert.equal(O.isNewcomer({ state: {}, profile: {}, now: NOW }), false);
 });
 
+test('autoDuelDue: neue Person ohne Challenge bekommt gleich ein Duell', () => {
+  const base = { route: 'start', newcomer: true, competitions: [], state: {} };
+  assert.equal(O.autoDuelDue(base), true);
+  assert.equal(O.autoDuelDue({ ...base, newcomer: false }), false, 'altes Konto sieht „Wie startest du?“');
+  for (const route of ['loading', 'welcome', 'profile', 'join', 'app']) {
+    assert.equal(O.autoDuelDue({ ...base, route }), false, route);
+  }
+  assert.equal(O.autoDuelDue({ ...base, competitions: null }), false, 'Challenges noch nicht geladen');
+  assert.equal(O.autoDuelDue({ ...base, competitions: [comp({ archived_at: daysAgo(3) })] }), false, 'nur archivierte');
+  assert.equal(O.autoDuelDue({ ...base, state: { firstChallenge: daysAgo(1) } }), false, 'war schon in einer Challenge (verlassen)');
+  assert.equal(O.autoDuelDue({ ...base, state: undefined }), true);
+  assert.equal(O.autoDuelDue(), false);
+});
+
+test('introKinds: neue Leute nach dem Erstellen erst Übungen, dann Einladen, dann erster Satz', () => {
+  const kinds = (args) => [...O.introKinds(args)];
+  assert.deepEqual(kinds({ intro: 'created', newcomer: true }), ['goal', 'invite', 'log']);
+  assert.deepEqual(kinds({ intro: 'created', newcomer: true, firstLog: daysAgo(2) }), ['goal', 'invite'], 'Feier nur einmal pro Konto');
+  assert.deepEqual(kinds({ intro: 'created', newcomer: false }), ['invite']);
+  assert.deepEqual(kinds({ intro: 'joined', newcomer: true }), ['goal', 'log']);
+  assert.deepEqual(kinds({ intro: 'joined', newcomer: true, firstLog: daysAgo(2) }), ['goal']);
+  assert.deepEqual(kinds({ intro: 'joined', newcomer: false }), []);
+  assert.deepEqual(kinds({ intro: null, newcomer: true }), []);
+  assert.deepEqual(kinds(), []);
+});
+
 test('suggestName macht aus der E-Mail einen Vornamen', () => {
   assert.equal(O.suggestName('lenn.hoffmann@bauerlieferant.de'), 'Lenn');
   assert.equal(O.suggestName('max_99@example.com'), 'Max');

@@ -1,4 +1,4 @@
-/* global React, ReactDOM, useCelebration, PTData, PTDashboard, DashboardScreen, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, obSetDemo, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
+/* global React, ReactDOM, useCelebration, PTData, PTDashboard, DashboardScreen, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, trc, PTi18n, PTBootCache */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -161,6 +161,8 @@ function App() {
   const [startView, setStartView] = useState(null); // Start-Bildschirm: null | 'create' | 'join'
   const [intro, setIntro] = useState(null); // { kind: 'created' | 'joined', id } → Ebenen in der Challenge
   const [joinCode, setJoinCode] = useState(''); // Code fürs Beitreten-Sheet (Einladungslink in der App)
+  const [loadedFor, setLoadedFor] = useState(null); // Konto frisch geladen (nicht nur Stand vom letzten Öffnen)
+  const [autoDuel, setAutoDuel] = useState({ user: null, busy: false, error: '' }); // Duell für neue Konten
 
   // Einladungslinks: im Browser ?join=CODE, in der App projektterminator://join/CODE
   // (Kaltstart über getLaunchUrl, sonst appUrlOpen). Der Code wird als offene
@@ -269,6 +271,7 @@ function App() {
       setCompetitions(list);
       setActiveId(cur => pickActive(p, list, preferId ?? cur));
       setAccountError(null);
+      setLoadedFor(userId);
       PTBootCache.write(userId, 'account', { profile: p, competitions: list });
     } catch (e) {
       console.error('loadAccount failed', e);
@@ -352,9 +355,15 @@ function App() {
 
   const newcomer = PTOnboarding.isNewcomer({ state: obState, profile });
 
+  // Erste Challenge des Kontos merken: danach legt der Start kein Duell mehr von selbst an.
+  function markFirstChallenge() {
+    if (!obStateRef.current.firstChallenge) patchOb({ firstChallenge: new Date().toISOString() });
+  }
+
   // Start-Ansicht und Einladung erst nach dem Laden zurücksetzen, sonst blitzt
   // „Wie startest du?“ auf und ließe sich ein zweites Mal antippen.
   async function handleCreated(c) {
+    markFirstChallenge();
     setSheet(null);
     setIntro({ kind: 'created', id: c.id });
     await loadAccount(c.id);
@@ -363,6 +372,7 @@ function App() {
   }
 
   async function handleJoined(id) {
+    markFirstChallenge();
     setSheet(null); setJoinCode('');
     setIntro({ kind: 'joined', id });
     await loadAccount(id);
@@ -370,6 +380,28 @@ function App() {
     setInvite(null); setStartView(null);
     if (!newcomer) setToast(tr('Willkommen in der Challenge 💪'));
   }
+
+  // Neue Person ohne Challenge und ohne Einladung: statt „Wie startest du?“
+  // gleich ein Duell anlegen (PTOnboarding.autoDuelDue), erst mit frisch
+  // geladenem Konto. Einmal pro Konto; der Ref hält auch doppelte Effekte ab.
+  // Geht es schief, kommt „Wie startest du?“ mit dem Fehler.
+  const autoDuelDue = !!userId && loadedFor === userId && !startView
+    && PTOnboarding.autoDuelDue({ route, newcomer, competitions, state: obState });
+  const autoDuelRef = React.useRef(null);
+  useEffect(() => {
+    if (!autoDuelDue || autoDuelRef.current === userId) return;
+    autoDuelRef.current = userId;
+    setAutoDuel({ user: userId, busy: true, error: '' });
+    api.createCompetition({
+      name: tr('Duell'), emoji: '⚔️', mode: '1v1', rotation: false, penalties: false, work: false,
+      startDate: PTData.isoDate(new Date()), endDate: null,
+    })
+      .then(handleCreated)
+      .then(() => setAutoDuel(s => ({ ...s, busy: false })))
+      .catch(e => setAutoDuel({ user: userId, busy: false, error: e.message || String(e) }));
+  }, [autoDuelDue, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoDuelMine = autoDuel.user === userId;
+  const autoDuelBusy = autoDuelMine ? autoDuel.busy : autoDuelDue;
 
   async function setMain(id) {
     try {
@@ -448,9 +480,11 @@ function App() {
     </>
   );
 
-  // Konto ohne aktive Challenge: offene Einladung → Vorschau, sonst Start.
+  // Konto ohne aktive Challenge: offene Einladung → Vorschau, neue Person →
+  // Duell wird angelegt, sonst Start.
   if (route === 'join' || route === 'start') {
     let screen;
+    const pickStart = (view) => () => { setAutoDuel(s => ({ ...s, error: '' })); setStartView(view); };
     if (route === 'join') {
       screen = <JoinPanel key={invite} api={api} initialCode={invite} onJoined={handleJoined}
         onCancel={() => setInvite(null)} onSkip={() => setInvite(null)} />;
@@ -458,9 +492,11 @@ function App() {
       screen = <CreatePanel api={api} onCancel={() => setStartView(null)} onCreated={handleCreated} />;
     } else if (startView === 'join') {
       screen = <JoinPanel api={api} onCancel={() => setStartView(null)} onJoined={handleJoined} />;
+    } else if (autoDuelBusy) {
+      screen = <Loader text={tr('Deine Challenge wird angelegt…')} />;
     } else {
-      screen = <ObStart profile={profile} onCreate={() => setStartView('create')} onJoin={() => setStartView('join')}
-        onProfile={() => setSheet('profile')} onDemo={() => obSetDemo(true)}
+      screen = <ObStart profile={profile} onCreate={pickStart('create')} onJoin={pickStart('join')}
+        onProfile={() => setSheet('profile')} error={autoDuelMine ? autoDuel.error : ''}
         onArchived={competitions.length ? () => setSheet('switcher') : null} />;
     }
     return <>{screen}{sheets}</>;
@@ -765,11 +801,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   useEffect(() => {
     if (!synced || !intro || introStarted.current) return;
     introStarted.current = true;
-    // Erster Satz mit Feier gibt es einmal pro Konto (obState.firstLog).
-    const firstLog = obState.firstLog ? [] : ['log'];
-    const kinds = intro === 'created' ? (newcomer ? ['invite', 'goal', ...firstLog] : ['invite'])
-      : newcomer ? ['goal', ...firstLog] : [];
-    openLayer(kinds);
+    // Neue Leute nach dem Erstellen: Übungen, Einladen, erster Satz (onboarding-model.js).
+    const kinds = PTOnboarding.introKinds({ intro, newcomer, firstLog: obState.firstLog });
+    openLayer(kinds, intro === 'created' && newcomer ? { data: { title: tr('Deine ersten Übungen') } } : undefined);
   }, [synced, intro, newcomer, openLayer, obState.firstLog]);
 
   // Erster eigener Satz einer neuen Person: Feier statt Toast (einmal pro Konto).
@@ -1556,14 +1590,15 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           }} />
       </Sheet>
 
+      {/* Frisch gesetzte Ziele weiterreichen, falls reload() sie für den ersten Satz noch nicht geliefert hat */}
       {layer?.kind === 'invite' && (
         <ObInviteLayer competition={competition} members={members} me={me} fresh={intro === 'created'}
-          onDone={() => advance()} />
+          onDone={() => advance(layer.extra ? { goals: layer.extra.length, data: { extra: layer.extra } } : {})} />
       )}
       {layer?.kind === 'goal' && (
         <ObGoalLayer api={capi} competition={competition} categories={categories} me={me}
           activeCount={participantsNow.length} weekStart={weekStart} title={layer.title}
-          onDone={(ch) => { reload(); dash.reload(); advance({ goals: 1, data: { extra: [ch] } }); }}
+          onDone={(chs) => { reload(); dash.reload(); advance({ goals: chs.length, data: { extra: chs } }); }}
           onSkip={() => advance({ goals: live.current.goals })}
           onMore={() => { layerQueue.current = []; setLayer(null); onIntroDone?.(); setSetupForChallenge({}); }} />
       )}

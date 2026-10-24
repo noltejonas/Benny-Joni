@@ -1,7 +1,7 @@
 // Projekt Terminator — lokaler Demo-Modus
 //
 // Aktiv nur mit `?demo` in der URL (bleibt dann für diesen Browser gemerkt) oder
-// über „Demo ansehen“ auf dem Willkommen-Bildschirm.
+// über obSetDemo(true). Nur zum Testen; in der App gibt es keinen Einstieg.
 //   ?demo=reset  Beispieldaten neu erzeugen
 //   ?demo=new    Demo abgemeldet starten (Onboarding als neue Person durchspielen)
 //   ?demo=off    zurück auf Supabase

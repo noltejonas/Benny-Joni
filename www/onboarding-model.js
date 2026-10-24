@@ -98,6 +98,24 @@
     return youngProfile(profile, now);
   }
 
+  // Neue Person ohne Challenge und ohne Einladung: statt „Wie startest du?“
+  // gleich ein Duell anlegen. Nur solange das Konto nie in einer Challenge war
+  // (state.firstChallenge, auch keine archivierte), sonst entstünde nach dem
+  // Verlassen sofort die nächste.
+  function autoDuelDue({ route, newcomer, competitions, state } = {}) {
+    return route === 'start' && !!newcomer && !!competitions && !competitions.length && !state?.firstChallenge;
+  }
+
+  // Ebenen nach dem Erstellen bzw. Beitreten (intro: 'created' | 'joined').
+  // Neue Leute: erst die Übungen, dann Einladen, dann der erste Satz; den gibt
+  // es einmal pro Konto (firstLog = Zeitpunkt der ersten Feier, obState.firstLog).
+  function introKinds({ intro, newcomer, firstLog } = {}) {
+    if (!intro) return [];
+    const log = firstLog ? [] : ['log'];
+    if (intro === 'created') return newcomer ? ['goal', 'invite', ...log] : ['invite'];
+    return newcomer ? ['goal', ...log] : [];
+  }
+
   // „lenn.hoffmann@…“ → „Lenn“. Leer, wenn nichts Sinnvolles herauskommt.
   function suggestName(email) {
     const local = String(email || '').split('@')[0];
@@ -365,7 +383,7 @@
   window.PTOnboarding = {
     ALPHABET, SCHEME, DAY,
     normalizeCode, parseInviteUrl, inviteLink, inviteText,
-    entryRoute, isNewcomer, youngProfile, suggestName, checkEmail, mergeState, stateKey,
+    entryRoute, isNewcomer, youngProfile, autoDuelDue, introKinds, suggestName, checkEmail, mergeState, stateKey,
     weekProgress, joinedMidWeek,
     expectedPeople, goalDefault, goalChoices, goalTarget,
     starterItems, showStarter,
