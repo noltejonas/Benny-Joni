@@ -234,7 +234,7 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
           <div className="rd-overline">
             {many ? trn(ex.entries.length, 'Zählt für eine Challenge', 'Zählt für {n} Challenges') : ex.entries[0].card.c.name}
           </div>
-          <h2 className="rd-focus-title">{ex.cat?.emoji} {ex.cat?.name}</h2>
+          <h2 className="rd-focus-title">{ex.cat?.name}</h2>
           <div className="rd-focus-sub">
             {ex.isObligatory
               ? (ex.finished ? tr('erledigt') : tr('einmal diese Woche'))
