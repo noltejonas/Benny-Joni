@@ -29,7 +29,6 @@
 }
 .rd-focus .quick-row.is-compact .quick-chip { height: 54px; font-size: 19px; background: rgba(255, 255, 255, 0.2); }
 .rd-focus .quick-row.is-compact .quick-chip.is-main { background: #fff; color: var(--focus-ink, #4338CA); }
-.rd-focus.fc-card.is-done .quick-row.is-compact .quick-chip.is-main { color: #137A55; }
 .quick-chip-more {
   flex: 0 0 54px; height: 54px; border: none; border-radius: 999px; cursor: pointer;
   background: rgba(255, 255, 255, 0.2); color: #fff; font: inherit; font-size: 22px; font-weight: 800;
@@ -41,9 +40,32 @@
   opacity: calc(1 - 0.22 * var(--fc-p));
   will-change: transform, opacity;
 }
-.rd-focus.fc-card.is-done { background: linear-gradient(135deg, #22A06B 0%, #137A55 100%); box-shadow: 0 12px 32px rgba(19, 122, 85, .28); }
+/* Erledigt: helles, frisches Grün mit dunkelgrüner Schrift (weiß wäre darauf kaum lesbar) */
+.rd-focus.fc-card.is-done {
+  --done-ink: #053D24;
+  background: linear-gradient(135deg, #7CF5B2 0%, #34DB86 52%, #16C46E 100%);
+  box-shadow: 0 12px 32px rgba(22, 196, 110, .32);
+  color: var(--done-ink);
+}
+.rd-focus.fc-card.is-done .rd-overline,
+.rd-focus.fc-card.is-done .rd-focus-sub,
+.rd-focus.fc-card.is-done .quick-row-label,
+.rd-focus.fc-card.is-done .quick-edit-btn { color: rgba(5, 61, 36, .72); }
+.rd-focus.fc-card.is-done .rd-chip-glass,
+.rd-focus.fc-card.is-done .rd-icon-glass,
+.rd-focus.fc-card.is-done .quick-chip,
+.rd-focus.fc-card.is-done .quick-row.is-compact .quick-chip,
+.rd-focus.fc-card.is-done .quick-chip-more { background: rgba(5, 61, 36, .1); color: var(--done-ink); }
 .rd-focus.fc-card.is-done .rd-btn-white,
-.rd-focus.fc-card.is-done .quick-chip-open { color: #137A55; }
+.rd-focus.fc-card.is-done .quick-chip-open,
+.rd-focus.fc-card.is-done .quick-row.is-compact .quick-chip.is-main { background: #fff; color: #0A8A4A; }
+.rd-focus.fc-card.is-done .fc-pct { background: rgba(255, 255, 255, .5); }
+.rd-focus.fc-card.is-done .mini-ring-label { color: var(--done-ink); }
+.rd-focus.fc-card.is-done .fc-tug { background: rgba(255, 255, 255, .35); }
+.rd-focus.fc-card.is-done .tw.on-dark .tw-who,
+.rd-focus.fc-card.is-done .tw.on-dark .tw-who b,
+.rd-focus.fc-card.is-done .tw.on-dark .tw-nums span { color: var(--done-ink); }
+.rd-focus.fc-card.is-done .tw.on-dark .tw-track { background: rgba(5, 61, 36, .12); }
 
 .fc-dots { display: flex; justify-content: center; gap: 6px; padding: 0 16px; }
 .fc-dot {
@@ -51,7 +73,7 @@
   background: var(--surface-3); cursor: pointer;
   transition: width .25s var(--ease), background .25s var(--ease);
 }
-.fc-dot.is-done { background: color-mix(in oklab, #22A06B 45%, var(--surface-3)); }
+.fc-dot.is-done { background: color-mix(in oklab, #34DB86 75%, var(--surface-3)); }
 .fc-dot.is-on { width: 22px; background: var(--primary); }
 
 /* Fläche für die Balken auf der Fokus-Karte */
