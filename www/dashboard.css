@@ -28,7 +28,7 @@
   font-size: 20px; font-weight: 800;
 }
 .rd-focus .quick-row.is-compact .quick-chip { height: 54px; font-size: 19px; background: rgba(255, 255, 255, 0.2); }
-.rd-focus .quick-row.is-compact .quick-chip.is-main { background: #fff; color: #4338CA; }
+.rd-focus .quick-row.is-compact .quick-chip.is-main { background: #fff; color: var(--focus-ink, #4338CA); }
 .rd-focus.fc-card.is-done .quick-row.is-compact .quick-chip.is-main { color: #137A55; }
 .quick-chip-more {
   flex: 0 0 54px; height: 54px; border: none; border-radius: 999px; cursor: pointer;

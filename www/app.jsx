@@ -138,11 +138,20 @@ function App() {
   const systemDark = useSystemDark();
   const theme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
   useEffect(() => { writePref(THEME_KEY, themePref); }, [themePref]);
+  // Farbpalette (theme.js) passt zum Modus; Einstellungen → Farben meldet Änderungen per Event.
+  const [colorsRev, setColorsRev] = useState(0);
+  useEffect(() => {
+    const onColors = () => setColorsRev(r => r + 1);
+    window.addEventListener('pt:colors', onColors);
+    return () => window.removeEventListener('pt:colors', onColors);
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    const colors = window.PTTheme?.read();
+    window.PTTheme?.apply(colors, theme);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'dark' ? '#16151F' : '#F4F3F8');
-  }, [theme]);
+    if (meta) meta.setAttribute('content', window.PTTheme ? window.PTTheme.bgFor(colors, theme) : (theme === 'dark' ? '#16151F' : '#F4F3F8'));
+  }, [theme, colorsRev]);
 
   const [notificationsOn, setNotificationsOn] = useState(() => readPref(PUSH_KEY, 'on') !== 'off');
   useEffect(() => { writePref(PUSH_KEY, notificationsOn ? 'on' : 'off'); }, [notificationsOn]);

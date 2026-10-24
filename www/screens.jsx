@@ -1432,7 +1432,7 @@ function WeekRecap({ recap, me, sides = [] }) {
               <span className="mono mu-rank-pos">{rank + 1}</span>
               <SideAvatar side={sides[i]} size={22} />
               <span className="mu-rank-name">{sides[i].label}</span>
-              <span className="mono mu-recap-podium-v" style={{ color: sides[i].color }}>{fmtRecapVal(totals[i] || 0)}</span>
+              <span className="mono mu-recap-podium-v" style={{ ...sideStyle(sides[i]), color: 'var(--sc)' }}>{fmtRecapVal(totals[i] || 0)}</span>
             </div>
           ))}
         </div>

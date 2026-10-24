@@ -1,4 +1,4 @@
-/* global React, PTi18n, PTHaptics, SideAvatar, ObFigure, obFigTall, weekNumber, formatDuration, tr, trn */
+/* global React, PTi18n, PTHaptics, SideAvatar, sideStyle, ObFigure, obFigTall, weekNumber, formatDuration, tr, trn */
 // Wochenabschluss: die große Feier, wenn eine Woche vorbei ist (einmal pro
 // Challenge und Woche) oder jemand im Strafkonto „Woche abschließen“ tippt.
 // Ablauf pro Challenge: Blackout mit „KW 43 ist vorbei“ → die Balken laufen um
@@ -214,7 +214,7 @@ function FinaleStage({ res, isLast, total, index, onNext }) {
                 const s = sides[i];
                 const isWin = phase === 'reveal' && res.winner === i;
                 return (
-                  <div key={s.key} className={`fin-lane${s.isMine ? ' is-me' : ''}${isWin ? ' is-win' : ''}`} style={{ '--sc': s.color }}>
+                  <div key={s.key} className={`fin-lane${s.isMine ? ' is-me' : ''}${isWin ? ' is-win' : ''}`} style={sideStyle(s)}>
                     <span className="fin-lane-who">
                       <span className="fin-lane-avatar">
                         <SideAvatar side={s} size={isWin ? 44 : 36} />
