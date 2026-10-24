@@ -1,0 +1,138 @@
+# Zusätzliche Store-Lanes; am Ende des Fastfile mit import "Storefile" laden.
+# Alle Uploads bleiben als Entwurf im jeweiligen Store.
+require "fileutils"
+require "tmpdir"
+
+PLAY_METADATA_DIR = File.join(IOS_APP_DIR, "fastlane", "play-metadata").freeze
+STORE_SCREENSHOT_DIR = File.join(REPO_ROOT, "docs", "launch", "screenshots").freeze
+
+def check_store_bundle!(platform, screenshots: true)
+  args = ["node", File.join(REPO_ROOT, "tools", "check-store.cjs"), "--ready", "--platform=#{platform}"]
+  args << "--screenshots" if screenshots
+  ok = Bundler.with_unbundled_env { system(*args) }
+  UI.user_error!("Store-Unterlagen noch nicht vollständig. Die oben genannten Dateien ergänzen (docs/launch/FASTLANE_STORES.md).") unless ok
+end
+
+# Dokumentationsordner bleiben menschenlesbar; deliver bekommt seine
+# Sprachordner (de-DE, en-GB) in einem temporären Upload-Verzeichnis.
+def with_store_screenshots
+  Dir.mktmpdir("benny-joni-store-") do |dir|
+    { "de-DE" => "de", "en-GB" => "en" }.each do |locale, lang|
+      target = File.join(dir, locale)
+      FileUtils.mkdir_p(target)
+      # Historische 6.3-Zoll-Captures enthalten noch Work-Einträge. Nur den
+      # ausgewählten, für den Sport-Launch vorbereiteten 6.9-Zoll-Satz laden.
+      %w[6.9].each do |display|
+        source = File.join(STORE_SCREENSHOT_DIR, "iphone-#{display}-#{lang}")
+        Dir.glob(File.join(source, "*")).sort.each do |file|
+          next unless File.file?(file) && file.match?(/\.(png|jpe?g)\z/i)
+          FileUtils.cp(file, File.join(target, "iphone-#{display}-#{File.basename(file)}"))
+        end
+      end
+    end
+    yield dir
+  end
+end
+
+def play_store_key_path
+  file = File.expand_path(require_env("PLAY_JSON_KEY_PATH"), REPO_ROOT)
+  UI.user_error!("Google-Play-JSON-Schlüssel nicht gefunden. PLAY_JSON_KEY_PATH prüfen.") unless File.file?(file)
+  file
+end
+
+def play_store_package
+  value = ENV["PLAY_PACKAGE_NAME"].to_s.strip
+  value.empty? ? APP_IDENTIFIER : value
+end
+
+def play_draft_options(screenshots: true)
+  {
+    package_name: play_store_package,
+    json_key: play_store_key_path,
+    metadata_path: PLAY_METADATA_DIR,
+    track: "internal",
+    release_status: "draft",
+    changes_not_sent_for_review: true,
+    # Ein automatischer Retry mit false könnte eine Prüfung auslösen.
+    rescue_changes_not_sent_for_review: false,
+    skip_upload_apk: true,
+    skip_upload_images: !screenshots,
+    skip_upload_screenshots: !screenshots,
+    skip_upload_changelogs: true
+  }
+end
+
+platform :ios do
+  desc "Store-Texte, Review-Daten und Screenshots als Entwurf hochladen (ohne Build)"
+  desc "Option: screenshots:false lädt nur Texte. Reicht nie zur Prüfung ein."
+  lane :store_metadata do |options|
+    screenshots = options[:screenshots] != false
+    check_store_bundle!("ios", screenshots: screenshots)
+    upload_options = {
+      api_key: asc_api_key,
+      app_identifier: APP_IDENTIFIER,
+      app_version: pbxproj_setting("MARKETING_VERSION"),
+      metadata_path: METADATA_DIR,
+      app_review_information: app_review_information,
+      skip_binary_upload: true,
+      skip_metadata: false,
+      skip_screenshots: !screenshots,
+      overwrite_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false,
+      run_precheck_before_submit: false,
+      precheck_include_in_app_purchases: false,
+      force: true
+    }
+    if screenshots
+      with_store_screenshots do |dir|
+        upload_to_app_store(**upload_options.merge(screenshots_path: dir))
+      end
+    else
+      upload_to_app_store(**upload_options)
+    end
+    UI.success("App-Store-Unterlagen als Entwurf hochgeladen. Keine Einreichung oder Veröffentlichung ausgelöst.")
+  end
+end
+
+platform :android do
+  desc "Google-Play-Dienstkonto prüfen (ohne Build oder Upload)"
+  lane :verify_auth do
+    versions = google_play_track_version_codes(
+      package_name: play_store_package,
+      json_key: play_store_key_path,
+      track: "internal"
+    )
+    UI.success("Google-Play-Zugang für die App bestätigt (#{versions.length} interne Build-Versionen).")
+  end
+
+  desc "Play-Store-Texte und Bilder speichern, ohne Build und ohne Einreichung"
+  desc "Option: screenshots:false lädt nur Texte; validate:true prüft den API-Upload ohne Commit."
+  lane :store_metadata do |options|
+    screenshots = options[:screenshots] != false
+    check_store_bundle!("android", screenshots: screenshots)
+    upload_to_play_store(**play_draft_options(screenshots: screenshots).merge(
+      skip_upload_aab: true,
+      validate_only: options[:validate] == true
+    ))
+    UI.success(options[:validate] == true ? "Play-Upload validiert, nicht gespeichert." : "Play-Store-Unterlagen gespeichert; nicht zur Prüfung gesendet.")
+  end
+
+  desc "Ein bereits signiertes AAB in den internen Testkanal als Entwurf hochladen"
+  desc "Pflicht: aab:/absoluter/pfad/app-release.aab. Optionen: screenshots:false, validate:true."
+  lane :internal_draft do |options|
+    value = options[:aab].to_s.strip
+    UI.user_error!("aab:/absoluter/pfad/app-release.aab fehlt; zuerst ein signiertes Android App Bundle bauen.") if value.empty?
+    aab = File.expand_path(value, REPO_ROOT)
+    UI.user_error!("Signiertes Android App Bundle (.aab) nicht gefunden.") unless File.file?(aab) && File.extname(aab).downcase == ".aab"
+    screenshots = options[:screenshots] != false
+    check_store_bundle!("android", screenshots: screenshots)
+    upload_to_play_store(**play_draft_options(screenshots: screenshots).merge(
+      aab: aab,
+      skip_upload_aab: false,
+      skip_upload_changelogs: false,
+      validate_only: options[:validate] == true
+    ))
+    UI.success(options[:validate] == true ? "AAB-Upload validiert, nicht gespeichert." : "AAB als interner Entwurf hochgeladen. Keine Prüfung oder Veröffentlichung ausgelöst.")
+  end
+end

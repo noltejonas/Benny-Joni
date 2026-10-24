@@ -1,5 +1,5 @@
 /* global React, PTi18n, tr */
-// Shared UI components for Projekt Terminator
+// Shared UI components for Benny & Joni
 const { useState, useEffect, useRef, useMemo } = React;
 
 // ─── Icons (SF-style) ────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ function Icon({ name, size = 24, color = 'currentColor', strokeWidth = 2 }) {
     camera: <><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></>,
     copy: <><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></>,
     clipboard: <><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h4"/></>,
+    shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}

@@ -37,6 +37,43 @@ function stEuroInput(cents) {
   return PTi18n.number(cents / 100, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
 }
 
+// ─── Rechtliches, Support, Melden ───────────────────────────────────────────
+// Adressen und Links stehen zentral in PTOnboarding (APP_NAME, LEGAL, SUPPORT_EMAIL,
+// APP_REVIEW_URL). Fehlt etwas davon, bleibt die jeweilige Zeile weg.
+const stLaunch = () => window.PTOnboarding || {};
+
+// Öffnet Links in Safari bzw. der Mail-App.
+function stOpen(url) {
+  if (!url) return;
+  const O = stLaunch();
+  if (typeof O.openExternal === 'function') { O.openExternal(url); return; }
+  if (/^(mailto|itms-apps):/i.test(url)) { window.location.href = url; return; }
+  window.open(url, '_blank');
+}
+
+// mailto an den Support mit Betreff und Text; ohne Adresse die Support-Seite.
+function stSupportUrl(subject, body) {
+  const O = stLaunch();
+  const mail = typeof O.supportMailto === 'function' ? O.supportMailto(subject, body)
+    : O.SUPPORT_EMAIL ? `mailto:${O.SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}` : '';
+  return mail || O.LEGAL?.support || '';
+}
+
+const stIds = (userId, challengeId) =>
+  [userId && tr('Nutzer-ID: {id}', { id: userId }), challengeId && tr('Challenge-ID: {id}', { id: challengeId })].filter(Boolean).join('\n');
+
+function stCanReport() {
+  const O = stLaunch();
+  return typeof O.reportContent === 'function' || !!stSupportUrl('-', '-');
+}
+
+// Meldung per Mail (Apple 1.2). `label` landet im Betreff, wenn wir die Mail selbst bauen.
+function stReport({ kind, label, userId, challengeId, note }) {
+  const O = stLaunch();
+  if (typeof O.reportContent === 'function') { O.reportContent({ kind, userId, challengeId, note }); return; }
+  stOpen(stSupportUrl(tr('Meldung: {label}', { label }), `${note}\n\n\n${stIds(userId, challengeId)}`));
+}
+
 // ─── Bausteine ──────────────────────────────────────────────────────────────
 function SettingsPageHeader({ title, onBack }) {
   return (
@@ -188,9 +225,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   if (page === 'penalties') {
     return <SettingsPenaltyPage {...moduleProps} cfg={penaltyCfg} onCfgChanged={loadPenalty} />;
   }
-  if (page === 'work') {
-    return <SettingsWorkPage {...moduleProps} projectTags={projectTags} toolTags={toolTags} />;
-  }
   if (page === 'language') {
     return <SettingsLanguagePage onBack={back} />;
   }
@@ -213,13 +247,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
     catch (e) { alert(e.message); }
     finally { setBusyRanking(false); }
   }
-  async function deleteAccount() {
-    if (!confirm(tr('Konto wirklich löschen? Deine Sätze, Medaillen und dein Profil werden entfernt. Challenges, die du erstellt hast, gehen an das nächste Mitglied.'))) return;
-    if (!confirm(tr('Letzte Frage: endgültig löschen? Das lässt sich nicht rückgängig machen.'))) return;
-    try { await baseApi.deleteMyAccount(); }
-    catch (e) { alert(e.message); }
-  }
-
   // Module: rechts An/Aus, darunter der Stand, wenn das Modul an ist.
   const onOff = (v) => v ? tr('An') : tr('Aus');
   const cycleLength = planSlots.length ? Math.max(...planSlots.map(s => s.week_index)) + 1 : 0;
@@ -230,9 +257,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   const penaltySub = !competition.penalties_enabled || !penaltyCfg ? null
     : !penaltyCfg.enabled ? tr('Pausiert')
     : tr('{amount} pro Strafe', { amount: formatEuro(penaltyCfg.amount_cents) }) + (rule ? ` · ${rule.name}` : '');
-  const tagCount = projectTags.length + toolTags.length;
-  const workSub = !competition.work_enabled ? null
-    : tagCount ? trn(tagCount, '{n} Tag', '{n} Tags') : tr('Keine Tags');
   const isMain = profile?.main_competition_id === competition.id;
 
   return (
@@ -266,8 +290,6 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
           onClick={() => go('plan')} chevron />
         <SettingsRow icon="wallet" title={tr('Strafkonto')} subtitle={penaltySub} value={onOff(competition.penalties_enabled)}
           onClick={() => go('penalties')} chevron />
-        <SettingsRow icon="laptop" title={tr('Work-Tracking')} subtitle={workSub} value={onOff(competition.work_enabled)}
-          onClick={() => go('work')} chevron />
       </SettingsGroup>
 
       <SettingsGroup title={tr('Rangliste')}>
@@ -290,13 +312,70 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
         </SettingsGroup>
       )}
 
+      <SettingsInfoGroup me={me} competition={competition} />
+
       {onSignOut && (
         <SettingsGroup>
           <SettingsRow title={tr('Abmelden')} tone="danger" onClick={onSignOut} />
-          {baseApi.deleteMyAccount && <SettingsRow title={tr('Konto löschen')} tone="danger" onClick={deleteAccount} />}
         </SettingsGroup>
       )}
+
+      <SettingsDeleteAccountGroup baseApi={baseApi} />
     </div>
+  );
+}
+
+// ─── Info & Rechtliches ─────────────────────────────────────────────────────
+function SettingsInfoGroup({ me, competition }) {
+  const O = stLaunch();
+  const legal = O.LEGAL || null;
+  const appName = O.APP_NAME || 'Benny & Joni';
+  const ids = stIds(me, competition?.id);
+  const supportUrl = stSupportUrl(tr('{app}: Support & Feedback', { app: appName }), `\n\n\n${ids}`);
+  const rateUrl = O.APP_REVIEW_URL || '';
+  const canReport = stCanReport();
+  if (!legal && !supportUrl && !rateUrl) return null;
+
+  const report = () => stReport({
+    kind: 'problem', label: tr('Problem oder Inhalt'), userId: me, challengeId: competition?.id,
+    note: tr('Beschreib kurz, was passiert ist oder welchen Inhalt du meldest:'),
+  });
+
+  return (
+    <SettingsGroup title={tr('Info & Rechtliches')}>
+      {legal?.privacy && <SettingsRow title={tr('Datenschutz')} onClick={() => stOpen(legal.privacy)} />}
+      {legal?.imprint && <SettingsRow title={tr('Impressum')} onClick={() => stOpen(legal.imprint)} />}
+      {legal?.terms && <SettingsRow title={tr('Nutzungsbedingungen')} onClick={() => stOpen(legal.terms)} />}
+      {supportUrl && <SettingsRow title={tr('Support & Feedback')} onClick={() => stOpen(supportUrl)} />}
+      {canReport && <SettingsRow title={tr('Problem oder Inhalt melden')} onClick={report} />}
+      {rateUrl && <SettingsRow title={tr('App bewerten')} onClick={() => stOpen(rateUrl)} />}
+    </SettingsGroup>
+  );
+}
+
+// ─── Konto löschen (App Store 5.1.1(v)) ─────────────────────────────────────
+// Zweimal fragen, dann löschen; danach startet die App neu auf der Startseite.
+function SettingsDeleteAccountGroup({ baseApi }) {
+  const [busy, setBusy] = useState(false);
+  if (typeof baseApi?.deleteAccount !== 'function') return null;
+
+  async function remove() {
+    if (!confirm(tr('Dein Profil, alle Sätze, Reaktionen, Strafkonto-Einträge und dein Foto werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.'))) return;
+    if (!confirm(tr('Konto jetzt wirklich löschen?'))) return;
+    setBusy(true);
+    try {
+      await baseApi.deleteAccount();
+      window.location.replace(window.location.pathname);
+    } catch (e) {
+      alert(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SettingsGroup footer={tr('Challenges mit anderen laufen ohne dich weiter.')}>
+      <SettingsRow title={busy ? tr('Konto wird gelöscht…') : tr('Konto löschen')} tone="danger" disabled={busy} onClick={remove} />
+    </SettingsGroup>
   );
 }
 
@@ -407,6 +486,16 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, 
     window.dispatchEvent(new CustomEvent('pt:push-permission', { detail: result }));
   }
 
+  // Google verlangt in EU/EWR, UK und der Schweiz einen Weg zurück zur
+  // Werbe-Einwilligung (www/ads.js meldet das über pt:ads-change).
+  const [adsPrivacy, setAdsPrivacy] = useState(() => !!window.PTAds?.privacyOptionsRequired());
+  useEffect(() => {
+    const onChange = () => setAdsPrivacy(!!window.PTAds?.privacyOptionsRequired());
+    onChange();
+    window.addEventListener('pt:ads-change', onChange);
+    return () => window.removeEventListener('pt:ads-change', onChange);
+  }, []);
+
   return (
     <SettingsGroup title={tr('App')}
       footer={pushBlocked ? (native ? tr('In den iOS-Einstellungen ausgeschaltet.') : tr('Im Browser blockiert.')) : null}>
@@ -431,6 +520,10 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, 
       {pushBlocked && native && (
         <SettingsRow icon="settings" title={tr('iOS-Einstellungen öffnen')} tone="accent" onClick={() => window.PTPush.openSettings()} />
       )}
+      {adsPrivacy && (
+        <SettingsRow icon="shield" title={tr('Werbe-Einwilligung')} subtitle={tr('Auswahl ändern oder widerrufen')}
+          onClick={() => window.PTAds?.showPrivacyOptions()} />
+      )}
     </SettingsGroup>
   );
 }
@@ -440,7 +533,7 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, 
 // die App hört auf „pt:colors“ und setzt auch die Statusleistenfarbe.
 const ST_PALETTE_NAMES = {
   violett: tr('Violett'), graphit: tr('Graphit & Grün'), mitternacht: tr('Mitternacht & Lime'), ozean: tr('Ozean'),
-  sonnenuntergang: tr('Sonnenuntergang'), kreide: tr('Kreide'), ruhig: tr('Violett ruhig'),
+  sonnenuntergang: tr('Sonnenuntergang'), kreide: tr('Kreide'), ruhig: tr('Violett ruhig'), girly: tr('Girly'),
 };
 const ST_COLOR_FIELDS = {
   bg: tr('Hintergrund'), surface: tr('Flächen'), text: tr('Text'), accent: tr('Akzent'),
@@ -689,6 +782,12 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
     if (!confirm(tr('{name} aus der Challenge entfernen? Die Sätze bleiben in der Historie.', { name: who }))) return;
     run(() => baseApi.removeMember(competition.id, m.user_id), tr('{name} entfernt', { name: who }));
   };
+  // Melden per Mail an den Support (Apple 1.2); Name, Nutzer- und Challenge-ID im Text.
+  const canReport = stCanReport();
+  const report = (m) => stReport({
+    kind: 'member', label: tr('Person'), userId: m.user_id, challengeId: competition.id,
+    note: tr('Gemeldete Person: {name}', { name: m.profile?.display_name || tr('Unbekannt') }) + '\n' + tr('Was ist passiert?'),
+  });
 
   const memberRow = (m) => {
     const isMe = m.user_id === me;
@@ -709,6 +808,10 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
               </button>
             ))}
           </div>
+        )}
+        {canReport && !isMe && (
+          <button type="button" className="st-link" aria-label={tr('{name} melden', { name: m.profile?.display_name })}
+            onClick={() => report(m)}>{tr('Melden')}</button>
         )}
         {isOwner && !isMe && (
           <SettingsIconButton icon="close" label={tr('{name} entfernen', { name: m.profile?.display_name })} tone="danger"
@@ -767,8 +870,7 @@ function SettingsPlanPage({ api, competition, categories, planSlots, rotationCon
     return t[0]?.week_in_cycle ?? null;
   }, [rotationConfig, planSlots, weekStart]);
 
-  // Work-Kategorien nur, wenn Work-Tracking an ist.
-  const pickable = competition.work_enabled ? categories : categories.filter(c => (c.kind || 'sports') !== 'work');
+  const pickable = categories.filter(c => (c.kind || 'sports') !== 'work');
 
   // Änderungen lösen über api.onChange ein Neuladen in CompetitionApp aus.
   const call = async (fn) => { try { await fn(); } catch (e) { alert(e.message); } };
@@ -1001,89 +1103,9 @@ function SettingsPenaltyPage({ api, competition, cfg, isOwner, ownerName, busyMo
   );
 }
 
-// ─── Unterseite: Work-Tracking ──────────────────────────────────────────────
-function SettingsWorkPage({ api, competition, projectTags, toolTags, isOwner, ownerName, busyModule, onModule, onBack }) {
-  const enabled = !!competition.work_enabled;
-  return (
-    <div className="st-screen">
-      <SettingsPageHeader title={tr('Work-Tracking')} onBack={onBack} />
-
-      <SettingsGroup footer={isOwner ? null : tr('Nur {name} kann das ändern.', { name: ownerName })}>
-        <SettingsSwitchRow icon="laptop" title={tr('Work-Tracking verwenden')} checked={enabled}
-          disabled={!isOwner || busyModule} onChange={v => onModule('work_enabled', v)} />
-      </SettingsGroup>
-
-      {enabled && <>
-        <TagList title={tr('Projekte')} addLabel={tr('Projekt hinzufügen')} defaultEmoji="📁" tags={projectTags}
-          onAdd={(n, e) => api.addProjectTag(n, e)}
-          onUpdate={(id, p) => api.updateProjectTag(id, p)}
-          onDelete={(id) => api.deleteProjectTag(id)} />
-        <TagList title={tr('Tools')} addLabel={tr('Tool hinzufügen')} defaultEmoji="🔧" tags={toolTags}
-          onAdd={(n, e) => api.addToolTag(n, e)}
-          onUpdate={(id, p) => api.updateToolTag(id, p)}
-          onDelete={(id) => api.deleteToolTag(id)} />
-      </>}
-    </div>
-  );
-}
-
-// Tags anlegen, umbenennen, löschen. Ein Tipp auf die Zeile öffnet die Bearbeitung.
-function TagList({ title, tags, addLabel, defaultEmoji, onAdd, onUpdate, onDelete }) {
-  const [editingId, setEditingId] = useState(null); // Tag-ID, 'new' oder null
-  const [draftName, setDraftName] = useState('');
-  const [draftEmoji, setDraftEmoji] = useState(defaultEmoji);
-  const [busy, setBusy] = useState(false);
-
-  const startEdit = (t) => { setEditingId(t.id); setDraftName(t.name); setDraftEmoji(t.emoji); };
-  const startNew = () => { setEditingId('new'); setDraftName(''); setDraftEmoji(defaultEmoji); };
-
-  async function run(fn) {
-    setBusy(true);
-    try { await fn(); setEditingId(null); }
-    catch (e) { alert(e.message); }
-    finally { setBusy(false); }
-  }
-  const commit = () => {
-    const name = draftName.trim();
-    if (!name) return;
-    const emoji = stFirstGrapheme(draftEmoji) || defaultEmoji;
-    run(() => editingId === 'new' ? onAdd(name, emoji) : onUpdate(editingId, { name, emoji }));
-  };
-  const remove = () => {
-    const tag = tags.find(t => t.id === editingId);
-    if (tag && confirm(tr('„{name}“ löschen?', { name: tag.name }))) run(() => onDelete(tag.id));
-  };
-
-  const form = (
-    <div className="st-row st-tag-form" key={`form-${editingId}`}>
-      <input className="input st-emoji-input" aria-label={tr('Emoji')} value={draftEmoji} maxLength={8}
-        onChange={e => setDraftEmoji(e.target.value)} />
-      <input className="input" aria-label={tr('Name')} placeholder={tr('Name')} autoFocus value={draftName}
-        onChange={e => setDraftName(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditingId(null); }} />
-      <SettingsIconButton icon="check" label={tr('Speichern')} tone="primary" disabled={busy || !draftName.trim()} onClick={commit} />
-      {editingId !== 'new' && <SettingsIconButton icon="trash" label={tr('Löschen')} tone="danger" disabled={busy} onClick={remove} />}
-      <SettingsIconButton icon="close" label={tr('Abbrechen')} disabled={busy} onClick={() => setEditingId(null)} />
-    </div>
-  );
-
-  return (
-    <SettingsGroup title={title}>
-      {tags.map(t => editingId === t.id ? form : (
-        <SettingsRow key={t.id} emoji={t.emoji} title={t.name} onClick={() => startEdit(t)} chevron={false}>
-          <span className="st-chev"><Icon name="edit" size={16} /></span>
-        </SettingsRow>
-      ))}
-      {editingId === 'new'
-        ? form
-        : <SettingsRow icon="plus" tone="accent" title={addLabel} onClick={startNew} chevron={false} />}
-    </SettingsGroup>
-  );
-}
-
 // Card on Home: the first person of the week picks the reps for every exercise.
 // Default = base_reps, range = [base_reps, base_reps + bonus_max].
-function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
+function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub }) {
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
   const [values, setValues] = useState(() => {
     const initial = {};
@@ -1116,8 +1138,8 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
       <div className="weekfix-head">
         <div>
           <div className="weekfix-label">{tr('Neue Woche')}</div>
-          <div className="weekfix-title">{tr('Reps für diese Woche fixieren')}</div>
-          <div className="weekfix-sub">{tr('Wer zuerst da ist, setzt das Ziel für alle.')}</div>
+          <div className="weekfix-title">{title || tr('Reps für diese Woche fixieren')}</div>
+          <div className="weekfix-sub">{sub || tr('Wer zuerst da ist, setzt das Ziel für alle.')}</div>
         </div>
         {onDismiss && (
           <button className="weekfix-dismiss" aria-label={tr('Später')} onClick={onDismiss}>×</button>
@@ -1162,4 +1184,4 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss }) {
   );
 }
 
-Object.assign(window, { SettingsScreen, PlanSlotRow, TagList, WeekFixCard });
+Object.assign(window, { SettingsScreen, PlanSlotRow, WeekFixCard });

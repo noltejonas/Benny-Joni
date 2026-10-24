@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="Benny &amp; Joni: Trainier gegen deine Freunde. Ein Wochenziel, jeder seinen Teil, und du siehst live, wer liefert." />
+  <title>Benny &amp; Joni</title>
+  <!-- Keine externen Ressourcen: keine Schriften, Skripte oder Bilder von fremden Servern. -->
+  <style>
+    :root {
+      --bg: #f4f3f8; --card: #ffffff; --text: #1c1c1e; --text-2: #5b5b63; --line: #e3e2e8;
+      --accent: #1f8f3a; --on-accent: #ffffff; --todo-bg: #fff1a8; --todo-text: #4d3a00; --draft-bg: #fff4e5; --draft-line: #e8a33d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000; --card: #1c1c1e; --text: #f2f2f7; --text-2: #a1a1aa; --line: #2c2c30;
+        --accent: #32d74b; --on-accent: #04210b; --todo-bg: #5c4500; --todo-text: #fff1a8; --draft-bg: #2b2111; --draft-line: #a8752a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+    header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; margin-bottom: 20px; }
+    .brand { font-weight: 800; font-size: 20px; color: var(--text); text-decoration: none; }
+    nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; }
+    nav a { color: var(--text-2); text-decoration: none; }
+    main { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 32px 20px; }
+    h1 { font-size: 34px; line-height: 1.15; margin: 0 0 10px; }
+    .lead { font-size: 19px; color: var(--text-2); margin: 0 0 24px; }
+    .cta {
+      display: inline-block; background: var(--accent); color: var(--on-accent); font-weight: 700;
+      padding: 12px 20px; border-radius: 12px; text-decoration: none;
+    }
+    .hint { color: var(--text-2); font-size: 14px; margin-top: 10px; }
+    ul.features { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 14px; }
+    ul.features li { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+    ul.features strong { display: block; }
+    a { color: var(--accent); }
+    footer { color: var(--text-2); font-size: 14px; margin-top: 24px; text-align: center; }
+    footer a { color: var(--text-2); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="index.html">Benny &amp; Joni</a>
+    <nav aria-label="Rechtliches">
+      <a href="datenschutz.html">Datenschutz</a>
+      <a href="impressum.html">Impressum</a>
+      <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>
+      <a href="support.html">Support</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Trainier gegen deine Freunde.</h1>
+    <p class="lead">Ein Wochenziel, jeder seinen Teil, und du siehst live, wer liefert.</p>
+
+    <a class="cta" href="support.html">Kontakt &amp; Support</a>
+    <p class="hint">Veröffentlichung wird vorbereitet · iOS und Android · Deutsch und Englisch · kostenlos · Werbung zunächst ausgeschaltet</p>
+
+    <ul class="features">
+      <li><strong>Gemeinsames Wochenziel</strong>Liegestütze, Klimmzüge, Kniebeugen oder eigene Übungen: Ihr legt die Menge fest, jeder schafft seinen Anteil.</li>
+      <li><strong>Live-Feed</strong>Seht die eingetragenen Sätze eurer Challenge und reagiert darauf. Auf iOS könnt ihr dazu Mitteilungen einschalten.</li>
+      <li><strong>Monatsrangliste</strong>Vergleiche dich mit anderen in der App. Ob deine eigenen Ergebnisse öffentlich erscheinen, entscheidest du selbst.</li>
+      <li><strong>Strafkonto, wenn ihr wollt</strong>Wer sein Ziel verpasst, zahlt in eure Kasse. Die App führt nur die Liste, Geld läuft nicht über sie.</li>
+    </ul>
+  </main>
+
+  <footer>
+    <a href="datenschutz.html">Datenschutz</a> · <a href="impressum.html">Impressum</a> · <a href="nutzungsbedingungen.html">Nutzungsbedingungen</a> · <a href="support.html">Support</a>
+  </footer>
+</div>
+</body>
+</html>

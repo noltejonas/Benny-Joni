@@ -38,6 +38,10 @@
     { id: 'ruhig',
       dark: { bg: '#121214', surface: '#1C1C20', text: '#F3F3F6', accent: '#A99DFF', grad0: '#6D5DF6', grad1: '#5145CD', tile0: '#6D5DF6', tile1: '#5145CD', side0: '#22D3EE', side1: '#FBBF24' },
       light: { bg: '#F6F6F8', surface: '#FFFFFF', text: '#17171C', accent: '#5145CD', grad0: '#6D5DF6', grad1: '#5145CD', tile0: '#6D5DF6', tile1: '#5145CD', side0: '#0891B2', side1: '#D97706' } },
+    // Rosa bis Flieder; Ich/Gegner Mint gegen Butter, damit die Balken auf der rosa Kachel sichtbar bleiben
+    { id: 'girly',
+      dark: { bg: '#1C1019', surface: '#2B1A27', text: '#FFF0F6', accent: '#FF8AC4', grad0: '#FF7EB6', grad1: '#D16BF5', tile0: '#FF7EB6', tile1: '#B65CF0', side0: '#7EEBD8', side1: '#FFD27A' },
+      light: { bg: '#FFF3F8', surface: '#FFFFFF', text: '#3A1631', accent: '#D6338A', grad0: '#FF6FB0', grad1: '#C45BEF', tile0: '#FF6FB0', tile1: '#A855F7', side0: '#0FA89A', side1: '#E39A12' } },
   ];
   // Felder, die man unter „Eigene Farben“ einzeln wählen kann (Reihenfolge der Liste)
   const FIELDS = ['bg', 'surface', 'text', 'accent', 'grad0', 'grad1', 'tile0', 'side0', 'side1'];

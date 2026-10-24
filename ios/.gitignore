@@ -20,3 +20,8 @@ App/fastlane/report.xml
 App/fastlane/Preview.html
 App/fastlane/screenshots
 App/fastlane/test_output
+
+# Schlüssel und Zugangsdaten: Das Repo ist öffentlich. App-Store-Connect-Key
+# (.p8) und Review-Login nie committen, auch nicht auf anderen Rechnern.
+*.p8
+App/fastlane/metadata/review_information/

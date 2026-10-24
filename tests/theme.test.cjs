@@ -63,6 +63,16 @@ test('eigene Farbe macht aus der Palette „custom“ und gilt nur für den Modu
   assert.equal(T.baseFor(again, 'dark').bg, '#101010');
 });
 
+test('jede Palette hat helle und dunkle Grundfarben', () => {
+  const { T } = load();
+  assert.ok(T.PALETTES.some((p) => p.id === 'girly'));
+  for (const p of T.PALETTES) for (const m of ['dark', 'light']) {
+    for (const k of ['bg', 'surface', 'text', 'accent', 'grad0', 'grad1', 'tile0', 'tile1', 'side0', 'side1']) {
+      assert.match(p[m][k], /^#[0-9A-Fa-f]{6}$/, `${p.id}.${m}.${k}`);
+    }
+  }
+});
+
 test('kaputte gespeicherte Werte fallen auf die Palette zurück', () => {
   const { T } = load();
   const s = { palette: 'custom', from: 'kreide', custom: { light: { bg: 'nope', text: '#123' } } };

@@ -9,7 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <title>Projekt Terminator</title>
+  <title>Benny &amp; Joni</title>
   <script>
     try {
       var t = localStorage.getItem('pt:theme2') || 'system';
@@ -20,86 +20,141 @@
   <!-- Farbpalette aus den Einstellungen vor dem ersten Bild setzen -->
   <script src="theme.js"></script>
   <!-- build:fonts -->
-  <!-- Blöcke von build:… bis /build ersetzt tools/build.cjs für die iOS-App
-       (dist/) durch Dateien aus node_modules. Im Browser bleibt alles wie hier. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Schrift liegt in der App (SIL OFL, vendor/fonts/OFL.txt): keine Anfrage an fremde Server. -->
+  <link rel="stylesheet" href="vendor/fonts/plus-jakarta-sans.css" />
   <!-- /build -->
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="redesign.css" />
   <link rel="stylesheet" href="onboarding.css" />
   <link rel="stylesheet" href="dashboard.css" />
+  <style>
+    /* Startplatzhalter und Notfallansicht. Eigene Farben, damit beides auch ohne
+       die übrigen CSS-Dateien steht; Werte wie --bg/--text/--primary in redesign.css. */
+    .pt-boot {
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 24px; text-align: center;
+      background: #F4F3F8; color: #1C1B2E;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    .pt-boot-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .pt-boot-spinner {
+      width: 36px; height: 36px; border-radius: 999px;
+      border: 3px solid #ECEAF3; border-top-color: #4F46E5;
+      animation: pt-boot-spin 0.9s linear infinite;
+    }
+    .pt-boot-text {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #5F5C74;
+    }
+    .pt-boot-msg { font-size: 16px; font-weight: 600; line-height: 1.45; max-width: 280px; color: #5F5C74; }
+    .pt-boot-btn {
+      margin-top: 8px; height: 52px; padding: 0 28px; border: 0; border-radius: 16px;
+      background: #4F46E5; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 700;
+    }
+    [data-theme="dark"] .pt-boot { background: #16151F; color: #F1F0F7; }
+    [data-theme="dark"] .pt-boot-spinner { border-color: #353345; border-top-color: #8B7CFF; }
+    [data-theme="dark"] .pt-boot-text,
+    [data-theme="dark"] .pt-boot-msg { color: #B9B6CC; }
+    [data-theme="dark"] .pt-boot-btn { background: #8B7CFF; color: #16151F; }
+    @keyframes pt-boot-spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-  <!-- Spinner bis React übernimmt, damit der Start nicht weiß bleibt -->
-  <div id="root"><div class="app-loader" aria-hidden="true"><div class="app-loader-spinner"></div><div class="app-loader-text">&nbsp;</div></div></div>
-
-  <!-- build:vendor -->
-  <!-- Supabase client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+  <!-- Platzhalter bis zum ersten React-Render; React leert #root dabei selbst. -->
+  <div id="root"><div id="pt-boot" class="pt-boot" role="status" aria-live="polite">
+    <div class="pt-boot-name">Benny &amp; Joni</div>
+    <div class="pt-boot-spinner" aria-hidden="true"></div>
+    <div class="pt-boot-text">Starte…</div>
+  </div></div>
 
   <script>
-    // Login-Session: data.js wartet auf dieses Promise und nutzt in der iOS-App
-    // @capacitor/preferences, im Browser localStorage (Wert null).
-    window.PTPreferencesReady = new Promise(function (resolve) { window.__ptResolvePreferences = resolve; });
-    // App-Plugin für Einladungslinks (projektterminator://join/<CODE>), nur nativ.
-    window.PTAppReady = new Promise(function (resolve) { window.__ptResolveApp = resolve; });
-  </script>
-  <script type="module">
-    try {
-      if (window.Capacitor?.isNativePlatform?.()) {
-        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/app@8/+esm');
-        window.__ptResolveApp(mod);
-      } else {
-        window.__ptResolveApp(null);
+    // Start-Wächter: Lädt ein Skript nicht oder steht nach 15 s noch der
+    // Platzhalter (React hat nie gerendert), zeigt schlichtes HTML mit
+    // „Neu laden“. Kommt das Netz zurück, lädt die Seite von selbst neu.
+    (function () {
+      var LIMIT_MS = 15000;
+      var shown = false;
+      // Sprache wie in i18n.js (Einstellung pt:lang, sonst Gerätesprache, sonst
+      // Englisch). i18n.js lädt erst nach den Bibliotheken, deshalb stehen die
+      // wenigen Texte für Platzhalter und Notfallansicht hier selbst.
+      var lang = (function () {
+        var ok = { de: 1, en: 1 };
+        try { var pref = localStorage.getItem('pt:lang'); if (ok[pref]) return pref; } catch (e) {}
+        var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+        for (var i = 0; i < tags.length; i++) {
+          var base = String(tags[i] || '').toLowerCase().split(/[-_]/)[0];
+          if (ok[base]) return base;
+        }
+        return 'en';
+      })();
+      var TEXT = lang === 'de'
+        ? { start: 'Starte…', fail: 'App konnte nicht starten. Prüfe deine Verbindung.', reload: 'Neu laden' }
+        : { start: 'Starting…', fail: 'The app couldn’t start. Check your connection.', reload: 'Reload' };
+      try {
+        document.documentElement.lang = lang;
+        var label = document.querySelector('#pt-boot .pt-boot-text');
+        if (label) label.textContent = TEXT.start;
+      } catch (e) {}
+      function stuck() {
+        var root = document.getElementById('root');
+        return !!document.getElementById('pt-boot') || (root && root.childElementCount === 0);
       }
-    } catch (e) {
-      window.__ptResolveApp(null);
-    }
-  </script>
-  <script type="module">
-    try {
-      if (window.Capacitor?.isNativePlatform?.()) {
-        const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/preferences@8/+esm');
-        window.__ptResolvePreferences(mod);
-      } else {
-        window.__ptResolvePreferences(null);
+      function fail(reason) {
+        if (shown || !stuck()) return;
+        shown = true;
+        try { if (window.PTReportError) window.PTReportError(new Error('Start fehlgeschlagen: ' + reason), { where: 'boot' }); } catch (e) {}
+        var root = document.getElementById('root');
+        root.innerHTML =
+          '<div id="pt-boot-fail" class="pt-boot" role="alert">' +
+            '<div class="pt-boot-name">Benny &amp; Joni</div>' +
+            '<p class="pt-boot-msg">' + TEXT.fail + '</p>' +
+            '<button type="button" class="pt-boot-btn">' + TEXT.reload + '</button>' +
+          '</div>';
+        root.querySelector('button').addEventListener('click', function () { location.reload(); });
+        window.addEventListener('online', function () {
+          if (document.getElementById('pt-boot-fail')) location.reload();
+        });
       }
-    } catch (e) {
-      window.__ptResolvePreferences(null);
-    }
+      // Ladefehler von <script src> steigen nicht auf, darum die Capture-Phase.
+      window.addEventListener('error', function (e) {
+        var el = e && e.target;
+        if (el && el.tagName === 'SCRIPT') fail('Skript ' + (el.getAttribute('src') || '?') + ' nicht geladen');
+      }, true);
+      setTimeout(function () { fail('nach ' + LIMIT_MS / 1000 + ' s kein Render'); }, LIMIT_MS);
+    })();
   </script>
 
-  <script type="module">
-    // Expose Capacitor Haptics globally for our non-module JSX files.
-    try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/haptics@8/+esm');
-      window.PTCelebrationHaptics = mod;
-    } catch (e) {
-      window.PTCelebrationHaptics = null;
-    }
+  <!-- build:vendor -->
+  <script>
+    // Capacitor-Plugins direkt über die native Bridge: iOS legt window.Capacitor
+    // samt Capacitor.Plugins.<Name> schon beim Dokumentstart an (WKUserScript),
+    // die JS-Seite passt damit immer zur nativen Version. Im Browser und in der
+    // Demo ist alles null. Form der Globals wie bisher (data.js, app.jsx,
+    // feed.jsx, celebration.jsx, onboarding*.jsx, settings.jsx).
+    (function () {
+      var C = window.Capacitor;
+      var native = false;
+      try { native = !!(C && C.isNativePlatform && C.isNativePlatform()); } catch (e) {}
+      var P = (native && C.Plugins) || {};
+      // Login-Session: data.js nutzt in der App Preferences, im Browser localStorage (null).
+      window.PTPreferencesReady = Promise.resolve(P.Preferences ? { Preferences: P.Preferences } : null);
+      // Einladungslinks (projektterminator://join/<CODE>), nur nativ.
+      window.PTAppReady = Promise.resolve(P.App ? { App: P.App } : null);
+      window.PTPushNotifications = P.PushNotifications && C.getPlatform?.() !== 'android' ? { PushNotifications: P.PushNotifications } : null;
+      // Haptik: die native Seite erwartet genau diese Strings (HapticsPlugin.swift).
+      window.PTCelebrationHaptics = P.Haptics ? {
+        Haptics: P.Haptics,
+        ImpactStyle: { Heavy: 'HEAVY', Medium: 'MEDIUM', Light: 'LIGHT' },
+        NotificationType: { Success: 'SUCCESS', Warning: 'WARNING', Error: 'ERROR' },
+      } : null;
+    })();
   </script>
 
-  <script type="module">
-    // Expose Capacitor PushNotifications only when running natively — the web
-    // build has no implementation and would throw UNIMPLEMENTED on every call.
-    try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/@capacitor/push-notifications@8/+esm');
-      if (window.Capacitor?.isNativePlatform?.()) {
-        window.PTPushNotifications = mod;
-      } else {
-        window.PTPushNotifications = null;
-      }
-    } catch (e) {
-      window.PTPushNotifications = null;
-    }
-  </script>
-
-  <!-- React 18 -->
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <!-- Bibliotheken liegen in der App; Herkunft und sha384 stehen in tools/build-web.cjs (VENDOR). -->
+  <script src="vendor/supabase-js-2.45.4.min.js"></script>
+  <script src="vendor/react-18.3.1.production.min.js"></script>
+  <script src="vendor/react-dom-18.3.1.production.min.js"></script>
+  <script src="vendor/babel-standalone-7.29.0.min.js"></script>
   <!-- /build -->
 
   <!-- Sprachen: vor allem anderen, damit tr() überall bereitsteht -->
@@ -116,6 +171,9 @@
   <script src="onboarding-model.js"></script>
   <script src="boot-cache.js"></script>
   <script src="figures/manifest.js"></script>
+
+  <!-- Werbung (AdMob, nur in der iOS-App; Plugin über window.Capacitor.Plugins wie oben) -->
+  <script src="ads.js"></script>
 
   <!-- Tweaks shell -->
   <script type="text/babel" src="tweaks-panel.jsx"></script>

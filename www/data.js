@@ -1,4 +1,4 @@
-// Projekt Terminator — Data Layer
+// Benny & Joni — Data Layer
 // Supabase-Client mit Auth, Profilen, Challenges (Tabelle `competitions`) und
 // einem pro Challenge gescopten API (`api.forCompetition(id)`), das dieselben
 // Methoden wie früher anbietet (listChallenges, addSet, …).
@@ -9,6 +9,25 @@
 
 (function() {
   const PAGE = 1000;
+
+  // Release app supports sports only. Filter views without deleting stored Work history.
+  // Accept both cached competition bundles and cross-challenge stats bundles.
+  function sportsOnlyBundle(bundle) {
+    const workCategories = new Set((bundle.categories || []).filter(c => c.kind === 'work').map(c => c.id));
+    const workChallenges = new Set([...(bundle.challenges || []), ...(bundle.allChallenges || [])]
+      .filter(ch => workCategories.has(ch.category_id) || ch.category?.kind === 'work').map(ch => ch.id));
+    const result = { ...bundle };
+    if (bundle.categories) result.categories = bundle.categories.filter(c => c.kind !== 'work');
+    for (const key of ['challenges', 'allChallenges', 'planSlots']) {
+      if (Array.isArray(bundle[key])) result[key] = bundle[key]
+        .filter(ch => !workCategories.has(ch.category_id) && ch.category?.kind !== 'work');
+    }
+    for (const key of ['sets', 'allSets', 'feed']) {
+      if (Array.isArray(bundle[key])) result[key] = bundle[key].filter(s => s.duration_minutes == null
+        && !workChallenges.has(s.challenge_id) && s.category?.kind !== 'work' && s.challenge?.category?.kind !== 'work');
+    }
+    return result;
+  }
 
   function mondayOf(date) {
     const d = new Date(date);
@@ -174,7 +193,7 @@
         if (reps < share) out.push({
           athlete, challenge_id: ch.id, amount_cents: amount, rule_mode: mode,
           // i18n-ignore: `reason` ist nur intern, angezeigt wird aus rule_mode
-          reason: ch.workout ? 'Pflicht-Workout fehlt' : `${share - reps} unter fairShare`,
+          reason: ch.workout ? 'Pflicht-Workout fehlt' : `${share - reps} unter dem eigenen Anteil`,
         });
       }
       return out;
@@ -200,7 +219,7 @@
       const workoutMissed = perCh.some(x => x.ch.workout && x.missed);
       failed = totalReps < totalShare || workoutMissed;
       // i18n-ignore: `reason` ist nur intern, angezeigt wird aus rule_mode
-      reason = totalReps < totalShare ? `aggregiert ${totalShare - totalReps} unter fairShare`
+      reason = totalReps < totalShare ? `Insgesamt ${totalShare - totalReps} unter dem eigenen Anteil`
         : workoutMissed ? 'Pflicht-Workout fehlt' : ''; // i18n-ignore: nur intern
     }
 
@@ -221,6 +240,7 @@
       case 'Liegestütze': name = tr('Liegestütze'); break;
       case 'Klimmzüge': name = tr('Klimmzüge'); break;
       case 'Kniebeugen': name = tr('Kniebeugen'); break;
+      case '20-Min-AMRAP': name = tr('20-Min-AMRAP'); break;
     }
     const rule = localizeRule(row.rule);
     return name === row.name && rule === row.rule ? row : { ...row, name, rule };
@@ -277,14 +297,51 @@
     credentials: tr('E-Mail oder Passwort falsch.'),
     otp: tr('Code ungültig oder abgelaufen.'),
     offline: tr('Keine Verbindung. Prüf dein Internet.'),
+    duplicate: tr('Gibt es schon.'),
+    invalid: tr('Ungültiger Wert.'),
+    noAccess: tr('Keine Berechtigung – bist du noch in der Challenge?'),
+    generic: tr('Etwas ist schiefgelaufen. Versuch es nochmal.'),
+    profilePending: tr('Dein Profil wird noch angelegt. Versuch es gleich nochmal.'),
+    hasSets: tr('Für dieses Ziel gibt es schon Sätze. Ändere stattdessen die Zielmenge.'),
+    categoryLocked: tr('Die Übung lässt sich nicht mehr wechseln, es gibt schon Sätze.'),
+    deleteFailed: tr('Konto konnte nicht gelöscht werden. Prüfe deine Verbindung und versuch es nochmal.'),
   };
 
+  // Mailversand (Bestätigung, Passwort-Reset) gescheitert; mit Support-Adresse,
+  // sobald PTOnboarding.SUPPORT_EMAIL gesetzt ist.
+  function mailText() {
+    const mail = window.PTOnboarding?.SUPPORT_EMAIL;
+    return mail
+      ? tr('Mail konnte gerade nicht verschickt werden. Versuch es später nochmal oder schreib uns an {mail}.', { mail })
+      : tr('Mail konnte gerade nicht verschickt werden. Versuch es später nochmal oder schreib uns.');
+  }
+
+  // Eigene Fehler mit festem Code (z. B. 'has_sets'); auch demo.js baut sie hiermit.
+  const APP_ERRORS = { has_sets: TEXT.hasSets, category_locked: TEXT.categoryLocked, delete_failed: TEXT.deleteFailed };
+  function appError(code) {
+    const e = new Error(APP_ERRORS[code] || TEXT.generic);
+    e.code = code;
+    e.friendly = true;
+    return e;
+  }
+
+  // Roh-Fehler von Supabase (PostgREST, Auth, Storage, Functions) erkennt man am
+  // Objekt ohne Error-Typ oder an code/status/details. Eigene Texte (`new Error('…')`)
+  // bleiben unverändert. Kein instanceof: Tests laden data.js in einem eigenen vm-Kontext.
+  function isBackendError(error) {
+    if (Object.prototype.toString.call(error) !== '[object Error]') return true;
+    return !!(error.code || error.status || error.details || error.hint)
+      || /^(Auth|Storage|Functions|Postgrest)/.test(error.name || '');
+  }
+
   // Supabase-Fehler (Text oder `code`) → Text in der App-Sprache, `code` bleibt erhalten.
-  // Netzfehler bekommen `code = 'offline'`.
+  // Netzfehler bekommen `code = 'offline'`. Unbekannte Roh-Fehler landen in der
+  // Konsole, die Person sieht einen allgemeinen Satz statt englischem Fachtext.
   function friendlyError(error) {
+    if (error?.friendly) return error;
     const msg = error?.message || String(error);
     const code = error?.code || '';
-    const wrap = (text, c = code) => { const e = new Error(text); e.code = c; return e; };
+    const wrap = (text, c = code) => { const e = new Error(text); e.code = c; e.friendly = true; return e; };
     const map = {
       invalid_code: tr('Code nicht gefunden.'),
       competition_full: tr('Diese Challenge ist schon voll.'),
@@ -303,12 +360,15 @@
     if (/Failed to fetch|Load failed|NetworkError|Network request failed|fetch failed/i.test(msg)
       || error?.name === 'AuthRetryableFetchError') return wrap(TEXT.offline, 'offline');
     if (/Password should be at least/i.test(msg)) return wrap(TEXT.shortPassword);
+    if (code === 'email_address_not_authorized' || /Error sending|not authorized/i.test(msg)) return wrap(mailText());
     const byCode = {
       user_already_exists: TEXT.exists, email_exists: TEXT.exists,
       email_address_invalid: TEXT.badEmail, weak_password: TEXT.weakPassword,
       over_email_send_rate_limit: TEXT.rateLimit, over_request_rate_limit: TEXT.rateLimit,
       signup_disabled: TEXT.signupOff, email_not_confirmed: TEXT.unconfirmed,
       invalid_credentials: TEXT.credentials, otp_expired: TEXT.otp,
+      // Postgres: doppelter Eintrag, Check-Constraint, Zahl zu groß, RLS/Rechte
+      23505: TEXT.duplicate, 23514: TEXT.invalid, 22003: TEXT.invalid, 42501: TEXT.noAccess,
     };
     if (byCode[code]) return wrap(byCode[code]);
     if (/already been registered/i.test(msg)) return wrap(TEXT.exists);
@@ -316,7 +376,11 @@
     if (/rate limit|For security purposes/i.test(msg)) return wrap(TEXT.rateLimit);
     if (/Signups not allowed/i.test(msg)) return wrap(TEXT.signupOff);
     if (/Token has expired or is invalid/i.test(msg)) return wrap(TEXT.otp);
-    return error instanceof Error ? error : wrap(msg);
+    if (isBackendError(error)) {
+      console.error('Unbekannter Fehler', error);
+      return wrap(TEXT.generic);
+    }
+    return error;
   }
   function check({ data, error }) {
     if (error) throw friendlyError(error);
@@ -371,10 +435,56 @@
       return currentUserId;
     };
 
+    // ── Konto löschen: Hilfen ──────────────────────────────────────────
+    // Profilbilder liegen unter avatars/<uid>/ (jeder Upload eine neue Datei). Die
+    // Datenbank-Kaskade erreicht den Storage nicht, deshalb vorher hier löschen.
+    // Das Konto erst löschen, wenn die Dateien entfernt sind: Danach würde
+    // der Nutzer seinen Storage-Zugriff und damit die Möglichkeit zum Aufräumen verlieren.
+    async function removeOwnAvatars(id) {
+      const bucket = client.storage.from('avatars');
+      for (let round = 0; round <= 20; round++) {
+        const { data, error } = await bucket.list(id, { limit: 100 });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw appError('delete_failed');
+        const paths = data.filter(f => f.id && f.name).map(f => `${id}/${f.name}`);
+        if (!paths.length) return;
+        if (round === 20) throw appError('delete_failed');
+        const { data: removed, error: rmError } = await bucket.remove(paths);
+        if (rmError) throw rmError;
+        if (!removed?.length) throw appError('delete_failed');
+        // Auch nach einer kleinen oder nur teilweise bestätigten Antwort
+        // erneut listen, bis der eigene Ordner nachweislich leer ist.
+      }
+    }
+    // Darf delete_my_account() auth.users nicht anfassen, übernimmt die Edge Function.
+    const needsAdminDelete = (error) =>
+      error?.code === '42501' || /permission denied/i.test(error?.message || '');
+    // Lokal abmelden; scheitert das (kein Netz), das gespeicherte Token selbst entfernen.
+    async function signOutLocal() {
+      try {
+        const { error } = await client.auth.signOut({ scope: 'local' });
+        if (error) throw error;
+      } catch (e) {
+        console.warn('Abmelden nach dem Löschen', e);
+        try { if (client.auth.storageKey) await sessionStorageAdapter.removeItem(client.auth.storageKey); } catch (_) {}
+      }
+      currentUserId = null;
+    }
+
     const base = {
       mode: 'supabase',
       client,
       mondayOf, isoDate,
+
+      // Öffentliche Betriebsfreigabe, ohne Offline-Cache. Fehlende Migration,
+      // keine Zeile oder Netz-/Rechtefehler lassen Werbung ausgeschaltet.
+      async getAdsEnabled() {
+        try {
+          const { data, error } = await client.from('app_release_settings')
+            .select('ads_enabled').eq('id', 1).maybeSingle();
+          return !error && data?.ads_enabled === true;
+        } catch (_) { return false; }
+      },
 
       // ── Auth ─────────────────────────────────────────────────────────
       async getSession() {
@@ -414,6 +524,27 @@
         await client.auth.signOut();
         currentUserId = null;
       },
+      // Konto endgültig löschen (App Store 5.1.1(v)): Profilbilder, dann das Konto
+      // per RPC delete_my_account (Migration 20261021000010; Ausweichweg Edge Function
+      // delete-account), dann lokal abmelden und Gerätedaten entfernen. Die Oberfläche
+      // lädt danach die Startseite neu.
+      async deleteAccount() {
+        const id = uid();
+        try {
+          await removeOwnAvatars(id);
+          const { error } = await client.rpc('delete_my_account');
+          if (error) {
+            if (!needsAdminDelete(error)) throw error;
+            const { error: fnError } = await client.functions.invoke('delete-account', { method: 'POST' });
+            if (fnError) throw fnError;
+          }
+        } catch (e) {
+          console.error('Konto löschen fehlgeschlagen', e);
+          throw appError('delete_failed');
+        }
+        await signOutLocal();
+        clearLocalData();
+      },
       // Passwort vergessen: Mail enthält einen 6-stelligen Code ({{ .Token }}),
       // der in der App eingegeben wird — kein Deep Link nötig.
       async requestPasswordReset(email) {
@@ -434,7 +565,7 @@
           // Trigger on_auth_user_created läuft async zur Session — kurz warten.
           await new Promise(r => setTimeout(r, 400));
         }
-        throw new Error(tr('Profil nicht gefunden. Ist Migration A eingespielt?'));
+        throw new Error(TEXT.profilePending);
       },
       async updateProfile(patch) {
         return check(await client.from('profiles').update(patch).eq('id', uid()).select().single());
@@ -471,10 +602,10 @@
           .order('joined_at'));
         return rows || [];
       },
-      async createCompetition({ name, emoji, mode, rotation, penalties, work, startDate, endDate }) {
+      async createCompetition({ name, emoji, mode, rotation, penalties, startDate, endDate }) {
         return check(await client.rpc('create_competition', {
           p_name: name, p_emoji: emoji, p_mode: mode,
-          p_rotation: !!rotation, p_penalties: !!penalties, p_work: !!work,
+          p_rotation: !!rotation, p_penalties: !!penalties, p_work: false,
           p_start_date: startDate || isoDate(new Date()), p_end_date: endDate || null,
         }));
       },
@@ -485,7 +616,7 @@
         return check(await client.rpc('join_competition', { p_code: code, p_team: team }));
       },
       async updateCompetition(id, patch) {
-        return check(await client.from('competitions').update(patch).eq('id', id).select().single());
+        return check(await client.from('competitions').update({ ...patch, work_enabled: false }).eq('id', id).select().single());
       },
       async setMemberTeam(competitionId, userId, team) {
         check(await client.rpc('set_member_team', { p_competition: competitionId, p_user: userId, p_team: team }));
@@ -514,12 +645,12 @@
             .in('competition_id', competitionIds).order('created_at', { ascending: false })),
           selectAll(() => client.from('categories').select('*').order('created_at')),
         ]);
-        return {
+        return sportsOnlyBundle({
           members,
           challenges: challenges.map(normChallenge),
           sets: sets.map(withAthlete),
           categories: categories.map(localizeCategory),
-        };
+        });
       },
 
       // ── Dashboard „Heute“ über alle Challenges ───────────────────────
@@ -716,16 +847,7 @@
       },
 
       // ── Konto löschen ────────────────────────────────────────────────
-      async deleteMyAccount() {
-        const me = uid();
-        try {
-          const { data: files } = await client.storage.from('avatars').list(me);
-          if (files?.length) await client.storage.from('avatars').remove(files.map(f => `${me}/${f.name}`));
-        } catch (e) { /* Profilbild bleibt im Zweifel liegen */ }
-        check(await client.rpc('delete_my_account'));
-        await client.auth.signOut();
-        currentUserId = null;
-      },
+      async deleteMyAccount() { return base.deleteAccount(); },
 
       // ── Push notification device tokens ──────────────────────────────
       async upsertDeviceToken({ token, platform }) {
@@ -763,10 +885,20 @@
         channel.on('postgres_changes', { event: '*', schema: 'public', table, filter }, emit);
       }
       channel
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, emit)
+        // reactions hat keine competition_id: nur neue Reaktionen, sonst lädt jedes
+        // Entfernen irgendwo (DELETE kommt ohne RLS bei allen an) alle Apps neu.
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reactions' }, emit)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'competitions', filter: `id=eq.${cid}` }, emit)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, emit)
         .subscribe();
+    }
+
+    // Anzahl Sätze eines Wochenziels (alle Mitglieder; RLS zeigt Mitgliedern alle).
+    async function countSets(challengeId) {
+      const { count, error } = await client.from('sets')
+        .select('id', { count: 'exact', head: true }).eq('challenge_id', challengeId);
+      if (error) throw friendlyError(error);
+      return count || 0;
     }
 
     async function ensureClosures(rows) {
@@ -799,9 +931,9 @@
           .order('created_at'));
         return (rows || []).map(localizeCategory);
       },
-      async addCategory(name, emoji='💪', kind='sports') {
+      async addCategory(name, emoji='💪') {
         const data = check(await client.from('categories')
-          .insert({ name, emoji, kind, competition_id: cid, created_by: uid() }).select().single());
+          .insert({ name, emoji, kind: 'sports', competition_id: cid, created_by: uid() }).select().single());
         emit();
         return data;
       },
@@ -861,6 +993,14 @@
           chosen_by_user: payload.chosen_by || uid(),
         };
         if (payload.id) {
+          // Übung wechseln, obwohl schon Sätze geloggt sind, würde aus 100 Liegestützen
+          // stillschweigend 100 Klimmzüge machen. Die Zielmenge bleibt änderbar.
+          if (row.category_id != null) {
+            const current = check(await client.from('weekly_challenges').select('category_id').eq('id', payload.id).maybeSingle());
+            if (current && current.category_id !== row.category_id && await countSets(payload.id) > 0) {
+              throw appError('category_locked');
+            }
+          }
           const data = check(await client.from('weekly_challenges').update(row).eq('id', payload.id).select().single());
           emit();
           return normChallenge(data);
@@ -880,7 +1020,10 @@
         emit();
         return normChallenge(data);
       },
+      // sets.challenge_id hängt per on delete cascade am Wochenziel: Löschen nähme die
+      // Sätze aller Mitglieder mit (die Kaskade umgeht RLS). Mit Sätzen daher abbrechen.
       async deleteChallenge(id) {
+        if (await countSets(id) > 0) throw appError('has_sets');
         check(await client.from('weekly_challenges').delete().eq('id', id));
         emit();
       },
@@ -1049,11 +1192,12 @@
           const data = check(await client.from('sets').select('*').in('challenge_id', chIds));
           wkSets = (data || []).map(normSet);
         }
-        annotateWorkouts(wkSets, chs, cats);
+        const sports = sportsOnlyBundle({ categories: cats, challenges: chs, sets: wkSets });
+        annotateWorkouts(sports.sets, sports.challenges, sports.categories);
         const participants = participantsFor(members, weekStart);
         const pens = [];
         for (const m of participants) {
-          pens.push(...computePenalties(chs, wkSets, m.user_id, cfg, participants.length));
+          pens.push(...computePenalties(sports.challenges, sports.sets, m.user_id, cfg, participants.length));
         }
         return { penalties: pens, cfg };
       },
@@ -1187,6 +1331,59 @@
     }));
   }
 
+  // ── Gerätedaten nach dem Löschen des Kontos ─────────────────────────
+  // Alle Schlüssel mit pt: und pt_ (Einladung, Onboarding-Stand, aktive Challenge,
+  // Push-Token, Timer, „Willkommen zurück“ …) plus die Schnellwerte. Erscheinungsbild
+  // und Sprache (pt:lang, i18n.js) gehören zum Gerät und bleiben.
+  const KEEP_LOCAL_KEYS = ['pt:theme2', 'pt:lang'];
+  const isAppKey = (k) => (/^pt[:_]/.test(k) || k === 'quickSets') && !KEEP_LOCAL_KEYS.includes(k);
+  function clearLocalData() {
+    for (const name of ['localStorage', 'sessionStorage']) {
+      try {
+        const store = window[name];
+        if (!store) continue;
+        const keys = [];
+        for (let i = 0; i < store.length; i++) keys.push(store.key(i));
+        for (const k of keys) if (k && isAppKey(k)) store.removeItem(k);
+      } catch (e) {}
+    }
+  }
+
+  // ── Fehlerprotokoll (optional, Tabelle client_errors) ───────────────
+  // Die ErrorBoundary meldet Abstürze über window.PTReportError(err, ctx). Höchstens
+  // 5 pro Sitzung, nur mit Anmeldung. Wirft nie: eine fehlende Tabelle
+  // (Migration 20261021000100 nicht eingespielt) oder fehlendes Netz bleiben still.
+  const REPORT_MAX = 5;
+  let reportClient = null;
+  let reportCount = 0;
+  const clip = (v, n) => (v == null || v === '' ? null : String(v).slice(0, n));
+  function reportError(err, ctx) {
+    try {
+      const client = reportClient;
+      if (!client || reportCount >= REPORT_MAX) return;
+      reportCount++;
+      let context = ctx;
+      if (ctx != null && typeof ctx !== 'string') {
+        try { context = ctx.componentStack || JSON.stringify(ctx); } catch (e) { context = String(ctx); }
+      }
+      const row = {
+        message: clip(err?.message || err, 500) || 'Unbekannt', // i18n-ignore: Protokoll, nicht sichtbar
+        stack: clip(err?.stack, 4000),
+        context: clip(context, 1000),
+        url: clip(typeof location !== 'undefined' ? location.pathname : null, 300),
+        user_agent: clip(typeof navigator !== 'undefined' ? navigator.userAgent : null, 300),
+      };
+      Promise.resolve()
+        .then(async () => {
+          const { data } = await client.auth.getSession();
+          if (!data?.session) return;
+          await client.from('client_errors').insert(row);
+        })
+        .catch(() => {});
+    } catch (e) {}
+  }
+  window.PTReportError = reportError;
+
   window.PTData = {
     init({ url, key }) {
       if (!url || !key || !window.supabase) return null;
@@ -1194,10 +1391,11 @@
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storage: sessionStorageAdapter },
         realtime: { params: { eventsPerSecond: 5 } },
       });
+      reportClient = client;
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
     isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, workoutPeopleDone,
-    friendlyError, localizeCategory, usesMinutes, exerciseKey, newLogId,
+    friendlyError, appError, clearLocalData, localizeCategory, sportsOnlyBundle, usesMinutes, exerciseKey, newLogId,
   };
 })();

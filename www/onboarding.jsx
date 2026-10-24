@@ -149,8 +149,7 @@ function ObWelcome({ invite, onStart, onCode, onLogin }) {
       {!invite && <button type="button" className="btn btn-secondary" onClick={onCode}>{tr('Code eingeben')}</button>}
       <button type="button" className="btn-link" onClick={onLogin}>{tr('Schon dabei? Anmelden')}</button>
     </>}>
-      {/* i18n-ignore: Marke */}
-      <div className="ob-brand">Projekt Terminator</div>
+      <div className="ob-brand">{PTOnboarding.APP_NAME}</div>
       {invite && <div className="ob-ticket"><span aria-hidden="true">🎟️</span> {tr('Einladung · Code {code}', { code: <span className="mono">{invite}</span> })}</div>}
       <ObHeroDuel />
       <h1 className="ob-title">{tr('Trainier gegen deine Freunde.')}</h1>
@@ -161,13 +160,19 @@ function ObWelcome({ invite, onStart, onCode, onLogin }) {
 
 // ─── Codefeld ───────────────────────────────────────────────────────────────
 // Nimmt getippte Codes, eingefügte Nachrichten und Links (normalizeCode).
-// `onComplete` meldet einen vollständigen Code (z. B. für die Auto-Vorschau).
-function ObCodeField({ value, onChange, onComplete, autoFocus, onPasteFail }) {
+// `onComplete` meldet einen vollständigen Code (z. B. für die Auto-Vorschau),
+// `onSubmit` die Return-Taste („Los“ auf der iOS-Tastatur) wie „Weiter“.
+function ObCodeField({ value, onChange, onComplete, onSubmit, autoFocus, onPasteFail }) {
   const take = (raw) => {
     const code = PTOnboarding.normalizeCode(raw);
     if (code) { onChange(code); onComplete?.(code); return true; }
     onChange(String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
     return false;
+  };
+  const enter = (e) => {
+    if (e.key !== 'Enter' || e.nativeEvent?.isComposing) return;
+    e.preventDefault();
+    onSubmit?.();
   };
   async function paste() {
     try {
@@ -183,13 +188,47 @@ function ObCodeField({ value, onChange, onComplete, autoFocus, onPasteFail }) {
       <input className="input mono" value={value} placeholder="ABC234" autoFocus={autoFocus}
         aria-label={tr('Einladungscode')} autoCapitalize="characters" autoCorrect="off" autoComplete="one-time-code"
         spellCheck={false} enterKeyHint="go"
-        onChange={e => take(e.target.value)} />
+        onChange={e => take(e.target.value)} onKeyDown={enter} />
       {navigator.clipboard?.readText && (
         <button type="button" className="ob-paste" onClick={paste}>
           <Icon name="clipboard" size={18} strokeWidth={2.2} />{tr('Einfügen')}
         </button>
       )}
     </div>
+  );
+}
+
+// ─── Zustimmung bei der Registrierung ───────────────────────────────────────
+// Kleine Zeile unter „Weiter“; die Adressen stehen in PTOnboarding.LEGAL und
+// öffnen in Safari (openExternal).
+function ObLegalConsent() {
+  const L = PTOnboarding.LEGAL;
+  const link = (url, text) => (
+    <button type="button" className="btn-link" onClick={() => PTOnboarding.openExternal(url)}
+      style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit', verticalAlign: 'baseline' }}>{text}</button>
+  );
+  // Link und folgendes Satzzeichen bleiben zusammen, sonst bricht der Punkt
+  // allein um. Die Sätze kommen ganz aus tr(); geklebt wird erst danach, damit
+  // das in jeder Sprache greift.
+  const glue = (parts) => {
+    const list = [].concat(parts);
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const part = list[i];
+      const next = list[i + 1];
+      const punct = part && typeof part === 'object' && typeof next === 'string'
+        ? (next.match(/^[.,;:!?…]+/) || [''])[0] : '';
+      if (!punct) { out.push(part); continue; }
+      out.push(<span key={`glue-${i}`} style={{ whiteSpace: 'nowrap' }}>{part}{punct}</span>);
+      list[i + 1] = next.slice(punct.length);
+    }
+    return out;
+  };
+  return (
+    <p className="ob-hint" style={{ margin: 0, textAlign: 'center' }}>
+      {glue(tr('Mit ‚Weiter‘ akzeptierst du die {terms}.', { terms: link(L.terms, tr('Nutzungsbedingungen')) }))}
+      {' '}{glue(tr('Infos zum Datenschutz findest du in der {privacy}.', { privacy: link(L.privacy, tr('Datenschutzerklärung')) }))}
+    </p>
   );
 }
 
@@ -330,14 +369,14 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
 
   if (view === 'code') {
     const valid = !!PTOnboarding.normalizeCode(code);
+    const next = () => { if (!valid) return; onInvite?.(PTOnboarding.normalizeCode(code)); go('signup'); };
     return (
       <ObScreen onBack={() => go('welcome')} stepKey="code" foot={
-        <button type="button" className="btn" disabled={!valid}
-          onClick={() => { onInvite?.(PTOnboarding.normalizeCode(code)); go('signup'); }}>{tr('Weiter')}</button>
+        <button type="button" className="btn" disabled={!valid} onClick={next}>{tr('Weiter')}</button>
       }>
         <h1 className="ob-title">{tr('Hast du einen Code?')}</h1>
         <ObGuide who="joni" pose="point">{tr('Steht in der Einladung. Danach legst du kurz ein Konto an und bist drin.')}</ObGuide>
-        <ObCodeField value={code} onChange={setCode} autoFocus onPasteFail={(m) => setInfo(m)} />
+        <ObCodeField value={code} onChange={setCode} onSubmit={next} autoFocus onPasteFail={(m) => setInfo(m)} />
         <ObMessage error={error} info={info} />
       </ObScreen>
     );
@@ -347,6 +386,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
     return (
       <ObScreen onBack={() => go('welcome')} steps={3} step={1} stepKey="signup" foot={<>
         <button type="submit" form="ob-signup" className="btn" disabled={busy || !email || !password}>{label(tr('Weiter'))}</button>
+        <ObLegalConsent />
         <button type="button" className="btn-link" onClick={() => go('login')}>{tr('Schon ein Konto? Anmelden')}</button>
       </>}>
         <h1 className="ob-title">{tr('Konto erstellen')}</h1>
@@ -395,6 +435,7 @@ function ObAuthFlow({ api, invite, returning, onInvite }) {
       }>
         <h1 className="ob-title">{step2 ? tr('Neues Passwort') : tr('Passwort vergessen')}</h1>
         <p className="ob-sub">{step2 ? tr('Code aus der Mail und dein neues Passwort.') : tr('Gib deine E-Mail ein, du bekommst einen Code.')}</p>
+        {step2 && <div className="ob-hint">{tr('Keine Mail da? Schau auch im Spam-Ordner.')}</div>}
         <form id="ob-reset" className="ob-fields" onSubmit={submitOn(step2 ? setNewPassword : requestReset)} noValidate>
           {emailInput}
           {step2 && <input className="input mono" placeholder={tr('Code aus der Mail')} inputMode="numeric" autoComplete="one-time-code"
@@ -560,7 +601,6 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
   const [extrasOpen, setExtrasOpen] = React.useState(false);
   const [penalties, setPenalties] = React.useState(false);
   const [rotation, setRotation] = React.useState(false);
-  const [work, setWork] = React.useState(false);
   const [startDate, setStartDate] = React.useState(() => PTData.isoDate(new Date()));
   const [endDate, setEndDate] = React.useState('');
   const [busy, setBusy] = React.useState(false);
@@ -568,14 +608,14 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
 
   const current = OB_MODES.find(m => m.id === mode);
   const pickMode = (m) => { setMode(m.id); if (!emojiTouched) setEmoji(m.emoji); };
-  const on = [penalties && tr('Strafkonto'), rotation && tr('Wochenplan'), work && tr('Work-Tracking')].filter(Boolean);
+  const on = [penalties && tr('Strafkonto'), rotation && tr('Wochenplan')].filter(Boolean);
 
   async function create() {
     if (!online) { setError(tr('Keine Verbindung. Prüf dein Internet.')); return; }
     setError(''); setBusy(true);
     try {
       const c = await api.createCompetition({
-        name: (name.trim() || current.name).slice(0, 40), emoji, mode, rotation, penalties, work,
+        name: (name.trim() || current.name).slice(0, 40), emoji, mode, rotation, penalties,
         startDate, endDate: endDate || null,
       });
       onCreated(c);
@@ -634,7 +674,6 @@ function CreatePanel({ api, variant = 'screen', onCreated, onCancel }) {
         <div className="ob-extras-body">
           {toggle(tr('Strafkonto'), tr('Wer seinen Wochenteil nicht schafft, zahlt {amount} in die Kasse.', { amount: PTi18n.euro(500) }), penalties, setPenalties)}
           {toggle(tr('Wochenplan'), tr('Ihr legt Übungen fest, die jede Woche wiederkommen.'), rotation, setRotation)}
-          {toggle(tr('Work-Tracking'), tr('Zählt auch Minuten am Schreibtisch, nicht nur Wiederholungen.'), work, setWork)}
           <div className="ob-dates">
             <label>{tr('Start')}<input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value || PTData.isoDate(new Date()))} /></label>
             <label>{tr('Ende (optional)')}<input className="input" type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} /></label>
@@ -721,7 +760,7 @@ function JoinPanel({ api, initialCode = '', variant = 'screen', onJoined, onCanc
 
   const codeBody = <>
     <ObCodeField value={code} onChange={setCode} autoFocus={!initialCode} onComplete={(c) => lookup(c)}
-      onPasteFail={(m) => setInfo(m)} />
+      onSubmit={() => { if (!busy) lookup(); }} onPasteFail={(m) => setInfo(m)} />
     <ObMessage error={error} info={info} />
   </>;
 
@@ -800,6 +839,6 @@ function JoinCompetitionSheet({ open, api, onClose, onJoined, initialCode = '' }
 
 Object.assign(window, {
   PTHaptics, PTSound, useObOnline, ObScreen, ObMessage, obSetDemo, ObWelcome, ObHeroDuel,
-  ObCodeField, ObAuthFlow, obMarkStarted, ObProfile, ObStart, ObSlots,
+  ObCodeField, ObLegalConsent, ObAuthFlow, obMarkStarted, ObProfile, ObStart, ObSlots,
   CreatePanel, CreateCompetitionSheet, JoinPanel, JoinCompetitionSheet,
 });

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Benny &amp; Joni</string>
+    <string name="title_activity_main">Benny &amp; Joni</string>
+    <string name="package_name">com.bennyjoni.terminator</string>
+    <string name="custom_url_scheme">com.bennyjoni.terminator</string>
+</resources>
