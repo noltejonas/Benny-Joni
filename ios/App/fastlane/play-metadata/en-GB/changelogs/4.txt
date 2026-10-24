@@ -1,0 +1,9 @@
+New in 1.5.0:
+• Today across all challenges: log once and it counts in every challenge with the same exercise
+• Focus tiles with quick sets; finished exercises get a tick and move to the end
+• Tap a challenge to open it straight away
+• Leaderboard with weekly medals
+• Your own colours: pick a palette or set every colour yourself
+• New celebration sounds with more bass
+• Tidier screens: less text, penalties collapsible by week
+• New accounts go straight into their first duel

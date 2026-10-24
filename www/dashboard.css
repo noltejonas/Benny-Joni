@@ -140,6 +140,8 @@
 .db-comps {
   display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
   margin: 0 -16px -14px; padding: 2px 16px 16px;
+  /* Ohne scroll-padding rastet die erste Karte am Rand ein statt auf der Linie der Kacheln darunter */
+  scroll-padding-inline: 16px;
   scrollbar-width: none;
 }
 .db-comps::-webkit-scrollbar { display: none; }
