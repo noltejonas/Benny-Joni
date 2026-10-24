@@ -1269,6 +1269,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           <DashboardScreen me={me} model={dashModel} weekStart={weekStart} daysLeft={daysLeftNow}
             focusKey={dashFocus} onFocus={setDashFocus}
             onOpenCard={(card) => setQuickCard(card)}
+            onOpenChallenge={(card) => dashOpenChallenge(card.c.id)}
             onQuickLog={dashQuickLog}
             onOpenLog={dashOpenLog}
             onStartWorkout={dashOpenLog}

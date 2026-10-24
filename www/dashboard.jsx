@@ -184,41 +184,46 @@ function compStatusLine(card) {
   return tr('Platz {rank} von {total}', { rank: standing.rank, total: standing.of });
 }
 
-function CompCard({ card, onOpen }) {
+// Tipp auf die Karte öffnet die Challenge, das Auge oben rechts die Schnellansicht.
+function CompCard({ card, onOpen, onPeek }) {
   const { c, sides, duel, done, total } = card;
   const two = sides.length === 2;
   const reps = duel.map(d => d.reps);
   const sum = reps.reduce((a, v) => a + v, 0);
   return (
-    <button type="button" className="db-comp" onClick={onOpen} aria-label={tr('{name} öffnen', { name: c.name })}>
-      <span className="db-comp-top">
-        <span className="db-comp-emoji" aria-hidden="true">{c.emoji}</span>
-        <span className="db-comp-name">{c.name}</span>
-        <Icon name="chevron" size={16} />
-      </span>
-      {two ? (
-        <span className="db-comp-duel">
-          <SideAvatar side={sides[0]} size={30} />
-          <span className="db-comp-score mono"><b style={{ color: 'var(--side0-ink)' }}>{duel[0].wins}</b> : <b style={{ color: 'var(--side1-ink)' }}>{duel[1].wins}</b></span>
-          <SideAvatar side={sides[1]} size={30} />
+    <div className="db-comp">
+      <button type="button" className="db-comp-main" onClick={onOpen} aria-label={tr('{name} öffnen', { name: c.name })}>
+        <span className="db-comp-top">
+          <span className="db-comp-emoji" aria-hidden="true">{c.emoji}</span>
+          <span className="db-comp-name">{c.name}</span>
         </span>
-      ) : (
-        <span className="db-comp-stack">
-          {sides.slice(0, 5).map(s => <SideAvatar key={s.key} side={s} size={26} />)}
-          {sides.length > 5 && <span className="db-comp-more">+{sides.length - 5}</span>}
+        {two ? (
+          <span className="db-comp-duel">
+            <SideAvatar side={sides[0]} size={30} />
+            <span className="db-comp-score mono"><b style={{ color: 'var(--side0-ink)' }}>{duel[0].wins}</b> : <b style={{ color: 'var(--side1-ink)' }}>{duel[1].wins}</b></span>
+            <SideAvatar side={sides[1]} size={30} />
+          </span>
+        ) : (
+          <span className="db-comp-stack">
+            {sides.slice(0, 5).map(s => <SideAvatar key={s.key} side={s} size={26} />)}
+            {sides.length > 5 && <span className="db-comp-more">+{sides.length - 5}</span>}
+          </span>
+        )}
+        <span className="db-comp-line">{compStatusLine(card)}</span>
+        {two && (
+          <span className="db-comp-split" aria-hidden="true">
+            <i style={{ flex: sum ? reps[0] : 1, ...sideStyle(sides[0]) }} />
+            <i style={{ flex: sum ? reps[1] : 1, ...sideStyle(sides[1]) }} />
+          </span>
+        )}
+        <span className="db-comp-meta">
+          <span>{total ? tr('{done}/{total} erledigt', { done, total }) : tr('Ziel festlegen')}</span>
         </span>
-      )}
-      <span className="db-comp-line">{compStatusLine(card)}</span>
-      {two && (
-        <span className="db-comp-split" aria-hidden="true">
-          <i style={{ flex: sum ? reps[0] : 1, ...sideStyle(sides[0]) }} />
-          <i style={{ flex: sum ? reps[1] : 1, ...sideStyle(sides[1]) }} />
-        </span>
-      )}
-      <span className="db-comp-meta">
-        <span>{total ? tr('{done}/{total} erledigt', { done, total }) : tr('Ziel festlegen')}</span>
-      </span>
-    </button>
+      </button>
+      <button type="button" className="db-comp-peek" onClick={onPeek} aria-label={tr('Schnellansicht: {name}', { name: c.name })}>
+        <Icon name="eye" size={16} />
+      </button>
+    </div>
   );
 }
 
@@ -254,7 +259,7 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
   );
 }
 
-function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onQuickLog, onOpenLog, onStartWorkout, onAddGoal }) {
+function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal }) {
   const { cards, exercises, ordered } = model;
   const items = React.useMemo(() => exercises.map(ex => ({ ...ex, done: ex.finished })), [exercises]);
   const active = items.find(e => e.key === focusKey) || items.find(e => !e.finished) || items[0];
@@ -269,7 +274,7 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
         </div>
         <div className="db-comps">
           {cards.map(card => (
-            <CompCard key={card.c.id} card={card} onOpen={() => onOpenCard(card)} />
+            <CompCard key={card.c.id} card={card} onOpen={() => onOpenChallenge(card)} onPeek={() => onOpenCard(card)} />
           ))}
         </div>
       </section>

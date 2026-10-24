@@ -112,16 +112,27 @@
 }
 .db-comps::-webkit-scrollbar { display: none; }
 .db-comp {
-  flex: 0 0 min(76%, 290px); scroll-snap-align: start;
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 16px; border: none; border-radius: var(--radius-lg);
-  background: var(--surface); box-shadow: var(--shadow);
-  color: inherit; text-align: left; cursor: pointer; font: inherit;
+  position: relative; flex: 0 0 min(76%, 290px); scroll-snap-align: start;
+  border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow);
   transition: transform .15s var(--ease);
 }
-.db-comp:active { transform: scale(0.98); }
-.db-comp-top { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; }
-.db-comp-top svg { flex-shrink: 0; color: var(--text-4); }
+.db-comp:has(.db-comp-main:active) { transform: scale(0.98); }
+.db-comp-main {
+  width: 100%; height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px; border: none; border-radius: inherit; background: transparent;
+  color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.db-comp-top { display: flex; align-items: center; gap: 8px; padding-right: 36px; font-size: 15px; font-weight: 800; }
+/* Schnellansicht: kleines Auge oben rechts, Trefferfläche größer als das Icon */
+.db-comp-peek {
+  position: absolute; top: 10px; right: 10px;
+  width: 34px; height: 34px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--surface-2); color: var(--text-3);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.db-comp-peek::before { content: ''; position: absolute; inset: -6px; }
+.db-comp-peek:active { transform: scale(0.92); }
 .db-comp-emoji { font-size: 20px; line-height: 1; }
 .db-comp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .db-comp-duel { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
