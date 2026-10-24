@@ -274,7 +274,9 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
           </div>
           <h2 className="rd-focus-title">{ex.cat?.name}</h2>
         </div>
-        <span className="fc-pct mono">{Math.round(ex.pct * 100)}%</span>
+        {ex.finished
+          ? <span className="fc-pct is-check" role="img" aria-label={tr('Erledigt')}><Icon name="check" size={30} strokeWidth={3} /></span>
+          : <span className="fc-pct mono">{Math.round(ex.pct * 100)}%</span>}
       </div>
 
       {ex.isObligatory ? (
@@ -291,7 +293,9 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
 
 function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal }) {
   const { cards, exercises, ordered } = model;
-  const items = React.useMemo(() => exercises.map(ex => ({ ...ex, done: ex.finished })), [exercises]);
+  // Erledigte Kacheln ans Ende, damit Blau und Grün nicht durcheinander wechseln
+  const items = React.useMemo(() => [...exercises.filter(ex => !ex.finished), ...exercises.filter(ex => ex.finished)]
+    .map(ex => ({ ...ex, done: ex.finished })), [exercises]);
   const active = items.find(e => e.key === focusKey) || items.find(e => !e.finished) || items[0];
   const finished = exercises.filter(e => e.finished).length;
 

@@ -324,8 +324,9 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const focus = rows.find(r => r.ch.id === selectedId)
     || orderedRows.find(r => r.isObligatory && !r.meFinished)
     || orderedRows[0];
-  // Fokus-Karten in fester Reihenfolge, damit eine fertige Übung nicht wegspringt
-  const slides = React.useMemo(() => rows.map(r => ({ key: r.ch.id, done: r.meFinished, row: r })), [rows]);
+  // Fokus-Karten: offene zuerst, erledigte (grün) am Ende, damit Blau und Grün
+  // nicht durcheinander wechseln. Die angezeigte Karte bleibt beim Umsortieren im Bild.
+  const slides = React.useMemo(() => orderedRows.map(r => ({ key: r.ch.id, done: r.meFinished, row: r })), [orderedRows]);
   const onSlide = React.useCallback((id) => setSelectedId(id), []);
 
   const duelEntries = React.useMemo(() => PTDashboard.duelOf(rows, sides), [rows, sides]);
@@ -389,9 +390,14 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
             <h2 className="rd-focus-title">{f.cat?.name}</h2>
             {f.ch.chosen_by && <div className="rd-focus-sub">{chosenByLabel(f.ch.chosen_by)}</div>}
           </div>
-          <MiniRing pct={pct} size={72} stroke={7} color="#fff" track="rgba(255,255,255,0.22)">
-            {Math.round(pct * 100)}%
-          </MiniRing>
+          {f.meFinished ? (
+            // Erledigt: Haken statt Prozent, erklärt die grüne Karte
+            <span className="fc-pct is-check is-lg" role="img" aria-label={tr('Erledigt')}><Icon name="check" size={34} strokeWidth={3} /></span>
+          ) : (
+            <MiniRing pct={pct} size={72} stroke={7} color="#fff" track="rgba(255,255,255,0.22)">
+              {Math.round(pct * 100)}%
+            </MiniRing>
+          )}
         </div>
         {!f.isObligatory && sides.length >= 1 && (
           <div className="fc-tug">

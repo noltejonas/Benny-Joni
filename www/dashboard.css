@@ -59,7 +59,12 @@
 .rd-focus.fc-card.is-done .rd-btn-white,
 .rd-focus.fc-card.is-done .quick-chip-open,
 .rd-focus.fc-card.is-done .quick-row.is-compact .quick-chip.is-main { background: #fff; color: #0A8A4A; }
-.rd-focus.fc-card.is-done .fc-pct { background: rgba(255, 255, 255, .5); }
+.fc-pct.is-lg { width: 72px; height: 72px; }
+/* Haken auf kräftigem Grün: weiß direkt auf Mint wäre zu blass */
+.rd-focus.fc-card.is-done .fc-pct.is-check {
+  background: #0E9F55; color: #fff;
+  box-shadow: 0 6px 16px rgba(5, 61, 36, .25), inset 0 0 0 3px rgba(255, 255, 255, .35);
+}
 .rd-focus.fc-card.is-done .mini-ring-label { color: var(--done-ink); }
 .rd-focus.fc-card.is-done .fc-tug { background: rgba(255, 255, 255, .35); }
 .rd-focus.fc-card.is-done .tw.on-dark .tw-who,
