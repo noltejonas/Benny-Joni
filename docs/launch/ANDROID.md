@@ -1,5 +1,16 @@
 # Android bis zum Play-Store-Upload
 
+**Stand 24.10.2026:** 1.4.1 (Code 2) ist in Produktion live. 1.5.0 (Code 3)
+ist gebaut und als interner Entwurf **1.5.0 – Heute über alle Challenges**
+mit Changelog (`play-metadata/*/changelogs/3.txt`) und neuer Beschreibung
+hochgeladen. Das Dienstkonto darf nur Testkanäle bedienen; die Freigabe in
+Produktion läuft über die Play Console (Produktion → Neuen Release erstellen →
+Aus Bundle-Bibliothek hinzufügen → Code 3 → Zur Prüfung senden). Änderungen
+gehen bei dieser App automatisch in die Prüfung; `changesNotSentForReview`
+darf deshalb nicht gesetzt sein (die Lane `internal_draft` bricht damit ab).
+
+Der Abschnitt darunter beschreibt den Stand bis 1.4.1.
+
 Das native Projekt verwendet `com.bennyjoni.terminator`, Version 1.4.1,
 **Version Code 2** und Ziel-API 36. Debug-APK und signiertes Release-AAB sind
 gebaut; das AAB ist in Play Console als interner Entwurf
