@@ -511,13 +511,24 @@
         return () => { clearTimeout(timer); for (const cid of ids) compListeners.get(cid)?.delete(ping); };
       },
       // Wie data.js: eine Zeile pro Wochenziel, alle mit derselben log_id
-      async logEverywhere({ targets, values, note = null, createdAt = null }) {
+      async logEverywhere({ targets, values, note = null, createdAt = null, skip = [] }) {
         const me = uid();
         if (!targets.length) throw fail('invalid_value');
         if (values.duration_minutes == null && !(values.reps > 0)) throw fail('invalid_value');
         const log = newId('log');
         const at = createdAt || new Date().toISOString();
-        const rows = targets.map((t, i) => {
+        // Wie log_set: gewertete Übungen auch in alle anderen eigenen Challenges
+        // mit derselben Übung dieser Woche (außer skip)
+        const all = [...targets];
+        const firstCh = db.weekly_challenges.find(w => w.id === targets[0].challenge_id);
+        const firstCat = firstCh && db.categories.find(c => c.id === firstCh.category_id);
+        if (firstCat?.ranked && values.duration_minutes == null) {
+          for (const t of logTargets(me, firstCh.category_id, firstCh.week_start)) {
+            if (skip.includes(t.competition_id) || all.some(x => x.challenge_id === t.challenge_id)) continue;
+            all.push({ challenge_id: t.challenge_id, competition_id: t.competition_id });
+          }
+        }
+        const rows = all.map((t, i) => {
           const row = { id: newId('s'), challenge_id: t.challenge_id, competition_id: t.competition_id, user_id: me, log_id: log,
             reps: values.reps ?? null, duration_minutes: values.duration_minutes ?? null,
             note: note && String(note).trim() ? String(note).trim() : null, created_at: at };

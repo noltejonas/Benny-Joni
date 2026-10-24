@@ -76,34 +76,44 @@ function TugBar({ sides, values, goals, minutes = false, onDark = false, compact
 // die sichtbare Karte (onActive), eine Auswahl von außen (activeKey) scrollt hin.
 function FocusCarousel({ items, activeKey, onActive, render, label }) {
   const trackRef = React.useRef(null);
-  const shownRef = React.useRef(activeKey);
+  const shownRef = React.useRef(activeKey);   // Karte, die gerade im Bild ist bzw. angesteuert wird
+  const targetRef = React.useRef(null);       // Ziel eines programmatischen Scrollens
   const index = Math.max(0, items.findIndex(it => it.key === activeKey));
+  const keysSig = items.map(it => it.key).join('|');
+  const itemsRef = React.useRef(items);
+  itemsRef.current = items;
+  const onActiveRef = React.useRef(onActive);
+  onActiveRef.current = onActive;
 
+  const leftOf = (el, slide) => slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2;
+
+  // Gemeldet wird erst, wenn das Scrollen zur Ruhe gekommen ist. So springt
+  // ein Wischen nicht mittendrin und eine Auswahl von außen wird nicht vom
+  // ersten Scroll-Frame wieder zurückgesetzt.
   React.useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const slides = [...el.children];
-        if (!slides.length) return;
-        const mid = el.scrollLeft + el.clientWidth / 2;
-        let best = 0, dist = Infinity;
-        slides.forEach((s, i) => {
-          const d = Math.abs(s.offsetLeft + s.offsetWidth / 2 - mid);
-          if (d < dist) { dist = d; best = i; }
-        });
-        const key = items[best]?.key;
-        if (key != null && key !== shownRef.current) {
-          shownRef.current = key;
-          onActive?.(key);
-        }
+    let timer = 0;
+    const settle = () => {
+      const slides = [...el.children];
+      if (!slides.length) return;
+      const mid = el.scrollLeft + el.clientWidth / 2;
+      let best = 0, dist = Infinity;
+      slides.forEach((sl, i) => {
+        const d = Math.abs(sl.offsetLeft + sl.offsetWidth / 2 - mid);
+        if (d < dist) { dist = d; best = i; }
       });
+      targetRef.current = null;
+      const key = itemsRef.current[best]?.key;
+      if (key != null && key !== shownRef.current) {
+        shownRef.current = key;
+        onActiveRef.current?.(key);
+      }
     };
+    const onScroll = () => { clearTimeout(timer); timer = setTimeout(settle, 120); };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => { el.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
-  }, [items, onActive]);
+    return () => { el.removeEventListener('scroll', onScroll); clearTimeout(timer); };
+  }, []);
 
   // Auswahl von außen (Liste angetippt): zur Karte scrollen
   React.useEffect(() => {
@@ -111,24 +121,30 @@ function FocusCarousel({ items, activeKey, onActive, render, label }) {
     const slide = el?.children[index];
     if (!slide || activeKey === shownRef.current) return;
     shownRef.current = activeKey;
-    el.scrollTo({ left: slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2, behavior: 'smooth' });
+    targetRef.current = activeKey;
+    el.scrollTo({ left: leftOf(el, slide), behavior: 'smooth' });
+    // Stand die Karte schon richtig, kommt kein Scroll-Ereignis: Ziel trotzdem freigeben
+    const key = activeKey;
+    setTimeout(() => { if (targetRef.current === key) targetRef.current = null; }, 900);
     // Aus der Liste weiter unten gewählt: Karte ins Bild holen
     const r = el.getBoundingClientRect();
     if (r.top < 0 || r.bottom > window.innerHeight - 90) el.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [activeKey, index]);
 
-  // Erste Anzeige und neue Reihenfolge (Karte kam dazu oder fiel weg): ohne
-  // Animation auf die aktive Karte
+  // Erste Anzeige und geänderte Karten (dazu, weg, andere Reihenfolge): ohne
+  // Animation auf die aktive Karte, außer es läuft gerade ein Scrollen dorthin
   React.useLayoutEffect(() => {
     const el = trackRef.current;
     const slide = el?.children[index];
-    if (slide && activeKey === shownRef.current) el.scrollLeft = slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2;
-  }, [index, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (slide && !targetRef.current) el.scrollLeft = leftOf(el, slide);
+  }, [keysSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (i) => {
     const el = trackRef.current;
     const slide = el?.children[i];
-    if (slide) el.scrollTo({ left: slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2, behavior: 'smooth' });
+    if (!slide) return;
+    targetRef.current = items[i]?.key ?? null;
+    el.scrollTo({ left: leftOf(el, slide), behavior: 'smooth' });
   };
 
   return (

@@ -939,4 +939,5 @@ PTi18n.add('en', {
   'Nach Übung': 'By exercise',
   'Wochenziel hinzufügen': 'Add weekly goal',
   'Ziel': 'Goal',
+  'Gespeichert, aber nicht in allen Challenges. Prüf deine Verbindung.': 'Saved, but not in all challenges. Check your connection.',
 });

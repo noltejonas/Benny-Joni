@@ -81,11 +81,14 @@ function useDashboardData(api, competitions, me) {
   const live = useMemo(() => (competitions || []).filter(c => !c.archived_at && c.mode !== 'solo'), [competitions]);
   const ids = live.map(c => c.id).join(',');
   const fromWeek = PTData.addDays(PTData.isoDate(PTData.mondayOf(new Date())), -7);
-  const [state, setState] = useState(() => {
-    const cached = me ? PTBootCache.read(me, 'dash') : null;
+  const fromCache = (id) => {
+    const cached = id ? PTBootCache.read(id, 'dash') : null;
     if (cached?.members) PTPeople.set(cached.members.map(m => m.profile).filter(Boolean));
-    return { me, bundle: cached?.members ? cached : null, fresh: false };
-  });
+    return { me: id, bundle: cached?.members ? cached : null, fresh: false };
+  };
+  const [state, setState] = useState(() => fromCache(me));
+  // Die Session kommt asynchron: Stand vom letzten Öffnen erst lesen, wenn klar ist, wer angemeldet ist
+  useEffect(() => { if (me) setState(s => (s.me === me ? s : fromCache(me))); }, [me]); // eslint-disable-line react-hooks/exhaustive-deps
   const load = useCallback(async () => {
     if (!api || !me || !ids || !api.getDashboard) return;
     try {
@@ -943,18 +946,22 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }, [dash.bundle, dashComps, competition.id]);
 
   // Andere eigene Challenges mit derselben Übung diese Woche („zählt auch für“)
+  // Ohne Dashboard-Daten (noch nicht geladen, offline) undefined: dann fragt das
+  // Log-Sheet selbst nach (log_targets) und log_set kopiert gewertete Übungen.
   const otherTargets = useCallback(
-    (ch, cat) => PTDashboard.matchingTargets({ bundle: dash.bundle, comps: dash.live, ch, cat, competitionId: competition.id }),
+    (ch, cat) => (dash.bundle ? PTDashboard.matchingTargets({ bundle: dash.bundle, comps: dash.live, ch, cat, competitionId: competition.id }) : undefined),
     [dash.bundle, dash.live, competition.id]
   );
 
   // Ein Eintrag für alle Challenges mit dieser Übung (api.logEverywhere).
   async function logEverywhere({ targets, values, note = null, skip = [], createdAt = null }) {
     const chosen = targets.filter(t => !skip.includes(t.competition_id));
-    await api.logEverywhere({ targets: chosen, values, note, skip, createdAt });
+    const res = await api.logEverywhere({ targets: chosen, values, note, skip, createdAt });
     if (chosen.some(t => t.competition_id === competition.id)) reload();
     dash.reload();
-    return chosen.length;
+    // Gespeichert, aber Kopien fehlen (Netz weg): nach der Erfolgsmeldung Bescheid geben
+    if (res?.missing > 0) setTimeout(() => setToast(tr('Gespeichert, aber nicht in allen Challenges. Prüf deine Verbindung.')), 2700);
+    return chosen.length - (res?.missing || 0);
   }
   const valueLabel = (cat, v) => `+${PTData.usesMinutes(cat) ? (window.formatDuration?.(v) ?? `${v}m`) : v}`;
   function logFailed(e) {
@@ -1262,7 +1269,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               const first = isFirstLog && !minutes;
               const v = parseInt(val);
               const n = await logEverywhere({
-                targets: [{ challenge_id: ch.id, competition_id: competition.id }, ...otherTargets(ch, cat)],
+                targets: [{ challenge_id: ch.id, competition_id: competition.id }, ...(otherTargets(ch, cat) || [])],
                 values: minutes ? { duration_minutes: v } : { reps: v },
               });
               PTHaptics.tap();
@@ -1443,7 +1450,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
               others={otherTargets(logForChallenge, logCat)}
               onSubmit={async ({ values, note, skip }) => {
                 logCountRef.current = await logEverywhere({ values, note, skip,
-                  targets: [{ challenge_id: logForChallenge.id, competition_id: competition.id }, ...otherTargets(logForChallenge, logCat)] });
+                  targets: [{ challenge_id: logForChallenge.id, competition_id: competition.id }, ...(otherTargets(logForChallenge, logCat) || [])] });
               }}
               onClose={() => setLogForChallenge(null)}
               onLogged={(r, isWork) => {
@@ -1467,7 +1474,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           projectTags={projectTags}
           toolTags={toolTags}
           onSubmit={({ challenge, category, values, createdAt }) => logEverywhere({ values, createdAt,
-            targets: [{ challenge_id: challenge.id, competition_id: competition.id }, ...otherTargets(challenge, category)] })}
+            targets: [{ challenge_id: challenge.id, competition_id: competition.id }, ...(otherTargets(challenge, category) || [])] })}
           onClose={() => setBackfillOpen(false)}
           onSaved={(r, isWork) => {setBackfillOpen(false);setToast(isWork ? tr('{value} nachgetragen', { value: window.formatDuration?.(r) ?? `${r}m` }) : tr('+{n} nachgetragen', { n: r }));}} />
       </Sheet>

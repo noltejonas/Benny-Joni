@@ -319,7 +319,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const renderSlide = ({ row: f }) => {
     const fmt = fmtOf(f);
     const pct = Math.min(1, f.total / Math.max(1, f.goal));
-    const also = otherTargets(f.ch, f.cat);
+    const also = otherTargets(f.ch, f.cat) || [];
     return (
       <div className={`rd-focus fc-card${f.meFinished ? ' is-done' : ''}`} aria-label={f.isObligatory ? tr('Pflicht-Challenge') : tr('Wochenziel im Fokus')}>
         <div className="rd-focus-top">
@@ -545,6 +545,9 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
     ? (perPerson ? Math.max(1, Math.round(existing.target_reps / people)) : existing.target_reps)
     : defaultAmount(selectedCat));
   const [touched, setTouched] = useState(!!existing);
+  // Bestehendes Ziel unverändert lassen, solange die Menge nicht angefasst wurde
+  // (100 bei 3 Personen würde sonst über „33 pro Person“ zu 99).
+  const [dirty, setDirty] = useState(false);
   const [nextWeek, setNextWeek] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [alsoIn, setAlsoIn] = useState([]);
@@ -556,7 +559,8 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const target = isWorkout ? 1 : perPerson ? amount * people : amount;
+  const target = isWorkout ? 1 : existing && !dirty && existing.category_id === catId ? existing.target_reps
+    : perPerson ? amount * people : amount;
   const ws = existing ? existing.week_start || weekStart : nextWeek ? PTData.addDays(weekStart, 7) : weekStart;
 
   function pick(c) {
@@ -567,7 +571,8 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
     if (pp === perPerson) return;
     setPerPerson(pp);
     try { localStorage.setItem(GOAL_INPUT_KEY, pp ? 'person' : 'total'); } catch (e) {}
-    setAmount(a => (pp ? Math.max(1, Math.round(a / people)) : a * people));
+    if (existing && !dirty) setAmount(pp ? Math.max(1, Math.round(existing.target_reps / people)) : existing.target_reps);
+    else setAmount(a => (pp ? Math.max(1, Math.round(a / people)) : a * people));
   }
 
   // Weitere Challenges: gleiche Übung (Katalog-ID bzw. gleicher Name und Einheit)
@@ -756,7 +761,7 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = true, weekStart,
         <div className="goal-workout">{tr('Pflicht-Workout: jede Person einmal pro Woche.')}</div>
       ) : (
         <div style={{ marginTop: 20 }}>
-          <ObAmount value={amount} onChange={(v) => { setTouched(true); setAmount(v); }} unit={unitLabel}
+          <ObAmount value={amount} onChange={(v) => { setTouched(true); setDirty(true); setAmount(v); }} unit={unitLabel}
             choices={choices} note={note} />
           {minutes && amount >= 60 && <div className="goal-hint" style={{ textAlign: 'center' }}>{tr('= {time}', { time: formatDuration(amount) })}</div>}
         </div>

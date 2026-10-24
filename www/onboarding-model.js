@@ -295,7 +295,7 @@
     const kindOf = (ch) => {
       const cat = catById[ch.category_id];
       if (D().isWorkoutType(cat?.challenge_type)) return 'workout';
-      return (cat?.kind || 'sports') === 'work' ? 'work' : 'reps';
+      return D().usesMinutes(cat) ? 'work' : 'reps'; // Minuten: Zeit und Work
     };
     const kinds = Object.fromEntries(week.map(ch => [ch.id, kindOf(ch)]));
     const weekSets = sets.filter(s => kinds[s.challenge_id]);

@@ -577,31 +577,39 @@
         const me = uid();
         const clean = note && String(note).trim() ? String(note).trim() : null;
         let row = null;
-        let rest = targets;
         if (values.duration_minutes == null) {
           const { data, error } = await client.rpc('log_set', {
             p_challenge: first.challenge_id, p_reps: values.reps, p_note: clean,
             p_created_at: createdAt, p_skip: skip,
           });
-          if (!error) {
-            row = data;
-            const have = new Set((check(await client.from('sets').select('challenge_id')
-              .eq('log_id', row.log_id).eq('user_id', me)) || []).map(r => r.challenge_id));
-            rest = targets.filter(t => !have.has(t.challenge_id));
-          } else if (!missingRpc(error)) throw friendlyError(error);
+          if (!error) row = data;
+          else if (!missingRpc(error)) throw friendlyError(error);
         }
         const base = { user_id: me, reps: values.reps ?? null, duration_minutes: values.duration_minutes ?? null,
           note: clean, created_at: row?.created_at || createdAt || new Date().toISOString(), log_id: row?.log_id || newLogId() };
-        const rows = rest.map((t, i) => ({
+        const rowsFor = (list, withTags) => list.map((t, i) => ({
           ...base, challenge_id: t.challenge_id, competition_id: t.competition_id,
           // Projekt und Tool (Work) nur an der Haupt-Challenge
-          ...(!row && i === 0 ? { project_tag_id: values.project_tag_id ?? null, tool_tag_id: values.tool_tag_id ?? null } : {}),
+          ...(withTags && i === 0 ? { project_tag_id: values.project_tag_id ?? null, tool_tag_id: values.tool_tag_id ?? null } : {}),
         }));
-        if (rows.length) {
-          const inserted = check(await client.from('sets').insert(rows).select());
-          if (!row) row = inserted[0];
+        if (!row) {
+          // Ohne log_set (Minuten, alte Datenbank): alles in einem Insert
+          const inserted = check(await client.from('sets').insert(rowsFor(targets, true)).select());
+          return Object.assign(normSet(inserted[0]), { missing: 0 });
         }
-        return normSet(row);
+        // Der Satz ist gespeichert. Fehlende Kopien nachtragen; scheitert das
+        // (z. B. Netz weg), nicht als „nicht gespeichert“ melden, sondern zählen.
+        let pending = null;
+        try {
+          const have = new Set((check(await client.from('sets').select('challenge_id')
+            .eq('log_id', row.log_id).eq('user_id', me)) || []).map(r => r.challenge_id));
+          pending = targets.filter(t => !have.has(t.challenge_id));
+          if (pending.length) check(await client.from('sets').insert(rowsFor(pending, false)).select('id'));
+          return Object.assign(normSet(row), { missing: 0 });
+        } catch (e) {
+          console.warn('logEverywhere: Kopien fehlen', e);
+          return Object.assign(normSet(row), { missing: pending ? pending.length : Math.max(0, targets.length - 1) });
+        }
       },
 
       // „Meine Leute“: alle, mit denen ich gerade in einer laufenden Challenge
