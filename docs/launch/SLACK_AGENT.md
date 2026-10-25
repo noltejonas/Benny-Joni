@@ -51,6 +51,11 @@ zählt), die Aktivsten, Reaktionen und abgeschlossene Wochenwertungen mit
 Medaillen. Medaillen erscheinen nur bei Personen mit Ranglisten-Zustimmung.
 Review-Testkonten („… Demo“) werden nicht hervorgehoben.
 
+Wochenupdates sowie `/neues`-Berichte und die Hilfe enthalten immer einen Link
+zur bestehenden HTML-Übersicht mit allen Nutzern und Challenges. Die Übersicht
+liegt als Claude-Artifact vor und erfordert eine Claude-Anmeldung; ihr Datenstand
+wird durch das Anhängen des Links nicht aktualisiert.
+
 ## Prüfen
 
 - Ohne gültige Slack-Signatur antwortet `slack-agent` mit 401, ohne gesetztes

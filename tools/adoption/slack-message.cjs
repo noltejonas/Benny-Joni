@@ -67,7 +67,7 @@ function render(dir, { mrkdwn = false } = {}) {
   if (busy.length) lines.push(`**Meiste Bewegung:** ${busy.join(' · ')}`);
   if (newcomers.length) lines.push(`**Neu dabei:** ${names(newcomers)}`);
   if (quiet) lines.push(`**Still:** ${n(quiet)} laufende Challenge${quiet === 1 ? '' : 's'} mit Mitspielern ohne Eintrag in 7 Tagen`);
-  lines.push('', `Dashboard: ${DASHBOARD}`);
+  lines.push('', `HTML-Übersicht mit allen Nutzern und Challenges: ${DASHBOARD}`);
 
   const text = lines.join('\n');
   if (!mrkdwn) return text;

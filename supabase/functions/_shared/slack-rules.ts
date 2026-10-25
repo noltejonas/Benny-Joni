@@ -84,6 +84,7 @@ export interface WhatsNew {
 
 const MODES: Record<string, string> = { "1v1": "1:1", "2v2": "2:2", ffa: "Jeder gegen jeden" };
 const MEDALS: Record<string, string> = { gold: "🥇", silver: "🥈", bronze: "🥉" };
+const DASHBOARD_LINK = "<https://claude.ai/artifact/TPW3gjPshgBHyasGTMmoy9|HTML-Übersicht mit allen Nutzern und Challenges>";
 
 // Slack-mrkdwn: &, <, > maskieren (Namen kommen von Nutzern).
 export const slackEscape = (s: unknown) =>
@@ -99,7 +100,6 @@ export function whatsNewText(d: WhatsNew): string {
   const nothing = !d.newUsers.length && !d.newChallenges.length && !d.joins && !d.logs && !d.reactions && !d.medals.length;
   if (nothing) {
     lines.push("Nichts Neues. Keine Anmeldungen, keine Einträge, keine Reaktionen.");
-    return lines.join("\n");
   }
   if (d.newUsers.length) lines.push(`👋 *${d.newUsers.length} neu angemeldet:* ${names(d.newUsers)}`);
   if (d.newChallenges.length) {
@@ -117,6 +117,7 @@ export function whatsNewText(d: WhatsNew): string {
     const byWeek = d.medals.map((m) => `${MEDALS[m.medal] ?? ""} ${slackEscape(m.name)} (${slackEscape(m.category)})`);
     lines.push(`🏆 *Wochenwertung abgeschlossen:* ${byWeek.slice(0, 9).join(" · ")}`);
   }
+  lines.push("", DASHBOARD_LINK);
   return lines.join("\n");
 }
 
@@ -125,4 +126,6 @@ export const HELP_TEXT = [
   "• `/neues` letzte 24 Stunden",
   "• `/neues heute`, `/neues woche` (seit Montag)",
   "• `/neues 48h`, `/neues 3 tage`, `/neues 2 wochen` (bis 90 Tage)",
+  "",
+  DASHBOARD_LINK,
 ].join("\n");
