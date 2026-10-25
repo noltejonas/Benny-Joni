@@ -1022,7 +1022,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Ohne Wochenplan: „Wie letzte Woche starten“ – die Ziele der Vorwoche als
   // Vorlage für dieselbe WeekFixCard, damit Woche 2 nicht leer beginnt. Eine
-  // angebrochene erste Woche wird auf sieben Tage hochgerechnet (stats-model.js).
+  // angebrochene erste Woche wird auf sieben Tage hochgerechnet, Vorschlag ist
+  // 10 % mehr als letzte Woche (stats-model.js).
   const prevWeekTemplate = useMemo(() => {
     if (useRotation || currentChallenges.length || !window.PTStats?.weekTemplateFromPrevious) return [];
     const prevWeek = PTData.addDays(weekStart, -7);
@@ -1031,6 +1032,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     if (!prev.length) return [];
     return PTStats.weekTemplateFromPrevious(prev, {
       fullWeekFactor: (ch) => PTStats.fullWeekFactor({ weekStart: prevWeek, startDate: competition.start_date, createdAt: ch.created_at }),
+      grow: PTStats.NEW_WEEK_GROW,
     });
   }, [useRotation, currentChallenges, weekStart, categories, allChallenges, competition.start_date]);
   const fixTemplate = weekTemplate.length ? weekTemplate : prevWeekTemplate;
@@ -1122,6 +1124,30 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   );
   const multi = dash.live.length >= 2;
   const showDashboard = tab === 'home' && multi && homeView === 'dashboard' && !!dashModel;
+  // Neue Woche auf „Heute“: Challenges ohne Ziel in dieser Woche, aber mit Zielen
+  // in der Vorwoche, bekommen dieselben Übungen als Vorschlag (NewWeekCard).
+  // Mit Wochenplan kommen Übungen und Ziele aus dem Plan in der Challenge.
+  const newWeekPlan = useMemo(() => {
+    if (!dash.bundle || !window.PTStats?.nextWeekSuggestion) return [];
+    const prevWeek = PTData.addDays(weekStart, -7);
+    return dashComps.map(x => {
+      const chs = dash.bundle.challenges.filter(ch => ch.competition_id === x.c.id);
+      if (chs.some(ch => ch.week_start === weekStart)) return null;
+      if (x.c.rotation_enabled) return { card: x, usesPlan: true, items: [] };
+      const usable = new Set(dash.bundle.categories
+        .filter(c => (c.competition_id == null || c.competition_id === x.c.id) && (c.kind || 'sports') !== 'work')
+        .map(c => c.id));
+      const seen = new Set();
+      const items = [];
+      for (const ch of chs) {
+        if (ch.week_start !== prevWeek || !usable.has(ch.category_id) || seen.has(ch.category_id)) continue;
+        seen.add(ch.category_id);
+        items.push({ category_id: ch.category_id, prev: ch.target_reps, workout: !!ch.workout,
+          factor: PTStats.fullWeekFactor({ weekStart: prevWeek, startDate: x.c.start_date, createdAt: ch.created_at }) });
+      }
+      return items.length ? { card: x, items } : null;
+    }).filter(Boolean);
+  }, [dash.bundle, dashComps, weekStart]);
   // Gruppenziel geknackt: auch im Dashboard feiern (gleiche Merker wie in der Challenge)
   const dashWeekChallenges = useMemo(
     () => (dash.bundle ? dash.bundle.challenges.filter(ch => ch.week_start === weekStart && dash.live.some(c => c.id === ch.competition_id)) : []),
@@ -1211,6 +1237,23 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   function dashOpenLog(ex) {
     const entry = ex.entries[0];
     setDashLog({ ex, entry });
+  }
+  // „Woche starten“ auf „Heute“: die Ziele in allen Challenges der Karte anlegen
+  async function startNewWeek(picks) {
+    try {
+      await Promise.all(picks.map(p => {
+        const target = p.competitionId === competition.id ? capi : api.forCompetition(p.competitionId);
+        return target.upsertChallenge({ week_start: weekStart, category_id: p.category_id, chosen_by: me, target_reps: p.target_reps });
+      }));
+      PTHaptics.tap();
+      setToast(tr("Woche fixiert – los geht's, {name}!", { name: profile.display_name.split(/\s+/)[0] }));
+      if (picks.some(p => p.competitionId === competition.id)) reload();
+    } catch (e) {
+      alert(e.message || tr('Fehler beim Speichern'));
+    } finally {
+      // Karte bleibt bis zum neuen Stand auf „Wird gesetzt…“
+      await dash.reload();
+    }
   }
   function dashOpenChallenge(id) {
     setQuickCard(null);
@@ -1590,7 +1633,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             onQuickLog={dashQuickLog}
             onOpenLog={dashOpenLog}
             onStartWorkout={dashOpenLog}
-            onAddGoal={() => setSetupForChallenge({})} />
+            onAddGoal={() => setSetupForChallenge({})}
+            newWeek={newWeekPlan} categories={dash.bundle?.categories || []} onStartWeek={startNewWeek} />
         )}
         {!showDashboard && tab === 'home' && multi && (
           <button type="button" className="db-back" onClick={() => setHomeView('dashboard')}>
@@ -1623,7 +1667,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           <WeekFixCard key={`${weekStart}-${fixFromPrev ? 'prev' : 'plan'}`}
             template={fixTemplate} categories={categories} me={me}
             title={fixFromPrev ? tr('Wie letzte Woche starten') : undefined}
-            sub={fixFromPrev ? tr('Gleiche Übungen wie letzte Woche. Ziele anpassen und los.') : undefined}
+            sub={fixFromPrev ? tr('Gleiche Übungen, 10 % mehr als letzte Woche. Ziele anpassen und los.') : undefined}
             onFix={fixWeek}
             onDismiss={() => setProposalDismissed(true)} />
         }

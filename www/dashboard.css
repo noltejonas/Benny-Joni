@@ -191,6 +191,46 @@
 }
 .db-back svg { transform: rotate(180deg); }
 
+/* Neue Woche: Vorschlag aus der Vorwoche, alle Challenges auf einmal starten */
+.nw { gap: 16px; }
+.nw-hero { gap: 18px; }
+.nw-mode {
+  display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.nw-mode button {
+  flex: 1; min-width: 0; height: 40px; border: none; border-radius: 999px;
+  background: transparent; color: #fff; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 700;
+}
+.nw-mode button.is-active { background: #fff; color: var(--focus-ink, #4338CA); }
+.nw-group { display: flex; flex-direction: column; gap: 8px; }
+.nw-group-name { margin: 0; font-size: 16px; line-height: 22px; font-weight: 700; color: var(--text); }
+.nw-row { display: flex; align-items: center; gap: 8px; padding: 12px 8px 12px 18px; }
+.nw-row.is-off .rd-row-name { color: var(--text-3); text-decoration: line-through; }
+.nw-stepper { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.nw-step {
+  width: 34px; height: 34px; border: none; border-radius: 999px;
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+  font: inherit; font-size: 18px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.nw-step:disabled { opacity: 0.35; cursor: default; }
+.nw-val {
+  width: 48px; padding: 0; border: none; background: transparent; outline: none;
+  text-align: center; color: var(--text);
+  font: inherit; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.nw-val::-webkit-outer-spin-button, .nw-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.nw-val.is-up, .nw-val:focus { color: var(--primary-ink); }
+.nw-toggle {
+  width: 32px; height: 32px; flex-shrink: 0; border: none; border-radius: 999px;
+  background: transparent; color: var(--text-3); cursor: pointer;
+  font: inherit; font-size: 18px; font-weight: 700;
+}
+.nw-cta { width: 100%; }
+
 /* Schnellansicht */
 .db-quick-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .db-quick-emoji { font-size: 36px; line-height: 1; }

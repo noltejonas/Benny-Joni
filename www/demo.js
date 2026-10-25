@@ -1112,7 +1112,10 @@
   function shiftWeek(weeks = 1) {
     for (const [table, rows] of Object.entries(db)) {
       if (!Array.isArray(rows) || table === 'categories') continue;
-      for (const row of rows) for (const k of DATE_KEYS) if (k in row) row[k] = shiftValue(row[k], -7 * weeks);
+      for (const row of rows) {
+        if (!row || typeof row !== 'object') continue; // z. B. Listen von Nutzer-IDs
+        for (const k of DATE_KEYS) if (k in row) row[k] = shiftValue(row[k], -7 * weeks);
+      }
     }
     save();
   }

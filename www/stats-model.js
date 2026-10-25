@@ -400,23 +400,38 @@
     return 7 / (7 - from);
   }
 
-  // „Wie letzte Woche starten“: dieselben Übungen mit denselben Gruppenzielen,
-  // im Format der Wochenplan-Vorlage (WeekFixCard). fullWeekFactor ist eine Zahl
-  // oder eine Funktion (ch) → Zahl; hochgerechnet wird ab 20 auf 5 gerundet,
-  // nie weniger als vorher. Pflicht-Workouts (ch.workout) bleiben unverändert.
-  function weekTemplateFromPrevious(prevChallenges, { fullWeekFactor: factorOf = 1 } = {}) {
+  // Vorschlag für die neue Woche: so viel mehr als letzte Woche.
+  const NEW_WEEK_GROW = 0.1;
+  // Ab 50 auf 5 gerundet; darunter wären 5er-Schritte zu grob (30 → 35 = +17 %).
+  const niceAmount = (v) => (v >= 50 ? Math.round(v / 5) * 5 : Math.round(v));
+
+  // Ziel der neuen Woche aus dem der Vorwoche: pro Person (people), eine
+  // angebrochene erste Woche auf sieben Tage hochgerechnet (factor), dann um
+  // grow erhöht (0.1 = +10 %, mindestens eins mehr).
+  // last = Vorwoche pro Person, per = Vorschlag pro Person, total = per × people.
+  function nextWeekSuggestion({ prev, people = 1, factor = 1, grow = 0 } = {}) {
+    const n = Math.max(1, Math.round(people) || 1);
+    const last = Math.max(1, Math.round((Number(prev) || 0) / n));
+    const f = Number.isFinite(factor) && factor > 1 ? Math.min(factor, 7) : 1;
+    const full = f > 1 ? Math.max(last, niceAmount(last * f)) : last;
+    const per = grow > 0 ? Math.max(full + 1, niceAmount(full * (1 + grow))) : full;
+    return { last, per, total: per * n };
+  }
+
+  // „Wie letzte Woche starten“: dieselben Übungen, Gruppenziele im Format der
+  // Wochenplan-Vorlage (WeekFixCard), mit prev_reps = Ziel der Vorwoche.
+  // fullWeekFactor ist eine Zahl oder eine Funktion (ch) → Zahl, grow wie bei
+  // nextWeekSuggestion. Pflicht-Workouts (ch.workout) bleiben unverändert.
+  function weekTemplateFromPrevious(prevChallenges, { fullWeekFactor: factorOf = 1, grow = 0 } = {}) {
     const seen = new Set();
     const out = [];
     for (const ch of prevChallenges || []) {
       if (!ch?.category_id || seen.has(ch.category_id)) continue;
       seen.add(ch.category_id);
       const target = Math.max(1, Math.round(Number(ch.target_reps) || 0));
-      const raw = typeof factorOf === 'function' ? factorOf(ch) : factorOf;
-      const factor = Number.isFinite(raw) && raw > 1 ? Math.min(raw, 7) : 1;
-      const scaled = target * factor;
-      const nice = scaled >= 20 ? Math.round(scaled / 5) * 5 : Math.round(scaled);
-      const base = ch.workout || factor === 1 ? target : Math.max(target, nice);
-      out.push({ category_id: ch.category_id, base_reps: base, bonus_max: 0, slot_id: `prev-${ch.category_id}` });
+      const factor = typeof factorOf === 'function' ? factorOf(ch) : factorOf;
+      const base = ch.workout ? target : nextWeekSuggestion({ prev: target, factor, grow }).per;
+      out.push({ category_id: ch.category_id, base_reps: base, prev_reps: target, bonus_max: 0, slot_id: `prev-${ch.category_id}` });
     }
     return out;
   }
@@ -424,6 +439,6 @@
   window.PTStats = {
     leaderIndex, streaks, challengeStats, cumulative, gapSeries, personalStats, intensityLevels,
     exerciseOptions, applyExerciseFilter,
-    SHARE_BASIS, sharePeople, fullWeekFactor, weekTemplateFromPrevious,
+    SHARE_BASIS, sharePeople, fullWeekFactor, weekTemplateFromPrevious, nextWeekSuggestion, NEW_WEEK_GROW,
   };
 })();

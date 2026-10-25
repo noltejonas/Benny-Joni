@@ -1,4 +1,4 @@
-/* global React, modeLabel, PTData, PTDashboard, PTPeople, Icon, MiniRing, CountUp, Sheet, SideAvatar, sideStyle, formatDuration, weekNumber, DuelCard, QuickLogRow, tr, trn, PTi18n */
+/* global React, modeLabel, PTData, PTDashboard, PTPeople, Icon, MiniRing, CountUp, Sheet, SideAvatar, sideStyle, formatDuration, weekNumber, DuelCard, QuickLogRow, tr, trn, PTi18n, PTStats */
 // „Heute“: wischbare Fokus-Karten mit Tauziehen-Balken und das Dashboard über
 // alle Challenges. Rechenlogik: www/dashboard-model.js (PTDashboard).
 
@@ -291,7 +291,140 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
   );
 }
 
-function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal }) {
+// ─── Neue Woche ─────────────────────────────────────────────────────────────
+// Erste Ansicht einer Woche ohne Ziele: dieselben Übungen wie letzte Woche,
+// vorgeschlagen mit 10 % mehr (oder genau wie letzte Woche). Werte pro Person;
+// jede Zahl lässt sich ändern, jede Übung weglassen. „Woche starten“ legt die
+// Gruppenziele (pro Person × Personen) in allen Challenges auf einmal an.
+// plan: [{ card: { c, participantCount }, usesPlan, items: [{ category_id, prev, workout, factor }] }]
+// Challenges mit Wochenplan (usesPlan) verweisen auf ihren Plan in der Challenge.
+// Plus und Minus rasten auf runde Werte ein: 33 → 35 → 40, 33 → 30.
+const nwStep = (n) => (n < 30 ? 1 : n < 100 ? 5 : 10);
+const nwUp = (v) => Math.floor(v / nwStep(v)) * nwStep(v) + nwStep(v);
+const nwDown = (v) => Math.max(1, Math.ceil(v / nwStep(v - 1)) * nwStep(v - 1) - nwStep(v - 1));
+
+function NewWeekCard({ plan, categories, weekStart, onStart, onOpenChallenge }) {
+  const [grow, setGrow] = React.useState(true);
+  const [edits, setEdits] = React.useState({});
+  const [off, setOff] = React.useState({});
+  const [busy, setBusy] = React.useState(false);
+  const catById = React.useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories]);
+  const groups = plan.map(({ card, usesPlan, items }) => ({
+    card,
+    usesPlan,
+    rows: items.map(it => {
+      const key = `${card.c.id}:${it.category_id}`;
+      const s = PTStats.nextWeekSuggestion({ prev: it.prev, people: card.participantCount, factor: it.factor,
+        grow: grow ? PTStats.NEW_WEEK_GROW : 0 });
+      const cat = catById[it.category_id];
+      return { key, it, cat, minutes: PTData.usesMinutes(cat), last: s.last, value: edits[key] ?? s.per };
+    }),
+  }));
+  const picked = groups.flatMap(g => g.rows.filter(r => !off[r.key]).map(r => ({
+    competitionId: g.card.c.id,
+    category_id: r.it.category_id,
+    target_reps: r.it.workout ? 1 : r.value * Math.max(1, g.card.participantCount),
+  })));
+
+  function pickMode(on) {
+    if (on === grow) return;
+    setGrow(on);
+    setEdits({});
+  }
+  const setValue = (key, v) => { if (Number.isFinite(v) && v >= 1) setEdits(e => ({ ...e, [key]: v })); };
+  async function start() {
+    setBusy(true);
+    try { await onStart(picked); } finally { setBusy(false); }
+  }
+
+  return (
+    <section className="rd-section nw" aria-label={tr('Neue Woche')}>
+      <div className="rd-focus nw-hero">
+        <div className="rd-focus-text">
+          <span className="rd-overline">{tr('Neue Woche')} · {tr('KW {week}', { week: weekNumber(weekStart) })}</span>
+          <h2 className="rd-focus-title">{tr('Weiter geht’s')}</h2>
+          <span className="rd-focus-sub">{tr('Dieselben Übungen wie letzte Woche. Zahlen antippen zum Ändern.')}</span>
+        </div>
+        <div className="nw-mode" role="radiogroup" aria-label={tr('Vorschlag')}>
+          <button type="button" role="radio" aria-checked={!grow} className={!grow ? 'is-active' : ''} onClick={() => pickMode(false)}>
+            {tr('Wie letzte Woche')}
+          </button>
+          <button type="button" role="radio" aria-checked={grow} className={grow ? 'is-active' : ''} onClick={() => pickMode(true)}>
+            {tr('+10 %')}
+          </button>
+        </div>
+      </div>
+
+      {groups.map(({ card, usesPlan, rows }) => usesPlan ? (
+        <div key={card.c.id} className="nw-group">
+          <div className="rd-section-head">
+            <h3 className="nw-group-name">{card.c.emoji} {card.c.name}</h3>
+          </div>
+          <ul className="rd-card rd-list">
+            <li>
+              <button type="button" className="rd-row" onClick={() => onOpenChallenge?.(card)}>
+                <span className="rd-row-text">
+                  <span className="rd-row-name">{tr('Wochenplan')}</span>
+                  <span className="rd-row-sub">{tr('Übungen und Ziele kommen aus eurem Plan.')}</span>
+                </span>
+                <Icon name="chevron" size={18} />
+              </button>
+            </li>
+          </ul>
+        </div>
+      ) : (
+        <div key={card.c.id} className="nw-group">
+          <div className="rd-section-head">
+            <h3 className="nw-group-name">{card.c.emoji} {card.c.name}</h3>
+            <span>{tr('pro Person')}</span>
+          </div>
+          <ul className="rd-card rd-list">
+            {rows.map(r => {
+              const isOff = !!off[r.key];
+              // Zeit-Übungen: Stepper in Minuten, deshalb auch die Vorwoche in Minuten
+              const sub = r.it.workout ? tr('Pflicht · einmal pro Person')
+                : r.minutes ? tr('letzte Woche {n} Min.', { n: PTi18n.number(r.last) })
+                : tr('letzte Woche {n}', { n: PTi18n.number(r.last) });
+              return (
+                <li key={r.key} className={`nw-row${isOff ? ' is-off' : ''}`}>
+                  <span className="rd-row-text">
+                    <span className="rd-row-name">{r.cat?.name || tr('Unbekannt')}</span>
+                    <span className="rd-row-sub">{isOff ? tr('diese Woche nicht dabei') : sub}</span>
+                  </span>
+                  {!r.it.workout && !isOff && (
+                    <span className="nw-stepper">
+                      <button type="button" className="nw-step" aria-label={tr('weniger')} disabled={r.value <= 1}
+                        onClick={() => setValue(r.key, nwDown(r.value))}>−</button>
+                      <input className={`nw-val${r.value > r.last ? ' is-up' : ''}`} type="number" inputMode="numeric"
+                        value={r.value} aria-label={r.cat?.name}
+                        onFocus={e => e.target.select()}
+                        onChange={e => setValue(r.key, parseInt(e.target.value, 10))} />
+                      <button type="button" className="nw-step" aria-label={tr('mehr')}
+                        onClick={() => setValue(r.key, nwUp(r.value))}>+</button>
+                    </span>
+                  )}
+                  <button type="button" className="nw-toggle" onClick={() => setOff(o => ({ ...o, [r.key]: !isOff }))}
+                    aria-label={isOff ? tr('Wieder aufnehmen') : tr('Diese Woche weglassen')}>
+                    {isOff ? '↺' : '×'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+
+      {groups.some(g => !g.usesPlan) && (
+        <button type="button" className="btn nw-cta" disabled={busy || !picked.length} onClick={start}>
+          {busy ? tr('Wird gesetzt…') : tr('Woche starten')}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal,
+  newWeek = [], categories = [], onStartWeek }) {
   const { cards, exercises, ordered } = model;
   // Erledigte Kacheln ans Ende, damit Blau und Grün nicht durcheinander wechseln
   const items = React.useMemo(() => [...exercises.filter(ex => !ex.finished), ...exercises.filter(ex => ex.finished)]
@@ -299,8 +432,13 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
   const active = items.find(e => e.key === focusKey) || items.find(e => !e.finished) || items[0];
   const finished = exercises.filter(e => e.finished).length;
 
+  const showNewWeek = newWeek.length > 0 && !!onStartWeek;
+
   return (
     <>
+      {showNewWeek && <NewWeekCard plan={newWeek} categories={categories} weekStart={weekStart} onStart={onStartWeek}
+        onOpenChallenge={onOpenChallenge} />}
+
       <section className="rd-section" aria-label={tr('Deine Challenges')}>
         <div className="rd-section-head">
           <h2>{tr('Deine Challenges')}</h2>
@@ -321,7 +459,7 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
               onLog={() => onOpenLog(ex)}
               onStart={() => onStartWorkout(ex)} />
           )} />
-      ) : (
+      ) : !showNewWeek && (
         <div className="rd-card rd-empty db-empty">
           <div className="rd-empty-title">{tr('Diese Woche ist noch offen')}</div>
           <div className="rd-empty-text">{tr('Öffne eine Challenge und leg das erste Wochenziel fest.')}</div>
