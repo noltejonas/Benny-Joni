@@ -611,6 +611,9 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
   // (100 bei 3 Personen würde sonst über „33 pro Person“ zu 99).
   const [dirty, setDirty] = useState(false);
   const [nextWeek, setNextWeek] = useState(false);
+  // Belegt: Übung hat diese Woche schon ein Ziel (beim Bearbeiten und für nächste Woche frei).
+  const isUsed = (id) => !existing && !nextWeek && usedCategoryIds.includes(id);
+  const firstFree = (skipId) => categories.find(c => c.id !== skipId && !usedCategoryIds.includes(c.id))?.id || '';
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [alsoIn, setAlsoIn] = useState([]);
   const chosenBy = existing?.chosen_by || me;
@@ -732,7 +735,7 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
     { id: 'work', label: tr('💻 Work'), items: allowWork ? categories.filter(c => c.kind === 'work') : [] },
   ];
   const card = (c) => {
-    const used = !existing && usedCategoryIds.includes(c.id) && !nextWeek;
+    const used = isUsed(c.id);
     return (
       <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
         <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} disabled={used} onClick={() => pick(c)}
