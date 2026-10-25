@@ -1,0 +1,9 @@
+Neu in 1.5.1:
+• Heute über alle Challenges: einmal eintragen, zählt in jeder Challenge mit derselben Übung
+• Fokus-Kacheln mit Schnellsatz, erledigte Übungen mit Haken am Ende
+• Tipp auf eine Challenge öffnet sie direkt
+• Rangliste mit Medaillen pro Woche
+• Eigene Farben: Palette wählen oder jede Farbe selbst festlegen
+• Neue Feier-Sounds mit mehr Bass
+• Aufgeräumter: weniger Text, Strafen pro Woche einklappbar
+• Neue Konten starten direkt ins erste Duell
