@@ -1,11 +1,13 @@
 # Android bis zum Play-Store-Upload
 
-**Stand 24.10.2026:** 1.4.1 (Code 2) ist in Produktion live. 1.5.0 (Code 4,
-mit dem Ausrichtungs-Fix der Challenge-Karten; Code 3 ist überholt) ist gebaut
-und als interner Entwurf **1.5.0 – Heute über alle Challenges** mit Changelog
-(`play-metadata/*/changelogs/4.txt`) und neuer Beschreibung hochgeladen. Das Dienstkonto darf nur Testkanäle bedienen; die Freigabe in
+**Stand 25.10.2026:** 1.4.1 (Code 2) ist in Produktion live. 1.5.1 (Code 5)
+ersetzt 1.5.0 (Code 4), das kein neues Wochenziel speichern konnte; Codes 3
+und 4 sind überholt. Code 5 liegt im internen Entwurf (Name noch **1.5.0 –
+Heute über alle Challenges**) mit Changelog (`play-metadata/*/changelogs/5.txt`).
+Hochgeladen per `fastlane run upload_to_play_store` mit den Werten der Lane,
+aber `changes_not_sent_for_review:false`. Das Dienstkonto darf nur Testkanäle bedienen; die Freigabe in
 Produktion läuft über die Play Console (Produktion → Neuen Release erstellen →
-Aus Bundle-Bibliothek hinzufügen → Code 4 → Zur Prüfung senden). Änderungen
+Aus Bundle-Bibliothek hinzufügen → Code 5 → Zur Prüfung senden). Änderungen
 gehen bei dieser App automatisch in die Prüfung; `changesNotSentForReview`
 darf deshalb nicht gesetzt sein (die Lane `internal_draft` bricht damit ab).
 
