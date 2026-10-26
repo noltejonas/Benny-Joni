@@ -69,8 +69,13 @@ eine ungültige Sitzung entfernt die Berichtsdaten aus der Ansicht. Bei einem
 Ladefehler bleibt der letzte Stand ausdrücklich als nicht aktualisiert markiert.
 
 Für die Einrichtung zuerst Migration `20261026120000_adoption_report.sql`
-anwenden und die statische Site über `legal-pages` veröffentlichen; danach
-`slack-agent` mit dem neuen Link deployen. Die bestehende Slack-Signaturprüfung
+anwenden. Die vier Dateien `uebersicht.html`, `adoption.css`, `adoption.mjs` und
+`adoption-client.mjs` aus `docs/launch/site` nach `Benny-Joni/` im bereits aktiven
+Hosting-Repository `noltejonas/noltejonas.github.io` übernehmen; dessen Pages-Build
+veröffentlicht die Übersicht. Danach `slack-agent` mit dem neuen Link deployen.
+Der separate Projekt-Workflow `legal-pages` setzt eine eigene, konfigurierte
+Projekt-Pages-Site voraus; sie ist für diesen bestehenden Hostingweg nicht nötig.
+Die bestehende Slack-Signaturprüfung
 und `verify_jwt=false` bleiben dabei erhalten. Der Wochenpost führt weiterhin
 seine vorhandene lesende DB-Abfrage aus und verlinkt dieselbe Live-Seite.
 
