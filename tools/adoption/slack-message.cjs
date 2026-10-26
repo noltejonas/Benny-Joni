@@ -14,7 +14,7 @@ function render(dir, { mrkdwn = false } = {}) {
   const k = read('kpis.json')[0];
   const users = read('users.json');
   const challenges = read('challenges.json');
-  const DASHBOARD = 'https://claude.ai/artifact/TPW3gjPshgBHyasGTMmoy9';
+  const DASHBOARD = 'https://noltejonas.github.io/Benny-Joni/uebersicht.html';
 
   const nf = new Intl.NumberFormat('de-DE');
   const n = (v) => nf.format(Number(v) || 0);
@@ -67,7 +67,7 @@ function render(dir, { mrkdwn = false } = {}) {
   if (busy.length) lines.push(`**Meiste Bewegung:** ${busy.join(' · ')}`);
   if (newcomers.length) lines.push(`**Neu dabei:** ${names(newcomers)}`);
   if (quiet) lines.push(`**Still:** ${n(quiet)} laufende Challenge${quiet === 1 ? '' : 's'} mit Mitspielern ohne Eintrag in 7 Tagen`);
-  lines.push('', `HTML-Übersicht mit allen Nutzern und Challenges: ${DASHBOARD}`);
+  lines.push('', `Live-Übersicht mit allen Nutzern und Challenges: ${DASHBOARD}`);
 
   const text = lines.join('\n');
   if (!mrkdwn) return text;

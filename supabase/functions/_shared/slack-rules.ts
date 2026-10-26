@@ -84,7 +84,7 @@ export interface WhatsNew {
 
 const MODES: Record<string, string> = { "1v1": "1:1", "2v2": "2:2", ffa: "Jeder gegen jeden" };
 const MEDALS: Record<string, string> = { gold: "🥇", silver: "🥈", bronze: "🥉" };
-const DASHBOARD_LINK = "<https://claude.ai/artifact/TPW3gjPshgBHyasGTMmoy9|HTML-Übersicht mit allen Nutzern und Challenges>";
+const DASHBOARD_LINK = "<https://noltejonas.github.io/Benny-Joni/uebersicht.html|Live-Übersicht mit allen Nutzern und Challenges>";
 
 // Slack-mrkdwn: &, <, > maskieren (Namen kommen von Nutzern).
 export const slackEscape = (s: unknown) =>

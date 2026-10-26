@@ -1,5 +1,6 @@
 # Veröffentlicht NUR docs/launch/site (Start, Datenschutz, Impressum,
-# Nutzungsbedingungen, Support) auf GitHub Pages:
+# Nutzungsbedingungen, Support und die leere, login-geschützte Live-Übersicht)
+# auf GitHub Pages. Nutzerdaten werden erst nach der Adminprüfung geladen:
 #   https://noltejonas.github.io/Benny-Joni/
 # Die App verlinkt diese Seiten über PTOnboarding.LEGAL (www/onboarding-model.js).
 # Specs und Pläne aus docs/ landen bewusst NICHT auf der Seite.

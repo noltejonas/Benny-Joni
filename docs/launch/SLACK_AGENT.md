@@ -51,10 +51,28 @@ zählt), die Aktivsten, Reaktionen und abgeschlossene Wochenwertungen mit
 Medaillen. Medaillen erscheinen nur bei Personen mit Ranglisten-Zustimmung.
 Review-Testkonten („… Demo“) werden nicht hervorgehoben.
 
-Wochenupdates sowie `/neues`-Berichte und die Hilfe enthalten immer einen Link
-zur bestehenden HTML-Übersicht mit allen Nutzern und Challenges. Die Übersicht
-liegt als Claude-Artifact vor und erfordert eine Claude-Anmeldung; ihr Datenstand
-wird durch das Anhängen des Links nicht aktualisiert.
+Wochenupdates sowie `/neues`-Berichte und die Hilfe enthalten immer denselben
+Link zur [Live-Übersicht](https://noltejonas.github.io/Benny-Joni/uebersicht.html).
+Sie lädt beim Öffnen, bei Rückkehr in den Tab und alle 60 Sekunden im sichtbaren
+Tab die aktuellen Nutzer, Challenges, Kennzahlen und Wochenverläufe aus Supabase.
+Damit sind keine gespeicherten HTML-Kopien oder manuellen Artifact-Updates nötig.
+
+Anmeldung mit dem bestehenden Benny-&-Joni-App-Konto. Die SQL-Funktion
+`adoption_report()` prüft bei jedem Abruf die bestehende Rolle `ranking_admins`
+(Benny/Jonas). Anonyme und normale App-Konten erhalten keinen Bericht. Auf
+GitHub Pages liegen nur die Oberfläche und der bereits öffentliche anon-Key;
+keine Berichte, Nutzerlisten, Passwörter oder Service-Schlüssel.
+
+Anmeldung und Bericht bleiben ausschließlich im Arbeitsspeicher des Tabs.
+Beim Schließen/Neuladen ist eine erneute Anmeldung erforderlich. Abmelden oder
+eine ungültige Sitzung entfernt die Berichtsdaten aus der Ansicht. Bei einem
+Ladefehler bleibt der letzte Stand ausdrücklich als nicht aktualisiert markiert.
+
+Für die Einrichtung zuerst Migration `20261026120000_adoption_report.sql`
+anwenden und die statische Site über `legal-pages` veröffentlichen; danach
+`slack-agent` mit dem neuen Link deployen. Die bestehende Slack-Signaturprüfung
+und `verify_jwt=false` bleiben dabei erhalten. Der Wochenpost führt weiterhin
+seine vorhandene lesende DB-Abfrage aus und verlinkt dieselbe Live-Seite.
 
 ## Prüfen
 
