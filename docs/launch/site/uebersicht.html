@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://jczyyupxxqrdgbeifcwe.supabase.co; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'" />
+  <meta name="description" content="Geschützte Live-Übersicht für Benny &amp; Joni." />
+  <title>Live-Übersicht · Benny &amp; Joni</title>
+  <link rel="stylesheet" href="adoption.css" />
+  <script type="module" src="adoption.mjs"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">BJ</span>Benny &amp; Joni</a>
+      <div id="sessionActions" class="session-actions" hidden>
+        <span class="access-label">Admin-Ansicht</span>
+        <button id="logoutButton" class="button subtle" type="button">Abmelden</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="pageTitle">
+        <div>
+          <p class="eyebrow">Die App im Überblick</p>
+          <h1 id="pageTitle">Nutzer &amp; Challenges.</h1>
+          <p class="lead">Aktuelle Zahlen. Alle Nutzer. Jede Challenge.</p>
+        </div>
+        <span id="liveIndicator" class="live-indicator" hidden><span aria-hidden="true"></span>Live-Daten</span>
+      </section>
+
+      <section id="loginPanel" class="login-panel card" aria-labelledby="loginTitle">
+        <div class="login-copy">
+          <span class="section-index" aria-hidden="true">01 / Zugang</span>
+          <h2 id="loginTitle">Willkommen zurück.</h2>
+          <p>Melde dich mit deinem bestehenden Benny-&amp;-Joni-App-Konto an. Diese Übersicht ist für Admins freigegeben.</p>
+          <p class="fine-print">Die Daten werden nach der Anmeldung direkt aus der App geladen.</p>
+        </div>
+        <form id="loginForm" class="login-form" method="post" action="#">
+          <label for="email">E-Mail-Adresse</label>
+          <input id="email" type="email" autocomplete="username" inputmode="email" required />
+          <label for="password">Passwort</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+          <button id="loginButton" class="button primary" type="submit" disabled>Anmelden</button>
+          <p id="loginStatus" class="form-status" role="status" aria-live="polite"></p>
+          <noscript><p>Bitte aktiviere JavaScript, um dich anzumelden und die aktuellen Daten zu sehen.</p></noscript>
+        </form>
+      </section>
+
+      <section id="dashboard" aria-label="Aktueller App-Bericht" hidden>
+        <div class="report-toolbar">
+          <div>
+            <p id="reportStatus" class="report-status" role="status" aria-live="polite">Daten werden geladen …</p>
+            <p class="refresh-hint">Aktualisiert sich jede Minute, solange diese Seite geöffnet ist.</p>
+          </div>
+          <button id="refreshButton" class="button" type="button">Aktualisieren</button>
+        </div>
+        <p id="reportError" class="error-banner" role="alert" hidden></p>
+
+        <div class="metrics" aria-label="Kennzahlen">
+          <article class="metric card"><p>Nutzer insgesamt</p><strong id="metricUsers">—</strong><span id="metricSignups">—</span></article>
+          <article class="metric card"><p>Aktiv in 7 Tagen</p><strong id="metricActive">—</strong><span>Personen mit einem Eintrag</span></article>
+          <article class="metric card"><p>Einträge in 7 Tagen</p><strong id="metricLogs">—</strong><span id="metricLogsTotal">—</span></article>
+          <article class="metric card"><p>Laufende Challenges</p><strong id="metricChallenges">—</strong><span id="metricChallengers">—</span></article>
+        </div>
+
+        <section class="directory card" aria-labelledby="directoryTitle">
+          <div class="directory-heading">
+            <div><p class="eyebrow">Alle im Blick</p><h2 id="directoryTitle">Das passiert in der App.</h2></div>
+            <p id="resultCount" class="result-count" aria-live="polite"></p>
+          </div>
+          <div class="directory-controls">
+            <div class="tabs" role="tablist" aria-label="Übersicht auswählen">
+              <button id="usersTab" role="tab" type="button" aria-selected="true" aria-controls="usersPanel">Nutzer</button>
+              <button id="challengesTab" role="tab" type="button" aria-selected="false" aria-controls="challengesPanel" tabindex="-1">Challenges</button>
+            </div>
+            <div class="search-control"><label class="sr-only" for="search">Nutzer oder Challenges suchen</label><input id="search" type="search" placeholder="Name oder Challenge suchen …" autocomplete="off" /></div>
+            <div id="challengeFilterControl" hidden><label class="sr-only" for="challengeFilter">Challenge-Status</label><select id="challengeFilter"><option value="all">Alle Challenges</option><option value="active">Nur laufende</option><option value="archived">Nur archivierte</option></select></div>
+          </div>
+
+          <div id="usersPanel" role="tabpanel" aria-labelledby="usersTab" tabindex="0">
+            <div class="table-scroll"><table><caption class="sr-only">Alle Nutzer der App</caption><thead><tr><th scope="col">Nutzer</th><th scope="col">Dabei seit</th><th scope="col" class="numeric">Einträge · 7 Tage</th><th scope="col">Challenges</th><th scope="col">Zuletzt aktiv</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+          </div>
+          <div id="challengesPanel" role="tabpanel" aria-labelledby="challengesTab" tabindex="0" hidden>
+            <div class="table-scroll"><table><caption class="sr-only">Alle Challenges der App</caption><thead><tr><th scope="col">Challenge</th><th scope="col">Status</th><th scope="col">Mitspieler</th><th scope="col" class="numeric">Einträge · 7 Tage</th><th scope="col">Zuletzt aktiv</th></tr></thead><tbody id="challengesBody"></tbody></table></div>
+          </div>
+          <p id="emptyResults" class="empty-results" hidden>Keine passenden Einträge gefunden.</p>
+        </section>
+
+        <details id="history" class="history card">
+          <summary>Wochenverlauf<span>Registrierungen, Aktivität und Einträge</span></summary>
+          <div class="table-scroll"><table><caption class="sr-only">Verlauf nach Kalenderwochen</caption><thead><tr><th scope="col">Woche ab</th><th scope="col" class="numeric">Neue Nutzer</th><th scope="col" class="numeric">Aktive Nutzer</th><th scope="col" class="numeric">Einträge</th><th scope="col" class="numeric">Neue Challenges</th></tr></thead><tbody id="weeksBody"></tbody></table></div>
+        </details>
+      </section>
+    </main>
+
+    <footer><span>Benny &amp; Joni · Live-Übersicht</span><nav aria-label="Rechtliches"><a href="datenschutz.html">Datenschutz</a><a href="impressum.html">Impressum</a><a href="support.html">Support</a></nav></footer>
+  </div>
+</body>
+</html>

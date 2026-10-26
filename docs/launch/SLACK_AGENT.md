@@ -51,6 +51,34 @@ zählt), die Aktivsten, Reaktionen und abgeschlossene Wochenwertungen mit
 Medaillen. Medaillen erscheinen nur bei Personen mit Ranglisten-Zustimmung.
 Review-Testkonten („… Demo“) werden nicht hervorgehoben.
 
+Wochenupdates sowie `/neues`-Berichte und die Hilfe enthalten immer denselben
+Link zur [Live-Übersicht](https://noltejonas.github.io/Benny-Joni/uebersicht.html).
+Sie lädt beim Öffnen, bei Rückkehr in den Tab und alle 60 Sekunden im sichtbaren
+Tab die aktuellen Nutzer, Challenges, Kennzahlen und Wochenverläufe aus Supabase.
+Damit sind keine gespeicherten HTML-Kopien oder manuellen Artifact-Updates nötig.
+
+Anmeldung mit dem bestehenden Benny-&-Joni-App-Konto. Die SQL-Funktion
+`adoption_report()` prüft bei jedem Abruf die bestehende Rolle `ranking_admins`
+(Benny/Jonas). Anonyme und normale App-Konten erhalten keinen Bericht. Auf
+GitHub Pages liegen nur die Oberfläche und der bereits öffentliche anon-Key;
+keine Berichte, Nutzerlisten, Passwörter oder Service-Schlüssel.
+
+Anmeldung und Bericht bleiben ausschließlich im Arbeitsspeicher des Tabs.
+Beim Schließen/Neuladen ist eine erneute Anmeldung erforderlich. Abmelden oder
+eine ungültige Sitzung entfernt die Berichtsdaten aus der Ansicht. Bei einem
+Ladefehler bleibt der letzte Stand ausdrücklich als nicht aktualisiert markiert.
+
+Für die Einrichtung zuerst Migration `20261026120000_adoption_report.sql`
+anwenden. Die vier Dateien `uebersicht.html`, `adoption.css`, `adoption.mjs` und
+`adoption-client.mjs` aus `docs/launch/site` nach `Benny-Joni/` im bereits aktiven
+Hosting-Repository `noltejonas/noltejonas.github.io` übernehmen; dessen Pages-Build
+veröffentlicht die Übersicht. Danach `slack-agent` mit dem neuen Link deployen.
+Der separate Projekt-Workflow `legal-pages` setzt eine eigene, konfigurierte
+Projekt-Pages-Site voraus; sie ist für diesen bestehenden Hostingweg nicht nötig.
+Die bestehende Slack-Signaturprüfung
+und `verify_jwt=false` bleiben dabei erhalten. Der Wochenpost führt weiterhin
+seine vorhandene lesende DB-Abfrage aus und verlinkt dieselbe Live-Seite.
+
 ## Prüfen
 
 - Ohne gültige Slack-Signatur antwortet `slack-agent` mit 401, ohne gesetztes
