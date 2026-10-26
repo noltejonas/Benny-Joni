@@ -258,7 +258,7 @@ test('weekTemplateFromPrevious: angebrochene Woche auf 7 Tage hochrechnen, Worko
   ];
   P.annotateWorkouts([], prev, cats);
   const t = S.weekTemplateFromPrevious(prev, { fullWeekFactor: 7 / 4 });
-  // 60 · 7/4 = 105; 7 · 7/4 = 12,25 → 12 (unter 20 nicht auf 5 gerundet); Tom Holland bleibt
+  // 60 · 7/4 = 105; 7 · 7/4 = 12,25 → 12 (unter 50 nicht auf 5 gerundet); Tom Holland bleibt
   assert.deepEqual([...t.map(x => x.base_reps)], [105, 12, 1]);
   // Faktor pro Ziel, höchstens 7-fach; 7 · 1,1 = 7,7 → 8
   const perCh = S.weekTemplateFromPrevious(prev, { fullWeekFactor: (ch) => (ch.id === 'w1' ? 100 : 1.1) });
@@ -266,4 +266,24 @@ test('weekTemplateFromPrevious: angebrochene Woche auf 7 Tage hochrechnen, Worko
   // Faktor ≤ 1 oder ungültig ändert nichts
   const same = S.weekTemplateFromPrevious(prev, { fullWeekFactor: () => NaN });
   assert.deepEqual([...same.map(x => x.base_reps)], [60, 7, 1]);
+});
+
+test('nextWeekSuggestion: pro Person, +10 % schön gerundet, mindestens eins mehr', () => {
+  // 150 für 2 Personen → 75 pro Person, +10 % = 82,5 → 85
+  assert.deepEqual({ ...S.nextWeekSuggestion({ prev: 150, people: 2, grow: 0.1 }) }, { last: 75, per: 85, total: 170 });
+  // 60 → 66 → 65; 100 → 110; 30 → 33 (unter 50 genau); 10 → 11; 5 → 5,5 → 6; 1 → 1,1 → mindestens 2
+  assert.deepEqual([60, 100, 30, 10, 5, 1].map(prev => S.nextWeekSuggestion({ prev, grow: 0.1 }).per), [65, 110, 33, 11, 6, 2]);
+  // ohne grow bleibt es gleich; angebrochene Woche erst hochrechnen, dann +10 %
+  assert.equal(S.nextWeekSuggestion({ prev: 60, people: 2 }).per, 30);
+  assert.equal(S.nextWeekSuggestion({ prev: 60, factor: 7 / 4, grow: 0.1 }).per, 115);
+});
+
+test('weekTemplateFromPrevious: grow schlägt mehr vor, Workouts bleiben, prev_reps bleibt die Vorwoche', () => {
+  const prev = [
+    { id: 'w1', category_id: 'push', week_start: LAST_WEEK, target_reps: 200 },
+    { id: 'w1th', category_id: 'th', week_start: LAST_WEEK, target_reps: 1 },
+  ];
+  P.annotateWorkouts([], prev, cats);
+  const t = S.weekTemplateFromPrevious(prev, { grow: S.NEW_WEEK_GROW });
+  assert.deepEqual([...t.map(x => [x.base_reps, x.prev_reps])], [[220, 200], [1, 1]]);
 });
