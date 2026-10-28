@@ -1,8 +1,14 @@
 # Release mit Fastlane
 
-## Vorbereitetes Update: eigene Übungen, Workout-Häufigkeit und Arschkicks
+## Update 1.5.2: eigene Übungen, Workout-Häufigkeit und Arschkicks
 
-Quellstand vom 28. Oktober 2026; noch nicht produktiv ausgeliefert:
+Stand 28. Oktober 2026: Der Backend-Rollout ist abgeschlossen. Die nativen
+Artefakte aus Quellstand `94e8a8406d85c73705d57deebe4ec955680762b5`
+(`94e8a84`) sind gebaut und geprüft: iOS **1.5.2 (31)** und Android
+**1.5.2 (Version Code 6)**. Apple ist zur Prüfung eingereicht. Bei Google
+ist der interne Entwurf gespeichert; die Produktion wurde noch nicht
+eingereicht. Die Anmeldung in der geöffneten Play Console im In-App-Browser
+steht aus. Eine Veröffentlichung dieses Updates ist noch nicht bestätigt.
 
 - Eigene Übung eingeben und unten „Speichern“ legt diese Übung an und verwendet
   ihre ID. Eine zuvor ausgewählte Katalogübung wird dabei nicht mehr übernommen.
@@ -22,54 +28,119 @@ Quellstand vom 28. Oktober 2026; noch nicht produktiv ausgeliefert:
   ist 22–7 Uhr Berlin. Unklare Versandfehler belegen den Tagesplatz weiter,
   um doppelte Benachrichtigungen zu verhindern. Die Zustellung nutzt wie
   bestehende Pushes APNs/iOS; Android/Web haben noch keine Push-Zustellung.
+- Finnisch und Schwedisch sind in beiden App-Artefakten enthalten,
+  einschließlich Sprachauswahl, Standardübungen und nativer iOS-Rückfragen.
+  Die Store-Listings bleiben auf Deutsch und Englisch.
 
-Vor einem App-Update diese beiden additiven Migrationen mit dem etablierten
-Migrationsverfahren einspielen:
+### Bestätigter Store-Stand für 1.5.2
+
+- **Apple 1.5.2 (31):** Build-Verarbeitung `VALID`; Version und
+  ReviewSubmission `WAITING_FOR_REVIEW`. Eingereicht am
+  `2026-10-28T21:25:21Z`, Submission-ID
+  `fe58f77f-6768-4518-a262-6e38d07d4cbb`, mit genau einem Submission-Item.
+  Release-Typ **`AFTER_APPROVAL`**: Veröffentlichung nach Apples Freigabe.
+  Eine Freigabe oder Veröffentlichung ist noch nicht bestätigt.
+  Beleg: `.local/release/update-20261028/apple/submit-result.json`.
+- **Google Play 1.5.2 (Code 6):** Der interne Entwurf ist erfolgreich
+  committed; das geprüfte Bundle steht in der globalen Bundle-Bibliothek.
+  In der Console ist ein Produktionsentwurf angelegt, dem noch kein Bundle
+  und keine Neuerungen zugeordnet sind. **Die Produktionseinreichung ist
+  nicht erfolgt.** Das API-Servicekonto erhält für Produktion HTTP 403.
+  Die native Computersteuerung übernimmt die Eingaben nicht zuverlässig.
+  Die Play Console ist deshalb im In-App-Browser geöffnet; die Anmeldung
+  durch den Nutzer steht aus. Danach bleibt die Zuordnung von Code 6 und
+  Neuerungen sowie die abschließende Einreichung über die Console zu erledigen.
+  Beleg für den gültigen internen Entwurf:
+  `.local/release/update-20261028/android/play-fresh-internal-verified.json`.
+
+### Produktiv angewendete Migrationen und Functions
+
+Diese drei additiven Migrationen sind im Supabase-Projekt
+`jczyyupxxqrdgbeifcwe` jeweils transaktional angewendet und in
+`supabase_migrations.schema_migrations` registriert:
 
 1. `supabase/migrations/20261028010000_teammate_kicks.sql`
 2. `supabase/migrations/20261028210000_workout_target_runs.sql`
+3. `supabase/migrations/20261028220000_workout_closure_client_guard.sql`
 
-Danach die neue Function deployen:
+Der letzte Schritt schützt die lokal berechneten Wochenabschlüsse:
+`week_closures.workout_targets_version` hat für vorhandene und alte Clients
+Standardwert 1. Ein alter Client darf eine Woche mit `target_runs > 1`
+nicht abschließen (`P0001`, `workout_update_required`). Beide Einfügepfade
+des neuen Clients senden Version 2. Bestehende Abschlüsse bleiben erhalten.
 
-```bash
-npx supabase functions deploy kick-teammate --no-verify-jwt --project-ref jczyyupxxqrdgbeifcwe
-```
+Deployt und als `ACTIVE` zurückgelesen sind **`notify-set` Version 15**,
+**`ranking-push` Version 9** und **`kick-teammate` Version 1**. Alle drei
+verwenden wie vorgesehen `verify_jwt = false` und authentisieren im Handler.
+Der Kick-Endpunkt prüft den Bearer-Token mit `auth.getUser`; seine
+Reservierungs-/Zustell-RPCs sind nur für `service_role` ausführbar.
+Die heruntergeladenen produktiven Quelldateien stimmen bytegenau mit dem
+Deployment-Stand überein. Unauthentisierte POSTs werden mit 401 und
+nicht unterstützte GETs mit 405 abgewiesen.
 
-Der Endpunkt verifiziert den Bearer-Token selbst über `auth.getUser`; die
-Reservierungs-/Zustell-RPCs sind ausschließlich für `service_role` freigegeben.
-Er verwendet die vorhandenen APNs-Secrets. Für die zugleich vorbereiteten
-finnischen/schwedischen Texte auch `notify-set`, `daily-nudge` und `ranking-push`
-aus diesem Quellstand deployen. Erst danach native App-Builds erstellen und
-das Update in den Stores einreichen. Bislang keine Migration angewendet,
-keine neue Function deployt und keine echte Arschkick-Mitteilung gesendet.
+Die vorhandenen Secrets und übrigen Functions sind unverändert; insbesondere
+bleibt `slack-agent` Version 5 erhalten. `daily-nudge` war produktiv nicht
+vorhanden und wurde nicht neu eingeführt. Es wurden keine Cronjobs angelegt,
+keine echten Mitteilungen versendet und keine Ranking-Jobs ausgeführt.
+`ads_enabled = false`, Profil-RLS und die bestehenden Kick-RPC-Rechte sind
+unverändert bestätigt. Belege:
+`.local/release/update-20261028/backend/summary.json`, `source-equality.json`,
+`safe-probes.json` und `closure-guard-summary.json`.
 
-Prüfbelege liegen lokal unter `.local/qa/update-custom-workouts-kicks/`:
-Regressionstests führen die tatsächlichen SetupSheet-/Push-Handler aus;
+### Prüfungen und native Artefakte
+
+Der integrierte Quellstand besteht **302 Tests**, ohne Fehler, mit einem
+vorgesehenen Release-Skip. Darin bestehen alle **38 Push-Tests** einschließlich
+finnischer/schwedischer Texte und der Erfüllung mehrerer Pflicht-Durchgänge.
+Web-Build, native Synchronisierung und die drei Übersetzungsprüfungen sind
+bestanden. Belege: `.local/release/update-20261028/integrated-tests.txt`
+und `native-sync.txt`; die vorherige gezielte Funktions-QA liegt unter
+`.local/qa/update-custom-workouts-kicks/`.
+
+Die Kick- und Workout-Migrationen wurden zweimal mit 19 erfolgreichen
+SQL-Prüfungen in isoliertem PostgreSQL 18.6/PGlite ausgeführt. Der
+Abschluss-Guard besteht weitere 11 SQL-Prüfungen: alter Client bei einem
+Durchgang erlaubt, bei drei Durchgängen abgewiesen, keine falsche Zeile
+angelegt, Version 2 erlaubt sowie Trigger-Reihenfolge und Berechtigungen
+geprüft. Echte parallele Datenbankverbindungen sind damit nicht geprüft.
 Browser-QA bestätigt Custom-Speichern, Sally-Ziel 3 → Fortschritt 2/3,
-Neustart mit erhaltenem Empfangs-Opt-out und lokalen Demo-Kick. Beide exakten
-Migrationen wurden zweimal in einer isolierten PostgreSQL-18.6-PGlite-Datenbank
-ausgeführt; 19 SQL-Prüfungen bestehen. Echte parallele Datenbankverbindungen
-sind damit nicht geprüft. Abschließende Testsuite: 268 bestanden, ein
-vorgesehener Release-Skip; alle drei Übersetzungsprüfungen und der Web-Build
-sind erfolgreich.
+Neustart mit erhaltenem Empfangs-Opt-out und lokalen Demo-Kick.
 
-## Ländererweiterung und bisheriger Release
+| Artefakt | SHA-256 |
+|---|---|
+| `ios/App/build/fastlane/BennyJoni-1.5.2-31.ipa` | `2fd1be37a0b5e72d83ea3f534ffa5d41fafcb111e0dca8735b4039fea8a0c449` |
+| `.local/release/update-20261028/android/BennyJoni-1.5.2-6.aab` | `5c70640ae4ad993db24b9004a7a1d71ccf8c6da7c0813b8e4956f427f0f694dd` |
+| `.local/release/update-20261028/android/BennyJoni-1.5.2-6.apk` | `e8ca42a84dbea9538b2ef2d74f4b5f8c15076a060dc7a3bb0a99cf01992fa14e` |
 
-**Aktualisierung 28. Oktober 2026:** Die bestehende Version 1.4.1 ist bereits
-veröffentlicht. Finnland und Schweden sind bei Apple zusätzlich verfügbar
-(abschließender Readback: `AVAILABLE`); die entsprechende Google-Play-
-Länderänderung befindet sich in der Vorprüfung/Prüfung. Details und Belege
-stehen im aktuellen Abschnitt von [STORE_LISTING.md](STORE_LISTING.md).
-Finnische und schwedische App-Texte sind im Quellstand fertig und getestet,
-aber noch nicht als neues Store-Update ausgeliefert. Die folgenden
-Review-/Launch-Angaben dokumentieren den historischen Stand vom 21. Oktober.
+Die IPA enthält Build 31, `de/en/fi/sv` und alle vier nativen
+Berechtigungstexte. Ihre Web-Dateien stimmen bytegenau mit dem Build überein.
+Für Android sind Version Code 6, Paketname und Upload-Signatur bestätigt;
+alle 93 gepackten Web-Dateien stimmen bytegenau mit `dist/` überein.
+Belege: `.local/release/update-20261028/apple/artifact-verification.json`
+und `.local/release/update-20261028/android/artifact-verification.json`.
+
+## Ländererweiterung am 28. Oktober 2026
+
+Die vor diesem Update veröffentlichte iOS-Version ist **1.5.1 (30)**.
+Finnland und Schweden sind bei Apple zusätzlich verfügbar (abschließender
+Readback: `AVAILABLE`); die getrennte Google-Play-Länderänderung wurde zur
+Prüfung gesendet. Die zugehörigen Belege liegen unter
+`.local/release/nordic-availability-20261028/`. Der bestätigte
+Einreichungsstand von 1.5.2 steht oben; Google-Produktion wird nach der
+ausstehenden Anmeldung und tatsächlichen Einreichung ergänzt.
+
+## Historischer Launch-Stand vom 21. Oktober 2026
+
+Die folgenden Angaben dokumentieren den damaligen Release 1.4.1 sowie
+seine Prüf- und Gerätebelege. Sie sind keine aktuellen Statusangaben für
+Version 1.5.2.
 
 Stand 21. Oktober 2026: **Beide Stores sind zur Prüfung eingereicht.**
 Google-Review läuft; keine Freigabe oder Veröffentlichung.
 Der Ablauf für weitere Uploads steht in
 [FASTLANE_STORES.md](FASTLANE_STORES.md).
 
-## Bestätigter Store-Stand
+### Bestätigter Store-Stand am 21. Oktober 2026
 
 - Apple **1.4.1 (26)**: Verarbeitung `VALID`, Build 26 ausgewählt,
   Version und ReviewSubmission **`WAITING_FOR_REVIEW`**, Release-Typ
@@ -91,7 +162,7 @@ Der Ablauf für weitere Uploads steht in
   Vorschau: null Fehler, zwei Warnungen (native Symbole/R8-Mapping).
   Beleg: `.local/qa/google-submission-vcode2-20261021/status.json`.
 
-## Werbefreier Launch und geprüfte Artefakte
+### Werbefreier Launch und geprüfte Artefakte vom 21. Oktober 2026
 
 `public.app_release_settings.id = 1` steht produktiv auf
 `ads_enabled = false`; die Migration ist angewendet und registriert.
@@ -114,7 +185,7 @@ Der Gate-Quellstand besteht 234 Tests und einen erwarteten Release-Skip;
 beide produktiven ID-Prüfungen bestehen je 34 Tests. Beide strikten
 Store-Bereitschaftschecks einschließlich Screenshots sind bestanden.
 
-## Tatsächliche Geräte- und Werbetests
+### Tatsächliche Geräte- und Werbetests vom 21. Oktober 2026
 
 - Originales Android-Paket **Code 2**: authentisierter Kaltstart,
   Heute/Feed/Stats, Hintergrund/Vordergrund und Einstellungen bestanden.

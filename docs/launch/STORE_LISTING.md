@@ -1,32 +1,58 @@
 # Store-Unterlagen für Benny & Joni
 
-## Ländererweiterung vom 28. Oktober 2026
+## Update und Ländererweiterung vom 28. Oktober 2026
 
-Die aktuelle Store-Version ist 1.4.1 (iOS Build 26, Android Code 2).
-Die älteren DACH- und Review-Angaben weiter unten beschreiben den Launch-Stand
-vom 21. Oktober und werden durch diesen Abschnitt ergänzt:
+Die zuvor veröffentlichte iOS-Version ist **1.5.1 (30)**. Das neue Update
+**1.5.2** ist aus Quellstand `94e8a84` gebaut und geprüft:
+
+- **Apple 1.5.2 (31):** Build `VALID`, Version und ReviewSubmission
+  `WAITING_FOR_REVIEW`. Eingereicht am `2026-10-28T21:25:21Z`, Submission-ID
+  `fe58f77f-6768-4518-a262-6e38d07d4cbb`, genau ein Submission-Item.
+  Release-Typ `AFTER_APPROVAL`; noch keine bestätigte Freigabe oder
+  Veröffentlichung. Beleg:
+  `.local/release/update-20261028/apple/submit-result.json`.
+- **Google Play 1.5.2 (Code 6):** Interner Entwurf erfolgreich committed,
+  Bundle in der globalen Bundle-Bibliothek vorhanden. Der Produktionsentwurf
+  ist in der Console angelegt, hat aber noch kein zugeordnetes Bundle und
+  keine Neuerungen. **Die Produktionseinreichung ist nicht erfolgt.**
+  Das API-Servicekonto erhält für Produktion HTTP 403; die native
+  Computersteuerung übernimmt Eingaben nicht zuverlässig. Die Play Console
+  ist im In-App-Browser geöffnet, die Anmeldung durch den Nutzer steht aus.
+  Anschließend müssen Code 6 und die Neuerungen zugeordnet und die
+  Produktion tatsächlich zur Prüfung gesendet werden. Beleg für den
+  gültigen internen Entwurf:
+  `.local/release/update-20261028/android/play-fresh-internal-verified.json`.
+
+Die getrennte Ländererweiterung wurde zuvor am selben Tag bearbeitet:
 
 - Apple: Finnland (`FIN`) und Schweden (`SWE`) zusätzlich zu Deutschland,
   Österreich und Schweiz aktiviert. API-Readback bestätigt genau diese fünf
   verfügbaren Länder. Der abschließende Readback meldet für beide neuen
   Länder `AVAILABLE`; die Freigabe ist verarbeitet.
-- Google Play: Die Veröffentlichungsübersicht zeigt unter „Changes in review“
-  ausschließlich die Länderänderung „Add 2 countries / regions: Finland,
-  Sweden“. Die automatischen Vorprüfungen laufen. Managed Publishing ist
-  aktuell ausgeschaltet; nach Googles Freigabe kann die Länderänderung
-  veröffentlicht werden.
+- Google Play: Bei der Ländererweiterung zeigte die Veröffentlichungsübersicht
+  unter „Changes in review“ die Änderung „Add 2 countries / regions: Finland,
+  Sweden“. Managed Publishing war dabei ausgeschaltet; der Länderstatus
+  wird beim abschließenden Google-Readback nach der noch ausstehenden
+  Produktionseinreichung erneut geprüft.
 - Belege: `.local/release/nordic-availability-20261028/apple-latest.json` und
-  `google-in-review.png`. Es wurde dafür kein neuer App-Build hochgeladen.
+  `google-in-review.png`. Für die reine Ländererweiterung wurde kein neuer
+  App-Build benötigt; das oben beschriebene 1.5.2 enthält die Übersetzungen.
 
-Finnisch und Schwedisch sind zusätzlich vollständig im App-Quellstand
-vorbereitet (je 912 Wörterbucheinträge, native iOS-Sprachangaben und Push-Texte).
-Sie benötigen ein neues App-Update; die vorhandenen Store-Listings bleiben
-Deutsch und Englisch. Für produktive Mitteilungen müssen zusätzlich
-`notify-set`, `daily-nudge` und `ranking-push` neu deployt werden.
-Die vollständige Testsuite besteht mit 240 erfolgreichen Tests und einem
-vorgesehenen Release-Skip. Build und Übersetzungsprüfungen bestehen;
-beide Sprachen sind in der lokalen App umschaltbar und bei 320 Pixeln Breite
+Finnisch und Schwedisch sind in beiden geprüften App-Artefakten enthalten:
+je **1059 Wörterbucheinträge**, native iOS-Sprachangaben und Push-Texte.
+Die Übersetzungsprüfung bestätigt für beide Sprachen **1386 Aufrufe,
+alles übersetzt**. Die Store-Listings bleiben Deutsch und Englisch.
+`notify-set` Version 15, `ranking-push` Version 9 und `kick-teammate`
+Version 1 sind produktiv deployt und bytegenau zurückgelesen.
+`daily-nudge` ist im Quellstand übersetzt, produktiv aber nicht eingerichtet
+oder deployt; es wurden keine neuen Erinnerungs-Cronjobs angelegt.
+
+Die integrierte Testsuite besteht mit 302 erfolgreichen Tests und einem
+vorgesehenen Release-Skip; Web-Build und native Synchronisierung bestehen.
+Beide Sprachen sind in der lokalen App umschaltbar und bei 320 Pixeln Breite
 ohne Seitenüberlauf oder überlaufende Navigationsbuttons geprüft.
+Artefakt-Hashes, Backend-Rollout und Prüfbelege stehen in
+[RELEASE.md](RELEASE.md).
 
 ## Bestehende Store-Unterlagen
 
@@ -34,6 +60,11 @@ Die aktuellen Texte stehen maschinenlesbar unter
 `ios/App/fastlane/metadata/` (App Store) und `play-metadata/` (Google Play).
 Beide Stores erhalten Deutsch (`de-DE`) und Englisch (`en-GB`). Ändert Texte
 in diesen Dateien und prüft sie danach mit `node tools/check-store.cjs`.
+
+### Historische Einreichung vom 21. Oktober 2026
+
+Die folgenden Angaben zu 1.4.1 dokumentieren den damaligen Launch-Stand.
+Der aktuelle Update-Status steht oben.
 
 Am 21. Oktober 2026 wurden die Apple-Metadaten für Version **1.4.1** mit
 `tools/fastlane.sh ios store_metadata` hochgeladen und anschließend direkt
