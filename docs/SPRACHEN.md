@@ -3,16 +3,16 @@
 Der Quellstand unterstützt Deutsch, Englisch, Finnisch (`fi`, Suomi) und
 Schwedisch (`sv`, Svenska). Finnisch und Schwedisch wurden am 28. Oktober 2026
 ergänzt. Sie sind in den geprüften Artefakten **1.5.2** (iOS Build 31,
-Android Version Code 6, Quellstand `94e8a84`) enthalten. Apple bestätigt
-für 1.5.2 `WAITING_FOR_REVIEW` und Build 31 `VALID`, Veröffentlichung
-`AFTER_APPROVAL`. Bei Google sind der interne Entwurf mit Code 6 und das
-Bundle in der Bibliothek gültig. Der Produktionsentwurf hat noch kein
-zugeordnetes Bundle und keine Neuerungen; die Produktion wurde noch nicht
-eingereicht. Das Servicekonto erhält dort HTTP 403, die native
-Computersteuerung übernimmt Eingaben nicht zuverlässig. Für die Fortsetzung
-in der geöffneten Play Console im In-App-Browser steht die Nutzeranmeldung
-aus. Eine Veröffentlichung ist noch nicht bestätigt. Details und
-Submission-Beleg: [RELEASE.md](launch/RELEASE.md).
+Android Version Code 6, Quellstand `94e8a84`) enthalten. Beide Updates sind
+zur Prüfung eingereicht: Apple bestätigt `WAITING_FOR_REVIEW`, Build 31
+`VALID` und Veröffentlichung `AFTER_APPROVAL` (Readback am 29. Oktober um
+00:23:47 Uhr CET/Stockholm). Google bestätigt nach dem Einreichungs-Commit
+am **29. Oktober 2026 um 00:37:23 Uhr CET/Stockholm**
+(`2026-10-28T23:37:23Z`) für Produktion Code 6
+`RELEASE_LIFECYCLE_STATE_IN_REVIEW`. Die früheren Google-Berechtigungs-/
+Anmeldehürden sind behoben; der Nutzer hat die benötigten App-Rechte
+für genau diese App gespeichert. Eine Freigabe oder Veröffentlichung
+ist noch nicht bestätigt. Details und Belege: [RELEASE.md](launch/RELEASE.md).
 Deutsch ist die Quellsprache: Texte stehen deutsch im Code und sind zugleich
 der Schlüssel für jede Übersetzung.
 

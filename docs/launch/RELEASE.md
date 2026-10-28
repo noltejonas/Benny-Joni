@@ -2,13 +2,11 @@
 
 ## Update 1.5.2: eigene Übungen, Workout-Häufigkeit und Arschkicks
 
-Stand 28. Oktober 2026: Der Backend-Rollout ist abgeschlossen. Die nativen
-Artefakte aus Quellstand `94e8a8406d85c73705d57deebe4ec955680762b5`
-(`94e8a84`) sind gebaut und geprüft: iOS **1.5.2 (31)** und Android
-**1.5.2 (Version Code 6)**. Apple ist zur Prüfung eingereicht. Bei Google
-ist der interne Entwurf gespeichert; die Produktion wurde noch nicht
-eingereicht. Die Anmeldung in der geöffneten Play Console im In-App-Browser
-steht aus. Eine Veröffentlichung dieses Updates ist noch nicht bestätigt.
+Stand 29. Oktober 2026: Backend-Rollout und Einreichungen in beiden Stores
+sind abgeschlossen. Die nativen Artefakte aus Quellstand
+`94e8a8406d85c73705d57deebe4ec955680762b5` (`94e8a84`) sind gebaut und
+geprüft: iOS **1.5.2 (31)** und Android **1.5.2 (Version Code 6)**.
+Eine Freigabe oder Veröffentlichung ist noch nicht bestätigt.
 
 - Eigene Übung eingeben und unten „Speichern“ legt diese Übung an und verwendet
   ihre ID. Eine zuvor ausgewählte Katalogübung wird dabei nicht mehr übernommen.
@@ -39,19 +37,35 @@ steht aus. Eine Veröffentlichung dieses Updates ist noch nicht bestätigt.
   `2026-10-28T21:25:21Z`, Submission-ID
   `fe58f77f-6768-4518-a262-6e38d07d4cbb`, mit genau einem Submission-Item.
   Release-Typ **`AFTER_APPROVAL`**: Veröffentlichung nach Apples Freigabe.
-  Eine Freigabe oder Veröffentlichung ist noch nicht bestätigt.
-  Beleg: `.local/release/update-20261028/apple/submit-result.json`.
-- **Google Play 1.5.2 (Code 6):** Der interne Entwurf ist erfolgreich
-  committed; das geprüfte Bundle steht in der globalen Bundle-Bibliothek.
-  In der Console ist ein Produktionsentwurf angelegt, dem noch kein Bundle
-  und keine Neuerungen zugeordnet sind. **Die Produktionseinreichung ist
-  nicht erfolgt.** Das API-Servicekonto erhält für Produktion HTTP 403.
-  Die native Computersteuerung übernimmt die Eingaben nicht zuverlässig.
-  Die Play Console ist deshalb im In-App-Browser geöffnet; die Anmeldung
-  durch den Nutzer steht aus. Danach bleibt die Zuordnung von Code 6 und
-  Neuerungen sowie die abschließende Einreichung über die Console zu erledigen.
-  Beleg für den gültigen internen Entwurf:
-  `.local/release/update-20261028/android/play-fresh-internal-verified.json`.
+  Letzter lesender Readback am 29. Oktober um **00:23:47 Uhr CET/Stockholm**
+  (`2026-10-28T23:23:47Z`) bestätigt diesen Zustand erneut.
+  Belege: `.local/release/update-20261028/apple/submit-result.json` und
+  `submit-readiness-20261028T232347Z.json` im selben Ordner.
+- **Google Play 1.5.2 (Code 6):** Produktion erfolgreich zur Prüfung
+  eingereicht. Der Commit erfolgte am **29. Oktober 2026 um 00:37:23 Uhr
+  CET/Stockholm** (`2026-10-28T23:37:23Z`). Der offizielle lesende
+  `releases.list`-Aufruf ohne Edit bestätigt Code 6 im Produktionstrack als
+  **`RELEASE_LIFECYCLE_STATE_IN_REVIEW`**. Der vorherige Validate-Lauf war
+  erfolgreich. Bundle-SHA-256, DE-/EN-Neuerungen, Länder
+  `AT/CH/DE/FI/SE` und interner Entwurf 6 sind unverändert geprüft;
+  es wurden keine Binärdateien oder Metadaten neu hochgeladen.
+  Commit-Schutz `ERROR_IF_IN_REVIEW`, kein Abbruch einer laufenden Prüfung.
+  Belege: `.local/release/update-20261028/android/fastlane-production-submit-20261028T233714Z-29683.json`
+  und `fastlane-production-validate-20261028T233658Z-29533.json` im selben Ordner.
+
+**Aufgelöste Google-Hürden:** Zuvor war nur der interne Entwurf gültig;
+der Produktionsentwurf enthielt noch kein zugeordnetes Bundle und keine
+Neuerungen. Das Servicekonto erhielt HTTP 403, native Eingaben waren
+unzuverlässig und die Browser-Anmeldung stand aus. Der Nutzer hat danach
+das Produktionsrecht für genau diese App gespeichert. Google ergänzte dabei
+automatisch das abhängige App-Recht zur Verwaltung von Deeplinks; damit
+sind acht statt sechs App-Rechte für genau eine App (`com.bennyjoni.terminator`)
+hinterlegt. Der lesende Console-Abgleich bestätigt acht Rechte und einen
+inaktiven Speichern-Button. Im Rollout wurden keine kontoweiten Rechte
+geändert; ein vollständiger separater Readback aller kontoweiten Rechte
+wurde nicht durchgeführt. Der bestehende Servicekonto-Zugang konnte
+anschließend Validate und Submit ausführen. Diese Hürden sind abgeschlossen.
+Berechtigungsbeleg: `.local/release/update-20261028/android/permissions-saved-app-scope.txt`.
 
 ### Produktiv angewendete Migrationen und Functions
 
@@ -126,8 +140,8 @@ Finnland und Schweden sind bei Apple zusätzlich verfügbar (abschließender
 Readback: `AVAILABLE`); die getrennte Google-Play-Länderänderung wurde zur
 Prüfung gesendet. Die zugehörigen Belege liegen unter
 `.local/release/nordic-availability-20261028/`. Der bestätigte
-Einreichungsstand von 1.5.2 steht oben; Google-Produktion wird nach der
-ausstehenden Anmeldung und tatsächlichen Einreichung ergänzt.
+Einreichungsstand von 1.5.2 steht oben. Der abschließende Google-Readback
+bestätigt die fünf Produktionsländer `AT/CH/DE/FI/SE` unverändert.
 
 ## Historischer Launch-Stand vom 21. Oktober 2026
 
