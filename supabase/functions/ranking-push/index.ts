@@ -12,6 +12,7 @@
 //    eigenen Werts ist.
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { buildApnsJwt, sendApns } from "../notify-set/apns.ts";
+import { rankingTextFor, type RANKING_TEXT } from "../_shared/push-rules.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -24,37 +25,6 @@ const WEBHOOK_SECRET = Deno.env.get("WEBHOOK_SECRET");
 
 const MEDAL: Record<string, string> = { gold: "🥇", silver: "🥈", bronze: "🥉" };
 
-// Texte je App-Sprache (profiles.language, Migration 20261021000000); ohne
-// Eintrag oder ohne Spalte Deutsch. Standard-Übungen heißen in der Datenbank
-// deutsch, die drei mit eigenem englischen Namen werden übersetzt.
-const TEXT = {
-  de: {
-    locale: "de-DE",
-    category: (name: string) => name,
-    rounds: (n: number) => `${n} ${n === 1 ? "Runde" : "Runden"}`,
-    points: (n: number) => `${n} ${n === 1 ? "Punkt" : "Punkte"}`,
-    closedTitle: (month: string) => `🏆 ${month} ist abgeschlossen`,
-    weekTitle: (kw: number) => `🏆 KW ${kw} ist abgeschlossen`,
-    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} in der Rangliste`,
-    lastDayTitle: "⏳ Letzter Tag im Monat",
-    lastWeekDayTitle: "⏳ Letzter Tag der Woche",
-    lastDayBody: (need: string, rank: number) => `Dir fehlen ${need} bis Platz ${rank}.`,
-  },
-  en: {
-    locale: "en-GB",
-    category: (name: string) => ({ "Liegestütze": "Push-ups", "Klimmzüge": "Pull-ups", "Kniebeugen": "Squats" } as Record<string, string>)[name] ?? name,
-    rounds: (n: number) => `${n} ${n === 1 ? "round" : "rounds"}`,
-    points: (n: number) => `${n} ${n === 1 ? "point" : "points"}`,
-    closedTitle: (month: string) => `🏆 ${month} is closed`,
-    weekTitle: (kw: number) => `🏆 Week ${kw} is closed`,
-    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} on the leaderboard`,
-    lastDayTitle: "⏳ Last day of the month",
-    lastWeekDayTitle: "⏳ Last day of the week",
-    lastDayBody: (need: string, rank: number) => `${need} to go for #${rank}.`,
-  },
-};
-type Lang = keyof typeof TEXT;
-const textFor = (lang: string | null | undefined) => TEXT[(lang ?? "de") as Lang] ?? TEXT.de;
 const LAST_DAY_HOUR = 18;
 const LAST_DAY_MAX_GAP = 0.2;
 
@@ -100,12 +70,13 @@ function weekNumber(week: string) {
 // RPC fehlt (Migration nicht eingespielt)
 const missingRpc = (e: { code?: string } | null) => !!e && (e.code === "PGRST202" || e.code === "42883");
 
-type Text = (typeof TEXT)[Lang];
+type Text = (typeof RANKING_TEXT)[keyof typeof RANKING_TEXT];
 const monthName = (t: Text, month: string) =>
   new Date(`${month}T12:00:00Z`).toLocaleDateString(t.locale, { month: "long", timeZone: "UTC" });
 const fmtValue = (t: Text, cat: Category, v: number) =>
   cat.challenge_type === "bring_sally_up" ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`
   : cat.challenge_type === "tom_holland" ? t.rounds(v)
+  : t.locale === "fi-FI" ? `${t.category(cat.name)}: ${v.toLocaleString(t.locale)}`
   : `${v.toLocaleString(t.locale)} ${t.category(cat.name)}`;
 
 // Sprache pro User; ohne Spalte profiles.language (Migration fehlt) Deutsch
@@ -199,7 +170,7 @@ async function closedPush(
   for (const r of results) (byUser[r.user_id] ||= []).push(r);
   const langs = await languagesOf(supabase, Object.keys(byUser));
   for (const [userId, rows] of Object.entries(byUser)) {
-    const t = textFor(langs[userId]);
+    const t = rankingTextFor(langs[userId]);
     rows.sort((a, b) => a.rank - b.rank);
     const points = rows.reduce((a, r) => a + r.points, 0);
     const medals = rows.filter((r) => r.medal).slice(0, 3)
@@ -266,7 +237,7 @@ async function lastDayPush(
   const out: Record<string, unknown>[] = [];
   const langs = await languagesOf(supabase, Object.keys(best));
   for (const [userId, b] of Object.entries(best)) {
-    const t = textFor(langs[userId]);
+    const t = rankingTextFor(langs[userId]);
     const kind = weekly ? "week_last_day" : "month_last_day";
     out.push(await push.once(userId, kind, now.today, {
       aps: {

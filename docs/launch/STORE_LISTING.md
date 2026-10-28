@@ -1,5 +1,35 @@
 # Store-Unterlagen für Benny & Joni
 
+## Ländererweiterung vom 28. Oktober 2026
+
+Die aktuelle Store-Version ist 1.4.1 (iOS Build 26, Android Code 2).
+Die älteren DACH- und Review-Angaben weiter unten beschreiben den Launch-Stand
+vom 21. Oktober und werden durch diesen Abschnitt ergänzt:
+
+- Apple: Finnland (`FIN`) und Schweden (`SWE`) zusätzlich zu Deutschland,
+  Österreich und Schweiz aktiviert. API-Readback bestätigt genau diese fünf
+  verfügbaren Länder. Der abschließende Readback meldet für beide neuen
+  Länder `AVAILABLE`; die Freigabe ist verarbeitet.
+- Google Play: Die Veröffentlichungsübersicht zeigt unter „Changes in review“
+  ausschließlich die Länderänderung „Add 2 countries / regions: Finland,
+  Sweden“. Die automatischen Vorprüfungen laufen. Managed Publishing ist
+  aktuell ausgeschaltet; nach Googles Freigabe kann die Länderänderung
+  veröffentlicht werden.
+- Belege: `.local/release/nordic-availability-20261028/apple-latest.json` und
+  `google-in-review.png`. Es wurde dafür kein neuer App-Build hochgeladen.
+
+Finnisch und Schwedisch sind zusätzlich vollständig im App-Quellstand
+vorbereitet (je 912 Wörterbucheinträge, native iOS-Sprachangaben und Push-Texte).
+Sie benötigen ein neues App-Update; die vorhandenen Store-Listings bleiben
+Deutsch und Englisch. Für produktive Mitteilungen müssen zusätzlich
+`notify-set`, `daily-nudge` und `ranking-push` neu deployt werden.
+Die vollständige Testsuite besteht mit 240 erfolgreichen Tests und einem
+vorgesehenen Release-Skip. Build und Übersetzungsprüfungen bestehen;
+beide Sprachen sind in der lokalen App umschaltbar und bei 320 Pixeln Breite
+ohne Seitenüberlauf oder überlaufende Navigationsbuttons geprüft.
+
+## Bestehende Store-Unterlagen
+
 Die aktuellen Texte stehen maschinenlesbar unter
 `ios/App/fastlane/metadata/` (App Store) und `play-metadata/` (Google Play).
 Beide Stores erhalten Deutsch (`de-DE`) und Englisch (`en-GB`). Ändert Texte

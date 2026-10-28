@@ -565,6 +565,16 @@ test('weekOneSummary: Reps, aktive Tage, erfüllte Teile und Ergebnis', () => {
 
 // ── Fehlertexte (www/data.js) ───────────────────────────────────────────────
 
+test('weekOneSummary: ein mehrfaches Workout-Ziel zählt erst nach allen eigenen Durchgängen', () => {
+  const weekStart = '2026-10-12';
+  const challenge = { id: 'sally-week', week_start: weekStart, category_id: 'sally', target_reps: 204, target_runs: 2 };
+  const categories = [{ id: 'sally', kind: 'sports', challenge_type: 'bring_sally_up' }];
+  const one = { id: 'run-1', challenge_id: challenge.id, athlete: 'me', reps: 204, created_at: '2026-10-12T12:00:00' };
+  const args = { weekStart, me: 'me', challenges: [challenge], categories, participantCount: 1 };
+  assert.equal(O.weekOneSummary({ ...args, sets: [one] }).sharesHit, 0);
+  assert.equal(O.weekOneSummary({ ...args, sets: [one, { ...one, id: 'run-2', reps: 60 }] }).sharesHit, 1);
+});
+
 const { D } = load();
 const err = (message, code) => Object.assign(new Error(message), code ? { code } : {});
 

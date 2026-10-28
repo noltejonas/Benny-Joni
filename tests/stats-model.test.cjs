@@ -123,6 +123,30 @@ test('challengeStats: Team-Ziel ist die Summe der Personen-Anteile', () => {
   assert.deepEqual(p.map(x => x.hit), [true, false]);
 });
 
+test('Workout-Statistik fordert mehrere Durchgänge von jedem Teammitglied', () => {
+  const teams = [{ key: 'A', userIds: ['a1', 'a2'] }, { key: 'B', userIds: ['b1', 'b2'] }];
+  const { challenges, sets } = prepare(
+    [{ id: 'th-week', competition_id: 'c1', category_id: 'th', week_start: LAST_WEEK, target_reps: 10, target_runs: 2 }],
+    [
+      ...['a1', 'a1', 'a1', 'a2', 'b1', 'b1', 'b2', 'b2'].map((athlete, i) => ({
+        id: `s${i}`, challenge_id: 'th-week', competition_id: 'c1', athlete, reps: 10, created_at: at('2026-10-06'),
+      })),
+    ],
+  );
+  const members = ['a1', 'a2', 'b1', 'b2'].map(id => member(id, { competition_id: 'c1' }));
+  const st = S.challengeStats({ sides: teams, challenges, categories: cats, sets, members, today: TODAY });
+  const row = st.weeks[0].rows[0];
+  assert.equal(row.share, 2);
+  assert.deepEqual(row.perSide.map(p => p.goal), [4, 4]);
+  assert.deepEqual(row.perSide.map(p => p.value), [4, 4]);
+  assert.deepEqual(row.perSide.map(p => p.hit), [false, true], 'Drei Läufe von a1 ersetzen den zweiten Lauf von a2 nicht');
+  assert.deepEqual(st.totals, [0, 0], 'Workout-Runden bleiben aus Wiederholungssummen heraus');
+  const bundle = { categories: cats, challenges, sets, members };
+  const me = S.personalStats({ me: 'a2', comps: [{ id: 'c1' }], sidesByComp: { c1: teams }, bundle, today: TODAY });
+  assert.equal(me.goals, 1);
+  assert.equal(me.goalsHit, 0);
+});
+
 test('challengeStats: Woche nur mit Workouts zählt nicht als Remis', () => {
   const { challenges, sets } = prepare(
     [{ id: 'w1th', category_id: 'th', week_start: LAST_WEEK, target_reps: 10 }],
@@ -266,4 +290,11 @@ test('weekTemplateFromPrevious: angebrochene Woche auf 7 Tage hochrechnen, Worko
   // Faktor ≤ 1 oder ungültig ändert nichts
   const same = S.weekTemplateFromPrevious(prev, { fullWeekFactor: () => NaN });
   assert.deepEqual([...same.map(x => x.base_reps)], [60, 7, 1]);
+});
+
+test('Vorwochen-Vorlage erhält die Zahl der Workout-Durchgänge ohne Hochrechnung', () => {
+  const previous = [{ category_id: 'th', target_reps: 10, target_runs: 3, workout: 'tom_holland' }];
+  const next = S.weekTemplateFromPrevious(previous, { fullWeekFactor: 7 / 2 });
+  assert.equal(next[0].base_reps, 10);
+  assert.equal(next[0].target_runs, 3);
 });

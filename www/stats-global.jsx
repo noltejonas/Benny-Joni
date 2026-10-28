@@ -346,7 +346,7 @@ function WeekDetail({ w, sides, comps, fmtVal = fmtNum }) {
         <div className="stats-wd-row" key={ch.id}>
           <div className="stats-wd-name">
             <span>{cat?.name}{multiComp && <span className="stats-muted"> · {compName(ch)}</span>}</span>
-            <small className="mono">{ch.workout ? tr('1× p. P.') : tr('{n} p. P.', { n: fmtVal(share) })}</small>
+            <small className="mono">{ch.workout ? (share === 1 ? tr('1× p. P.') : tr('{n}× p. P.', { n: fmtNum(share) })) : tr('{n} p. P.', { n: fmtVal(share) })}</small>
           </div>
           {perSide.map((p, i) => (
             <div className="stats-wd-side" key={sides[i].key}>

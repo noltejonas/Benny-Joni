@@ -1,8 +1,10 @@
 # Sprachen
 
-„Benny & Joni“ gibt es ab Version 1.4 (Launch) auf Deutsch und Englisch. Deutsch ist
-die Quellsprache: Texte stehen deutsch im Code und sind zugleich der Schlüssel für jede
-Übersetzung.
+Der Quellstand unterstützt Deutsch, Englisch, Finnisch (`fi`, Suomi) und
+Schwedisch (`sv`, Svenska). Finnisch und Schwedisch wurden am 28. Oktober 2026
+ergänzt; sie benötigen ein neues App-Update und sind noch nicht in der bestehenden
+Store-Version enthalten. Deutsch ist die Quellsprache: Texte stehen deutsch im Code
+und sind zugleich der Schlüssel für jede Übersetzung.
 
 ## Wie die Sprache gewählt wird
 
@@ -24,7 +26,8 @@ erlauben, Fotoauswahl, Kopieren/Einsetzen) und die App einheitlich englisch, wie
 `FALLBACK = 'en'` in `www/i18n.js`. Auf deutschen Geräten bleibt alles deutsch.
 
 Datum, Zahlen und Euro folgen der Region des Geräts, wenn dessen Sprache zur App-Sprache
-passt (`en-US` → 12-Stunden-Uhr), sonst `de-DE` bzw. `en-GB`.
+passt (`en-US` → 12-Stunden-Uhr, `sv-FI` → schwedische Formate für Finnland),
+sonst `de-DE`, `en-GB`, `fi-FI` beziehungsweise `sv-SE`.
 
 ## Texte schreiben
 
@@ -49,17 +52,19 @@ Regeln:
   (`competition_id` leer) übersetzt `PTData.localizeCategory` beim Laden.
 - Absichtlich deutscher Text bekommt einen Kommentar mit `i18n-ignore`.
 
-Neue Texte brauchen einen Eintrag in `www/i18n/en.js`. Fehlt er, steht in der App der
+Neue Texte brauchen einen Eintrag in `www/i18n/en.js`, `fi.js` und `sv.js`. Fehlt er, steht in der App der
 deutsche Text und der Test schlägt fehl. Das gilt auch nach dem Launch unverändert für
 jede neue Funktion: Text deutsch in `tr()`/`trn()`/`trc()` schreiben, englischen Eintrag
-in `en.js` ergänzen (British English, typografischer Apostroph ’, gleiche Platzhalter),
-`node tools/i18n-check.cjs` laufen lassen.
+in allen drei Wörterbüchern ergänzen (Englisch: British English und typografischer
+Apostroph ’; überall gleiche Platzhalter). Die Tests prüfen alle Wörterbücher.
 
 ## Prüfen
 
 ```bash
 node --test tests/
 node tools/i18n-check.cjs
+node tools/i18n-check.cjs --lang fi
+node tools/i18n-check.cjs --lang sv
 ```
 
 `tests/i18n.test.cjs` (über `tools/i18n-check.cjs`) findet fehlende Einträge, falsche
@@ -80,20 +85,30 @@ deutschem Text ist eine Heuristik; Fehlalarme mit `i18n-ignore` markieren.
 6. iOS: `fr` in `CFBundleLocalizations` (Info.plist), `fr.lproj/InfoPlist.strings`
    anlegen und in Xcode der Variantengruppe `InfoPlist.strings` hinzufügen.
 7. Push: in `supabase/functions/_shared/push-rules.ts` bei `PushLang`, `PUSH_TEXT` und
-   `STANDARD_CATEGORY_NAMES` ergänzen, Test in `tests/push-rules.test.mjs` erweitern,
-   `notify-set` und `daily-nudge` neu deployen.
-8. Store: Ordner `ios/App/fastlane/metadata/fr-FR/` wie `en-GB/` anlegen (Limits mit dem
-   Längen-Check aus `docs/launch/STORE_LISTING.md` prüfen).
+   `STANDARD_CATEGORY_NAMES` und `RANKING_TEXT` ergänzen, Test in
+   `tests/push-rules.test.mjs` erweitern. `notify-set`, `daily-nudge` und
+   `ranking-push` müssen für produktive Push-Texte neu deployt werden.
+8. Optional eine eigene Store-Lokalisierung ergänzen: Ordner
+   `ios/App/fastlane/metadata/fr-FR/` wie `en-GB/` anlegen (Limits mit dem
+   Längen-Check aus `docs/launch/STORE_LISTING.md` prüfen). Die Länderfreigabe
+   wird in jedem Store separat verwaltet und benötigt keine Übersetzung.
 
 ## Push-Mitteilungen
 
 Die App meldet ihre Sprache in `profiles.language` (Migration
 `20261021000000_profile_language.sql`, nur wenn die Spalte existiert). Alle Mitteilungen
-kommen in der Sprache der Empfänger: `notify-set` (Rivale, Beitritt, Reaktion) und
-`daily-nudge` (Tageserinnerung, „Letzte Chance“). Ohne Eintrag, ohne Spalte oder bei
+kommen in der Sprache der Empfänger: `notify-set` (Rivale, Beitritt, Reaktion,
+Überholen), `daily-nudge` (Tageserinnerung, „Letzte Chance“) und `ranking-push`
+(Monatsabschluss, letzter Monatstag). Ohne Eintrag, ohne Spalte oder bei
 einer Sprache ohne Push-Texte: Deutsch. Die Texte stehen in
 `supabase/functions/_shared/push-rules.ts` (`PUSH_TEXT`); Standard-Übungen übersetzt
 `localizedCategoryName` wie `PTData.localizeCategory` in der App.
+
+Manuelle Arschkicks verwenden `supabase/functions/_shared/kick.ts` mit je drei
+festen Sprüchen auf Deutsch, Englisch, Finnisch und Schwedisch. Neue Sprachen
+dort ebenfalls ergänzen und `kick-teammate` deployen. Empfänger können diese
+Mitteilungen kontoweit über `profiles.kick_enabled` abschalten. Siehe den
+vorbereiteten Update-Abschnitt in `docs/launch/RELEASE.md`.
 
 ## App Store
 

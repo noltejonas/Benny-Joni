@@ -663,18 +663,18 @@ function buildWeekRecaps({ allChallenges, allSets, categories, penalties, sides,
     const challStats = challs.map(ch => {
       const cat = catById[ch.category_id];
       const isWorkCh = PTData.usesMinutes(cat);
-      // Pflicht-Workouts fließen nicht in die Wiederholungs-Wertung; erreicht = jede Person ein Durchgang.
+      // Pflicht-Workouts fließen nicht in die Wiederholungs-Wertung.
       const workout = PTData.isWorkoutType(cat?.challenge_type) ? cat.challenge_type : null;
       const val = (s) => workout ? 0 : isWorkCh ? (s.duration_minutes ?? 0) : (s.reps ?? 0);
       const csets = allSets.filter(s => s.challenge_id === ch.id);
       const doneBySide = totalsBySide(csets, sides, val);
       const total = doneBySide.reduce((a, x) => a + x, 0);
       const idsOf = (side) => side.statUserIds || side.userIds;
-      const countBySide = workout ? sides.map(side => csets.filter(s => idsOf(side).includes(s.athlete)).length) : null;
+      const countBySide = workout ? sides.map(side => PTData.workoutRunCount(csets.filter(s => idsOf(side).includes(s.athlete)))) : null;
       const hitBySide = workout
-        ? sides.map(side => PTData.workoutPeopleDone(csets, idsOf(side)) === idsOf(side).length)
+        ? sides.map(side => idsOf(side).length > 0 && PTData.workoutPeopleDone(csets, idsOf(side), PTData.workoutTargetRuns(ch)) === idsOf(side).length)
         : doneBySide.map(d => d >= ch.target_reps);
-      const fairShare = workout ? 1 : PTData.fairShareOf(ch.target_reps, participants.length || sides.length);
+      const fairShare = workout ? PTData.workoutTargetRuns(ch) : PTData.fairShareOf(ch.target_reps, participants.length || sides.length);
       return { ch, cat, total, doneBySide, countBySide, hitBySide, hit: hitBySide.every(Boolean), isWorkCh, workout, val, fairShare };
     });
     // Wochensieg nach Wiederholungen; Minuten zählen nur in reinen Minuten-Wochen
@@ -741,6 +741,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft,
   intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
   const capi = useMemo(() => api.forCompetition(initialCompetition.id), [api, initialCompetition.id]);
+  const kicksAllowed = React.useRef(profile?.kick_enabled !== false);
+  kicksAllowed.current = profile?.kick_enabled !== false;
 
   const [competition, setCompetition] = useState(initialCompetition);
   useEffect(() => { setCompetition(c => ({ ...c, ...initialCompetition })); }, [initialCompetition]);
@@ -1239,6 +1241,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           category_id: p.category_id,
           chosen_by: me,
           target_reps: p.target_reps,
+          target_runs: p.target_runs,
         });
       }
       setToast(tr("Woche fixiert – los geht's, {name}!", { name: profile.display_name.split(/\s+/)[0] }));
@@ -1517,7 +1520,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         });
         const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
           const data = action?.notification?.data || {};
-          // Rangliste-Pushes (überholt, letzter Tag, Wochen- und Monatsabschluss) öffnen die Rangliste, auch nach einem Neustart.
+          if (data.kind === 'teammate_kick') {
+            writeHomeView('challenge');
+            try { sessionStorage.setItem(TAB_KEY, 'home'); } catch (e) {}
+            if (data.competition_id) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId: data.competition_id } }));
+            window.dispatchEvent(new CustomEvent('pt:nav-home'));
+            return;
+          }
+          // Rangliste-Pushes einschließlich Wochenabschluss öffnen die Rangliste.
           if (/^(rank_|month_|week_)/.test(data.kind || '')) {
             try { sessionStorage.setItem(TAB_KEY, 'ranking'); } catch (e) {}
             window.dispatchEvent(new CustomEvent('pt:nav-ranking'));
@@ -1530,11 +1540,15 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           }
           window.dispatchEvent(new CustomEvent('pt:nav-feed'));
         });
-        // Foreground deliveries: do nothing here. Supabase Realtime + the
-        // existing notify() toast covers in-app feedback. iOS suppresses
-        // the banner automatically while the app is in the foreground.
+        // Ein Arschkick erzeugt keinen Trainingssatz/Realtime-Feed-Eintrag.
+        // Deshalb seinen Spruch auch bei geöffneter App sichtbar machen.
+        const onReceived = await Push.addListener('pushNotificationReceived', notification => {
+          if (notification.data?.kind === 'teammate_kick' && kicksAllowed.current) {
+            setToast(notification.body || notification.title);
+          }
+        });
 
-        cleanup = () => { onReg.remove(); onErr.remove(); onTap.remove(); };
+        cleanup = () => { onReg.remove(); onErr.remove(); onTap.remove(); onReceived.remove(); };
         if (cancelled) { cleanup(); return; }
         await Push.register();
       } catch (e) { console.warn('Push setup failed', e); }
@@ -1545,11 +1559,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Push-Taps öffnen den passenden Tab und aktualisieren nach dem Hintergrund.
   useEffect(() => {
+    const onNavHome = () => { setHomeView('challenge'); setTab('home'); reload(); };
     const onNavFeed = () => { setTab('feed'); reload(); };
     const onNavRanking = () => { setTab('ranking'); reload(); };
+    window.addEventListener('pt:nav-home', onNavHome);
     window.addEventListener('pt:nav-feed', onNavFeed);
     window.addEventListener('pt:nav-ranking', onNavRanking);
     return () => {
+      window.removeEventListener('pt:nav-home', onNavHome);
       window.removeEventListener('pt:nav-feed', onNavFeed);
       window.removeEventListener('pt:nav-ranking', onNavRanking);
     };

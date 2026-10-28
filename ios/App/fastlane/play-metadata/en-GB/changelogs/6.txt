@@ -1,0 +1,4 @@
+• Now available in Finnish and Swedish.
+• Fixed saving your own exercises.
+• Set multiple Bring Sally Up and other compulsory workout runs per person per week.
+• Progress, weekly plans and results follow your chosen number of runs.

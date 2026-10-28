@@ -1,5 +1,69 @@
 # Release mit Fastlane
 
+## Vorbereitetes Update: eigene Übungen, Workout-Häufigkeit und Arschkicks
+
+Quellstand vom 28. Oktober 2026; noch nicht produktiv ausgeliefert:
+
+- Eigene Übung eingeben und unten „Speichern“ legt diese Übung an und verwendet
+  ihre ID. Eine zuvor ausgewählte Katalogübung wird dabei nicht mehr übernommen.
+- „Bring Sally Up“ und AMRAP haben eine einstellbare Zahl gespeicherter
+  Durchgänge pro Person und Woche. `target_runs` ist unabhängig von
+  `target_reps` (bisherige Sekunden/Runden). Bestehende Ziele bleiben bei einem
+  Durchgang. Wochenplan, Vorwochen-Vorlage, Fortschritt, Statistik, Rückblicke
+  und alle Strafregeln beachten die neue Häufigkeit. Zusätzliche Durchgänge
+  einer Person ersetzen keinen fehlenden Anteil eines Teammitglieds.
+- Teilnehmerliste: „Arschkick“ sendet einen von drei festen lustigen Sprüchen
+  in der Sprache des Empfängers. `profiles.kick_enabled` lässt sich unter
+  Einstellungen → App → „Arschkicks empfangen“ ausschalten. Die allgemeinen
+  Push-Einstellungen und Blocklisten werden ebenfalls berücksichtigt.
+- Der Server prüft Anmeldung und aktive gemeinsame Challenge. Er erlaubt
+  weltweit über alle gemeinsamen Challenges einen Kick pro Personenpaar und
+  Berliner Kalendertag sowie höchstens drei empfangene Kicks am Tag. Ruhezeit
+  ist 22–7 Uhr Berlin. Unklare Versandfehler belegen den Tagesplatz weiter,
+  um doppelte Benachrichtigungen zu verhindern. Die Zustellung nutzt wie
+  bestehende Pushes APNs/iOS; Android/Web haben noch keine Push-Zustellung.
+
+Vor einem App-Update diese beiden additiven Migrationen mit dem etablierten
+Migrationsverfahren einspielen:
+
+1. `supabase/migrations/20261028010000_teammate_kicks.sql`
+2. `supabase/migrations/20261028210000_workout_target_runs.sql`
+
+Danach die neue Function deployen:
+
+```bash
+npx supabase functions deploy kick-teammate --no-verify-jwt --project-ref jczyyupxxqrdgbeifcwe
+```
+
+Der Endpunkt verifiziert den Bearer-Token selbst über `auth.getUser`; die
+Reservierungs-/Zustell-RPCs sind ausschließlich für `service_role` freigegeben.
+Er verwendet die vorhandenen APNs-Secrets. Für die zugleich vorbereiteten
+finnischen/schwedischen Texte auch `notify-set`, `daily-nudge` und `ranking-push`
+aus diesem Quellstand deployen. Erst danach native App-Builds erstellen und
+das Update in den Stores einreichen. Bislang keine Migration angewendet,
+keine neue Function deployt und keine echte Arschkick-Mitteilung gesendet.
+
+Prüfbelege liegen lokal unter `.local/qa/update-custom-workouts-kicks/`:
+Regressionstests führen die tatsächlichen SetupSheet-/Push-Handler aus;
+Browser-QA bestätigt Custom-Speichern, Sally-Ziel 3 → Fortschritt 2/3,
+Neustart mit erhaltenem Empfangs-Opt-out und lokalen Demo-Kick. Beide exakten
+Migrationen wurden zweimal in einer isolierten PostgreSQL-18.6-PGlite-Datenbank
+ausgeführt; 19 SQL-Prüfungen bestehen. Echte parallele Datenbankverbindungen
+sind damit nicht geprüft. Abschließende Testsuite: 268 bestanden, ein
+vorgesehener Release-Skip; alle drei Übersetzungsprüfungen und der Web-Build
+sind erfolgreich.
+
+## Ländererweiterung und bisheriger Release
+
+**Aktualisierung 28. Oktober 2026:** Die bestehende Version 1.4.1 ist bereits
+veröffentlicht. Finnland und Schweden sind bei Apple zusätzlich verfügbar
+(abschließender Readback: `AVAILABLE`); die entsprechende Google-Play-
+Länderänderung befindet sich in der Vorprüfung/Prüfung. Details und Belege
+stehen im aktuellen Abschnitt von [STORE_LISTING.md](STORE_LISTING.md).
+Finnische und schwedische App-Texte sind im Quellstand fertig und getestet,
+aber noch nicht als neues Store-Update ausgeliefert. Die folgenden
+Review-/Launch-Angaben dokumentieren den historischen Stand vom 21. Oktober.
+
 Stand 21. Oktober 2026: **Beide Stores sind zur Prüfung eingereicht.**
 Google-Review läuft; keine Freigabe oder Veröffentlichung.
 Der Ablauf für weitere Uploads steht in

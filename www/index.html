@@ -78,18 +78,22 @@
       // Englisch). i18n.js lädt erst nach den Bibliotheken, deshalb stehen die
       // wenigen Texte für Platzhalter und Notfallansicht hier selbst.
       var lang = (function () {
-        var ok = { de: 1, en: 1 };
-        try { var pref = localStorage.getItem('pt:lang'); if (ok[pref]) return pref; } catch (e) {}
+        var ok = { de: 1, en: 1, fi: 1, sv: 1 };
+        var supported = function (code) { return Object.prototype.hasOwnProperty.call(ok, code); };
+        try { var pref = localStorage.getItem('pt:lang'); if (supported(pref)) return pref; } catch (e) {}
         var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
         for (var i = 0; i < tags.length; i++) {
           var base = String(tags[i] || '').toLowerCase().split(/[-_]/)[0];
-          if (ok[base]) return base;
+          if (supported(base)) return base;
         }
         return 'en';
       })();
-      var TEXT = lang === 'de'
-        ? { start: 'Starte…', fail: 'App konnte nicht starten. Prüfe deine Verbindung.', reload: 'Neu laden' }
-        : { start: 'Starting…', fail: 'The app couldn’t start. Check your connection.', reload: 'Reload' };
+      var TEXT = {
+        de: { start: 'Starte…', fail: 'App konnte nicht starten. Prüfe deine Verbindung.', reload: 'Neu laden' },
+        en: { start: 'Starting…', fail: 'The app couldn’t start. Check your connection.', reload: 'Reload' },
+        fi: { start: 'Käynnistetään…', fail: 'Sovellusta ei voitu käynnistää. Tarkista verkkoyhteytesi.', reload: 'Lataa uudelleen' },
+        sv: { start: 'Startar…', fail: 'Appen kunde inte startas. Kontrollera din anslutning.', reload: 'Ladda om' },
+      }[lang];
       try {
         document.documentElement.lang = lang;
         var label = document.querySelector('#pt-boot .pt-boot-text');
@@ -160,6 +164,8 @@
   <!-- Sprachen: vor allem anderen, damit tr() überall bereitsteht -->
   <script src="i18n.js"></script>
   <script src="i18n/en.js"></script>
+  <script src="i18n/fi.js"></script>
+  <script src="i18n/sv.js"></script>
 
   <!-- Data layer -->
   <script src="data.js"></script>

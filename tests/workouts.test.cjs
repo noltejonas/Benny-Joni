@@ -74,6 +74,40 @@ test('workoutPeopleDone zählt Personen mit mindestens einem Durchgang', () => {
   assert.equal(P.workoutPeopleDone(sets, ['u1', 'u3']), 2);
 });
 
+test('Workout-Ziele zählen Durchgänge pro Person und erhalten alte Zielmengen', () => {
+  assert.equal(P.workoutTargetRuns({ target_reps: 204 }), 1);
+  assert.equal(P.workoutTargetRuns({ target_runs: 3, target_reps: 204 }), 3);
+  for (const target_runs of [null, undefined, 0, -3, NaN, Infinity]) {
+    assert.equal(P.workoutTargetRuns({ target_runs }), 1);
+  }
+  const sets = [
+    { athlete: 'a', id: 's1', log_id: 'run-1' },
+    { athlete: 'a', id: 'cached-s1', log_id: 'run-1' },
+    { athlete: 'a', id: 's2', log_id: 'run-2' },
+    { athlete: 'a', id: 's3' },
+    { athlete: 'a', id: 's4' },
+    { athlete: 'b', id: 's5' },
+  ];
+  assert.equal(P.workoutRunCount(sets.filter(s => s.athlete === 'a')), 4);
+  assert.equal(P.workoutPeopleDone(sets, ['a', 'b'], 2), 1);
+  assert.equal(P.workoutProgress(sets, ['a', 'b'], 2), 3, 'Mehrarbeit ersetzt keinen fehlenden Durchgang des Partners');
+  assert.equal(P.workoutProgress(sets, ['a', 'a', 'b'], 2), 3, 'Mitglieder werden nur einmal gezählt');
+});
+
+test('Wochenplan übernimmt die Workout-Häufigkeit statt Sally-Sekunden als Anzahl zu deuten', () => {
+  const template = P.weekTemplateFor({
+    weekStart: '2026-10-26', config: { enabled: true, start_date: '2026-10-26' },
+    slots: [{ id: 'slot', week_index: 0, category_id: 'sally', start_target: 204, target_runs: 3 }],
+  });
+  assert.equal(template[0].base_reps, 204);
+  assert.equal(template[0].target_runs, 3);
+  const suggested = P.suggestForWeek({
+    weekStart: '2026-10-26', config: { enabled: true, start_date: '2026-10-26' },
+    slots: [{ id: 'slot', week_index: 0, category_id: 'sally', start_target: 204, target_runs: 3 }],
+  });
+  assert.equal(suggested[0].target_runs, 3);
+});
+
 const cfg = (rule_mode) => ({ rule_mode, amount_cents: 500 });
 
 test('per_challenge: Workout erfüllt mit einem Durchgang, fehlendes kostet', () => {
@@ -123,4 +157,22 @@ test('per_week_aggregate: alles erledigt ergibt keine Strafe', () => {
   ];
   P.annotateWorkouts(sets, challenges, cats);
   assert.deepEqual([...P.computePenalties(challenges, sets, 'u1', cfg('per_week_aggregate'), 2)], []);
+});
+
+test('Mehrere Pflicht-Durchgänge: alle Strafregeln werten den eigenen Sollwert aus', () => {
+  const challenges = [{ id: 'sally', category_id: 'c-sally', target_reps: 204, target_runs: 3 }];
+  const sets = [
+    { id: 'a1', challenge_id: 'sally', athlete: 'a', reps: 204 },
+    { id: 'a2', challenge_id: 'sally', athlete: 'a', reps: 20 },
+    { id: 'b1', challenge_id: 'sally', athlete: 'b', reps: 204 },
+    { id: 'b2', challenge_id: 'sally', athlete: 'b', reps: 204 },
+    { id: 'b3', challenge_id: 'sally', athlete: 'b', reps: 204 },
+    { id: 'b4', challenge_id: 'sally', athlete: 'b', reps: 204 },
+  ];
+  P.annotateWorkouts(sets, challenges, cats);
+  for (const rule of ['per_challenge', 'per_week_any', 'per_week_all', 'per_week_aggregate']) {
+    assert.equal(P.computePenalties(challenges, sets, 'a', cfg(rule), 2).length, 1, rule);
+    assert.equal(P.computePenalties(challenges, sets, 'b', cfg(rule), 2).length, 0, rule);
+    assert.equal(P.computePenalties(challenges, [...sets, { id: 'a3', challenge_id: 'sally', athlete: 'a', reps: 1 }], 'a', cfg(rule), 2).length, 0, rule);
+  }
 });

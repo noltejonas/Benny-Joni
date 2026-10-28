@@ -1,2 +1,4 @@
-Neu in 1.5.1:
-• Behoben: Ein neues Wochenziel lässt sich wieder speichern
+• Jetzt auch auf Finnisch und Schwedisch verfügbar.
+• Eigene Übungen werden beim Speichern korrekt angelegt.
+• Für Bring Sally Up und andere Pflicht-Workouts die Anzahl der Durchgänge pro Person und Woche wählen. Fortschritt, Wochenplan und Auswertung berücksichtigen das neue Ziel.
+• Mit einem lustigen Arschkick zum Training motivieren. Den Empfang kannst du unter Einstellungen → App ausschalten.

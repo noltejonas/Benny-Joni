@@ -21,6 +21,8 @@
   const LANGUAGES = [
     { code: 'de', name: 'Deutsch', locale: 'de-DE' },
     { code: 'en', name: 'English', locale: 'en-GB' },
+    { code: 'fi', name: 'Suomi', locale: 'fi-FI' },
+    { code: 'sv', name: 'Svenska', locale: 'sv-SE' },
   ];
   // Gerät in keiner unterstützten Sprache: Englisch versteht man eher.
   const FALLBACK = 'en';
@@ -140,6 +142,8 @@
   const WEEKDAYS = {
     de: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
     en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    fi: ['ma', 'ti', 'ke', 'to', 'pe', 'la', 'su'],
+    sv: ['mån', 'tis', 'ons', 'tor', 'fre', 'lör', 'sön'],
   };
   const weekdays = () => (WEEKDAYS[lang] || WEEKDAYS[SOURCE]).slice();
 

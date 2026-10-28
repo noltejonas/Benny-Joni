@@ -172,6 +172,8 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   const [busyModule, setBusyModule] = useState(false);
   const [rankingAdmin, setRankingAdmin] = useState(false);
   const [busyRanking, setBusyRanking] = useState(false);
+  const [busyKickPreference, setBusyKickPreference] = useState(false);
+  const kickAvailable = typeof profile?.kick_enabled === 'boolean' && typeof baseApi.setKickEnabled === 'function';
   useEffect(() => {
     let off = false;
     baseApi.isRankingAdmin?.().then(v => { if (!off) setRankingAdmin(!!v); }).catch(() => {});
@@ -217,7 +219,8 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
   }
   if (page === 'members') {
     return <SettingsMembersPage baseApi={baseApi} competition={competition} members={active} me={me}
-      isOwner={isOwner} ownerName={ownerName} onBack={back} onChanged={onCompetitionChanged} onToast={onToast} />;
+      isOwner={isOwner} ownerName={ownerName} canKick={kickAvailable && !competition.archived_at}
+      onBack={back} onChanged={onCompetitionChanged} onToast={onToast} />;
   }
   if (page === 'plan') {
     return <SettingsPlanPage {...moduleProps} me={me} categories={categories} planSlots={planSlots} rotationConfig={rotationConfig} />;
@@ -246,6 +249,15 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
     }
     catch (e) { alert(e.message); }
     finally { setBusyRanking(false); }
+  }
+  async function setKickPreference(on) {
+    if (!kickAvailable || busyKickPreference) return;
+    setBusyKickPreference(true);
+    try {
+      onProfileChanged?.(await baseApi.setKickEnabled(on));
+      onToast?.(on ? tr('Arschkicks sind an 🍑') : tr('Arschkicks sind ausgeschaltet'));
+    } catch (e) { alert(e.message); }
+    finally { setBusyKickPreference(false); }
   }
   // Module: rechts An/Aus, darunter der Stand, wenn das Modul an ist.
   const onOff = (v) => v ? tr('An') : tr('Aus');
@@ -301,7 +313,9 @@ function SettingsScreen({ api, baseApi, competition, members = [], categories = 
       </SettingsGroup>
 
       <SettingsDeviceGroup themePref={themePref} onSetThemePref={onSetThemePref} onLanguage={() => go('language')} onColors={() => go('colors')}
-        notificationsEnabled={notificationsEnabled} onSetNotifications={onSetNotifications} />
+        notificationsEnabled={notificationsEnabled} onSetNotifications={onSetNotifications}
+        kickAvailable={kickAvailable} kickEnabled={profile?.kick_enabled}
+        onSetKickEnabled={setKickPreference} kickBusy={busyKickPreference} />
 
       {api?.mode === 'demo' && window.PTDemo && (
         <SettingsGroup title={tr('Demo')}>
@@ -461,7 +475,8 @@ function SettingsReportsPage({ baseApi, onBack, onToast }) {
 // ─── App (gerätebezogen) ────────────────────────────────────────────────────
 const ST_THEMES = [['system', tr('System')], ['light', tr('Hell')], ['dark', tr('Dunkel')]];
 
-function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, notificationsEnabled, onSetNotifications }) {
+function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, notificationsEnabled, onSetNotifications,
+  kickAvailable, kickEnabled, onSetKickEnabled, kickBusy }) {
   // Erlaubnis über PTPush (onboarding-intro.jsx); beim Zurückkehren aus den
   // iOS-Einstellungen neu prüfen.
   const [perm, setPerm] = useState('unsupported');
@@ -517,6 +532,11 @@ function SettingsDeviceGroup({ themePref, onSetThemePref, onLanguage, onColors, 
       <SettingsRow icon="globe" title={tr('Sprache')} value={stLanguageName(PTi18n.lang)} onClick={onLanguage} chevron />
       <SettingsSwitchRow icon="bell" title={tr('Push-Mitteilungen')}
         checked={notificationsEnabled} onChange={setPush} />
+      {kickAvailable && (
+        <SettingsSwitchRow icon="flame" title={tr('Arschkicks empfangen')}
+          subtitle={tr('Lustige Motivationssprüche von deinen Mitspielern. Höchstens drei pro Tag.')}
+          checked={kickEnabled} disabled={kickBusy} onChange={onSetKickEnabled} />
+      )}
       {pushBlocked && native && (
         <SettingsRow icon="settings" title={tr('iOS-Einstellungen öffnen')} tone="accent" onClick={() => window.PTPush.openSettings()} />
       )}
@@ -761,9 +781,36 @@ function SettingsEmojiSheet({ open, current, onPick, onClose }) {
 }
 
 // ─── Unterseite: Teilnehmer & Einladen ──────────────────────────────────────
-function SettingsMembersPage({ baseApi, competition, members, me, isOwner, ownerName, onBack, onChanged, onToast }) {
+function stKickFeedback(result, name) {
+  if (result.sent) return result.demo ? tr('Demo-Arschkick für {name} 🍑', { name }) : tr('Arschkick für {name} ist unterwegs 🍑', { name });
+  switch (result.reason) {
+    case 'disabled': return tr('{name} hat Arschkicks ausgeschaltet.', { name });
+    case 'no_device': return tr('Für {name} ist gerade keine Push-Zustellung möglich.', { name });
+    case 'quiet_hours': return tr('Gerade ist Ruhezeit. Versuch es später nochmal.');
+    case 'already_sent_today': return tr('Du hast {name} heute schon motiviert. Morgen geht’s weiter!', { name });
+    case 'daily_limit': return tr('{name} hat heute schon genug Arschkicks bekommen.', { name });
+    default: return tr('Arschkick konnte nicht gesendet werden. Versuch es später nochmal.');
+  }
+}
+
+function SettingsMembersPage({ baseApi, competition, members, me, isOwner, ownerName, canKick = false, onBack, onChanged, onToast }) {
   const [busy, setBusy] = useState(false);
+  const [kicking, setKicking] = useState(null);
+  const [kicked, setKicked] = useState({});
+  const kickDay = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+  const kickedToday = id => kicked[id] === kickDay;
   const is2v2 = competition.mode === '2v2';
+
+  async function kick(m) {
+    if (kicking || kickedToday(m.user_id)) return;
+    setKicking(m.user_id);
+    try {
+      const result = await baseApi.kickMember(competition.id, m.user_id);
+      if (result.sent || result.reason === 'already_sent_today') setKicked(current => ({ ...current, [m.user_id]: kickDay }));
+      onToast?.(stKickFeedback(result, m.profile?.display_name || tr('Diese Person')));
+    } catch (e) { alert(e.message); }
+    finally { setKicking(null); }
+  }
 
   async function run(fn, message) {
     setBusy(true);
@@ -792,7 +839,8 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
   const memberRow = (m) => {
     const isMe = m.user_id === me;
     return (
-      <div key={m.user_id} className="st-row">
+      <div key={m.user_id} className="st-member">
+      <div className="st-row">
         <Avatar profile={m.profile} size={36} />
         <span className="st-row-text">
           <span className="st-row-title">{isMe ? tr('{name} (du)', { name: m.profile?.display_name }) : m.profile?.display_name}</span>
@@ -809,14 +857,26 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
             ))}
           </div>
         )}
-        {canReport && !isMe && (
-          <button type="button" className="st-link" aria-label={tr('{name} melden', { name: m.profile?.display_name })}
-            onClick={() => report(m)}>{tr('Melden')}</button>
-        )}
         {isOwner && !isMe && (
           <SettingsIconButton icon="close" label={tr('{name} entfernen', { name: m.profile?.display_name })} tone="danger"
             disabled={busy} onClick={() => remove(m)} />
         )}
+      </div>
+      {!isMe && (canKick || canReport) && (
+        <div className="st-member-actions">
+          {canKick && (
+            <button type="button" className="st-kick-btn" disabled={busy || !!kicking || kickedToday(m.user_id)}
+              aria-label={tr('{name} einen Arschkick geben', { name: m.profile?.display_name })}
+              onClick={() => kick(m)}>
+              <span aria-hidden="true">🍑</span> {kickedToday(m.user_id) ? tr('Motiviert!') : tr('Arschkick')}
+            </button>
+          )}
+          {canReport && (
+            <button type="button" className="st-link" aria-label={tr('{name} melden', { name: m.profile?.display_name })}
+              onClick={() => report(m)}>{tr('Melden')}</button>
+          )}
+        </div>
+      )}
       </div>
     );
   };
@@ -842,7 +902,8 @@ function SettingsMembersPage({ baseApi, competition, members, me, isOwner, owner
       </SettingsGroup>
 
       {groups.map(g => (
-        <SettingsGroup key={g.key} title={g.title}>
+        <SettingsGroup key={g.key} title={g.title}
+          footer={canKick ? tr('Ein Arschkick schickt einen lustigen Motivationsspruch. Pro Person einmal am Tag.') : null}>
           {g.rows.map(memberRow)}
           {!g.rows.length && <SettingsRow title={tr('Noch niemand')} />}
         </SettingsGroup>
@@ -902,8 +963,8 @@ function SettingsPlanPage({ api, competition, categories, planSlots, rotationCon
       for (const t of template) {
         const match = thisWeek.find(c => c.category_id === t.category_id);
         await api.upsertChallenge(match
-          ? { id: match.id, week_start: weekStart, category_id: t.category_id, chosen_by: match.chosen_by, target_reps: t.base_reps }
-          : { week_start: weekStart, category_id: t.category_id, chosen_by: me, target_reps: t.base_reps });
+          ? { id: match.id, week_start: weekStart, category_id: t.category_id, chosen_by: match.chosen_by, target_reps: t.base_reps, target_runs: t.target_runs }
+          : { week_start: weekStart, category_id: t.category_id, chosen_by: me, target_reps: t.base_reps, target_runs: t.target_runs });
       }
       onToast?.(tr('Woche auf Vorschläge gesetzt'));
     });
@@ -969,8 +1030,10 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
   const catName = cat?.name || tr('Übung');
   const [base, setBase] = useState(String(slot.start_target));
   const [max, setMax] = useState(String(slot.start_target + (slot.bonus_max || 0)));
+  const [runs, setRuns] = useState(String(PTData.workoutTargetRuns(slot)));
   useEffect(() => { setBase(String(slot.start_target)); }, [slot.start_target]);
   useEffect(() => { setMax(String(slot.start_target + (slot.bonus_max || 0))); }, [slot.start_target, slot.bonus_max]);
+  useEffect(() => { setRuns(String(PTData.workoutTargetRuns(slot))); }, [slot.target_runs]);
 
   const commitBase = () => {
     const v = Math.max(1, parseInt(base) || 1);
@@ -1014,7 +1077,16 @@ function PlanSlotRow({ slot, catById, categories, usedInWeek, onChange, onDelete
           <span className="st-select-caret"><Icon name="chevron" size={14} strokeWidth={2.5} /></span>
         </label>
         {workout ? (
-          <span className="st-row-sub">{tr('Pflicht-Workout')}</span>
+          <div className="st-range">
+            <input {...numProps} aria-label={tr('Durchgänge pro Person / Woche')} value={runs}
+              onChange={e => setRuns(e.target.value)}
+              onBlur={() => {
+                const target = PTData.workoutTargetRuns({ target_runs: runs });
+                setRuns(String(target));
+                if (target !== PTData.workoutTargetRuns(slot)) onChange({ target_runs: target });
+              }} />
+            <span>{tr('pro Person')}</span>
+          </div>
         ) : (
           <div className="st-range">
             {PTData.usesMinutes(cat) ? tr('{from} bis {to} min', range) : tr('{from} bis {to} Reps', range)}
@@ -1107,9 +1179,11 @@ function SettingsPenaltyPage({ api, competition, cfg, isOwner, ownerName, busyMo
 // Default = base_reps, range = [base_reps, base_reps + bonus_max].
 function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub }) {
   const catById = Object.fromEntries(categories.map(c => [c.id, c]));
+  const isWorkout = t => PTData.isWorkoutType(catById[t.category_id]?.challenge_type);
+  const initialValue = t => isWorkout(t) ? PTData.workoutTargetRuns(t) : t.base_reps;
   const [values, setValues] = useState(() => {
     const initial = {};
-    for (const t of template) initial[t.slot_id] = t.base_reps;
+    for (const t of template) initial[t.slot_id] = initialValue(t);
     return initial;
   });
   const [busy, setBusy] = useState(false);
@@ -1117,8 +1191,8 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub })
 
   const step = (n) => n < 30 ? 1 : n < 100 ? 5 : 10;
   const bump = (t, dir) => {
-    const cur = values[t.slot_id] ?? t.base_reps;
-    const next = Math.max(1, cur + dir * step(cur));
+    const cur = values[t.slot_id] ?? initialValue(t);
+    const next = Math.max(1, cur + dir * (isWorkout(t) ? 1 : step(cur)));
     setValues({ ...values, [t.slot_id]: next });
   };
   const setExact = (t, raw) => {
@@ -1129,7 +1203,11 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub })
 
   const fix = async () => {
     setBusy(true);
-    try { await onFix(template.map(t => ({ category_id: t.category_id, target_reps: values[t.slot_id] ?? t.base_reps }))); }
+    try { await onFix(template.map(t => ({
+      category_id: t.category_id,
+      target_reps: isWorkout(t) ? t.base_reps : (values[t.slot_id] ?? t.base_reps),
+      target_runs: isWorkout(t) ? (values[t.slot_id] ?? initialValue(t)) : 1,
+    }))); }
     finally { setBusy(false); }
   };
 
@@ -1148,7 +1226,7 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub })
       <div className="weekfix-list">
         {template.map(t => {
           const cat = catById[t.category_id];
-          const cur = values[t.slot_id] ?? t.base_reps;
+          const cur = values[t.slot_id] ?? initialValue(t);
           const isObligatory = cat?.challenge_type === 'tom_holland' || cat?.challenge_type === 'bring_sally_up';
           return (
             <div className="weekfix-item" key={t.slot_id}>
@@ -1156,23 +1234,21 @@ function WeekFixCard({ template, categories, me, onFix, onDismiss, title, sub })
                 <span className="weekfix-item-name">{cat?.name || tr('Unbekannt')}</span>
                 {isObligatory && <span className="weekfix-pflicht-badge">{tr('PFLICHT')}</span>}
               </div>
-              {isObligatory ? (
-                <div className="weekfix-range weekfix-range-fixed" style={{textAlign:'center',padding:'10px 0'}}>{tr('Wird jede Woche gemacht')}</div>
-              ) : (
-                <>
+              <>
                   <div className="weekfix-stepper">
                     <button className="weekfix-step" disabled={cur <= 1}
                       onClick={() => bump(t, -1)} aria-label={tr('weniger')}>−</button>
                     <input className="weekfix-val mono" type="number" inputMode="numeric"
-                      value={cur}
+                      value={cur} min={1} aria-label={isObligatory ? tr('Durchgänge pro Person / Woche') : tr('Ziel-Wiederholungen / Woche')}
                       onFocus={e => e.target.select()}
                       onChange={e => setExact(t, e.target.value)}/>
                     <button className="weekfix-step"
                       onClick={() => bump(t, 1)} aria-label={tr('mehr')}>+</button>
                   </div>
-                  <div className="weekfix-range weekfix-range-fixed">{tr('Vorschlag: {n}', { n: t.base_reps })}</div>
-                </>
-              )}
+                  <div className="weekfix-range weekfix-range-fixed">{isObligatory
+                    ? (cur === 1 ? tr('Wird jede Woche gemacht') : tr('{n}× pro Person', { n: cur }))
+                    : tr('Vorschlag: {n}', { n: t.base_reps })}</div>
+              </>
             </div>
           );
         })}

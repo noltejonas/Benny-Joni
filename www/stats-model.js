@@ -2,7 +2,7 @@
 //
 // Stats zeigen nur Sport: Work-Kategorien fließen nicht ein. Pflicht-Workouts
 // (s.workout / ch.workout, siehe PTData.annotateWorkouts) zählen nie als Reps;
-// ihr Ziel ist ein Durchgang pro Person.
+// ihr Ziel ist target_runs Durchgänge pro Person (ohne Feld: ein Durchgang).
 //
 // Ziele werden immer gegen den fairen Anteil gemessen: target_reps ist das
 // gemeinsame Wochenziel, jede Person schuldet ceil(target / Teilnehmer), ein
@@ -97,15 +97,14 @@
         const cs = setsByCh[ch.id] || [];
         const participants = participantsOf(members, ch);
         const partIds = new Set(participants.map(m => m.user_id));
-        const share = ch.workout ? 1 : P.fairShareOf(ch.target_reps, participants.length || sides.length);
+        const share = ch.workout ? P.workoutTargetRuns(ch) : P.fairShareOf(ch.target_reps, participants.length || sides.length);
         const perSide = sides.map((side, i) => {
           const mine = cs.filter(s => sideOf[s.athlete] === i);
           // Wer auf dieser Seite schuldet in dieser Woche einen Anteil?
           const owing = participants.length ? idsOf(side).filter(id => partIds.has(id)) : idsOf(side);
           if (ch.workout) {
-            const did = new Set(mine.map(s => s.athlete));
-            const hit = owing.length > 0 && owing.every(id => did.has(id));
-            return { value: mine.length, goal: owing.length, hit, sets: mine, owing };
+            const hit = owing.length > 0 && P.workoutPeopleDone(mine, owing, share) === owing.length;
+            return { value: P.workoutRunCount(mine), goal: share * owing.length, hit, sets: mine, owing };
           }
           const value = mine.reduce((a, s) => a + P.setValue(s), 0);
           const goal = share * owing.length;
@@ -293,7 +292,7 @@
           if (!p.owing.includes(me)) continue;
           const myOwn = p.sets.filter(s => s.athlete === me);
           const hit = r.ch.workout
-            ? myOwn.length > 0
+            ? P.workoutRunCount(myOwn) >= r.share
             : myOwn.reduce((a, s) => a + P.setValue(s), 0) >= r.share;
           goals++;
           if (hit) goalsHit++;
@@ -416,7 +415,8 @@
       const scaled = target * factor;
       const nice = scaled >= 20 ? Math.round(scaled / 5) * 5 : Math.round(scaled);
       const base = ch.workout || factor === 1 ? target : Math.max(target, nice);
-      out.push({ category_id: ch.category_id, base_reps: base, bonus_max: 0, slot_id: `prev-${ch.category_id}` });
+      out.push({ category_id: ch.category_id, base_reps: base, bonus_max: 0,
+        target_runs: P.workoutTargetRuns(ch), slot_id: `prev-${ch.category_id}` });
     }
     return out;
   }

@@ -8,6 +8,7 @@ YOUR GOAL, YOUR CHALLENGE
 • Set one or more weekly goals with your chosen exercises
 • Log sets quickly and add entries you forgot
 • Use your own exercises and workouts with a timer
+• Set multiple Bring Sally Up runs per person per week
 • Take part in several challenges at once
 
 SEE WHO KEEPS GOING
@@ -19,6 +20,6 @@ Want to agree an amount for your group kitty when someone misses a goal? The opt
 TAKE A LOOK FIRST
 The demo shows the app with sample data, without creating an account. Register with email and password to start your own challenges.
 
-Choose English or German in the app.
+Choose English, German, Finnish or Swedish in the app.
 
 Questions and feedback can be sent through the support page.

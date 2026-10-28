@@ -191,6 +191,45 @@ async function signedInApi(opts = {}, windowExtra = {}) {
   return { api, calls: fake.calls, ...loaded };
 }
 
+test('Arschkick-Einstellung aktualisiert ausschließlich das eigene Profil', async () => {
+  const { api } = await signedInApi({ respond: (table, ops) => {
+    assert.equal(table, 'profiles');
+    assert.deepEqual(ops.map(op => op.name), ['update', 'eq', 'select', 'single']);
+    assert.equal(JSON.stringify(ops[0].args), JSON.stringify([{ kick_enabled: false }]));
+    assert.deepEqual(ops[1].args, ['id', 'u1']);
+    return { data: { id: 'u1', kick_enabled: false }, error: null };
+  } });
+  assert.equal((await api.setKickEnabled(false)).kick_enabled, false);
+});
+
+test('Arschkick nutzt authentifizierte Function und bewahrt Opt-out-/Limit-Antworten', async () => {
+  let response = { data: { sent: true }, error: null };
+  const { api, calls } = await signedInApi({ invoke: async (name, options) => {
+    assert.equal(name, 'kick-teammate');
+    assert.equal(JSON.stringify(options.body), JSON.stringify({ competition_id: 'c1', recipient_id: 'u2' }));
+    return response;
+  } });
+  assert.equal((await api.kickMember('c1', 'u2')).sent, true);
+  for (const reason of ['disabled', 'quiet_hours', 'no_device', 'already_sent_today', 'daily_limit']) {
+    response = { data: { sent: false, reason }, error: null };
+    assert.equal((await api.kickMember('c1', 'u2')).reason, reason);
+  }
+  assert.equal(calls.filter(c => c.invoke).length, 6);
+  response = { data: { ok: true }, error: null };
+  await assert.rejects(api.kickMember('c1', 'u2'), /Arschkick konnte nicht gesendet werden/);
+  response = { data: null, error: new TypeError('Failed to fetch') };
+  await assert.rejects(api.kickMember('c1', 'u2'), error => error.code === 'offline');
+});
+
+test('ohne Anmeldung wird kein Arschkick verschickt', async () => {
+  const fake = fakeClient({ getSession: async () => ({ data: { session: null } }) });
+  const { D } = load({ window: { supabase: { createClient: () => fake.client } } });
+  const api = D.init({ url: 'u', key: 'k' });
+  await api.getSession();
+  await assert.rejects(api.kickMember('c1', 'u2'), /Bitte zuerst anmelden/);
+  assert.equal(fake.calls.filter(c => c.invoke).length, 0);
+});
+
 test('getAdsEnabled: ausschließlich explizites Server-true erlaubt, ohne Session oder Cache', async () => {
   let response = { data: { ads_enabled: true }, error: null };
   const fake = fakeClient({ respond: (table, ops) => {
@@ -429,4 +468,28 @@ test('Wochenabschluss wertet nur Sport: versteckte Work-Ziele erzeugen und tilge
   assert.equal(inserted[0].amount_cents, 500);
   assert.deepEqual(await capi.listPenalties(), before, 'bestehende Strafe bleibt unverändert');
   assert.ok(!mutations.some(m => m.table === 'penalties' && m.name !== 'insert'));
+});
+
+
+test('Workout-Wochenplan behält die Zahl der Durchgänge beim Anlegen oder Kopieren', async () => {
+  let inserted;
+  const { api } = await signedInApi({ respond: (table, ops) => {
+    assert.equal(table, 'plan_slots');
+    inserted = ops.find(op => op.name === 'insert').args[0];
+    return { data: { id: 'slot-1', ...inserted }, error: null };
+  } });
+  await api.forCompetition('c1').addPlanSlot({ category_id: 'sally', week_index: 1, start_target: 204, target_runs: 3 });
+  assert.equal(inserted.target_runs, 3);
+  assert.equal(inserted.start_target, 204);
+});
+
+test('neuer Wochenabschluss kennzeichnet Workout-Unterstützung und erklärt erforderliches Update', async () => {
+  let inserted;
+  const { api } = await signedInApi({ respond: (table, ops) => {
+    assert.equal(table, 'week_closures');
+    inserted = ops.find(op => op.name === 'insert').args[0];
+    return { data: null, error: { code: 'P0001', message: 'workout_update_required' } };
+  } });
+  await assert.rejects(api.forCompetition('c1').closeWeek('2026-10-19'), /Bitte aktualisiere die App/);
+  assert.equal(inserted.workout_targets_version, 2);
 });

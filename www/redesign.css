@@ -975,6 +975,11 @@ button.st-row:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .st-segmented, .st-team-switch { margin: 0; }
 .st-team-switch { flex-shrink: 0; }
 .st-team-switch button { min-width: 36px; min-height: 32px; padding: 0 10px; }
+.st-member .st-row-text { min-width: 0; }
+.st-member-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 0 16px 12px 66px; }
+.st-kick-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 12px; border: 0; border-radius: 12px; background: var(--primary-tint); color: var(--primary-ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.st-kick-btn:disabled { opacity: .5; cursor: default; }
+.st-kick-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .toggle-switch { flex-shrink: 0; }
 .toggle-switch input:disabled + .toggle-slider { opacity: 0.45; cursor: not-allowed; }

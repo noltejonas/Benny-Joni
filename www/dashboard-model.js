@@ -41,22 +41,22 @@
       const minutes = P.usesMinutes(cat);
       const isWork = cat?.kind === 'work';
       const catType = cat?.challenge_type || 'standard';
-      // Pflicht-Workout: jeder Eintrag ist ein Durchgang, Ziel ist einer pro Person.
+      // Pflicht-Workout: gespeicherte Durchgänge je Person, standardmäßig einer.
       const isObligatory = P.isWorkoutType(catType);
       const val = (x) => (minutes ? (x.duration_minutes ?? 0) : (x.reps ?? 0));
       const csets = (sets || []).filter(x => x.challenge_id === ch.id);
+      const people = participantCount || sides.length || 1;
+      const share = isObligatory ? P.workoutTargetRuns(ch) : P.fairShareOf(ch.target_reps, people);
       const doneBySide = sides.map(side => (isObligatory
-        ? P.workoutPeopleDone(csets, idsOf(side))
+        ? P.workoutProgress(csets, idsOf(side), share)
         : csets.filter(s => idsOf(side).includes(s.athlete)).reduce((a, s) => a + val(s), 0)));
       const total = isObligatory ? doneBySide.reduce((a, x) => a + x, 0) : csets.reduce((a, x) => a + val(x), 0);
-      const people = participantCount || sides.length || 1;
-      const share = isObligatory ? 1 : P.fairShareOf(ch.target_reps, people);
-      const goal = isObligatory ? people : ch.target_reps;
+      const goal = isObligatory ? people * share : ch.target_reps;
       // Ziel einer Seite: Anteil pro Person mal Personen (Team = Summe)
       const sideGoals = sides.map(side => share * Math.max(1, side.userIds.length));
       const expectedByEod = Math.ceil(share * dayIndexInWeek(ch.week_start, today) / 7);
       const mine = csets.filter(x => x.athlete === me);
-      const myDone = isObligatory ? mine.length : mine.reduce((a, x) => a + val(x), 0);
+      const myDone = isObligatory ? P.workoutRunCount(mine) : mine.reduce((a, x) => a + val(x), 0);
       return {
         ch, cat, minutes, isWork, catType, isObligatory, total, goal, share, doneBySide, sideGoals,
         leader: isObligatory ? null : leaderIndex(doneBySide),
@@ -128,9 +128,7 @@
       }
       const finished = g.entries.every(e => e.row.meFinished);
       // Fortschritt = die Challenge, in der ich am weitesten zurück bin
-      const pct = g.isObligatory
-        ? (finished ? 1 : 0)
-        : Math.min(...g.entries.map(e => Math.min(1, e.row.myDone / Math.max(1, e.row.share))));
+      const pct = Math.min(...g.entries.map(e => Math.min(1, e.row.myDone / Math.max(1, e.row.share))));
       return {
         ...g, myWeek, finished, pct,
         shareMax: Math.max(...g.entries.map(e => e.row.share)),

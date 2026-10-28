@@ -418,7 +418,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
                 : tr('gemeinsam {done} / {target} Reps', { done: fmt(f.total), target: fmt(f.ch.target_reps) })}
           </span>
           <span className="rd-chip-glass">
-            {f.isObligatory ? (f.meFinished ? tr('du: {summary}', { summary: f.mySummary }) : tr('einmal diese Woche'))
+            {f.isObligatory ? (f.meFinished ? tr('du: {summary}', { summary: f.mySummary }) : f.share === 1 ? tr('einmal diese Woche') : tr('{done} / {total} Durchgänge', { done: f.myDone, total: f.share }))
               : f.meFinished ? tr('dein Teil ist erledigt')
               : f.myTodayLeft > 0 ? tr('heute noch {amount}', { amount: fmt(f.myTodayLeft) }) : tr('du bist auf Kurs')}
           </span>
@@ -469,7 +469,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
             const fmt = fmtOf(r);
             const progress = { done: fmt(r.myDone), total: fmt(r.share) };
             const sub = r.isObligatory
-              ? (r.meFinished ? tr('erledigt · {summary}', { summary: r.mySummary }) : tr('einmal diese Woche'))
+              ? (r.meFinished ? tr('erledigt · {summary}', { summary: r.mySummary }) : r.share === 1 ? tr('einmal diese Woche') : tr('{done} / {total} Durchgänge', { done: r.myDone, total: r.share }))
               : r.meFinished
                 ? tr('{done} von {total}', progress)
                 : r.myTodayLeft > 0
@@ -556,7 +556,7 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
                       <span className="rd-row-sub">{isConfirmed && ch.chosen_by ? chosenByLabel(ch.chosen_by) : tr('noch offen')}</span>
                     </span>
                     <span className="rd-row-value">
-                      {PTData.isWorkoutType(ctype) ? <>1×<small>{tr('pro Person')}</small></> : <>
+                      {PTData.isWorkoutType(ctype) ? <>{PTData.workoutTargetRuns(ch)}×<small>{tr('pro Person')}</small></> : <>
                         {!isConfirmed && ch.bonus_max > 0
                           ? <>{ch.target_reps}–{ch.target_reps + ch.bonus_max}</>
                           : ch.target_reps}
@@ -594,8 +594,16 @@ const UNIT_KIND = { reps: 'sports', minutes: 'time', work: 'work' };
 function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart, existing, participantCount = 2,
   competitionName = '', usedCategoryIds = [], otherComps = [], onClose, onSaved, onDeleted, onAddCategory }) {
   const people = Math.max(1, participantCount);
-  const [catId, setCatId] = useState(existing?.category_id || categories.find(c => !usedCategoryIds.includes(c.id))?.id || categories[0]?.id || '');
-  const selectedCat = categories.find(c => c.id === catId);
+  // Keep newly created rows selected until the parent category reload arrives.
+  const [addedCategories, setAddedCategories] = useState([]);
+  const categoryOptions = [...categories, ...addedCategories.filter(c => !categories.some(x => x.id === c.id))];
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatUnit, setNewCatUnit] = useState('reps');
+  const [catId, setCatId] = useState(existing?.category_id || categoryOptions.find(c => !usedCategoryIds.includes(c.id))?.id || categoryOptions[0]?.id || '');
+  const selectedCat = showNewCat
+    ? { name: newCatName.trim(), kind: UNIT_KIND[newCatUnit] || 'sports', competition_id: api.competitionId || 'custom-draft' }
+    : categoryOptions.find(c => c.id === catId);
   const minutes = PTData.usesMinutes(selectedCat);
   const isWorkout = PTData.isWorkoutType(selectedCat?.challenge_type);
   const [perPerson, setPerPerson] = useState(() => { try { return localStorage.getItem(GOAL_INPUT_KEY) !== 'total'; } catch (e) { return true; } });
@@ -613,23 +621,29 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
   const [nextWeek, setNextWeek] = useState(false);
   // Belegt: Übung hat diese Woche schon ein Ziel (beim Bearbeiten und für nächste Woche frei).
   const isUsed = (id) => !existing && !nextWeek && usedCategoryIds.includes(id);
-  const firstFree = (skipId) => categories.find(c => c.id !== skipId && !usedCategoryIds.includes(c.id))?.id || '';
+  const firstFree = (skipId) => categoryOptions.find(c => c.id !== skipId && !usedCategoryIds.includes(c.id))?.id || '';
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [alsoIn, setAlsoIn] = useState([]);
   const chosenBy = existing?.chosen_by || me;
-  const [showNewCat, setShowNewCat] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatUnit, setNewCatUnit] = useState('reps');
+  const [targetRuns, setTargetRuns] = useState(() => PTData.workoutTargetRuns(existing));
   const [editingCat, setEditingCat] = useState(null); // {id, name, emoji}
   const [saving, setSaving] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const mutationRef = React.useRef(false);
+  const busy = saving || addingCategory;
   const [deleting, setDeleting] = useState(false);
-  const target = isWorkout ? 1 : existing && !dirty && existing.category_id === catId ? existing.target_reps
+  const target = isWorkout ? (existing?.target_reps || 1) : existing && !dirty && existing.category_id === catId ? existing.target_reps
     : perPerson ? amount * people : amount;
   const ws = existing ? existing.week_start || weekStart : nextWeek ? PTData.addDays(weekStart, 7) : weekStart;
 
   function pick(c) {
+    setShowNewCat(false);
     setCatId(c.id);
     if (!touched) setAmount(defaultAmount(c));
+  }
+  function pickNewUnit(unit) {
+    setNewCatUnit(unit);
+    if (!touched) setAmount(defaultAmount({ kind: UNIT_KIND[unit] || 'sports' }));
   }
   function switchInput(pp) {
     if (pp === perPerson) return;
@@ -664,26 +678,32 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
   }
 
   async function save() {
-    if (!catId) return;
-    if (isUsed(catId)) { alert(tr('Diese Übung hat diese Woche schon ein Ziel. Wähl eine andere.')); return; }
+    if (mutationRef.current || (showNewCat ? !newCatName.trim() : !selectedCat?.id)) return;
+    mutationRef.current = true;
     setSaving(true);
     try {
+      const cat = showNewCat ? await createNewCategory() : selectedCat;
+      if (isUsed(cat.id)) { alert(tr('Diese Übung hat diese Woche schon ein Ziel. Wähl eine andere.')); return; }
+      const workout = PTData.isWorkoutType(cat.challenge_type);
+      const savedKey = PTData.exerciseKey(cat);
       await api.upsertChallenge({
         ...(existing?.id ? { id: existing.id } : { week_start: ws }),
-        category_id: catId,
+        category_id: cat.id,
         chosen_by: chosenBy,
-        target_reps: Math.max(1, Math.round(target)),
+        target_reps: workout ? (existing?.target_reps || 1) : Math.max(1, Math.round(target)),
+        target_runs: workout ? targetRuns : 1,
       });
       // Dasselbe Ziel in den ausgewählten anderen Challenges
       let copied = 0;
       for (const o of others.filter(x => alsoIn.includes(x.c.id) && !x.has)) {
         const capi = baseApi.forCompetition(o.c.id);
-        let otherCat = selectedCat.competition_id == null ? selectedCat
-          : o.categories.find(c => PTData.exerciseKey(c) === key);
-        if (!otherCat) otherCat = await capi.addCategory(selectedCat.name, selectedCat.emoji, selectedCat.kind || 'sports');
+        let otherCat = cat.competition_id == null ? cat
+          : o.categories.find(c => PTData.exerciseKey(c) === savedKey);
+        if (!otherCat) otherCat = await capi.addCategory(cat.name, cat.emoji, cat.kind || 'sports');
         await capi.upsertChallenge({
           week_start: ws, category_id: otherCat.id, chosen_by: me,
-          target_reps: isWorkout ? 1 : Math.max(1, Math.round(perPerson ? amount * o.participantCount : amount)),
+          target_reps: workout ? 1 : Math.max(1, Math.round(perPerson ? amount * o.participantCount : amount)),
+          target_runs: workout ? targetRuns : 1,
         });
         copied++;
       }
@@ -691,29 +711,38 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
     } catch (e) {
       alert(e.message || tr('Fehler beim Speichern'));
     } finally {
+      mutationRef.current = false;
       setSaving(false);
     }
   }
 
+  async function createNewCategory() {
+    const cat = await api.addCategory(newCatName.trim(), '💪', UNIT_KIND[newCatUnit] || 'sports');
+    setAddedCategories(rows => [...rows, cat]);
+    setCatId(cat.id);
+    if (!touched) setAmount(defaultAmount(cat));
+    setShowNewCat(false);
+    setNewCatName('');
+    setNewCatUnit('reps');
+    return cat;
+  }
+
   async function addNewCat() {
-    if (!newCatName.trim()) return;
+    if (mutationRef.current || !newCatName.trim()) return;
+    mutationRef.current = true;
+    setAddingCategory(true);
     try {
-      const cat = await api.addCategory(newCatName.trim(), '💪', UNIT_KIND[newCatUnit] || 'sports');
-      onAddCategory();
-      setCatId(cat.id);
-      if (!touched) setAmount(defaultAmount(cat));
-      setShowNewCat(false);
-      setNewCatName('');
-      setNewCatUnit('reps');
-    } catch (e) {
-      alert(e.message);
-    }
+      await createNewCategory();
+      onAddCategory?.();
+    } catch (e) { alert(e.message); }
+    finally { mutationRef.current = false; setAddingCategory(false); }
   }
 
   async function saveEdit() {
     if (!editingCat?.name.trim()) return;
     try {
       await api.updateCategory(editingCat.id, { name: editingCat.name.trim(), emoji: editingCat.emoji });
+      setAddedCategories(rows => rows.map(c => c.id === editingCat.id ? { ...c, ...editingCat, name: editingCat.name.trim() } : c));
       setEditingCat(null);
       onAddCategory();
     } catch (e) {alert(e.message);}
@@ -724,21 +753,22 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
     try {
       await api.deleteCategory(editingCat.id);
       if (catId === editingCat.id) setCatId(firstFree(editingCat.id));
+      setAddedCategories(rows => rows.filter(c => c.id !== editingCat.id));
       setEditingCat(null);
       onAddCategory();
     } catch (e) {alert(e.message);}
   }
 
   const groups = [
-    { id: 'sports', label: null, items: categories.filter(c => (c.kind || 'sports') === 'sports') },
-    { id: 'time', label: tr('⏱️ Zeit'), items: categories.filter(c => c.kind === 'time') },
+    { id: 'sports', label: null, items: categoryOptions.filter(c => (c.kind || 'sports') === 'sports') },
+    { id: 'time', label: tr('⏱️ Zeit'), items: categoryOptions.filter(c => c.kind === 'time') },
     { id: 'work', label: tr('💻 Work'), items: allowWork ? categories.filter(c => c.kind === 'work') : [] },
   ];
   const card = (c) => {
     const used = isUsed(c.id);
     return (
-      <div key={c.id} className={`cat-card-wrap ${catId === c.id ? 'selected' : ''}`}>
-        <button className={`cat-card ${catId === c.id ? 'selected' : ''}`} disabled={used} onClick={() => pick(c)}
+      <div key={c.id} className={`cat-card-wrap ${!showNewCat && catId === c.id ? 'selected' : ''}`}>
+        <button className={`cat-card ${!showNewCat && catId === c.id ? 'selected' : ''}`} disabled={used || busy} onClick={() => pick(c)}
           aria-label={used ? tr('{name}, hat diese Woche schon ein Ziel', { name: c.name }) : undefined}>
           <div className="name">{c.name}</div>
           {used ? <div className="cat-note">{tr('läuft schon')}</div>
@@ -781,7 +811,7 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
           </React.Fragment>
         ))}
         <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
-          onClick={() => { setShowNewCat((v) => !v); setEditingCat(null); }}>
+          disabled={busy} onClick={() => { setShowNewCat((v) => !v); setEditingCat(null); }}>
           <div className="emoji">＋</div>
           <div className="name">{tr('Eigene Übung')}</div>
         </button>
@@ -806,21 +836,28 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
           </div>
           <div className="label" style={{ margin: '12px 0 8px' }}>{tr('Einheit')}</div>
           <div className="segmented goal-seg" role="radiogroup" aria-label={tr('Einheit')}>
-            <button role="radio" aria-checked={newCatUnit === 'reps'} className={newCatUnit === 'reps' ? 'active' : ''} onClick={() => setNewCatUnit('reps')}>{tr('Wiederholungen')}</button>
-            <button role="radio" aria-checked={newCatUnit === 'minutes'} className={newCatUnit === 'minutes' ? 'active' : ''} onClick={() => setNewCatUnit('minutes')}>{tr('Minuten')}</button>
-            {allowWork && <button role="radio" aria-checked={newCatUnit === 'work'} className={newCatUnit === 'work' ? 'active' : ''} onClick={() => setNewCatUnit('work')}>{tr('Work')}</button>}
+            <button role="radio" aria-checked={newCatUnit === 'reps'} className={newCatUnit === 'reps' ? 'active' : ''} onClick={() => pickNewUnit('reps')}>{tr('Wiederholungen')}</button>
+            <button role="radio" aria-checked={newCatUnit === 'minutes'} className={newCatUnit === 'minutes' ? 'active' : ''} onClick={() => pickNewUnit('minutes')}>{tr('Minuten')}</button>
+            {allowWork && <button role="radio" aria-checked={newCatUnit === 'work'} className={newCatUnit === 'work' ? 'active' : ''} onClick={() => pickNewUnit('work')}>{tr('Work')}</button>}
           </div>
           <div className="goal-hint">
             {newCatUnit === 'minutes' ? tr('Für alles, was man nach Zeit misst: Lesen, Planks, Laufen, Dehnen.')
               : newCatUnit === 'work' ? tr('Arbeitszeit mit Projekt und Tool, nur mit Work-Tracking.')
               : tr('Gezählt wird in Wiederholungen.')}
           </div>
-          <button className="btn" style={{ marginTop: 12 }} disabled={!newCatName.trim()} onClick={addNewCat}>{tr('Übung anlegen')}</button>
+          <button className="btn" style={{ marginTop: 12 }} disabled={busy || !newCatName.trim()} onClick={addNewCat}>{tr('Übung anlegen')}</button>
         </div>
       }
 
       {isWorkout ? (
-        <div className="goal-workout">{tr('Pflicht-Workout: jede Person einmal pro Woche.')}</div>
+        <div style={{ marginTop: 20 }}>
+          <div className="label">{tr('Durchgänge pro Person / Woche')}</div>
+          <Stepper value={targetRuns} onChange={setTargetRuns} step={1} min={1} />
+          <div className="chip-row" style={{ justifyContent: 'center' }}>
+            {[1, 2, 3, 5, 7].map(v => <button key={v} className="chip" onClick={() => setTargetRuns(v)}>{v}×</button>)}
+          </div>
+          <div className="goal-hint">{tr('Jeder gespeicherte Durchgang zählt für das Wochenziel.')}</div>
+        </div>
       ) : (
         <div style={{ marginTop: 20 }}>
           <ObAmount value={amount} onChange={(v) => { setTouched(true); setDirty(true); setAmount(v); }} unit={unitLabel}
@@ -881,8 +918,8 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
 
       <div className="btn-row" style={{ marginTop: 24 }}>
         <button className="btn btn-secondary" onClick={onClose}>{tr('Abbrechen')}</button>
-        <button className="btn" onClick={save} disabled={saving || !catId}>
-          {saving ? '…' : tr('Speichern')}
+        <button className="btn" onClick={save} disabled={busy || (showNewCat ? !newCatName.trim() : !selectedCat?.id)}>
+          {busy ? '…' : tr('Speichern')}
         </button>
       </div>
       {existing?.id &&
