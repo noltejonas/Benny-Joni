@@ -295,9 +295,7 @@ PTi18n.add('en', {
 
   // ── onboarding-model.js ──
   'Komm in meine Challenge „{name}“ bei {app} 💪': 'Join my challenge “{name}” on {app} 💪',
-  'App laden: {url}': 'Get the app: {url}',
-  'Im App Store: {app}': 'On the App Store: {app}',
-  'Schon installiert? {link}': 'Already installed? {link}',
+  'Mitmachen: {url}': 'Join here: {url}',
   'Art: {label}': 'Type: {label}',
   'Satz-ID: {id}': 'Set ID: {id}',
   'Nutzer-ID: {id}': 'User ID: {id}',
@@ -1099,5 +1097,24 @@ PTi18n.add('en', {
   '{n}× pro Person': '{n}× per person',
   '{n}× p. P.': '{n}× each',
   'Ziel-Wiederholungen / Woche': 'Target reps / week',
-  "Bitte aktualisiere die App, um diese Woche abzuschließen.": "Please update the app to close this week."
+  "Bitte aktualisiere die App, um diese Woche abzuschließen.": "Please update the app to close this week.",
+  // ── Alle Challenges, Strafkonto-Übersicht, Widget ──
+  'Heute, Feed, Stats und Strafkonto zusammen': 'Today, Feed, Stats and Penalties together',
+  'Stand pro Übung': 'Score per exercise',
+  'Deine Stats über alle Challenges': 'Your stats across all challenges',
+  'Kontostand aller Challenges': 'Balance of all challenges',
+  'Offen in allen Challenges': 'Open in all challenges',
+  '{n} Challenges mit Strafkonto': { one: '{n} challenge with penalties', other: '{n} challenges with penalties' },
+  '{n} offene Abschlüsse': { one: '{n} open week close', other: '{n} open week closes' },
+  'Strafen gesamt': 'Penalties in total',
+  'Pro Challenge': 'Per challenge',
+  'Strafkonto von {name} öffnen': 'Open penalties of {name}',
+  'du: {amount} offen': 'you: {amount} open',
+  'du: beglichen': 'you: settled',
+  '{n} Abschlüsse offen': { one: '{n} week to close', other: '{n} weeks to close' },
+  'sauber': 'clean',
+  'Kein Strafkonto in {name}': 'No penalties in {name}',
+  'Das Strafkonto lässt sich in den Einstellungen der Challenge einschalten.': 'You can turn on penalties in the challenge settings.',
+  'Alles erledigt 💪': 'All done 💪',
+  'Öffne die App für deine neuen Ziele.': 'Open the app for your new goals.'
 });

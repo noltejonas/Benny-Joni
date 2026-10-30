@@ -8,35 +8,79 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		41A59D891EDDD47372D4F932 /* BennyJoniWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F6E5E508A55957380FCB980A /* BennyJoniWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
-		5E3A1C0C2E9F4A7100D1B2C3 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3A1C0B2E9F4A7100D1B2C3 /* SceneDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
-		FE8A75272B7DA2F86FC7388B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 52C56C2F0BC60E0815C7732A /* PrivacyInfo.xcprivacy */; };
+		5E3A1C0C2E9F4A7100D1B2C3 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3A1C0B2E9F4A7100D1B2C3 /* SceneDelegate.swift */; };
+		643EA112BB625D9793359026 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFBFE99F39A834D375CA49E /* MainViewController.swift */; };
 		7A1E0B012F00000100A1B2C3 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E0B022F00000100A1B2C3 /* InfoPlist.strings */; };
+		81995F9119B5F1B64036C877 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEFDD39101BBDE6B06EEA33D /* WidgetBridgePlugin.swift */; };
+		9C713D9E260D7857BF331BCC /* WidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BF41331A598F8D8ACF5253 /* WidgetStore.swift */; };
+		9E0DE632595CDB554C5D1D4F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2B4B1C24F40B12DE8DA38940 /* Localizable.strings */; };
+		CD6731C845650ED739D8F391 /* WidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BF41331A598F8D8ACF5253 /* WidgetStore.swift */; };
+		F1009A3A0B4B78BC8CC7B548 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 011DB14BC720148964A0644E /* PrivacyInfo.xcprivacy */; };
+		F732AF0C00409D2F6FC20D6E /* BennyJoniWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438464BCEFC8F98AA2504D59 /* BennyJoniWidget.swift */; };
+		FE8A75272B7DA2F86FC7388B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 52C56C2F0BC60E0815C7732A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		FA84384CB517BDDA25413E05 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1DE8D5E98B7AEEF3C2062897;
+			remoteInfo = BennyJoniWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BE00B73CBF649FAE7986BE08 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				41A59D891EDDD47372D4F932 /* BennyJoniWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		011DB14BC720148964A0644E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		03BC73ABFE436C474F14E58A /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		28BF41331A598F8D8ACF5253 /* WidgetStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetStore.swift; sourceTree = "<group>"; };
+		2DFBFE99F39A834D375CA49E /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		438464BCEFC8F98AA2504D59 /* BennyJoniWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BennyJoniWidget.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		5E3A1C0B2E9F4A7100D1B2C3 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		52C56C2F0BC60E0815C7732A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		58A19A809B965C1A294F062A /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5E3A1C0B2E9F4A7100D1B2C3 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		73E4762234AF5319FFCD98CB /* de */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
 		7A1E0B032F00000100A1B2C3 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		7A1E0B042F00000100A1B2C3 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		7A1E0B052F00000100A1B2C3 /* fi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fi; path = fi.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		7A1E0B062F00000100A1B2C3 /* sv */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		C208C67467B1C18D997860E0 /* BennyJoniWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = BennyJoniWidget.entitlements; sourceTree = "<group>"; };
+		CA5BD014ABF2DCA3FEE547EB /* fi */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = fi; path = fi.lproj/Localizable.strings; sourceTree = "<group>"; };
+		CEFDD39101BBDE6B06EEA33D /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
+		CF6C12915FD8DD3F543BF879 /* sv */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = sv; path = sv.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F6E5E508A55957380FCB980A /* BennyJoniWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BennyJoniWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +89,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B28B5A0F9FEA328EA006D8A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,6 +108,8 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				D94DF0BA47C1D261B4D1E56C /* Shared */,
+				AA7287DF9D8B55B5EEC5302F /* BennyJoniWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -64,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				F6E5E508A55957380FCB980A /* BennyJoniWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,13 +136,54 @@
 				7A1E0B022F00000100A1B2C3 /* InfoPlist.strings */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				CEFDD39101BBDE6B06EEA33D /* WidgetBridgePlugin.swift */,
+				2DFBFE99F39A834D375CA49E /* MainViewController.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		AA7287DF9D8B55B5EEC5302F /* BennyJoniWidget */ = {
+			isa = PBXGroup;
+			children = (
+				438464BCEFC8F98AA2504D59 /* BennyJoniWidget.swift */,
+				58A19A809B965C1A294F062A /* Info.plist */,
+				C208C67467B1C18D997860E0 /* BennyJoniWidget.entitlements */,
+				011DB14BC720148964A0644E /* PrivacyInfo.xcprivacy */,
+				2B4B1C24F40B12DE8DA38940 /* Localizable.strings */,
+			);
+			name = BennyJoniWidget;
+			path = BennyJoniWidget;
+			sourceTree = "<group>";
+		};
+		D94DF0BA47C1D261B4D1E56C /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				28BF41331A598F8D8ACF5253 /* WidgetStore.swift */,
+			);
+			name = Shared;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1DE8D5E98B7AEEF3C2062897 /* BennyJoniWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7F78C981E71FE00C6A1DD7B6 /* Build configuration list for PBXNativeTarget "BennyJoniWidget" */;
+			buildPhases = (
+				58351EF253500B632B7C1FBE /* Sources */,
+				B28B5A0F9FEA328EA006D8A5 /* Frameworks */,
+				95973EA0A81595CF8748DDB9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BennyJoniWidget;
+			productName = BennyJoniWidget;
+			productReference = F6E5E508A55957380FCB980A /* BennyJoniWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -96,10 +191,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				BE00B73CBF649FAE7986BE08 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A5B5ADBC3252364EC2285240 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -118,6 +215,10 @@
 				LastSwiftUpdateCheck = 0920;
 				LastUpgradeCheck = 0920;
 				TargetAttributes = {
+					1DE8D5E98B7AEEF3C2062897 = {
+						CreatedOnToolsVersion = 27.1;
+						ProvisioningStyle = Automatic;
+					};
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
@@ -145,6 +246,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				1DE8D5E98B7AEEF3C2062897 /* BennyJoniWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -165,6 +267,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		95973EA0A81595CF8748DDB9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F1009A3A0B4B78BC8CC7B548 /* PrivacyInfo.xcprivacy in Resources */,
+				9E0DE632595CDB554C5D1D4F /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -174,12 +285,44 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				5E3A1C0C2E9F4A7100D1B2C3 /* SceneDelegate.swift in Sources */,
+				81995F9119B5F1B64036C877 /* WidgetBridgePlugin.swift in Sources */,
+				643EA112BB625D9793359026 /* MainViewController.swift in Sources */,
+				9C713D9E260D7857BF331BCC /* WidgetStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		58351EF253500B632B7C1FBE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F732AF0C00409D2F6FC20D6E /* BennyJoniWidget.swift in Sources */,
+				CD6731C845650ED739D8F391 /* WidgetStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A5B5ADBC3252364EC2285240 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = BennyJoniWidget;
+			target = 1DE8D5E98B7AEEF3C2062897 /* BennyJoniWidget */;
+			targetProxy = FA84384CB517BDDA25413E05 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin PBXVariantGroup section */
+		2B4B1C24F40B12DE8DA38940 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				03BC73ABFE436C474F14E58A /* en */,
+				73E4762234AF5319FFCD98CB /* de */,
+				CA5BD014ABF2DCA3FEE547EB /* fi */,
+				CF6C12915FD8DD3F543BF879 /* sv */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -334,7 +477,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.6.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bennyjoni.terminator;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -358,7 +501,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bennyjoni.terminator;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
@@ -366,6 +509,63 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
+		};
+		6D9A97557B9A973B12C8244F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = BennyJoniWidget/BennyJoniWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 31;
+				DEVELOPMENT_TEAM = HHJ498GCL6;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BennyJoniWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bennyjoni.terminator.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9DDD0A628ADFC3F99499AE83 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = BennyJoniWidget/BennyJoniWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 31;
+				DEVELOPMENT_TEAM = HHJ498GCL6;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BennyJoniWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bennyjoni.terminator.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
@@ -384,6 +584,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7F78C981E71FE00C6A1DD7B6 /* Build configuration list for PBXNativeTarget "BennyJoniWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6D9A97557B9A973B12C8244F /* Release */,
+				9DDD0A628ADFC3F99499AE83 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

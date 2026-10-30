@@ -1,4 +1,4 @@
-/* global React, ReactDOM, useCelebration, PTData, PTDashboard, DashboardScreen, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTStats, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, obSetDemo, trc, PTi18n, PTBootCache */
+/* global React, ReactDOM, useCelebration, PTData, PTDashboard, DashboardScreen, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTStats, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, obSetDemo, trc, PTi18n, PTBootCache, PTScope, PTWidget, PenaltyOverviewScreen, PenaltyOffNote, fmtAmount, compStatusLine, weekNumber */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -177,8 +177,11 @@ function loggedToast(value, name, count = 1) {
   return count > 1 ? `${base} · ${trn(count, 'zählt für {n} Challenge', 'zählt für {n} Challenges')}` : base;
 }
 
-const HOME_VIEW_KEY = 'pt:home-view'; // „Heute“: 'dashboard' (alle Challenges) | 'challenge'
-function writeHomeView(v) { try { sessionStorage.setItem(HOME_VIEW_KEY, v); } catch (e) {} }
+// Ein Filter für Heute, Feed, Stats und Strafkonto (PTScope): 'all' = alle
+// laufenden Challenges, 'one' = nur die aktive. Gewählt im Challenge-Switcher.
+const SCOPE_KEY = 'pt:scope';
+function readScope() { try { return sessionStorage.getItem(SCOPE_KEY) === 'one' ? 'one' : 'all'; } catch (e) { return 'all'; } }
+function writeScope(v) { try { sessionStorage.setItem(SCOPE_KEY, v); } catch (e) {} }
 
 // Beim allerersten Dashboard auf diesem Gerät: schon geknackte Gruppenziele
 // nicht nacheinander als Vollbild feiern, nur was ab jetzt geknackt wird.
@@ -278,12 +281,19 @@ function App() {
   const [joinCode, setJoinCode] = useState(''); // Code fürs Beitreten-Sheet (Einladungslink in der App)
   const [loadedFor, setLoadedFor] = useState(null); // Konto frisch geladen (nicht nur Stand vom letzten Öffnen)
   const [autoDuel, setAutoDuel] = useState({ user: null, busy: false, error: '' }); // Duell für neue Konten
+  const [scope, setScopeState] = useState(readScope); // 'all' | 'one', s. SCOPE_KEY
+  const setScope = useCallback((v) => { writeScope(v); setScopeState(v); }, []);
 
   // Einladungslinks: im Browser ?join=CODE, in der App projektterminator://join/CODE
   // (Kaltstart über getLaunchUrl, sonst appUrlOpen). Der Code wird als offene
   // Einladung gemerkt; entryRoute bzw. der Effekt unten führen in die Vorschau.
+  // Links aus dem Homescreen-Widget (PTWidget.parseLink): erst anwenden, wenn
+  // die Challenges geladen sind (Kaltstart).
+  const [widgetLink, setWidgetLink] = useState(null);
   useEffect(() => {
     const take = (url) => {
+      const link = PTWidget.parseLink(url);
+      if (link) { setWidgetLink(link); return null; }
       const code = PTOnboarding.parseInviteUrl(url);
       if (code) setInvite(code);
       return code;
@@ -352,12 +362,15 @@ function App() {
     if (!api) return;
     api.getSession().then(adoptSession).catch(() => setSession(null));
     return api.onAuthChange((s, evt) => {
-      if (evt === 'SIGNED_OUT') PTBootCache.clear();
+      // Abgemeldet: auch das Widget leeren, damit keine fremden Daten stehen bleiben
+      if (evt === 'SIGNED_OUT') { PTBootCache.clear(); PTWidget.clear(); }
       adoptSession(s);
     });
   }, [api, adoptSession]);
 
   const userId = session?.user?.id || null;
+  // Ohne Anmeldung (abgelaufen, auf anderem Weg abgemeldet) nichts Altes im Widget lassen.
+  useEffect(() => { if (session === null) PTWidget.clear(); }, [session]);
   // Demo-Besuche gelten nicht als echte Anmeldung.
   const isDemo = api?.mode === 'demo' || !!session?.demo;
   useEffect(() => { if (userId && !isDemo) writePref(RETURNING_KEY, '1'); }, [userId, isDemo]);
@@ -447,6 +460,17 @@ function App() {
     }
   }, [route, obState.started, patchOb, profile]);
 
+  // Widget angetippt: „Heute“ über alle Challenges, eine Challenge oder eine Übung im Fokus.
+  useEffect(() => {
+    if (!widgetLink || !competitions) return;
+    setWidgetLink(null);
+    try { sessionStorage.setItem(TAB_KEY, 'home'); } catch (e) {}
+    if (widgetLink.kind === 'challenge' && competitions.some(c => c.id === widgetLink.id)) {
+      setScope('one'); setActiveId(widgetLink.id);
+    } else setScope('all');
+    window.dispatchEvent(new CustomEvent('pt:widget-open', { detail: widgetLink }));
+  }, [widgetLink, competitions, setScope]);
+
   // Push-Tap mit competition_id → passende Challenge öffnen
   useEffect(() => {
     const onOpen = (e) => {
@@ -465,6 +489,7 @@ function App() {
     } catch (e) {}
     setSheet(null);
     PTBootCache.clear();
+    PTWidget.clear();
     // Nach dem nächsten Anmelden auf „Heute“ starten, nicht im zuletzt offenen Tab.
     try { sessionStorage.removeItem('pt:tab'); } catch (e) {}
     await api.signOut();
@@ -482,6 +507,7 @@ function App() {
   async function handleCreated(c) {
     markFirstChallenge();
     setSheet(null);
+    setScope('one');
     setIntro({ kind: 'created', id: c.id });
     await loadAccount(c.id);
     setActiveId(c.id);
@@ -491,6 +517,7 @@ function App() {
   async function handleJoined(id) {
     markFirstChallenge();
     setSheet(null); setJoinCode('');
+    setScope('one');
     setIntro({ kind: 'joined', id });
     await loadAccount(id);
     setActiveId(id);
@@ -528,9 +555,9 @@ function App() {
     } catch (e) { alert(e.message); }
   }
 
-  // Rangliste, Stats & Co. bleiben bei der aktiven Challenge; „Heute“ zeigt alle.
+  // „Alle Challenges“ (Heute, Feed, Stats, Strafkonto) liest aus den Daten aller laufenden Challenges.
   const dash = useDashboardData(api, userId ? competitions : null, userId);
-  const openCompetition = useCallback((id) => { writeHomeView('challenge'); setActiveId(id); }, []);
+  const openCompetition = useCallback((id) => { setScope('one'); setActiveId(id); }, [setScope]);
 
   if (!api) {
     return (
@@ -576,11 +603,9 @@ function App() {
     <>
       <ChallengeSwitcherSheet open={sheet === 'switcher'} onClose={() => setSheet(null)}
         profile={profile} competitions={competitions} activeId={activeId}
-        onSelect={(id) => {
-          writeHomeView('challenge');
-          if (id === activeId) window.dispatchEvent(new CustomEvent('pt:challenge-view'));
-          setActiveId(id); setSheet(null);
-        }}
+        allSelected={PTScope.resolve(scope, dash.live.length) === 'all'}
+        onSelectAll={dash.live.length >= 2 ? () => { setScope('all'); setSheet(null); } : null}
+        onSelect={(id) => { setScope('one'); setActiveId(id); setSheet(null); }}
         onSetMain={setMain}
         onCreate={() => setSheet('create')}
         onJoin={() => setSheet('join')}
@@ -626,7 +651,7 @@ function App() {
         api={api} competition={active} profile={profile} me={profile.id}
         email={session.user?.email}
         competitions={competitions}
-        dash={dash} onOpenCompetition={openCompetition}
+        dash={dash} onOpenCompetition={openCompetition} scope={scope} onScope={setScope}
         t={t} setTweak={setTweak}
         themePref={themePref} onSetThemePref={setThemePref}
         notificationsOn={notificationsOn} onSetNotifications={setNotificationsOn}
@@ -736,7 +761,7 @@ function markCelebrated(me, challengeIds) {
 }
 
 function CompetitionApp({ api, competition: initialCompetition, profile, me, email, t, setTweak,
-  competitions = [], dash = { live: [], bundle: null, reload: () => {} }, onOpenCompetition,
+  competitions = [], dash = { live: [], bundle: null, reload: () => {} }, onOpenCompetition, scope = 'all', onScope,
   themePref, onSetThemePref, notificationsOn, onSetNotifications,
   onOpenSwitcher, onOpenProfile, onProfileChanged, onSetMain, onSignOut, onCompetitionChanged, onLeft,
   intro, onIntroDone, newcomer, obState = {}, onObPatch }) {
@@ -757,24 +782,31 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     // Neuer Tab beginnt oben, nicht auf der Scrollhöhe des vorigen.
     try { window.scrollTo(0, 0); } catch {}
   }, [tab]);
-  // „Heute“ bei mehreren Challenges: Dashboard über alle oder diese Challenge.
-  const [homeView, setHomeView] = useState(() => {
-    if (intro) return 'challenge';
-    try { return sessionStorage.getItem(HOME_VIEW_KEY) || 'dashboard'; } catch { return 'dashboard'; }
-  });
-  useEffect(() => { writeHomeView(homeView); }, [homeView]);
-  // Dieselbe Challenge im Switcher gewählt: Challenge-Ansicht statt Dashboard
+  // Bei mehreren Challenges zeigen Heute, Feed, Stats und Strafkonto alle
+  // zusammen (scopeAll) oder nur diese Challenge (PTScope).
+  const multi = dash.live.length >= 2;
+  const scopeAll = PTScope.resolve(scope, dash.live.length) === 'all';
+  // Widget angetippt (App): „Heute“, bei einer Übung diese Karte in den Fokus
   useEffect(() => {
-    const onView = () => { setHomeView('challenge'); setTab('home'); };
-    window.addEventListener('pt:challenge-view', onView);
-    return () => window.removeEventListener('pt:challenge-view', onView);
+    const onWidget = (e) => {
+      setTab('home');
+      if (e.detail?.kind === 'exercise') setDashFocus(e.detail.key);
+      try { window.scrollTo(0, 0); } catch (err) {}
+    };
+    window.addEventListener('pt:widget-open', onWidget);
+    return () => window.removeEventListener('pt:widget-open', onWidget);
   }, []);
   // reload() ist memoisiert; notify() braucht trotzdem den aktuellen Tab.
   const tabRef = React.useRef(tab);
   tabRef.current = tab;
+  // Strafkonto-Tab: diese Challenge hat eins oder (bei „Alle“) irgendeine laufende.
+  const penaltyComps = useMemo(
+    () => PTScope.orderComps(dash.live.filter(c => c.penalties_enabled), profile.main_competition_id),
+    [dash.live, profile.main_competition_id]);
+  const showPenaltyTab = !!competition.penalties_enabled || (multi && penaltyComps.length > 0);
   useEffect(() => {
-    if (tab === 'strafkonto' && !competition.penalties_enabled) setTab('home');
-  }, [tab, competition.penalties_enabled]);
+    if (tab === 'strafkonto' && !showPenaltyTab) setTab('home');
+  }, [tab, showPenaltyTab]);
   // Unterseite im Einstellungen-Tab ('root', 'challenge', 'members', 'plan', 'penalties', 'language').
   // Nach einem Sprachwechsel lädt die App neu und öffnet wieder die Sprachseite.
   const [settingsPage, setSettingsPage] = useState(() => {
@@ -1115,15 +1147,37 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     return order.map(c => {
       const ms = dash.bundle.members.filter(m => m.competition_id === c.id);
       const parts = PTData.participantsFor(ms, weekStart).length;
-      return { c, members: ms, sides: buildSides(c, ms, me), participantCount: PTOnboarding.expectedPeople(c.mode, parts) };
+      // Gleicher Anteil wie in der Challenge selbst (peopleForShare), damit
+      // Dashboard, Schnellansicht, Feed und Challenge dieselben Zahlen zeigen.
+      return { c, members: ms, sides: buildSides(c, ms, me), participantCount: sharePeopleFor(c.mode, parts) };
     });
-  }, [dash.bundle, dash.live, me, weekStart, profile.main_competition_id]);
+  }, [dash.bundle, dash.live, me, weekStart, profile.main_competition_id, sharePeopleFor]);
   const dashModel = useMemo(
     () => (dash.bundle && dashComps.length ? PTDashboard.buildDashboard({ me, comps: dashComps, bundle: dash.bundle, weekStart }) : null),
     [dash.bundle, dashComps, me, weekStart]
   );
-  const multi = dash.live.length >= 2;
-  const showDashboard = tab === 'home' && multi && homeView === 'dashboard' && !!dashModel;
+  const showDashboard = tab === 'home' && scopeAll && !!dashModel;
+  // Homescreen-Widget: Schnappschuss aus demselben Modell wie „Heute“, bei jeder
+  // Änderung (Laden, Realtime, eigene Sätze) und bei neuer Farbpalette.
+  const [widgetColorsRev, setWidgetColorsRev] = useState(0);
+  useEffect(() => {
+    const onColors = () => setWidgetColorsRev(r => r + 1);
+    window.addEventListener('pt:colors', onColors);
+    return () => window.removeEventListener('pt:colors', onColors);
+  }, []);
+  useEffect(() => {
+    if (!dashModel || !dash.fresh) return;
+    const T = window.PTTheme;
+    const pick = (mode) => {
+      const b = T?.baseFor?.(T.read(), mode);
+      return b ? { tile0: b.tile0, tile1: b.tile1 || b.tile0, side0: b.side0, side1: b.side1, accent: b.accent } : null;
+    };
+    PTWidget.sync(PTWidget.snapshot({
+      model: dashModel, weekStart, weekNumber: weekNumber(weekStart),
+      fmt: fmtAmount, statusOf: compStatusLine,
+      colors: T ? { light: pick('light'), dark: pick('dark') } : null,
+    }));
+  }, [dashModel, dash.fresh, weekStart, widgetColorsRev]);
   // Gruppenziel geknackt: auch im Dashboard feiern (gleiche Merker wie in der Challenge)
   const dashWeekChallenges = useMemo(
     () => (dash.bundle ? dash.bundle.challenges.filter(ch => ch.week_start === weekStart && dash.live.some(c => c.id === ch.competition_id)) : []),
@@ -1216,7 +1270,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }
   function dashOpenChallenge(id) {
     setQuickCard(null);
-    if (id === competition.id) { setHomeView('challenge'); setTab('home'); window.scrollTo?.(0, 0); }
+    if (id === competition.id) { onScope?.('one'); setTab('home'); window.scrollTo?.(0, 0); }
     else onOpenCompetition?.(id);
   }
 
@@ -1231,6 +1285,86 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     items.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     return items;
   }, [feed, weekRecaps, monthRecap, weekStart]);
+
+  // ── Feed „Alle Challenges“ ──────────────────────────────────────────────
+  // Sätze der laufenden Woche aus allen laufenden Challenges; ein Eintrag, der
+  // in mehreren zählt, steht einmal da (PTScope.mergeLogCopies). Meilensteine
+  // je Challenge, dazu der Rückblick der letzten Woche jeder Challenge.
+  const feedAllOn = tab === 'feed' && scopeAll && !!dash.bundle;
+  const allFeedIds = dashComps.map(x => x.c.id).join(',');
+  const [allFeedSets, setAllFeedSets] = useState(null); // null = noch nicht geladen
+  const dashBundleRef = React.useRef(dash.bundle);
+  dashBundleRef.current = dash.bundle;
+  const loadAllFeed = useCallback(async () => {
+    if (!allFeedIds || !api.getFeedAll) return;
+    try {
+      const rows = await api.getFeedAll(allFeedIds.split(','), new Date(weekStart + 'T00:00:00').toISOString());
+      const b = dashBundleRef.current;
+      const { feed: sports } = PTData.sportsOnlyBundle({ feed: rows, challenges: b?.challenges || [], categories: b?.categories || [] });
+      PTData.annotateWorkouts(sports, b?.challenges || [], b?.categories || []);
+      setAllFeedSets(sports);
+    } catch (e) {
+      console.warn('getFeedAll failed', e);
+      setAllFeedSets(cur => cur || []);
+    }
+  }, [api, allFeedIds, weekStart]);
+  // Neu laden bei neuen Sätzen (dash lädt bei jeder Änderung neu) und Reaktionen (capi).
+  useEffect(() => { if (feedAllOn) loadAllFeed(); }, [feedAllOn, loadAllFeed, dash.bundle]);
+  useEffect(() => (feedAllOn ? capi.onChange(loadAllFeed) : undefined), [feedAllOn, capi, loadAllFeed]);
+  const allFeed = useMemo(() => {
+    if (!feedAllOn || !allFeedSets) return null;
+    const b = dash.bundle;
+    const comps = dashComps.map(x => {
+      const challenges = b.challenges.filter(ch => ch.competition_id === x.c.id && ch.week_start === weekStart);
+      const ids = new Set(challenges.map(ch => ch.id));
+      return { c: x.c, sides: x.sides, challenges, weekSets: b.sets.filter(st => ids.has(st.challenge_id)),
+        participantCount: x.participantCount };
+    });
+    // Ältere Wochen stehen im Feed der einzelnen Challenge
+    const recaps = dashComps.flatMap(x => buildWeekRecaps({
+      allChallenges: b.challenges.filter(ch => ch.competition_id === x.c.id && ch.week_start === lastWeek),
+      allSets: b.sets.filter(st => st.competition_id === x.c.id),
+      categories: b.categories, penalties: [], sides: x.sides, members: x.members,
+    }).map(r => ({ ...r, id: `${x.c.id}-${r.id}`, competition_id: x.c.id, weekNumber: null })));
+    const sets = PTScope.mergeLogCopies(allFeedSets, dashComps.map(x => x.c.id)).map(st => ({ kind: 'set', ...st }));
+    return { comps, items: [...recaps, ...(monthRecap ? [monthRecap] : []), ...sets] };
+  }, [feedAllOn, allFeedSets, dash.bundle, dashComps, weekStart, lastWeek, monthRecap]);
+  // Aktionen im Feed „Alle Challenges“ laufen über die Challenge des Satzes.
+  const apiFor = (cid) => (!cid || cid === competition.id ? capi : api.forCompetition(cid));
+  async function toggleReactionAll(st, emoji) {
+    try {
+      for (const op of PTScope.reactionOps(st, emoji, me)) {
+        const a = apiFor(op.competition_id);
+        if (op.op === 'add') await a.addReaction({ set_id: op.set_id, emoji });
+        else await a.removeReaction({ set_id: op.set_id, emoji });
+      }
+      loadAllFeed();
+    } catch (e) { alert(e.message); }
+  }
+
+  // ── Strafkonto „Alle Challenges“ ────────────────────────────────────────
+  const penaltyAllOn = scopeAll && penaltyComps.length > 0;
+  const penaltyIds = penaltyComps.map(c => c.id).join(',');
+  const [penaltyData, setPenaltyData] = useState(null);
+  const loadPenaltyOverview = useCallback(async () => {
+    if (!penaltyIds || !api.getPenaltyOverview) return;
+    try { setPenaltyData(await api.getPenaltyOverview(penaltyIds.split(','))); }
+    catch (e) { console.warn('getPenaltyOverview failed', e); setPenaltyData(cur => cur || { error: e }); }
+  }, [api, penaltyIds]);
+  useEffect(() => {
+    if (!penaltyAllOn) return;
+    loadPenaltyOverview();
+    return api.onCompetitionsChange?.(penaltyIds.split(','), loadPenaltyOverview,
+      ['penalties', 'payouts', 'week_closures', 'weekly_challenges']);
+  }, [penaltyAllOn, penaltyIds, api, loadPenaltyOverview]);
+  const penaltyOverview = useMemo(() => (penaltyData && !penaltyData.error ? PTScope.penaltyOverview({
+    comps: penaltyComps, ...penaltyData, me, monday: weekStart,
+  }) : null), [penaltyData, penaltyComps, me, weekStart]);
+  // Was der Strafkonto-Tab zeigt: Übersicht, diese Challenge oder „hier aus“.
+  // Ohne laufende Challenge mit Strafkonto (z. B. archivierte aktiv) bleibt es bei dieser.
+  const penaltyView = penaltyAllOn ? 'all' : usePenalties ? 'one' : 'off';
+  // Feed „Alle“ braucht die Dashboard-Daten; ohne sie (offline, erster Start) diese Challenge.
+  const feedView = scopeAll && dash.bundle ? 'all' : 'one';
 
   async function fixWeek(picks) {
     try {
@@ -1521,7 +1655,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         const onTap = await Push.addListener('pushNotificationActionPerformed', (action) => {
           const data = action?.notification?.data || {};
           if (data.kind === 'teammate_kick') {
-            writeHomeView('challenge');
+            writeScope('one');
             try { sessionStorage.setItem(TAB_KEY, 'home'); } catch (e) {}
             if (data.competition_id) window.dispatchEvent(new CustomEvent('pt:open-competition', { detail: { competitionId: data.competition_id } }));
             window.dispatchEvent(new CustomEvent('pt:nav-home'));
@@ -1559,7 +1693,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   // Push-Taps öffnen den passenden Tab und aktualisieren nach dem Hintergrund.
   useEffect(() => {
-    const onNavHome = () => { setHomeView('challenge'); setTab('home'); reload(); };
+    const onNavHome = () => { onScope?.('one'); setTab('home'); reload(); };
     const onNavFeed = () => { setTab('feed'); reload(); };
     const onNavRanking = () => { setTab('ranking'); reload(); };
     window.addEventListener('pt:nav-home', onNavHome);
@@ -1574,17 +1708,23 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
 
   const setupCategories = categories.filter(c => (c.kind || 'sports') !== 'work');
   // Badge = Personen mit offenem Saldo (Strafen minus Einzahlungen), wie im Strafkonto.
-  const openPenaltyCount = usePenalties ? (window.penaltySummary?.(penalties, payouts).openPeople ?? 0) : 0;
+  // Bei „Alle“ zählt jede Person einmal, auch mit offenen Strafen in mehreren Challenges.
+  const openPenaltyCount = penaltyView === 'all'
+    ? (penaltyOverview?.total.openPeople ?? 0)
+    : usePenalties ? (window.penaltySummary?.(penalties, payouts).openPeople ?? 0) : 0;
+  // Kopfzeile: „Alle Challenges“, solange der Tab alle zeigt (Einstellungen gehören zur Challenge)
+  const headerAll = scopeAll && (tab === 'home' ? showDashboard : tab === 'feed' ? feedView === 'all'
+    : tab === 'strafkonto' ? penaltyView === 'all' : tab !== 'settings');
 
   return (
     <div className="app">
       <header className="app-header">
-        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={tr('Challenge wechseln, aktuell {name}', { name: competition.name })}>
+        <button className="app-header-text mu-header-title" onClick={onOpenSwitcher} aria-label={tr('Challenge wechseln, aktuell {name}', { name: headerAll ? tr('Alle Challenges') : competition.name })}>
           <span className="date">
             {todayGreeting()}, {profile.display_name.split(/\s+/)[0]} · {PTi18n.date(new Date(), { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
           <span className="greeting">
-            <span className="app-header-name">{showDashboard ? tr('Alle Challenges') : competition.name}</span>
+            <span className="app-header-name">{headerAll ? tr('Alle Challenges') : competition.name}</span>
             <Icon name="chevron" size={20} strokeWidth={2.5} />
           </span>
         </button>
@@ -1609,8 +1749,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             onStartWorkout={dashOpenLog}
             onAddGoal={() => setSetupForChallenge({})} />
         )}
-        {!showDashboard && tab === 'home' && multi && (
-          <button type="button" className="db-back" onClick={() => setHomeView('dashboard')}>
+        {multi && ((tab === 'home' && !showDashboard) || (!headerAll && (tab === 'feed' || tab === 'strafkonto'))) && (
+          <button type="button" className="db-back" onClick={() => onScope?.('all')}>
             <Icon name="chevron" size={16} strokeWidth={2.5} /> {tr('Alle Challenges')}
           </button>
         )}
@@ -1694,7 +1834,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           }} />
         }
 
-        {tab === 'strafkonto' && usePenalties &&
+        {tab === 'strafkonto' && penaltyView === 'all' &&
+        <PenaltyOverviewScreen me={me} overview={penaltyOverview} error={penaltyData?.error}
+          onRetry={loadPenaltyOverview} onOpen={(id) => onOpenCompetition?.(id)} />
+        }
+        {tab === 'strafkonto' && penaltyView === 'off' &&
+        <PenaltyOffNote competition={competition} />
+        }
+        {tab === 'strafkonto' && penaltyView === 'one' &&
         <StrafkontoScreen
           api={capi} me={me} sides={sides} members={members}
           penalties={penalties}
@@ -1704,7 +1851,18 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onChange={reload} />
         }
 
-        {tab === 'feed' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories} competition={competition}
+        {tab === 'feed' && feedView === 'all' && (allFeed ? (
+          <FeedScreen comps={allFeed.comps} feed={allFeed.items} me={me} categories={dash.bundle.categories}
+            loading={!allFeedSets}
+            onEditSet={async (st, patch) => { try { await apiFor(st.competition_id).updateSet(st.id, patch); setToast(tr('Satz aktualisiert')); loadAllFeed(); reload(); dash.reload(); } catch (e) { alert(e.message); } }}
+            onDeleteSet={async (st) => { try { await apiFor(st.competition_id).deleteSet(st.id); setToast(tr('Gelöscht')); loadAllFeed(); reload(); dash.reload(); } catch (e) { alert(e.message); } }}
+            onToggleReaction={toggleReactionAll}
+            onPickEmoji={(st) => setPickerForSet(st)}
+            alone={activeMembers.length < 2 && dashComps.every(x => x.members.filter(m => !m.left_at).length < 2)}
+            onFirstLog={() => { onScope?.('all'); setTab('home'); }}
+            onInvite={() => { onScope?.('one'); setTab('home'); openLayer(['invite']); }} />
+        ) : <Loader />)}
+        {tab === 'feed' && feedView === 'one' && <FeedScreen feed={feedItems} me={me} sides={sides} categories={categories} competition={competition}
           challenges={currentChallenges} weekSets={currentWeekSets} participantCount={peopleForShare}
           loading={loading}
           projectTags={projectTags} toolTags={toolTags}
@@ -1739,7 +1897,16 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           members={members}
           challenges={allChallenges}
           categories={categories}
-          allSets={allSets} />
+          allSets={allSets}
+          multi={multi} scopeAll={scopeAll}
+          onScopeAll={() => onScope?.('all')}
+          onPickChallenge={() => {
+            // „Challenge“ aus „Ich“: zuerst die Haupt-Challenge
+            const main = dash.live.find(c => c.id === profile.main_competition_id);
+            if (main && main.id !== competition.id) onOpenCompetition?.(main.id);
+            else onScope?.('one');
+          }}
+          onOpenSwitcher={onOpenSwitcher} />
         }
 
         {tab === 'settings' &&
@@ -1767,13 +1934,13 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             { id: 'feed', icon: 'feed', label: tr('Feed') },
             { id: 'ranking', icon: 'trophy', label: tr('Rangliste') },
             { id: 'history', icon: 'stats', label: tr('Stats') },
-            ...(usePenalties ? [{ id: 'strafkonto', icon: 'wallet', label: tr('Strafkonto'), badge: openPenaltyCount }] : []),
+            ...(showPenaltyTab ? [{ id: 'strafkonto', icon: 'wallet', label: tr('Strafkonto'), badge: openPenaltyCount }] : []),
           ].map(t => (
             <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`}
               aria-current={tab === t.id ? 'page' : undefined}
               onClick={() => {
                 // „Heute“ nochmal antippen: zurück zum Dashboard über alle Challenges
-                if (t.id === 'home' && tab === 'home' && multi && homeView === 'challenge') setHomeView('dashboard');
+                if (t.id === 'home' && tab === 'home' && multi && !scopeAll) onScope?.('all');
                 setTab(t.id);
               }}>
               <span className="tab-icon">
@@ -1941,9 +2108,10 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
           onPick={async (emoji) => {
             if (!pickerForSet) { setPickerForSet(null); return; }
             try {
-              await capi.addReaction({ set_id: pickerForSet.id, emoji });
+              await apiFor(pickerForSet.competition_id).addReaction({ set_id: pickerForSet.id, emoji });
               setPickerForSet(null);
               reload();
+              if (feedAllOn) loadAllFeed();
             } catch (e) { alert(e.message); }
           }} />
       </Sheet>

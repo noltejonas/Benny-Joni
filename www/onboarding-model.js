@@ -23,6 +23,12 @@
   const DOWNLOAD_URL = IS_ANDROID ? LEGAL_BASE : APP_STORE_URL;
   const APP_REVIEW_URL = !IS_ANDROID && STORE_DIGITS
     ? `itms-apps://apps.apple.com/app/id${STORE_DIGITS}?action=write-review` : '';
+  // Einladungsseite (docs/launch/site/join/index.html): öffnet die App mit dem
+  // Code oder führt zum Download. WhatsApp & Co. machen nur http(s)-Adressen
+  // anklickbar, nicht projektterminator://; deshalb steht in Einladungen nur
+  // dieser eine Link. Ordner statt .html, damit kein Server beim Umleiten auf
+  // „saubere“ Adressen den Code verliert.
+  const JOIN_URL = `${LEGAL_BASE}join/`;
   const LEGAL = Object.freeze({
     privacy: `${LEGAL_BASE}datenschutz.html`,
     imprint: `${LEGAL_BASE}impressum.html`,
@@ -100,12 +106,14 @@
   }
 
   // Einladungslinks: projektterminator://join/ABC123, …://join?code=ABC123,
-  // im Browser ?join=ABC123 bzw. #join=ABC123.
+  // die Einladungsseite …/join/?code=ABC123, im Browser ?join=ABC123 bzw. #join=ABC123.
   function parseInviteUrl(url) {
     const s = String(url || '');
     if (!s) return null;
     const scheme = s.match(new RegExp(`${SCHEME}://join(?:/([A-Za-z0-9]+)|\\?(?:[^#]*&)?code=([A-Za-z0-9]+))`, 'i'));
     if (scheme) return cleanCode(scheme[1] || scheme[2]);
+    const page = s.match(/https?:\/\/\S*?\/join(?:\.html)?\/?\?(?:[^#\s]*&)?code=([A-Za-z0-9]+)/i);
+    if (page) return cleanCode(page[1]);
     const web = s.match(/[?&#]join=([A-Za-z0-9]+)/i);
     if (web) return cleanCode(web[1]);
     return null;
@@ -136,19 +144,24 @@
     return null;
   }
 
+  // Öffnet die App direkt (nur, wo sie installiert ist).
   function inviteLink(code) {
     return `${SCHEME}://join/${String(code || '').toUpperCase()}`;
   }
+  // Ein Link für alle: die Einladungsseite öffnet die App oder führt zum Download.
+  function inviteUrl(code) {
+    return `${JOIN_URL}?code=${encodeURIComponent(String(code || '').toUpperCase())}`;
+  }
 
-  // Teilen-Text in der Sprache des Absenders. Wer die App noch nicht hat,
-  // braucht Store-Link bzw. Namen. Die Zeile „Code: …“ bleibt in jeder Sprache
-  // gleich, weil normalizeCode den Code ohne Link nur über dieses Etikett findet.
+  // Teilen-Text in der Sprache des Absenders, mit genau einem Link (WhatsApp
+  // macht nur den ersten anklickbar, und projektterminator:// gar nicht). Die
+  // Zeile „Code: …“ bleibt in jeder Sprache gleich, weil normalizeCode den
+  // Code ohne Link nur über dieses Etikett findet.
   function inviteText(competition) {
     const code = String(competition.invite_code || '').toUpperCase();
     return tr('Komm in meine Challenge „{name}“ bei {app} 💪', { name: competition.name, app: APP_NAME }) + '\n'
-      + (DOWNLOAD_URL ? tr('App laden: {url}', { url: DOWNLOAD_URL }) : tr('Im App Store: {app}', { app: APP_NAME })) + '\n'
-      + `Code: ${code}\n`
-      + tr('Schon installiert? {link}', { link: inviteLink(code) });
+      + tr('Mitmachen: {url}', { url: inviteUrl(code) }) + '\n'
+      + `Code: ${code}`;
   }
 
   // ── Einstieg ────────────────────────────────────────────────────────
@@ -472,7 +485,7 @@
     APP_NAME, APP_STORE_ID, APP_STORE_URL, DOWNLOAD_URL, APP_REVIEW_URL, SUPPORT_EMAIL, LEGAL,
     openExternal, supportMailto, reportText, reportContent,
     ALPHABET, SCHEME, DAY,
-    normalizeCode, parseInviteUrl, inviteLink, inviteText,
+    normalizeCode, parseInviteUrl, inviteLink, inviteUrl, inviteText, JOIN_URL,
     entryRoute, isNewcomer, youngProfile, autoDuelDue, introKinds, suggestName, checkEmail, mergeState, stateKey,
     weekProgress, joinedMidWeek,
     expectedPeople, goalDefault, goalChoices, goalTarget,

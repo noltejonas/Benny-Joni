@@ -735,14 +735,45 @@
           categories: categories.map(localizeCategory),
         });
       },
-      // Live-Änderungen an Sätzen und Wochenzielen dieser Challenges
-      onCompetitionsChange(competitionIds, fn) {
+      // Feed „Alle Challenges“: Sätze ab `since` (ISO-Zeit) aus allen diesen
+      // Challenges, mit Reaktionen wie recentFeed. Kopien eines Eintrags (gleiche
+      // log_id) kommen einzeln; PTScope.mergeLogCopies fasst sie zusammen.
+      async getFeedAll(competitionIds, since, limit = 300) {
+        if (!competitionIds.length) return [];
+        const data = check(await client.from('sets')
+          .select('*, challenge:challenge_id(*, category:category_id(*)), reactions(id, user_id, emoji)')
+          .in('competition_id', competitionIds)
+          .gte('created_at', since)
+          .order('created_at', { ascending: false })
+          .limit(limit));
+        return (data || []).map(s => {
+          normSet(s);
+          return { ...s, category: localizeCategory(s.challenge?.category), challenge: normChallenge(s.challenge), reactions: s.reactions || [] };
+        });
+      },
+      // Strafkonto-Übersicht: Strafen, Einzahlungen, Abschlüsse und die Wochen
+      // mit Zielen dieser Challenges (für offene Abschlüsse). Jede Zeile gehört
+      // genau zu einer Challenge (competition_id), nichts wird doppelt geladen.
+      async getPenaltyOverview(competitionIds) {
+        if (!competitionIds.length) return { penalties: [], payouts: [], closures: [], challengeWeeks: [] };
+        const [penalties, payouts, closures, challengeWeeks] = await Promise.all([
+          selectAll(() => client.from('penalties').select('*').in('competition_id', competitionIds)
+            .order('week_start', { ascending: false }).order('created_at', { ascending: false })),
+          selectAll(() => client.from('payouts').select('*').in('competition_id', competitionIds).order('paid_at', { ascending: false })),
+          selectAll(() => client.from('week_closures').select('competition_id, week_start').in('competition_id', competitionIds)),
+          selectAll(() => client.from('weekly_challenges').select('competition_id, week_start').in('competition_id', competitionIds)),
+        ]);
+        return { penalties: penalties.map(normPenalty), payouts: payouts.map(withAthlete), closures, challengeWeeks };
+      },
+      // Live-Änderungen an Sätzen und Wochenzielen dieser Challenges.
+      // tables: andere Tabellen mit competition_id (z. B. Strafkonto).
+      onCompetitionsChange(competitionIds, fn, tables = ['sets', 'weekly_challenges', 'competition_members']) {
         if (!competitionIds.length) return () => {};
         let timer = null;
         const ping = () => { clearTimeout(timer); timer = setTimeout(fn, 250); };
         const filter = `competition_id=in.(${competitionIds.join(',')})`;
         const channel = client.channel(`pt-dash-${Math.random().toString(36).slice(2, 8)}`);
-        for (const table of ['sets', 'weekly_challenges', 'competition_members']) {
+        for (const table of tables) {
           channel.on('postgres_changes', { event: '*', schema: 'public', table, filter }, ping);
         }
         channel.subscribe();

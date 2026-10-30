@@ -1,4 +1,4 @@
-/* global React, PTData, PTDashboard, PTOnboarding, ObAmount, TugBar, FocusCarousel, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
+/* global React, PTData, PTDashboard, ChallengeInsights, PTOnboarding, ObAmount, TugBar, FocusCarousel, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo } = React;
 
 // Schnellsatz-Werte pro Person und Übung, lokal gespeichert. Schlüssel ist
@@ -233,8 +233,20 @@ function WeekCloseBanner({ weekStart, onClose }) {
 
 // Vergleichskarte auf „Heute“. Zwei Seiten (1v1, 2v2): Duell mit Score und geteiltem Balken.
 // Mehr Seiten (Jeder gegen jeden): Rangliste. entries[0] ist immer die eigene Seite.
-function DuelCard({ entries, title, meta }) {
+// Mit onToggle lässt sich der Balken aufklappen; children (ChallengeInsights)
+// stehen dann darunter, dieselben Insights wie in der Schnellansicht.
+function DuelCard({ entries, title, meta, expanded = false, onToggle = null, children = null }) {
   const total = entries.reduce((a, e) => a + e.reps, 0);
+  const foldable = (bars) => (onToggle ? (
+    <button type="button" className={`rd-duel-toggle${expanded ? ' is-open' : ''}`} aria-expanded={expanded} onClick={onToggle}>
+      {bars}
+      <span className="rd-duel-more">
+        {expanded ? tr('Weniger anzeigen') : tr('Stand pro Übung')}
+        <Icon name="chevron" size={14} strokeWidth={2.5} />
+      </span>
+    </button>
+  ) : bars);
+  const details = onToggle && expanded && children ? <div className="rd-duel-details">{children}</div> : null;
 
   if (entries.length !== 2) {
     const ranked = [...entries].sort((x, y) => y.reps - x.reps);
@@ -244,7 +256,7 @@ function DuelCard({ entries, title, meta }) {
       <section className="rd-card rd-duel" aria-label={tr('Rangliste diese Woche')}>
         <div className="rd-duel-head"><span>{title}</span><span>{meta}</span></div>
         <p className="rd-duel-line">{total === 0 ? tr('Noch nichts geloggt. Wer legt vor?') : tr('Du bist auf Platz {rank}.', { rank: myRank })}</p>
-        <ol className="rd-rank">
+        {foldable(<ol className="rd-rank">
           {ranked.map((e, i) => (
             <li key={e.side.key} className={e.side.isMine ? 'is-me' : ''} style={sideStyle(e.side)}>
               <span className="rd-rank-pos">{i + 1}</span>
@@ -256,7 +268,8 @@ function DuelCard({ entries, title, meta }) {
               <span className="rd-rank-val"><CountUp value={e.reps} /></span>
             </li>
           ))}
-        </ol>
+        </ol>)}
+        {details}
       </section>
     );
   }
@@ -290,6 +303,7 @@ function DuelCard({ entries, title, meta }) {
         ))}
       </div>
       <p className="rd-duel-line">{line}</p>
+      {foldable(<>
       <div className="rd-split" role="img" aria-label={tr('{nameA} {repsA} Reps, {nameB} {repsB} Reps', { nameA: a.side.label, repsA: a.reps, nameB: b.side.label, repsB: b.reps })}>
         <div className="rd-split-a" style={{ width: `${aShare}%`, ...sideStyle(a.side) }} />
         <div className="rd-split-b" style={sideStyle(b.side)} />
@@ -298,6 +312,8 @@ function DuelCard({ entries, title, meta }) {
         <span>{trn(a.reps, '{n} Reps', '{n} Reps', { n: <CountUp value={a.reps} /> })}</span>
         <span>{trn(b.reps, '{n} Reps', '{n} Reps', { n: <CountUp value={b.reps} /> })}</span>
       </div>
+      </>)}
+      {details}
     </section>
   );
 }
@@ -310,6 +326,14 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
   const tabChallenges = challenges;
   const celebration = useCelebration(challenges, allSets, me, categories);
   const [selectedId, setSelectedId] = React.useState(null);
+  // Duell-Balken aufgeklappt: Stand pro Übung (wie die Schnellansicht im Dashboard)
+  const [insightsOpen, setInsightsOpen] = React.useState(() => {
+    try { return sessionStorage.getItem('pt:duel-open') === '1'; } catch (e) { return false; }
+  });
+  const toggleInsights = () => setInsightsOpen(v => {
+    try { sessionStorage.setItem('pt:duel-open', v ? '0' : '1'); } catch (e) {}
+    return !v;
+  });
 
   // Kennzahlen pro Wochenziel einmal berechnen; Karten, Liste und Duell lesen daraus.
   const rows = React.useMemo(
@@ -447,7 +471,10 @@ function HomeScreen({ api, me, sides = [], participantCount = 0, challenges = []
           title={twoSided
             ? tr('KW {week} · Duell', { week: weekNumber(tabChallenges[0].week_start) })
             : tr('KW {week} · Rangliste', { week: weekNumber(tabChallenges[0].week_start) })}
-          meta={daysLeft <= 1 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')} />
+          meta={daysLeft <= 1 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')}
+          expanded={insightsOpen} onToggle={toggleInsights}>
+          <ChallengeInsights sides={sides} rows={rows} />
+        </DuelCard>
       )}
 
       {focus && (
@@ -1446,7 +1473,8 @@ function BringSallySheet({ api, me, challenge, allSets = [], onClose, onLogged }
 
 // ─── FEED ────────────────────────────────────────────────────────────────────
 // getShareText: nur auf der neuesten Karte (FeedScreen), liefert den Text für „Ergebnis teilen“.
-function WeekRecap({ recap, me, sides = [], getShareText }) {
+// compLabel: Challenge, zu der der Rückblick gehört (Feed „Alle Challenges“).
+function WeekRecap({ recap, me, sides = [], getShareText, compLabel = '' }) {
   const { week_start, challStats, totals = [], winnerIdx, sumAll, hitCount, totalChallenges, analysis,
     perSide = [], penCentsBySide = [], weekNumber } = recap;
   const isWorkWeek = challStats.length > 0 && challStats.every(c => PTData.usesMinutes(c.cat));
@@ -1495,7 +1523,8 @@ function WeekRecap({ recap, me, sides = [], getShareText }) {
       <div className="recap-head">
         <div className="recap-head-left">
           <div className="recap-label">{tr('🏁 Wochenabschluss')}</div>
-          {weekNumber != null && <div className="recap-week-num">{tr('Woche {n}', { n: weekNumber })}</div>}
+          {weekNumber != null && <div className="recap-week-num">{tr('Woche {n}', { n: weekNumber })}{compLabel && ` · ${compLabel}`}</div>}
+          {weekNumber == null && compLabel && <div className="recap-week-num">{compLabel}</div>}
         </div>
         <div className="recap-date">{fmtD(monday)} – {fmtD(sunday)}</div>
       </div>

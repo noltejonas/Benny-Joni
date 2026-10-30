@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="robots" content="noindex" />
+  <title>Einladung · Benny &amp; Joni</title>
+  <meta name="description" content="Du bist zu einer Challenge bei Benny &amp; Joni eingeladen. You're invited to a challenge on Benny &amp; Joni." />
+  <!-- Vorschau in WhatsApp & Co. (statisch, für alle Einladungen gleich) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Benny &amp; Joni" />
+  <meta property="og:title" content="Komm in meine Challenge 💪" />
+  <meta property="og:description" content="Tippen, App öffnen, mittrainieren. · Tap to join the challenge." />
+  <!--
+    Einladungsseite (www/onboarding-model.js: JOIN_URL, inviteUrl). Einladungen
+    enthalten nur diesen einen https-Link, weil WhatsApp projektterminator://
+    nicht anklickbar macht. Die Seite liest ?code=ABC234, öffnet damit die App
+    (projektterminator://join/ABC234, wie bisher) oder führt zum Download und
+    zeigt den Code zum Abtippen. Keine externen Ressourcen, keine Cookies; der
+    Code verlässt das Gerät nicht.
+  -->
+  <style>
+    :root {
+      --bg: #f4f3f8; --card: #ffffff; --text: #1c1b2e; --text-2: #5b5a6e; --line: #e3e2e8;
+      --accent: #4f46e5; --grad0: #6a4cf5; --grad1: #4338ca; --on-grad: #ffffff; --code-bg: #efeefa;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16151f; --card: #211f2c; --text: #f1f0f7; --text-2: #a7a5b8; --line: #2f2c3d;
+        --accent: #8b7cff; --code-bg: #2b2840;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 460px; margin: 0 auto; padding: 28px 16px 48px; }
+    .brand { font-weight: 800; font-size: 18px; color: var(--text); text-decoration: none; }
+    main {
+      margin-top: 18px; border-radius: 24px; padding: 28px 22px 24px; color: var(--on-grad);
+      background: linear-gradient(135deg, var(--grad0) 0%, var(--grad1) 100%);
+      box-shadow: 0 12px 32px rgba(67, 56, 202, 0.28);
+    }
+    .over { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .85; margin: 0; }
+    h1 { font-size: 30px; line-height: 1.15; margin: 6px 0 18px; letter-spacing: -0.02em; }
+    .code {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      background: rgba(255, 255, 255, 0.16); border-radius: 16px; padding: 12px 12px 12px 18px;
+    }
+    .code-label { font-size: 12px; font-weight: 700; opacity: .85; }
+    .code-value { font: 800 28px/1.1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .12em; }
+    .copy {
+      border: none; border-radius: 999px; padding: 10px 14px; cursor: pointer;
+      background: rgba(255, 255, 255, 0.22); color: var(--on-grad); font: inherit; font-size: 14px; font-weight: 700;
+    }
+    .btn {
+      display: flex; align-items: center; justify-content: center; min-height: 52px; margin-top: 12px;
+      border-radius: 16px; text-decoration: none; font-weight: 800; font-size: 17px;
+    }
+    .btn-main { background: #ffffff; color: var(--grad1); margin-top: 18px; }
+    .btn-alt { background: rgba(255, 255, 255, 0.16); color: var(--on-grad); }
+    .steps { margin: 22px 4px 0; padding: 0 0 0 20px; color: var(--text-2); font-size: 15px; }
+    .steps li + li { margin-top: 6px; }
+    .steps b { color: var(--text); }
+    .invalid { background: var(--card); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+    .invalid .btn-main { background: var(--accent); color: #fff; }
+    footer { color: var(--text-2); font-size: 13px; margin-top: 28px; text-align: center; }
+    footer a { color: var(--text-2); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a class="brand" href="../index.html">Benny &amp; Joni</a>
+
+  <main id="invite" hidden>
+    <p class="over" data-t="over">Einladung</p>
+    <h1 data-t="title">Komm in meine Challenge 💪</h1>
+    <div class="code">
+      <div>
+        <div class="code-label" data-t="codeLabel">Dein Code</div>
+        <div class="code-value" id="code"></div>
+      </div>
+      <button type="button" class="copy" id="copy" data-t="copy">Kopieren</button>
+    </div>
+    <a class="btn btn-main" id="open" href="#" data-t="open">In der App öffnen</a>
+    <a class="btn btn-alt" id="get" href="#" data-t="get">App laden</a>
+  </main>
+
+  <main id="invalid" class="invalid" hidden>
+    <h1 data-t="invalidTitle">Dieser Link ist unvollständig</h1>
+    <p data-t="invalidText">Frag nach einem neuen Einladungslink oder gib den Code in der App unter „Code eingeben“ ein.</p>
+    <a class="btn btn-main" id="get2" href="#" data-t="get">App laden</a>
+  </main>
+
+  <ol class="steps" id="steps" hidden>
+    <li data-t="step1">Hast du die App schon? Tippe auf <b>In der App öffnen</b>.</li>
+    <li data-t="step2">Noch nicht? <b>App laden</b>, öffnen, anmelden.</li>
+    <li data-t="step3">Dann hier nochmal <b>In der App öffnen</b> tippen oder den Code eingeben.</li>
+  </ol>
+
+  <footer>
+    <a href="../datenschutz.html">Datenschutz</a> · <a href="../impressum.html">Impressum</a> · <a href="../support.html">Support</a>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    // Gleiche Regeln wie www/onboarding-model.js (cleanCode, APP_STORE_ID, SCHEME).
+    var APP_STORE_URL = 'https://apps.apple.com/app/id6768353714';
+    var ANDROID_URL = '../index.html'; // bis der Play-Eintrag öffentlich ist
+    var SCHEME = 'projektterminator';
+
+    var TEXT = {
+      de: {
+        over: 'Einladung', title: 'Komm in meine Challenge 💪', codeLabel: 'Dein Code', copy: 'Kopieren', copied: 'Kopiert ✓',
+        open: 'In der App öffnen', get: 'App laden',
+        step1: 'Hast du die App schon? Tippe auf <b>In der App öffnen</b>.',
+        step2: 'Noch nicht? <b>App laden</b>, öffnen, anmelden.',
+        step3: 'Dann hier nochmal <b>In der App öffnen</b> tippen oder den Code eingeben.',
+        invalidTitle: 'Dieser Link ist unvollständig',
+        invalidText: 'Frag nach einem neuen Einladungslink oder gib den Code in der App unter „Code eingeben“ ein.'
+      },
+      en: {
+        over: 'Invitation', title: 'Join my challenge 💪', codeLabel: 'Your code', copy: 'Copy', copied: 'Copied ✓',
+        open: 'Open in the app', get: 'Get the app',
+        step1: 'Already have the app? Tap <b>Open in the app</b>.',
+        step2: 'Not yet? <b>Get the app</b>, open it, sign in.',
+        step3: 'Then come back and tap <b>Open in the app</b>, or enter the code.',
+        invalidTitle: 'This link is incomplete',
+        invalidText: 'Ask for a new invite link, or enter the code in the app under “Enter code”.'
+      },
+      fi: {
+        over: 'Kutsu', title: 'Tule mukaan haasteeseeni 💪', codeLabel: 'Koodisi', copy: 'Kopioi', copied: 'Kopioitu ✓',
+        open: 'Avaa sovelluksessa', get: 'Lataa sovellus',
+        step1: 'Onko sovellus jo asennettu? Napauta <b>Avaa sovelluksessa</b>.',
+        step2: 'Ei vielä? <b>Lataa sovellus</b>, avaa se ja kirjaudu sisään.',
+        step3: 'Palaa sitten tänne ja napauta <b>Avaa sovelluksessa</b> tai syötä koodi.',
+        invalidTitle: 'Tämä linkki on puutteellinen',
+        invalidText: 'Pyydä uusi kutsulinkki tai syötä koodi sovelluksessa kohdassa ”Syötä koodi”.'
+      },
+      sv: {
+        over: 'Inbjudan', title: 'Häng med i min utmaning 💪', codeLabel: 'Din kod', copy: 'Kopiera', copied: 'Kopierad ✓',
+        open: 'Öppna i appen', get: 'Hämta appen',
+        step1: 'Har du redan appen? Tryck på <b>Öppna i appen</b>.',
+        step2: 'Inte än? <b>Hämta appen</b>, öppna den och logga in.',
+        step3: 'Kom sedan tillbaka och tryck på <b>Öppna i appen</b>, eller ange koden.',
+        invalidTitle: 'Den här länken är ofullständig',
+        invalidText: 'Be om en ny inbjudningslänk eller ange koden i appen under ”Ange kod”.'
+      }
+    };
+    var langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'de'])
+      .map(function (l) { return String(l).slice(0, 2).toLowerCase(); });
+    var lang = langs.filter(function (l) { return TEXT[l]; })[0] || 'en';
+    var t = TEXT[lang];
+    document.documentElement.lang = lang;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (el) {
+      var v = t[el.getAttribute('data-t')];
+      if (v) el.innerHTML = v; // nur feste Texte von oben, nie Werte aus der Adresse
+    });
+
+    var params = new URLSearchParams(location.search);
+    var raw = (params.get('code') || (location.hash.match(/(?:^#|[#&]code=)([A-Za-z0-9]{6})$/) || [])[1] || '').toUpperCase();
+    var code = /^[A-Z0-9]{6}$/.test(raw) ? raw : '';
+    var android = /android/i.test(navigator.userAgent);
+    var store = android ? ANDROID_URL : APP_STORE_URL;
+    document.getElementById('get').href = store;
+    document.getElementById('get2').href = store;
+
+    if (!code) { document.getElementById('invalid').hidden = false; return; }
+    document.getElementById('invite').hidden = false;
+    document.getElementById('steps').hidden = false;
+    document.getElementById('code').textContent = code;
+    document.getElementById('open').href = SCHEME + '://join/' + code;
+
+    var copy = document.getElementById('copy');
+    copy.addEventListener('click', function () {
+      var done = function () { copy.textContent = t.copied; setTimeout(function () { copy.textContent = t.copy; }, 2000); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, function () {});
+    });
+  })();
+</script>
+</body>
+</html>

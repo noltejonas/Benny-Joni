@@ -1,5 +1,10 @@
 /* global React, PTData, PTStats, PTPeople, Avatar, SideAvatar, Icon, ChartFullscreen, GapChart, RaceChart, ActivityHeatmap, sideFill, sideInk, sideName, buildSides, formatDuration, weekNumber, tr, trn, PTi18n */
-// Stats-Tab: Challenge | Ich (alle Challenges) | Duelle
+// Stats-Tab: Ich (alle Challenges) | Challenge | Duelle
+//
+// „Ich“ und „Challenge“ folgen dem gemeinsamen Filter (PTScope): „Alle
+// Challenges“ zeigt „Ich“, eine gewählte Challenge ihre Stats. „Challenge“
+// aus „Ich“ heraus öffnet zuerst die Haupt-Challenge. „Duelle“ gilt immer
+// über alle gemeinsamen Challenges.
 //
 // Aufbau pro Vergleich, jede Karte beantwortet eine Frage:
 //   Bilanz     – wer gewinnt die Wochen?          (Wochensiege, Reps gesamt)
@@ -32,15 +37,25 @@ function fmtWeekRange(weekStart) {
     : `${weekDayFmt.format(a)}–${weekDayFmt.format(b)}`;
 }
 
-function StatsTab({ api, me, profile, competition, sides, members, challenges: rawChallenges, categories: rawCategories, allSets: rawSets }) {
+function StatsTab({ api, me, profile, competition, sides, members, challenges: rawChallenges, categories: rawCategories, allSets: rawSets,
+  multi = false, scopeAll = false, onScopeAll, onPickChallenge, onOpenSwitcher }) {
   // Include cached competition props in the same release filter as fresh API data.
   const { challenges, categories, sets: allSets } = React.useMemo(() => PTData.sportsOnlyBundle({
     challenges: rawChallenges, categories: rawCategories, sets: rawSets,
   }), [rawChallenges, rawCategories, rawSets]);
-  const [view, setView] = React.useState(() => {
-    try { return sessionStorage.getItem('pt_stats_view') || 'challenge'; } catch (e) { return 'challenge'; }
+  // Duelle merkt sich der Tab selbst; „Ich“/„Challenge“ kommt bei mehreren
+  // Challenges aus dem Filter, bei einer aus dem Tab (Standard „Ich“).
+  const [stored, setStored] = React.useState(() => {
+    try { return sessionStorage.getItem('pt_stats_view') || 'me'; } catch (e) { return 'me'; }
   });
-  const switchView = (v) => { setView(v); try { sessionStorage.setItem('pt_stats_view', v); } catch (e) {} };
+  const remember = (v) => { setStored(v); try { sessionStorage.setItem('pt_stats_view', v); } catch (e) {} };
+  const view = stored === 'duel' ? 'duel' : multi ? (scopeAll ? 'me' : 'challenge') : (stored === 'challenge' ? 'challenge' : 'me');
+  const switchView = (v) => {
+    remember(v);
+    if (!multi || v === 'duel') return;
+    if (v === 'me') onScopeAll?.();
+    else if (scopeAll) onPickChallenge?.();
+  };
 
   // Cross-Challenge-Daten erst laden, wenn „Ich“ oder „Duelle“ geöffnet wird.
   const [bundle, setBundle] = React.useState(null);
@@ -65,11 +80,23 @@ function StatsTab({ api, me, profile, competition, sides, members, challenges: r
 
   return (
     <>
-      <div className="segmented mu-stats-switch">
-        <button className={view === 'challenge' ? 'active' : ''} onClick={() => switchView('challenge')}>{tr('Challenge')}</button>
-        <button className={view === 'me' ? 'active' : ''} onClick={() => switchView('me')}>{tr('Ich')}</button>
-        <button className={view === 'duel' ? 'active' : ''} onClick={() => switchView('duel')}>{tr('Duelle')}</button>
+      <div className="segmented mu-stats-switch" role="tablist" aria-label={tr('Stats')}>
+        <button role="tab" aria-selected={view === 'me'} className={view === 'me' ? 'active' : ''} onClick={() => switchView('me')}>{tr('Ich')}</button>
+        <button role="tab" aria-selected={view === 'challenge'} className={view === 'challenge' ? 'active' : ''} onClick={() => switchView('challenge')}>{tr('Challenge')}</button>
+        <button role="tab" aria-selected={view === 'duel'} className={view === 'duel' ? 'active' : ''} onClick={() => switchView('duel')}>{tr('Duelle')}</button>
       </div>
+      {view === 'me' && (
+        <div className="stats-scope-note">{tr('Deine Stats über alle Challenges')}</div>
+      )}
+      {view === 'challenge' && (
+        // Welche Challenge? Wechseln über den Challenge-Switcher, wie im Kopf.
+        <button type="button" className="stats-scope-pick" onClick={onOpenSwitcher}
+          aria-label={tr('Challenge wechseln, aktuell {name}', { name: competition.name })}>
+          <span aria-hidden="true">{competition.emoji}</span>
+          <span className="stats-scope-name">{competition.name}</span>
+          <Icon name="chevron" size={16} strokeWidth={2.5} />
+        </button>
+      )}
       {view === 'challenge' && firstWeek && (
         <div className="ob-note"><span className="ob-note-emoji" aria-hidden="true">📊</span>
           {tr('Woche 1 läuft. Ab Montag steht hier eure erste Bilanz.')}</div>

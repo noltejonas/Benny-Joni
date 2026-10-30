@@ -61,6 +61,26 @@ Nach einem frischen Klon einmal `npm run build`, sonst bricht `cap sync` mit
 „Could not find the web assets directory: ./dist“ ab. Den Build im Browser
 prüfen: Startkonfiguration „dist (iOS-Build …)“ in `.claude/launch.json`.
 
+## Homescreen-Widget (ab 1.6.0)
+
+Die App bettet die WidgetKit-Extension `BennyJoniWidget`
+(`com.bennyjoni.terminator.widget`, ab iOS 17) ein. Die Web-App schreibt nach
+jedem Laden einen Schnappschuss der Woche (`www/widget-model.js` →
+`WidgetBridgePlugin.swift`) in die geteilte Keychain-Gruppe
+`<Team-ID>.com.bennyjoni.terminator.shared`, das Widget liest ihn.
+
+- **Keine App Group**: Die ließe sich nur mit Apple-ID im Developer-Portal
+  anlegen; Xcode bricht bei der Signierung per API-Key mit „Authentication
+  failed“ ab. Keychain-Gruppen mit Team-Präfix erlaubt jedes Profil.
+- **Bundle-ID** `com.bennyjoni.terminator.widget` ist registriert (30.10.2026,
+  per API-Key); Profile legt die automatische Signierung selbst an.
+
+- **Version erhöhen**: `MARKETING_VERSION` steht für App *und* Widget im
+  Projekt (Debug und Release). Apple lehnt Builds ab, wenn die Extension eine
+  andere Version oder Build-Nummer hat; `tests/ios-widget.test.cjs` prüft das.
+- **Eigene Plugins**: `MainViewController.swift` registriert App-eigene
+  Capacitor-Plugins; `Main.storyboard` muss diese Klasse verwenden.
+
 ## Typische Fehler
 
 - **`FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`**: In App Store Connect

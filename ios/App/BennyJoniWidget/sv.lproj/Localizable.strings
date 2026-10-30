@@ -1,0 +1,21 @@
+/* Widget för hemskärmen (svenska). Appens texter kommer färdiga i ögonblicksbilden. */
+"widget.name" = "Din vecka";
+"widget.description" = "Veckans övningar och utmaningar i en överblick.";
+"widget.noData.title" = "Benny & Joni";
+"widget.noData.text" = "Öppna appen så visas din vecka här.";
+"widget.updated %@" = "Uppdaterad %@";
+"sample.title" = "V. 44";
+"sample.daysLeft" = "4 dagar kvar";
+"sample.done" = "1 av 3 klara";
+"sample.ex1" = "Armhävningar";
+"sample.ex2" = "Chins";
+"sample.ex3" = "Knäböj";
+"sample.line1" = "20 till idag";
+"sample.line2" = "du ligger i fas";
+"sample.line3" = "klar";
+"sample.comp1" = "Duell";
+"sample.comp2" = "Kompisgänget";
+"sample.status1" = "Du leder i en övning";
+"sample.status2" = "Plats 2 av 5";
+"sample.exercises" = "Dina övningar";
+"sample.challenges" = "Dina utmaningar";

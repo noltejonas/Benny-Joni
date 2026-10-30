@@ -430,7 +430,8 @@ function ObWeekOne({ summary, competition = null, onDone }) {
   const canShare = typeof Share === 'function' && typeof window.PTFeed?.weekOneShareText === 'function';
   const shareText = () => PTFeed.weekOneShareText({
     summary, fmtMinutes: formatDuration,
-    appName: PTOnboarding.APP_NAME || 'Benny & Joni', appUrl: PTOnboarding.DOWNLOAD_URL || '',
+    appName: PTOnboarding.APP_NAME || 'Benny & Joni',
+    appUrl: (competition?.invite_code && PTOnboarding.inviteUrl?.(competition.invite_code)) || PTOnboarding.DOWNLOAD_URL || '',
     code: competition?.invite_code || '',
   });
   return (

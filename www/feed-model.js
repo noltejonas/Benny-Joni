@@ -24,9 +24,14 @@
   const asc = (a, b) => String(a.created_at).localeCompare(String(b.created_at));
   const desc = (a, b) => String(b.created_at).localeCompare(String(a.created_at));
 
+  // Zusammengeführte Einträge (PTScope.mergeLogCopies) nur in einer Serie,
+  // wenn sie in denselben Challenges zählen.
+  const compsSig = (s) => (s.competition_ids || []).join(',');
+
   function groupable(prev, s) {
     return prev.athlete === s.athlete
       && prev.challenge_id === s.challenge_id
+      && compsSig(prev) === compsSig(s)
       && !prev.workout && !s.workout
       && !prev.note && !s.note
       && (prev.project_tag_id || null) === (s.project_tag_id || null)
@@ -139,6 +144,33 @@
     const { events, progressBySet } = weekTimeline({ weekSets, challenges, sides, participantCount });
     const runs = bursts(sets).map((b) => ({ ...b, progress: progressBySet[b.sets[0].id] || null }));
     // Bei gleicher Zeit steht der Meilenstein über der Zeile, die ihn ausgelöst hat.
+    const rank = (e) => (e.kind === 'milestone' ? 0 : 1);
+    return [...runs, ...events, ...recaps]
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || rank(a) - rank(b));
+  }
+
+  // Feed „Alle Challenges“. items: zusammengeführte Sätze (PTScope.mergeLogCopies,
+  // kind 'set') plus Rückblicke mit competition_id. comps: pro Challenge
+  // { c, sides, participantCount, challenges, weekSets } der laufenden Woche.
+  // Meilensteine und Anteile rechnet jede Challenge für sich (eigene Seiten und
+  // Ziele); jeder Eintrag trägt competition_id (vertretende Challenge) und
+  // competition_ids. Ein Eintrag in mehreren Challenges steht einmal da, sein
+  // Anteil gilt dann nicht eindeutig und entfällt.
+  function buildFeedAll({ items = [], comps = [] }) {
+    const sets = items.filter((x) => x.kind !== 'recap' && x.kind !== 'month');
+    const recaps = items.filter((x) => x.kind === 'recap' || x.kind === 'month').map((r) => ({ ...r, key: r.id }));
+    const events = [];
+    const progressBySet = {};
+    for (const x of comps) {
+      const t = weekTimeline({ weekSets: x.weekSets, challenges: x.challenges, sides: x.sides, participantCount: x.participantCount });
+      for (const e of t.events) events.push({ ...e, competition_id: x.c.id, competition_ids: [x.c.id] });
+      Object.assign(progressBySet, t.progressBySet);
+    }
+    const runs = bursts(sets).map((b) => {
+      const ids = b.sets[0].competition_ids || [b.sets[0].competition_id].filter(Boolean);
+      return { ...b, competition_id: b.sets[0].competition_id, competition_ids: ids,
+        progress: ids.length > 1 ? null : progressBySet[b.sets[0].id] || null };
+    });
     const rank = (e) => (e.kind === 'milestone' ? 0 : 1);
     return [...runs, ...events, ...recaps]
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || rank(a) - rank(b));
@@ -295,7 +327,7 @@
   }
 
   window.PTFeed = {
-    BURST_GAP_MIN, bursts, leaderIndex, weekTimeline, buildFeed,
+    BURST_GAP_MIN, bursts, leaderIndex, weekTimeline, buildFeed, buildFeedAll,
     REPS_MAX, REPS_ASK, repsCheck,
     BLOCK_KEY, blockedIds, isBlocked, setBlocked,
     reportMailto,

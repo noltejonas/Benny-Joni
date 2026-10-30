@@ -168,21 +168,22 @@ function FeedSkeleton() {
   );
 }
 
-function FeedMilestone({ e, parts, side, arriving }) {
+function FeedMilestone({ e, parts, side, arriving, compLabel = '' }) {
   return (
     <div className={`lf-event lf-event-${e.type}${arriving ? ' is-arriving' : ''}`} style={sideStyle(side)} data-lf-key={e.key}>
       <span className="lf-event-icon"><Icon name={parts.icon} size={16} strokeWidth={2.4} /></span>
       <span className="lf-event-body">
         <span className="lf-event-text">{parts.text}</span>
-        <span className="lf-event-sub">{parts.sub} · {formatRelative(e.created_at)}</span>
+        <span className="lf-event-sub">{parts.sub} · {formatRelative(e.created_at)}{compLabel && ` · ${compLabel}`}</span>
       </span>
     </div>
   );
 }
 
+// compBadge: Emojis der Challenges, in denen der Eintrag zählt („Alle Challenges“).
 function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions, onReact, onMore,
   progressLabel, tags, editId, editVal, setEditVal, startEdit, commitEdit, cancelEdit, onDeleteSet,
-  blocked = false, onReport, onToggleBlock }) {
+  blocked = false, onReport, onToggleBlock, compBadge = null }) {
   const mine = b.athlete === me;
   const note = blocked ? null : PTData.noteText(b.sets[0].note);
   const showSets = mine || b.count > 1;
@@ -195,7 +196,8 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
           {isNew && <span className="lf-dot" aria-label={tr('neu')} />}
         </span>
         <span className="lf-body">
-          <span className="lf-title"><strong>{personName(b.athlete, me)}</strong> · {b.category?.name || '—'}</span>
+          <span className="lf-title"><strong>{personName(b.athlete, me)}</strong> · {b.category?.name || '—'}
+            {compBadge && <span className="lf-comps" aria-label={compBadge.label}>{compBadge.emojis}</span>}</span>
           <span className="lf-meta">
             {formatRelative(b.created_at)}
             {b.count > 1 && ` · ${trn(b.count, '{n} Satz', '{n} Sätze')}`}
@@ -281,22 +283,47 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
 
 // `alone`, `onFirstLog`, `onInvite`: leerer Zustand und Hinweis für neue Challenges.
 // `competition` (optional): Name und Einladungscode für „Ergebnis teilen“.
+// `comps` (optional): „Alle Challenges“. Pro Challenge { c, sides, participantCount,
+// challenges, weekSets }; `feed` enthält dann zusammengeführte Sätze
+// (PTScope.mergeLogCopies) und Rückblicke mit competition_id. Seiten, Ziele und
+// Meilensteine gelten je Challenge, jede Zeile trägt das Emoji ihrer Challenges.
 function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], weekSets = [], participantCount = 2,
-  projectTags = [], toolTags = [], loading = false, alone = false, competition = null,
+  projectTags = [], toolTags = [], loading = false, alone = false, competition = null, comps = null,
   onEditSet, onDeleteSet, onToggleReaction, onPickEmoji, onBackfill, onFirstLog, onInvite }) {
   useTicker(30000);
   const online = useOnline();
 
   const entries = React.useMemo(
-    () => PTFeed.buildFeed({ items: feed, weekSets, challenges, sides, participantCount }),
-    [feed, weekSets, challenges, sides, participantCount]
+    () => (comps
+      ? PTFeed.buildFeedAll({ items: feed, comps })
+      : PTFeed.buildFeed({ items: feed, weekSets, challenges, sides, participantCount })),
+    [comps, feed, weekSets, challenges, sides, participantCount]
   );
   const sideIdx = React.useMemo(() => sideIndexByUser(sides), [sides]);
+  // „Alle Challenges“: Seiten und Namen je Challenge
+  const compById = React.useMemo(() => {
+    const out = {};
+    for (const x of comps || []) out[x.c.id] = { ...x, sideIdx: sideIndexByUser(x.sides) };
+    return out;
+  }, [comps]);
+  const sidesOf = (e) => (comps ? compById[e.competition_id]?.sides || [] : sides);
+  const sideOfAthlete = (e) => {
+    if (!comps) return sides[sideIdx[e.athlete]];
+    const x = compById[e.competition_id];
+    return x ? x.sides[x.sideIdx[e.athlete]] : null;
+  };
+  const compBadgeOf = (e) => {
+    if (!comps) return null;
+    const list = (e.competition_ids || [e.competition_id]).map((id) => compById[id]?.c).filter(Boolean);
+    return list.length ? { emojis: list.map((c) => c.emoji).join(''), label: list.map((c) => c.name).join(', ') } : null;
+  };
+  const compLabelOf = (e) => { const c = comps && compById[e.competition_id]?.c; return c ? `${c.emoji} ${c.name}` : ''; };
   const catOfChallenge = React.useMemo(() => {
     const out = {};
-    for (const ch of challenges) out[ch.id] = categories.find((c) => c.id === ch.category_id) || null;
+    const all = comps ? comps.flatMap((x) => x.challenges) : challenges;
+    for (const ch of all) out[ch.id] = categories.find((c) => c.id === ch.category_id) || null;
     return out;
-  }, [challenges, categories]);
+  }, [comps, challenges, categories]);
   const fmtFor = (challengeId) => (v) => (PTData.usesMinutes(catOfChallenge[challengeId]) ? formatDuration(v) : String(v));
 
   // Punkt an Einträgen anderer, die seit dem letzten Besuch dazugekommen sind.
@@ -334,7 +361,7 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
     const e = fromOthers[0];
     setAnnounce(e.kind === 'burst'
       ? `${personName(e.athlete, me)}: ${burstValueLabel(e)} ${e.category?.name || ''}`
-      : milestoneParts(e, { me, sides, catName: catOfChallenge[e.challenge_id]?.name || '', fmt: fmtFor(e.challenge_id) }).plain);
+      : milestoneParts(e, { me, sides: sidesOf(e), catName: catOfChallenge[e.challenge_id]?.name || '', fmt: fmtFor(e.challenge_id) }).plain);
   }, [entries, me]);
   // Leseposition halten: Wer weiter unten liest, soll nicht verrutschen, wenn
   // oben etwas dazukommt. Gemerkt wird der oberste sichtbare Eintrag; nach dem
@@ -428,7 +455,9 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
     return PTFeed.recapShareText({
       recap: r, sides, kw: weekNumber(r.week_start), name: competition?.name || '',
       unit: work ? '' : trc('Einheit', 'Reps'), fmt: work ? formatDuration : PTi18n.number,
-      appName: O?.APP_NAME || 'Benny & Joni', appUrl: O?.DOWNLOAD_URL || '', code: competition?.invite_code || '',
+      // Mit Code führt der eine Link direkt in die Challenge (Einladungsseite)
+      appName: O?.APP_NAME || 'Benny & Joni', code: competition?.invite_code || '',
+      appUrl: (competition?.invite_code && O?.inviteUrl?.(competition.invite_code)) || O?.DOWNLOAD_URL || '',
     });
   };
 
@@ -476,18 +505,19 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
         if (day) lastDay = day;
 
         if (e.kind === 'recap') {
-          const share = e === newestRecap && e.sumAll > 0 && PTFeed.recapShareText ? () => recapShareText(e) : undefined;
-          return <React.Fragment key={e.key}>{heading}<WeekRecap recap={e} me={me} sides={sides} getShareText={share} /></React.Fragment>;
+          // Teilen nur in der einzelnen Challenge (Name und Code gehören zu ihr)
+          const share = !comps && e === newestRecap && e.sumAll > 0 && PTFeed.recapShareText ? () => recapShareText(e) : undefined;
+          return <React.Fragment key={e.key}>{heading}<WeekRecap recap={e} me={me} sides={sidesOf(e)} getShareText={share} compLabel={compLabelOf(e)} /></React.Fragment>;
         }
         if (e.kind === 'month') {
           return <React.Fragment key={e.key}>{heading}<MonthRecapCard item={e} me={me} /></React.Fragment>;
         }
         if (e.kind === 'milestone') {
-          const side = e.type === 'lead' ? sides[e.sideIndex] : sides[sideIdx[e.athlete]];
-          const parts = milestoneParts(e, { me, sides, catName: catOfChallenge[e.challenge_id]?.name || '—', fmt: fmtFor(e.challenge_id) });
+          const side = e.type === 'lead' ? sidesOf(e)[e.sideIndex] : sideOfAthlete(e);
+          const parts = milestoneParts(e, { me, sides: sidesOf(e), catName: catOfChallenge[e.challenge_id]?.name || '—', fmt: fmtFor(e.challenge_id) });
           return (
             <React.Fragment key={e.key}>{heading}
-              <FeedMilestone e={e} parts={parts} side={side} arriving={!!arriving[e.key]} />
+              <FeedMilestone e={e} parts={parts} side={side} arriving={!!arriving[e.key]} compLabel={compLabelOf(e)} />
             </React.Fragment>
           );
         }
@@ -504,7 +534,7 @@ function FeedScreen({ feed, me, sides = [], categories = [], challenges = [], we
         const isNew = !!me && e.athlete !== me && !!lastSeen && String(e.created_at) > lastSeen;
         return (
           <React.Fragment key={e.key}>{heading}
-            <FeedBurst b={e} me={me} side={sides[sideIdx[e.athlete]]}
+            <FeedBurst b={e} me={me} side={sideOfAthlete(e)} compBadge={compBadgeOf(e)}
               isNew={isNew} arriving={!!arriving[e.key]}
               open={openKey === e.key}
               onToggleOpen={() => { setOpenKey((k) => (k === e.key ? null : e.key)); setEditId(null); }}

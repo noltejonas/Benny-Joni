@@ -22,7 +22,7 @@ async function mount({ notificationsOn = true } = {}) {
   const ctx = {
     me: 'u1', notificationsOn, kicksAllowed, setToast: text => toasts.push(text), console,
     api: { async upsertDeviceToken() {}, async deleteDeviceToken() {} },
-    TAB_KEY: 'pt:tab', writeHomeView: view => stored.set('pt:home-view', view),
+    TAB_KEY: 'pt:tab', writeScope: scope => stored.set('pt:scope', scope),
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     sessionStorage: { setItem: (key, value) => stored.set(key, value) },
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
@@ -61,7 +61,7 @@ test('Arschkick-Tap öffnet Heute und die zugehörige Challenge', async () => {
   const h = await mount();
   h.listeners.get('pushNotificationActionPerformed')({ notification: { data: { kind: 'teammate_kick', competition_id: 'c2' } } });
   assert.equal(h.stored.get('pt:tab'), 'home');
-  assert.equal(h.stored.get('pt:home-view'), 'challenge');
+  assert.equal(h.stored.get('pt:scope'), 'one', 'Filter auf diese eine Challenge');
   assert.deepEqual(h.events.map(event => event.type), ['pt:open-competition', 'pt:nav-home']);
   assert.equal(h.events[0].detail.competitionId, 'c2');
   h.cleanup();

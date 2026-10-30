@@ -578,6 +578,28 @@
           categories: db.categories.map(localizeCategory),
         }));
       },
+      async getFeedAll(ids, since, limit = 300) {
+        const set = new Set(ids);
+        const rows = db.sets.filter(s => set.has(s.competition_id) && s.created_at >= since)
+          .sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+        return later(rows.map(s => {
+          const ch = db.weekly_challenges.find(c => c.id === s.challenge_id);
+          const category = ch && localizeCategory(db.categories.find(c => c.id === ch.category_id));
+          return { ...withAthlete(s), challenge: ch ? { ...normCh(ch), category } : null, category,
+            reactions: db.reactions.filter(r => r.set_id === s.id).map(withAthlete) };
+        }));
+      },
+      async getPenaltyOverview(ids) {
+        const set = new Set(ids);
+        const of = (table) => db[table].filter(x => set.has(x.competition_id));
+        return later({
+          penalties: of('penalties').map(p => ({ ...withAthlete(p), paid_by: p.paid_by_user })),
+          payouts: of('payouts').map(withAthlete),
+          closures: of('week_closures').map(c => ({ competition_id: c.competition_id, week_start: c.week_start })),
+          challengeWeeks: of('weekly_challenges').map(c => ({ competition_id: c.competition_id, week_start: c.week_start })),
+        });
+      },
+      // tables wie data.js; im Demo-Modus meldet jede Änderung einer Challenge.
       onCompetitionsChange(ids, fn) {
         let timer = null;
         const ping = () => { clearTimeout(timer); timer = setTimeout(fn, 120); };
