@@ -268,7 +268,7 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
         <div className="rd-focus-text">
           <div className="rd-focus-sub">
             {ex.isObligatory
-              ? (ex.finished ? tr('erledigt') : tr('einmal diese Woche'))
+              ? (ex.finished ? tr('erledigt') : ex.shareMax === 1 ? tr('einmal diese Woche') : tr('{done} / {total} Durchgänge', { done: ex.myWeek, total: ex.shareMax }))
               : ex.finished ? tr('überall erledigt')
               : ex.todayLeft > 0 ? tr('heute noch {amount}', { amount: fmt(ex.todayLeft) }) : tr('du bist auf Kurs')}
           </div>
@@ -344,7 +344,7 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
               const isFocus = active && ex.key === active.key;
               const fmt = (v) => fmtAmount(ex.minutes, v);
               const sub = ex.isObligatory
-                ? (ex.finished ? tr('erledigt') : tr('einmal diese Woche'))
+                ? (ex.finished ? tr('erledigt') : ex.shareMax === 1 ? tr('einmal diese Woche') : tr('{done} / {total} Durchgänge', { done: ex.myWeek, total: ex.shareMax }))
                 : ex.finished ? tr('{done} diese Woche', { done: fmt(ex.myWeek) })
                 : ex.todayLeft > 0
                   ? tr('{done} diese Woche · heute noch {left}', { done: fmt(ex.myWeek), left: fmt(ex.todayLeft) })

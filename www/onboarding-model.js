@@ -412,7 +412,10 @@
     let sharesHit = 0;
     for (const ch of week) {
       const own = mine.filter(s => s.challenge_id === ch.id);
-      if (kinds[ch.id] === 'workout') { if (own.length) sharesHit++; continue; }
+      if (kinds[ch.id] === 'workout') {
+        if (D().workoutRunCount(own) >= D().workoutTargetRuns(ch)) sharesHit++;
+        continue;
+      }
       const done = sum(own, kinds[ch.id] === 'work' ? 'duration_minutes' : 'reps');
       if (done >= D().fairShareOf(ch.target_reps, participantCount)) sharesHit++;
     }

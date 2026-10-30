@@ -1,5 +1,40 @@
 # App Store und Google Play mit Fastlane
 
+## Aktueller Stand: 1.5.2 eingereicht
+
+Stand 29. Oktober 2026: Backend-Rollout und beide Store-Einreichungen sind
+abgeschlossen. Artefaktquelle bleibt `94e8a84`: iOS **1.5.2 (31)** und
+Android **1.5.2 (Code 6)**. Apple bestätigt `WAITING_FOR_REVIEW`, Build
+`VALID`, Release-Typ `AFTER_APPROVAL` (Readback 29. Oktober, 00:23:47 Uhr
+CET/Stockholm). Google bestätigt nach dem Commit am **29. Oktober 2026,
+00:37:23 Uhr CET/Stockholm** (`2026-10-28T23:37:23Z`) offiziell
+`RELEASE_LIFECYCLE_STATE_IN_REVIEW` für Produktion 6. Eine Freigabe oder
+Veröffentlichung ist noch nicht bestätigt.
+
+Für Google hat der Nutzer das Produktionsrecht nur für diese App gespeichert.
+Google ergänzte automatisch das abhängige Deeplink-App-Recht: acht statt
+sechs App-Rechte für genau eine App (`com.bennyjoni.terminator`). Die
+Console bestätigt acht gespeicherte Rechte und einen inaktiven Speichern-Button.
+Kontoweite Rechte wurden im Rollout nicht geändert; ein vollständiger
+separater Readback aller kontoweiten Rechte wurde nicht durchgeführt. Der
+bestehende Servicekonto-Zugang bestand danach Validate und Submit.
+Der Commit lief mit `ERROR_IF_IN_REVIEW`; keine laufende Prüfung wurde
+abgebrochen. Ein abschließender `releases.list`-Readback erfolgte ohne Edit.
+Bundle-Hash, DE-/EN-Neuerungen, fünf Produktionsländer `AT/CH/DE/FI/SE` und interner
+Entwurf 6 blieben unverändert. Es wurden keine Binärdateien oder
+Metadaten neu hochgeladen.
+
+Belege: `.local/release/update-20261028/android/fastlane-production-submit-20261028T233714Z-29683.json`
+und `fastlane-production-validate-20261028T233658Z-29533.json` im selben Ordner.
+Gespeicherte App-Rechte:
+`.local/release/update-20261028/android/permissions-saved-app-scope.txt`.
+Vollständiger Status und Artefakthashes: [RELEASE.md](RELEASE.md).
+
+## Historischer Launch-Stand vom 21. Oktober 2026
+
+Die folgenden Angaben zu 1.4.1/Build 26/Code 2 beschreiben den damaligen
+Launch und seine Einrichtung. Die aktuellen Einreichungen stehen oben.
+
 Die Store-Texte liegen für Deutsch und Englisch vor. Der Apple-Metadaten-
 Upload für Version 1.4.1 ist abgeschlossen und per API geprüft; Build 26 ist
 ausgewählt, `VALID` und seit 21. Oktober 2026, 18:15 Uhr CEST zur Prüfung
@@ -37,8 +72,9 @@ Apple-Team-Key und die Review-Angaben sind lokal hinterlegt;
 `ios verify_auth` war erfolgreich. Die private `.p8` liegt nicht versioniert
 unter `.local/release/apple/` mit Dateirechten `0600`. Der separate
 Google-Play-Zugang ist ebenfalls eingerichtet; `android verify_auth`
-war beim Einrichten mit dem damaligen Version Code 1 erfolgreich; der
-aktuelle Console-Entwurf und die Produktion verwenden Code 2.
+war beim Einrichten mit dem damaligen Version Code 1 erfolgreich;
+Console-Entwurf und Produktion verwendeten beim Launch Code 2.
+Der aktuelle Code-6-Stand und die gespeicherten App-Rechte stehen oben.
 
 Die Gem-Versionen sind in `ios/App/Gemfile.lock` festgelegt. Auf einem
 anderen Mac werden sie vor dem ersten Aufruf mit `bundle install` installiert.

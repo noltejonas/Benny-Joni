@@ -1,9 +1,83 @@
 # Store-Unterlagen für Benny & Joni
 
+## Update und Ländererweiterung vom 28./29. Oktober 2026
+
+Die zuvor veröffentlichte iOS-Version ist **1.5.1 (30)**. Das neue Update
+**1.5.2** ist aus Quellstand `94e8a84` gebaut, geprüft und in beiden Stores
+zur Prüfung eingereicht. Backend-Rollout und Store-Einreichungen sind
+abgeschlossen; eine Freigabe oder Veröffentlichung ist noch nicht bestätigt.
+
+- **Apple 1.5.2 (31):** Build `VALID`, Version und ReviewSubmission
+  `WAITING_FOR_REVIEW`. Eingereicht am `2026-10-28T21:25:21Z`, Submission-ID
+  `fe58f77f-6768-4518-a262-6e38d07d4cbb`, genau ein Submission-Item.
+  Release-Typ `AFTER_APPROVAL`. Letzter lesender Readback:
+  29. Oktober, **00:23:47 Uhr CET/Stockholm** (`2026-10-28T23:23:47Z`).
+  Belege: `.local/release/update-20261028/apple/submit-result.json` und
+  `submit-readiness-20261028T232347Z.json` im selben Ordner.
+- **Google Play 1.5.2 (Code 6):** Produktion eingereicht; Commit am
+  **29. Oktober 2026, 00:37:23 Uhr CET/Stockholm**
+  (`2026-10-28T23:37:23Z`). Der offizielle `releases.list`-Readback ohne
+  Edit bestätigt **`RELEASE_LIFECYCLE_STATE_IN_REVIEW`** für Produktion 6.
+  Validate und Submit waren erfolgreich. Bundle-Hash, DE-/EN-Neuerungen,
+  Länder `AT/CH/DE/FI/SE` und interner Entwurf 6 sind unverändert;
+  keine neuen Binär-/Metadaten-Uploads, kein Review-Abbruch,
+  Commit-Schutz `ERROR_IF_IN_REVIEW`.
+  Belege: `.local/release/update-20261028/android/fastlane-production-submit-20261028T233714Z-29683.json`
+  und `fastlane-production-validate-20261028T233658Z-29533.json` im selben Ordner.
+
+Der frühere Google-Zwischenstand (leerer Produktionsentwurf, Servicekonto
+HTTP 403, unzuverlässige native Eingaben und ausstehende Browser-Anmeldung)
+ist historisch. Nach dem durch den Nutzer gespeicherten Produktionsrecht
+für genau diese App funktioniert die Einreichung über den bestehenden
+API-Zugang. Google ergänzte das abhängige App-Recht für Deeplinks automatisch:
+acht statt sechs App-Rechte für genau eine App (`com.bennyjoni.terminator`),
+lesend bestätigt mit inaktivem Speichern-Button. Kontoweite Rechte wurden
+im Rollout nicht geändert; ihr vollständiger separater Readback ist nicht
+belegt. Berechtigungsbeleg:
+`.local/release/update-20261028/android/permissions-saved-app-scope.txt`.
+
+Die getrennte Ländererweiterung wurde zuvor am 28. Oktober bearbeitet:
+
+- Apple: Finnland (`FIN`) und Schweden (`SWE`) zusätzlich zu Deutschland,
+  Österreich und Schweiz aktiviert. API-Readback bestätigt genau diese fünf
+  verfügbaren Länder. Der abschließende Readback meldet für beide neuen
+  Länder `AVAILABLE`; die Freigabe ist verarbeitet.
+- Google Play: Bei der Ländererweiterung zeigte die Veröffentlichungsübersicht
+  unter „Changes in review“ die Änderung „Add 2 countries / regions: Finland,
+  Sweden“. Managed Publishing war dabei ausgeschaltet. Der abschließende
+  Readback bei der erfolgreichen Produktionseinreichung bestätigt
+  `AT/CH/DE/FI/SE` unverändert.
+- Belege: `.local/release/nordic-availability-20261028/apple-latest.json` und
+  `google-in-review.png`. Für die reine Ländererweiterung wurde kein neuer
+  App-Build benötigt; das oben beschriebene 1.5.2 enthält die Übersetzungen.
+
+Finnisch und Schwedisch sind in beiden geprüften App-Artefakten enthalten:
+je **1059 Wörterbucheinträge**, native iOS-Sprachangaben und Push-Texte.
+Die Übersetzungsprüfung bestätigt für beide Sprachen **1386 Aufrufe,
+alles übersetzt**. Die Store-Listings bleiben Deutsch und Englisch.
+`notify-set` Version 15, `ranking-push` Version 9 und `kick-teammate`
+Version 1 sind produktiv deployt und bytegenau zurückgelesen.
+`daily-nudge` ist im Quellstand übersetzt, produktiv aber nicht eingerichtet
+oder deployt; es wurden keine neuen Erinnerungs-Cronjobs angelegt.
+
+Die integrierte Testsuite besteht mit 302 erfolgreichen Tests und einem
+vorgesehenen Release-Skip; Web-Build und native Synchronisierung bestehen.
+Beide Sprachen sind in der lokalen App umschaltbar und bei 320 Pixeln Breite
+ohne Seitenüberlauf oder überlaufende Navigationsbuttons geprüft.
+Artefakt-Hashes, Backend-Rollout und Prüfbelege stehen in
+[RELEASE.md](RELEASE.md).
+
+## Bestehende Store-Unterlagen
+
 Die aktuellen Texte stehen maschinenlesbar unter
 `ios/App/fastlane/metadata/` (App Store) und `play-metadata/` (Google Play).
 Beide Stores erhalten Deutsch (`de-DE`) und Englisch (`en-GB`). Ändert Texte
 in diesen Dateien und prüft sie danach mit `node tools/check-store.cjs`.
+
+### Historische Einreichung vom 21. Oktober 2026
+
+Die folgenden Angaben zu 1.4.1 dokumentieren den damaligen Launch-Stand.
+Der aktuelle Update-Status steht oben.
 
 Am 21. Oktober 2026 wurden die Apple-Metadaten für Version **1.4.1** mit
 `tools/fastlane.sh ios store_metadata` hochgeladen und anschließend direkt

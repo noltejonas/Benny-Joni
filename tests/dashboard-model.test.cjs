@@ -191,3 +191,42 @@ test('challengeStats zählt einen Satz in zwei Challenges (gleiche log_id) nur e
   // Pro Wochenziel bleibt der Satz sichtbar
   assert.equal(st.weeks[0].rows.find(r => r.ch.id === 'b').perSide[0].value, 30);
 });
+
+
+test('workout rows cap each team member at their own repeated-run goal', () => {
+  const categories = [{ id: 'sally', name: 'Bring Sally Up', kind: 'sports', challenge_type: 'bring_sally_up' }];
+  const challenges = [{ id: 's1', category_id: 'sally', week_start: WEEK, target_reps: 204, target_runs: 3 }];
+  const sides = [{ userIds: ['me', 'lea'] }, { userIds: ['jonas', 'sam'] }];
+  const sets = ['me', 'me', 'me', 'me', 'me', 'jonas', 'jonas', 'jonas', 'sam', 'sam', 'sam']
+    .map((athlete, i) => ({ athlete, challenge_id: 's1', log_id: `log${i}`, reps: 204 }));
+  sets.push({ ...sets[0] });
+  const [row] = D.challengeRows({ challenges, categories, sets, sides, me: 'me', participantCount: 4, today: WED });
+  assert.equal(row.share, 3);
+  assert.equal(row.goal, 12);
+  assert.equal(row.myDone, 5);
+  assert.equal(row.meFinished, true);
+  assert.deepEqual(row.doneBySide, [3, 6]);
+  assert.deepEqual(row.sideGoals, [6, 6]);
+  assert.equal(row.total, 9);
+});
+
+test('global dashboard shows partial repeated-workout progress across different goals', () => {
+  const category = { id: 'sally', name: 'Bring Sally Up', kind: 'sports', challenge_type: 'bring_sally_up', competition_id: null };
+  const bundle = { categories: [category], challenges: [
+    { id: 's1', competition_id: 'A', category_id: 'sally', week_start: WEEK, target_reps: 204, target_runs: 3 },
+    { id: 's2', competition_id: 'B', category_id: 'sally', week_start: WEEK, target_reps: 204, target_runs: 2 },
+  ], sets: [
+    { id: 'a1', log_id: 'run1', challenge_id: 's1', athlete: 'me', reps: 204 },
+    { id: 'a2', log_id: 'run2', challenge_id: 's1', athlete: 'me', reps: 200 },
+    { id: 'b1', log_id: 'run1', challenge_id: 's2', athlete: 'me', reps: 204 },
+  ] };
+  const result = D.buildDashboard({ me: 'me', comps: [
+    { c: { id: 'A' }, sides: duel, participantCount: 2 },
+    { c: { id: 'B' }, sides: duel, participantCount: 2 },
+  ], bundle, weekStart: WEEK, today: WED });
+  assert.equal(result.exercises.length, 1);
+  assert.equal(result.exercises[0].myWeek, 2);
+  assert.equal(result.exercises[0].shareMax, 3);
+  assert.equal(result.exercises[0].finished, false);
+  assert.equal(result.exercises[0].pct, 0.5);
+});

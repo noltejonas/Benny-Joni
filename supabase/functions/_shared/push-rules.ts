@@ -226,6 +226,7 @@ export interface GoalRow {
   id: string;
   competition_id: string;
   target_reps: number | null;
+  target_runs?: number | null;
   category: GoalCategory | null;
 }
 
@@ -238,12 +239,18 @@ export function isRepGoal(goal: GoalRow): boolean {
     (goal.target_reps ?? 0) > 0;
 }
 
+// Pflicht-Durchgänge pro Person; alte Ziele ohne Feld verlangen einen.
+export function workoutRunsRequired(goal: { target_runs?: number | null }): number {
+  const n = Number(goal.target_runs);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
+
 // ── Sprache der Empfänger ────────────────────────────────────────────────────
 // Die App meldet ihre Sprache in profiles.language (Migration
 // 20261021000000_profile_language.sql, Codes wie in www/i18n.js). Ohne Eintrag,
 // ohne Spalte oder bei einer Sprache ohne Push-Texte: Deutsch wie bisher.
 // Neue Sprache: Eintrag in PUSH_TEXT (und STANDARD_CATEGORY_NAMES) ergänzen.
-export type PushLang = "de" | "en";
+export type PushLang = "de" | "en" | "fi" | "sv";
 export const PUSH_LANG_DEFAULT: PushLang = "de";
 
 export function pushLang(raw: string | null | undefined): PushLang {
@@ -275,10 +282,12 @@ interface PushTexts {
   overtakeTeamBody: (unit: string, theirs: number, ours: number) => string;
   goalTitle: (name: string) => string;
   goalBody: string;
+  rankTitle: string;
+  rankBody: (who: string, category: string, rank: number) => string;
 }
 
-// Gleiche Wortwahl wie in der App (www/i18n/en.js: British English, typografischer
-// Apostroph). Namen, Challenge-Namen und eigene Übungen bleiben, wie sie sind.
+// Gleiche Wortwahl wie in den App-Wörterbüchern (www/i18n/).
+// Namen, Challenge-Namen und eigene Übungen bleiben, wie sie sind.
 export const PUSH_TEXT: Record<PushLang, PushTexts> = {
   de: {
     someone: "Jemand",
@@ -304,6 +313,8 @@ export const PUSH_TEXT: Record<PushLang, PushTexts> = {
     overtakeTeamBody: (unit, theirs, ours) => `${unit}: ${theirs} zu ${ours}. Holt euch die Führung zurück!`,
     goalTitle: (name) => `🏁 ${name} hat 100 % geschafft`,
     goalBody: "Alle Wochenziele erledigt. Und du?",
+    rankTitle: "🏆 Rangliste",
+    rankBody: (who, category, rank) => `${who} hat dich bei ${category} auf Platz ${rank} verdrängt.`,
   },
   en: {
     someone: "Someone",
@@ -329,6 +340,62 @@ export const PUSH_TEXT: Record<PushLang, PushTexts> = {
     overtakeTeamBody: (unit, theirs, ours) => `${unit}: ${theirs} to ${ours}. Take the lead back together!`,
     goalTitle: (name) => `🏁 ${name} hit 100%`,
     goalBody: "Every weekly goal done. Your turn?",
+    rankTitle: "🏆 Leaderboard",
+    rankBody: (who, category, rank) => `${who} pushed you down to #${rank} in ${category}.`,
+  },
+  fi: {
+    someone: "Joku",
+    yourChallenge: "haasteesi",
+    yourRival: "Vastustajasi",
+    reps: "Toistot",
+    and: "ja",
+    rivalTitle: (name) => `🔥 ${name} on vauhdissa`,
+    rivalBody: (n) => `Jo ${n} ${n === 1 ? "toisto" : "toistoa"} tänään — sinulla vielä 0.`,
+    dailyTitle: (comp) => `⏰ Tänään vielä tekemättä: ${comp}`,
+    dailyBody: (rival, n) => `${rival} on tehnyt jo ${n} ${n === 1 ? "toiston" : "toistoa"} – ota kiinni!`,
+    dailyBodyFirst: "Yksi sarja riittää ottamaan johdon.",
+    lastCallTitle: (comp) => `⏳ Viimeinen mahdollisuus: ${comp}`,
+    lastCallBody: (list) => `Tee vielä ennen keskiyötä: ${list}.`,
+    joinTitle: (name) => `🎉 ${name} on mukana`,
+    joinBodyDuel: "Kaksintaistelu on alkanut. Aloitetaan!",
+    joinBodyGroup: "Haaste on alkanut. Aloitetaan!",
+    reactionAmount: (who, amount, unit) => `${who} reagoi sarjaasi (${unit}: ${amount}).`,
+    reactionSet: (who) => `${who} reagoi sarjaasi.`,
+    overtakeTitle: (name) => `⚡ ${name} ohitti sinut`,
+    overtakeTeamTitle: (name) => `⚡ ${name} ohitti joukkueenne`,
+    overtakeBody: (unit, theirs, mine) => `${unit}: ${theirs} – ${mine}. Ota johto takaisin!`,
+    overtakeTeamBody: (unit, theirs, ours) => `${unit}: ${theirs} – ${ours}. Ottakaa johto yhdessä takaisin!`,
+    goalTitle: (name) => `🏁 ${name} saavutti 100 %`,
+    goalBody: "Kaikki viikon tavoitteet tehty. Sinun vuorosi!",
+    rankTitle: "🏆 Tulostaulu",
+    rankBody: (who, category, rank) => `${who} ohitti sinut. Uusi sijoituksesi: ${rank} (${category}).`,
+  },
+  sv: {
+    someone: "Någon",
+    yourChallenge: "din utmaning",
+    yourRival: "Din motståndare",
+    reps: "reps",
+    and: "och",
+    rivalTitle: (name) => `🔥 ${name} är i gång`,
+    rivalBody: (n) => `Redan ${n} ${n === 1 ? "rep" : "reps"} i dag — du är fortfarande på 0.`,
+    dailyTitle: (comp) => `⏰ Inget gjort än i dag i ${comp}`,
+    dailyBody: (rival, n) => `${rival} har redan gjort ${n} ${n === 1 ? "rep" : "reps"} – dags att komma ikapp!`,
+    dailyBodyFirst: "Ett set räcker för att ta ledningen.",
+    lastCallTitle: (comp) => `⏳ Sista chansen i ${comp}`,
+    lastCallBody: (list) => `Du behöver fortfarande ${list} före midnatt.`,
+    joinTitle: (name) => `🎉 ${name} är med`,
+    joinBodyDuel: "Duellen är i gång. Nu kör vi!",
+    joinBodyGroup: "Utmaningen är i gång. Nu kör vi!",
+    reactionAmount: (who, amount, unit) => `${who} reagerade på dina ${amount} ${unit}.`,
+    reactionSet: (who) => `${who} reagerade på ditt set.`,
+    overtakeTitle: (name) => `⚡ ${name} gick om dig`,
+    overtakeTeamTitle: (name) => `⚡ ${name} gick om ert lag`,
+    overtakeBody: (unit, theirs, mine) => `${unit}: ${theirs} mot ${mine}. Ta tillbaka ledningen!`,
+    overtakeTeamBody: (unit, theirs, ours) => `${unit}: ${theirs} mot ${ours}. Ta tillbaka ledningen tillsammans!`,
+    goalTitle: (name) => `🏁 ${name} nådde 100 %`,
+    goalBody: "Alla veckomål klara. Din tur!",
+    rankTitle: "🏆 Topplista",
+    rankBody: (who, category, rank) => `${who} gick om dig. Du ligger nu på plats ${rank} i ${category}.`,
   },
 };
 
@@ -340,6 +407,8 @@ const textFor = (lang: string | null | undefined): PushTexts => PUSH_TEXT[pushLa
 export const STANDARD_CATEGORY_NAMES: Record<PushLang, Record<string, string>> = {
   de: {},
   en: { "Liegestütze": "Push-ups", "Klimmzüge": "Pull-ups", "Kniebeugen": "Squats", "20-Min-AMRAP": "20-min AMRAP" },
+  fi: { "Liegestütze": "Punnerrukset", "Klimmzüge": "Leuanvedot", "Kniebeugen": "Kyykyt", "20-Min-AMRAP": "20 min AMRAP" },
+  sv: { "Liegestütze": "Armhävningar", "Klimmzüge": "Chins", "Kniebeugen": "Knäböj", "20-Min-AMRAP": "20 min AMRAP" },
 };
 
 export function localizedCategoryName(
@@ -396,7 +465,11 @@ export function dailyNudgeAlert(o: CompText & { rivalName?: string | null; rival
 // missing[].name ist schon in der Sprache der Empfänger (localizedCategoryName).
 export function lastCallAlert(o: CompText & { missing: { amount: number; name: string }[] }): Alert {
   const t = textFor(o.lang);
-  const items = o.missing.slice(0, 3).map((x) => `${x.amount} ${cleanText(x.name, 30, t.reps)}`);
+  // Kategorien als Liste: So bleiben auf Finnisch auch eigene Übungsnamen
+  // unverändert, ohne sie nach der Mengenangabe grammatisch beugen zu müssen.
+  const items = o.missing.slice(0, 3).map((x) => pushLang(o.lang) === "fi"
+    ? `${cleanText(x.name, 30, t.reps)}: ${x.amount}`
+    : `${x.amount} ${cleanText(x.name, 30, t.reps)}`);
   return {
     title: t.lastCallTitle(cleanText(o.compName, 40, t.yourChallenge)),
     body: t.lastCallBody(joinList(items, t.and)),
@@ -444,6 +517,69 @@ export function goalAlert(o: CompText & { name: string }): Alert {
     subtitle: compLine(o),
     body: t.goalBody,
   };
+}
+
+export function rankOvertakenAlert(o: { lang?: string | null; senderName: string; categoryName: string; rank: number }): Alert {
+  const t = textFor(o.lang);
+  const category = localizedCategoryName({ name: o.categoryName }, o.lang);
+  return { title: t.rankTitle, body: t.rankBody(o.senderName, category, o.rank) };
+}
+
+// Reine Texte auch für ranking-push, damit alle Mitteilungsarten dieselben
+// Sprachcodes und Standard-Übungen verwenden und ohne Versand testbar sind.
+export const RANKING_TEXT = {
+  de: {
+    locale: "de-DE",
+    category: (name: string) => name,
+    rounds: (n: number) => `${n} ${n === 1 ? "Runde" : "Runden"}`,
+    points: (n: number) => `${n} ${n === 1 ? "Punkt" : "Punkte"}`,
+    closedTitle: (month: string) => `🏆 ${month} ist abgeschlossen`,
+    weekTitle: (kw: number) => `🏆 KW ${kw} ist abgeschlossen`,
+    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} in der Rangliste`,
+    lastDayTitle: "⏳ Letzter Tag im Monat",
+    lastWeekDayTitle: "⏳ Letzter Tag der Woche",
+    lastDayBody: (need: string, rank: number) => `Dir fehlen ${need} bis Platz ${rank}.`,
+  },
+  en: {
+    locale: "en-GB",
+    category: (name: string) => localizedCategoryName({ name }, "en"),
+    rounds: (n: number) => `${n} ${n === 1 ? "round" : "rounds"}`,
+    points: (n: number) => `${n} ${n === 1 ? "point" : "points"}`,
+    closedTitle: (month: string) => `🏆 ${month} is closed`,
+    weekTitle: (kw: number) => `🏆 Week ${kw} is closed`,
+    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} on the leaderboard`,
+    lastDayTitle: "⏳ Last day of the month",
+    lastWeekDayTitle: "⏳ Last day of the week",
+    lastDayBody: (need: string, rank: number) => `${need} to go for #${rank}.`,
+  },
+  fi: {
+    locale: "fi-FI",
+    category: (name: string) => localizedCategoryName({ name }, "fi"),
+    rounds: (n: number) => `${n} ${n === 1 ? "kierros" : "kierrosta"}`,
+    points: (n: number) => `${n} ${n === 1 ? "piste" : "pistettä"}`,
+    closedTitle: (month: string) => `🏆 ${month} on päättynyt`,
+    weekTitle: (kw: number) => `🏆 Viikko ${kw} on päättynyt`,
+    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `Tulostaulu: ${points}`,
+    lastDayTitle: "⏳ Kuukauden viimeinen päivä",
+    lastWeekDayTitle: "⏳ Viikon viimeinen päivä",
+    lastDayBody: (need: string, rank: number) => `Tarvitset vielä (${need}) päästäksesi sijalle ${rank}.`,
+  },
+  sv: {
+    locale: "sv-SE",
+    category: (name: string) => localizedCategoryName({ name }, "sv"),
+    rounds: (n: number) => `${n} ${n === 1 ? "runda" : "rundor"}`,
+    points: (n: number) => `${n} poäng`,
+    closedTitle: (month: string) => `🏆 ${month} är avslutad`,
+    weekTitle: (kw: number) => `🏆 Vecka ${kw} är avslutad`,
+    closedBody: (medals: string, points: string) => medals ? `${medals} · ${points}` : `${points} på topplistan`,
+    lastDayTitle: "⏳ Sista dagen i månaden",
+    lastWeekDayTitle: "⏳ Sista dagen i veckan",
+    lastDayBody: (need: string, rank: number) => `${need} kvar till plats ${rank}.`,
+  },
+};
+
+export function rankingTextFor(lang: string | null | undefined) {
+  return RANKING_TEXT[pushLang(lang)];
 }
 
 // ── Tageserinnerung planen ───────────────────────────────────────────────────

@@ -1,0 +1,3 @@
+/* iOS:n käyttöoikeuspyynnöt (suomi). */
+"NSCameraUsageDescription" = "Voit ottaa kuvan profiilikuvaksesi.";
+"NSPhotoLibraryUsageDescription" = "Voit valita profiilikuvan kuvakirjastostasi.";

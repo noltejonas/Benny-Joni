@@ -188,7 +188,10 @@ test('pushLang: Sprache aus profiles.language, sonst Deutsch', () => {
   assert.equal(R.pushLang('fr'), 'de'); // keine Push-Texte → Deutsch
   assert.equal(R.pushLang('constructor'), 'de');
   // Jede Sprache hat alle Texte
-  assert.deepEqual(Object.keys(R.PUSH_TEXT.en).sort(), Object.keys(R.PUSH_TEXT.de).sort());
+  for (const lang of ['en', 'fi', 'sv']) {
+    assert.equal(R.pushLang(lang), lang);
+    assert.deepEqual(Object.keys(R.PUSH_TEXT[lang]).sort(), Object.keys(R.PUSH_TEXT.de).sort());
+  }
 });
 
 test('Texte auf Englisch: gleiche Platzhalter, Namen bleiben', () => {
@@ -231,6 +234,54 @@ test('localizedCategoryName: nur Standard-Übungen werden übersetzt', () => {
   assert.equal(R.localizedCategoryName({ name: 'Dips', competition_id: null }, 'en'), 'Dips');
   assert.equal(R.localizedCategoryName({ name: 'constructor', competition_id: null }, 'en'), 'constructor');
   assert.equal(R.localizedCategoryName(null, 'en'), '');
+});
+
+test('Finnische und schwedische Mitteilungen behalten Namen und Mengen', () => {
+  assert.deepEqual(R.rivalAlert({ lang: 'fi', senderName: 'Benny', senderToday: 12, compName: 'Büro-Battle', compEmoji: '💪' }), {
+    title: '🔥 Benny on vauhdissa', subtitle: '💪 Büro-Battle', body: 'Jo 12 toistoa tänään — sinulla vielä 0.',
+  });
+  assert.equal(R.dailyNudgeAlert({ lang: 'fi', compName: 'X', rivalName: 'Joni', rivalToday: 1 }).body,
+    'Joni on tehnyt jo 1 toiston – ota kiinni!');
+  assert.equal(R.lastCallAlert({ lang: 'fi', compName: 'X', missing: [{ amount: 30, name: 'Punnerrukset' }, { amount: 10, name: 'Oma harjoitus' }] }).body,
+    'Tee vielä ennen keskiyötä: Punnerrukset: 30 ja Oma harjoitus: 10.');
+  assert.equal(R.joinAlert({ lang: 'fi', name: 'Joni', mode: '1v1', compName: 'X' }).body,
+    'Kaksintaistelu on alkanut. Aloitetaan!');
+  assert.equal(R.reactionAlert({ lang: 'fi', reactorName: 'Joni', emoji: '🔥', amount: 25, unitName: 'Leuanvedot', compName: 'X' }).body,
+    'Joni reagoi sarjaasi (Leuanvedot: 25).');
+  assert.deepEqual(R.rivalAlert({ lang: 'sv', senderName: 'Benny', senderToday: 12, compName: 'Büro-Battle', compEmoji: '💪' }), {
+    title: '🔥 Benny är i gång', subtitle: '💪 Büro-Battle', body: 'Redan 12 reps i dag — du är fortfarande på 0.',
+  });
+  assert.equal(R.dailyNudgeAlert({ lang: 'sv', compName: 'X', rivalName: 'Joni', rivalToday: 1 }).body,
+    'Joni har redan gjort 1 rep – dags att komma ikapp!');
+  assert.equal(R.lastCallAlert({ lang: 'sv', compName: 'X', missing: [{ amount: 30, name: 'Armhävningar' }, { amount: 10, name: 'Dips' }] }).body,
+    'Du behöver fortfarande 30 Armhävningar och 10 Dips före midnatt.');
+  assert.equal(R.joinAlert({ lang: 'sv', name: 'Joni', mode: '1v1', compName: 'X' }).body,
+    'Duellen är i gång. Nu kör vi!');
+  assert.equal(R.reactionAlert({ lang: 'sv', reactorName: 'Joni', emoji: '🔥', amount: 25, unitName: 'Chins', compName: 'X' }).body,
+    'Joni reagerade på dina 25 Chins.');
+  for (const [lang, pushups, pullups, squats] of [
+    ['fi', 'Punnerrukset', 'Leuanvedot', 'Kyykyt'], ['sv', 'Armhävningar', 'Chins', 'Knäböj'],
+  ]) {
+    for (const [name, localized] of [['Liegestütze', pushups], ['Klimmzüge', pullups], ['Kniebeugen', squats]]) {
+      assert.equal(R.localizedCategoryName({ name, competition_id: null }, lang), localized);
+      assert.equal(R.localizedCategoryName({ name, competition_id: 'custom' }, lang), name);
+    }
+  }
+});
+
+test('Ranking-Mitteilungen in allen App-Sprachen', () => {
+  assert.deepEqual(R.rankOvertakenAlert({ lang: 'fi', senderName: 'Benny', categoryName: 'Klimmzüge', rank: 3 }), {
+    title: '🏆 Tulostaulu', body: 'Benny ohitti sinut. Uusi sijoituksesi: 3 (Leuanvedot).',
+  });
+  assert.deepEqual(R.rankOvertakenAlert({ lang: 'sv', senderName: 'Benny', categoryName: 'Liegestütze', rank: 2 }), {
+    title: '🏆 Topplista', body: 'Benny gick om dig. Du ligger nu på plats 2 i Armhävningar.',
+  });
+  assert.equal(R.rankingTextFor('fi').points(40), '40 pistettä');
+  assert.equal(R.rankingTextFor('fi').points(1), '1 piste');
+  assert.equal(R.rankingTextFor('fi').rounds(2), '2 kierrosta');
+  assert.equal(R.rankingTextFor('sv').closedTitle('oktober'), '🏆 oktober är avslutad');
+  assert.equal(R.rankingTextFor('sv').lastDayBody('12 Chins', 2), '12 Chins kvar till plats 2.');
+  assert.equal(R.rankingTextFor('constructor'), R.RANKING_TEXT.de);
 });
 
 test('Texte nennen weder den alten Namen noch Tom Holland', () => {
@@ -377,6 +428,15 @@ test('Erinnerungen in der Sprache der Empfänger (profiles.language)', () => {
     ['a', '⏳ Last chance for C-c1', 'You still need 30 Push-ups and 10 Dips before midnight.'],
     ['b', '⏳ Letzte Chance für C-c1', 'Dir fehlen noch 35 Liegestütze und 10 Dips bis Mitternacht.'],
   ]);
+  const nordic = base({
+    kind: 'last_call', today: '2026-10-25',
+    members: [member('c1', 'a', { language: 'fi' }), member('c1', 'b', { language: 'sv' })],
+    goals: [goal('g1', 'c1', 100, { competition_id: null })],
+  });
+  assert.deepEqual(R.planNudges(nordic).map(x => [x.user_id, x.alert.body]), [
+    ['a', 'Tee vielä ennen keskiyötä: Punnerrukset: 30.'],
+    ['b', 'Du behöver fortfarande 35 Armhävningar före midnatt.'],
+  ]);
 });
 
 test('last_call: allein gerechnet mit erwarteter Besetzung, ausgetretene zählen in der Woche mit', () => {
@@ -503,4 +563,42 @@ test('overtakeAlert und goalAlert: Texte in Deutsch und Englisch', () => {
   assert.equal(R.goalAlert({ lang: 'en', name: 'Jonas', compName: 'X' }).title, '🏁 Jonas hit 100%');
   assert.equal(R.PUSH_KIND.overtake, 'overtake');
   assert.equal(R.PUSH_KIND.goal, 'goal');
+});
+
+test('Nordic overtake, complete-goal and weekly-ranking alerts preserve the current release events', () => {
+  for (const [lang, marker, week] of [['fi', 'Lea ohitti', 'Viikko 44'], ['sv', 'Lea gick om', 'Vecka 44']]) {
+    const alert = R.overtakeAlert({ lang, senderName: 'Lea', unitName: 'Custom', theirs: 30, mine: 20, compName: 'Team' });
+    assert.ok(alert.title.includes(marker));
+    assert.ok(alert.body.includes('Custom') && alert.body.includes('30') && alert.body.includes('20'));
+    assert.ok(R.goalAlert({ lang, name: 'Lea', compName: 'Team' }).title.includes('100'));
+    assert.ok(R.rankingTextFor(lang).weekTitle(44).includes(week));
+    assert.ok(R.rankingTextFor(lang).lastWeekDayTitle);
+  }
+});
+
+test('Actual goal-completion notification waits for the configured workout count', async () => {
+  const src = readFileSync(fn('notify-set/index.ts'), 'utf8');
+  const helpers = src.slice(src.indexOf('const isWorkout ='), src.indexOf('// ── Überholt'));
+  const job = src.slice(src.indexOf('function goalJob('), src.indexOf('// ── Beitritt'));
+  const compile = `const { WORKOUT_TYPES, expectedPeople, participantsFor, fairShareOf, workoutRunsRequired, completesAll, PUSH_KIND, goalAlert, pushLang } = R;
+    const ignored = reason => Response.json({ ignored: true, reason });
+    const recipientOf = m => ({user_id:m.user_id,lang:pushLang(m.profile?.language)});
+    ${stripTypeScriptTypes(helpers + job)}; return goalJob;`;
+  const goalJob = new Function('R', 'Response', compile)(R, Response);
+  const goal = { id: 'sally', week_start: '2026-10-26', target_reps: 204, target_runs: 3, category: { kind: 'sports', challenge_type: 'bring_sally_up' } };
+  const ctx = {
+    set: { id: 's3', user_id: 'u1', challenge_id: 'sally', reps: 60 }, goal, goals: [goal],
+    competition: { id: 'c1', mode: '1v1', name: 'Team' },
+    members: [{ user_id: 'u1', joined_at: '2026-10-01', profile: {display_name:'Lea'} }, { user_id: 'u2', joined_at: '2026-10-01', profile: {language:'fi'} }],
+    sets: [1,2].map(n => ({id:'s'+n,user_id:'u1',challenge_id:'sally',reps:60})),
+  };
+  assert.equal((await goalJob(ctx).json()).reason, 'not_complete');
+  ctx.sets.push(ctx.set);
+  const result = goalJob(ctx);
+  assert.equal(result.kind, 'goal');
+  assert.equal(result.recipients[0].lang, 'fi');
+  assert.ok(result.alert('fi').title.includes('Lea'));
+  ctx.sets.push({...ctx.set,id:'s4'});
+  assert.equal((await goalJob(ctx).json()).reason, 'not_complete', 'No repeated 100% alert after already complete');
+  assert.equal(R.workoutRunsRequired({target_reps:204}), 1, 'Legacy seconds do not become a run target');
 });

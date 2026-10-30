@@ -79,7 +79,8 @@
   // ── Pflicht-Workouts (Bring Sally Up, Tom Holland) ──────────────────
   // Ein Satz dieser Kategorien ist ein Durchgang; `reps` hält den Wert des
   // Durchgangs (Sally: Sekunden, Tom Holland: Runden). Workouts zählen nie in
-  // Wiederholungs-Summen, ihr Wochenziel ist ein Durchgang pro Person.
+  // Wiederholungs-Summen. target_runs ist die Zahl der Durchgänge pro Person;
+  // alte Ziele ohne dieses Feld verlangen weiterhin einen Durchgang.
   const WORKOUT_TYPES = ['bring_sally_up', 'tom_holland'];
   const SALLY_FULL_SECONDS = 204;
 
@@ -139,10 +140,39 @@
     return `${sets.length}× · ${vals.join(', ')}`;
   }
 
-  // Wie viele der Personen haben mindestens einen Durchgang? `sets` = Sätze einer Challenge.
-  function workoutPeopleDone(sets, userIds) {
-    const did = new Set(sets.map(s => s.athlete));
-    return userIds.filter(id => did.has(id)).length;
+  function workoutTargetRuns(ch) {
+    const n = Number(ch?.target_runs);
+    return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+  }
+
+  // Eine log_id bezeichnet denselben Trainingseintrag auch bei Wiederholungen
+  // im Cache. Alte Sätze ohne ID sind jeweils ein eigener Durchgang.
+  function workoutRunCount(sets) {
+    const seen = new Set();
+    let count = 0;
+    for (const s of sets || []) {
+      const key = s.log_id || s.id;
+      if (key) {
+        const ownKey = `${s.athlete || s.user_id || ''}|${key}`;
+        if (seen.has(ownKey)) continue;
+        seen.add(ownKey);
+      }
+      count++;
+    }
+    return count;
+  }
+
+  // Fortschritt wird pro Person gedeckelt: zusätzliche Durchgänge einer Person
+  // ersetzen den fehlenden Anteil eines anderen Mitglieds nicht.
+  function workoutProgress(sets, userIds, targetRuns = 1) {
+    const target = workoutTargetRuns({ target_runs: targetRuns });
+    return [...new Set(userIds)].reduce((sum, id) =>
+      sum + Math.min(target, workoutRunCount(sets.filter(s => s.athlete === id))), 0);
+  }
+
+  function workoutPeopleDone(sets, userIds, targetRuns = 1) {
+    const target = workoutTargetRuns({ target_runs: targetRuns });
+    return [...new Set(userIds)].filter(id => workoutRunCount(sets.filter(s => s.athlete === id)) >= target).length;
   }
 
   // ── Einheiten und gleiche Übungen ───────────────────────────────────
@@ -172,18 +202,19 @@
 
   // ── Penalty system: pure computation ────────────────────────────────
   // Pflicht-Workouts (ch.workout, s. annotateWorkouts) zählen Durchgänge und
-  // verlangen einen pro Person.
+  // verlangen target_runs pro Person (standardmäßig einen).
   function doneOnChallenge(sets, athlete, ch) {
+    if (ch.workout) return workoutRunCount(sets.filter(s => s.challenge_id === ch.id && s.athlete === athlete));
     let total = 0;
     for (const s of sets) {
       if (s.challenge_id === ch.id && s.athlete === athlete) {
-        total += ch.workout ? 1 : (s.reps ?? s.duration_minutes ?? 0);
+        total += s.reps ?? s.duration_minutes ?? 0;
       }
     }
     return total;
   }
   function shareOn(ch, participantCount) {
-    return ch.workout ? 1 : fairShareOf(ch.target_reps, participantCount);
+    return ch.workout ? workoutTargetRuns(ch) : fairShareOf(ch.target_reps, participantCount);
   }
 
   // Returns penalty descriptors for one athlete on one week.
@@ -350,6 +381,7 @@
     const code = error?.code || '';
     const wrap = (text, c = code) => { const e = new Error(text); e.code = c; e.friendly = true; return e; };
     const map = {
+      workout_update_required: tr('Bitte aktualisiere die App, um diese Woche abzuschließen.'),
       invalid_code: tr('Code nicht gefunden.'),
       competition_full: tr('Diese Challenge ist schon voll.'),
       team_full: tr('Dieses Team ist schon voll.'),
@@ -576,6 +608,22 @@
       },
       async updateProfile(patch) {
         return check(await client.from('profiles').update(patch).eq('id', uid()).select().single());
+      },
+      async setKickEnabled(on) {
+        return base.updateProfile({ kick_enabled: !!on });
+      },
+      async kickMember(competitionId, recipientId) {
+        uid();
+        let response;
+        try {
+          response = await client.functions.invoke('kick-teammate', {
+            body: { competition_id: competitionId, recipient_id: recipientId },
+          });
+        } catch (error) { throw friendlyError(error); }
+        const { data, error } = response;
+        if (error) throw friendlyError(error);
+        if (!data || typeof data.sent !== 'boolean') throw new Error(tr('Arschkick konnte nicht gesendet werden. Versuch es später nochmal.'));
+        return data;
       },
       // Onboarding-Stand fürs Konto (Spalte profiles.onboarding, Migration
       // 20261020000000). Aufrufen nur, wenn das geladene Profil die Spalte hat.
@@ -913,7 +961,7 @@
       const { data: existing } = await client.from('week_closures').select('week_start').eq('competition_id', cid);
       const have = new Set((existing || []).map(r => r.week_start));
       const missing = rows.filter(r => !have.has(r.week_start));
-      if (missing.length) check(await client.from('week_closures').insert(missing));
+      if (missing.length) check(await client.from('week_closures').insert(missing.map(row => ({ ...row, workout_targets_version: 2 }))));
     }
 
     const api = {
@@ -999,6 +1047,7 @@
           category_id: payload.category_id,
           target_reps: payload.target_reps,
           chosen_by_user: payload.chosen_by || uid(),
+          ...(payload.target_runs == null ? {} : { target_runs: workoutTargetRuns(payload) }),
         };
         if (payload.id) {
           // Übung wechseln, obwohl schon Sätze geloggt sind, würde aus 100 Liegestützen
@@ -1132,6 +1181,7 @@
           week_index: payload.week_index,
           category_id: payload.category_id,
           start_target: payload.start_target || 100,
+          target_runs: workoutTargetRuns(payload),
           bonus_max: payload.bonus_max ?? 0,
           position: payload.position || 0,
         }).select().single());
@@ -1211,7 +1261,7 @@
       },
       async closeWeek(weekStart) {
         const { error: clErr } = await client.from('week_closures')
-          .insert({ week_start: weekStart, competition_id: cid, closed_by_user: uid() });
+          .insert({ week_start: weekStart, competition_id: cid, closed_by_user: uid(), workout_targets_version: 2 });
         if (clErr) {
           if (clErr.code === '23505') throw new Error(tr('Woche bereits abgeschlossen'));
           throw friendlyError(clErr);
@@ -1322,6 +1372,7 @@
         category_id: s.category_id,
         base_reps: Math.max(1, Math.round(Number(s.start_target) || 0)),
         bonus_max: Math.max(0, Math.round(Number(s.bonus_max) || 0)),
+        target_runs: workoutTargetRuns(s),
         slot_id: s.id,
         week_in_cycle: weekInCycle,
       }));
@@ -1334,6 +1385,7 @@
       category_id: t.category_id,
       target_reps: t.base_reps,
       bonus_max: t.bonus_max,
+      target_runs: t.target_runs,
       slot_id: t.slot_id,
       week_in_cycle: t.week_in_cycle,
     }));
@@ -1403,7 +1455,8 @@
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
-    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, workoutPeopleDone,
+    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary,
+    workoutTargetRuns, workoutRunCount, workoutProgress, workoutPeopleDone,
     friendlyError, appError, clearLocalData, localizeCategory, sportsOnlyBundle, usesMinutes, exerciseKey, newLogId,
   };
 })();
