@@ -4,5 +4,12 @@
 <dict>
 	<key>aps-environment</key>
 	<string>production</string>
+	<!-- Gemeinsamer Speicher mit dem Homescreen-Widget (Shared/WidgetStore.swift).
+	     Die eigene Gruppe steht zuerst, damit sie Standard bleibt wie ohne Eintrag. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.bennyjoni.terminator</string>
+		<string>$(AppIdentifierPrefix)com.bennyjoni.terminator.shared</string>
+	</array>
 </dict>
 </plist>

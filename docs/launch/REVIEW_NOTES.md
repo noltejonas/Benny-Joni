@@ -22,41 +22,40 @@ erleichtert spätere Prüfungen, falls Apple die Kontolöschung am ersten Konto
 testet. Teile der schreibenden Gerätefunktionstests sind bestanden, weitere
 Prüfungen bleiben offen; Details stehen in [RELEASE.md](RELEASE.md).
 Für den Launch ist die Werbefunktion zentral ausgeschaltet; weder Werbung
-noch UMP-Dialog sollen erscheinen. Die folgenden aktualisierten Notizen
-sind für Apple hochgeladen und per API bestätigt. Version 1.4.1 mit Build 26
-ist seit 21. Oktober 2026, 18:15:25 CEST **WAITING_FOR_REVIEW**, Veröffentlichung
-bleibt **MANUAL**. Submission-ID: `04ba9efd-76a8-423d-911f-e3abc54178a7`.
-Android Code 2 ist als interner Entwurf gespeichert und mit elf Änderungen
-in Produktion zur Prüfung gesendet; Review läuft. Managed
-Publishing ist nach Neuladen bestätigt aktiviert. Kein öffentlicher Release.
+noch UMP-Dialog sollen erscheinen. Die folgenden Notizen wurden am 28. Oktober 2026 für das Update mit
+Finnisch/Schwedisch, eigenen Übungen, Workout-Häufigkeit und Arschkicks
+überarbeitet. Den aktuellen Upload- und Einreichungsstand dokumentiert
+[RELEASE.md](RELEASE.md); ältere Review-Angaben aus dem Launch gelten dafür
+nicht als Bestätigung.
 
 <!-- review-notes:start -->
-Benny & Joni is a fitness challenge app. Friends agree on weekly exercise goals, log sets and follow their group's progress in a live feed. Challenges are joined by invite code. A separate, app-wide leaderboard is available to signed-in users; appearing in it is optional.
+Benny & Joni is a fitness challenge app. Friends agree on weekly goals, log sets and follow their group's progress in a private challenge feed. An app-wide leaderboard is optional.
 
 LANGUAGE AND ACCESS
-The app supports German and English. Change the language in Settings > App > Language. Sign in with the production review account supplied in App Review Information. It belongs to a prepared challenge with sample activity. The welcome screen also offers "Try the demo" ("Demo ansehen"), which uses local sample data and needs no account.
+German, English, Finnish and Swedish are available under Settings > App > Language. Sign in with the production review account in App Review Information; it belongs to a prepared challenge with sample activity. The welcome screen's "Try the demo" uses local sample data without an account.
+
+THIS UPDATE
+Custom exercises now save with their correct name and identity. Bring Sally Up and other compulsory workouts support a chosen number of saved runs per person per week. Existing workout goals retain one run. Time and round results remain separate from the weekly run count.
 
 HOW TO REVIEW
-1. Sign in, open the challenge, log a set and review Feed and Stats.
-2. To test joining, create another account, follow the registration prompts and enter this invite code: [BITTE AUSFÜLLEN: Einladungscode].
-3. Open the leaderboard. The participation prompt explains that opting in makes the display name, profile photo and ranked exercise results visible to other app users. This choice can be changed under Settings > "In der Rangliste erscheinen". Email addresses and private challenge details are not displayed in the leaderboard.
+1. Log a set, then review Feed and Stats.
+2. Today > Add weekly goal > Own exercise: enter a name and press Save. The saved goal uses that custom exercise.
+3. Create or edit a Bring Sally Up goal and choose multiple runs per person per week. Each saved attempt counts towards that person's goal; a teammate's extra runs do not replace it.
+4. Settings > Participants: "Kick" sends a fixed, playful training reminder to another active member. The recipient can disable these under Settings > App > Receive kicks. Push delivery requires a registered iOS device and enabled notifications; Android does not yet receive pushes. Kicks respect block lists, one per sender/recipient per day, a maximum of three received per day, and quiet hours (22:00-07:00 Berlin time). In the local demo the action is simulated and sends nothing.
+5. To test joining, register another account and enter invite code: [BITTE AUSFÜLLEN: Einladungscode].
 
-USER CONTENT AND MODERATION
-Challenge feeds are visible to their members. Opted-in leaderboard profiles and results are visible more broadly inside the app. Feed entries can be reported or their author blocked. Leaderboard profile sheets also provide reporting and blocking; Settings contains the blocked list. Leaderboard reports go to the moderation queue; challenge reports and general problems can be sent through the app's support links. Terms: https://noltejonas.github.io/Benny-Joni/nutzungsbedingungen.html
+LEADERBOARD AND MODERATION
+Leaderboard opt-in makes the display name, profile photo and ranked exercise results visible to other app users; it is reversible in Settings. Email addresses and private challenge details stay private. Feed entries and leaderboard profiles can be reported or their author blocked. Settings contains the blocked list. Leaderboard reports enter a moderation queue; challenge reports and general issues use the support links. Terms: https://noltejonas.github.io/Benny-Joni/nutzungsbedingungen.html
 
-PENALTY POT
-The optional "Strafkonto" records amounts agreed privately by a group when members miss their weekly share. The app does not process, hold or transfer money and awards no cash prizes. There are no in-app purchases.
-
-ACCOUNT DELETION
-Open Settings using the avatar at the top right, choose "Delete account" ("Konto löschen") and confirm the prompts. Please create a spare account for this test so the supplied review login remains available.
+PENALTY POT AND ACCOUNT DELETION
+The optional penalty pot records amounts privately agreed by a group. The app does not process, hold or transfer money, award cash prizes or offer in-app purchases. For deletion, open the avatar > Settings > Delete account and confirm. Please use a spare account so the supplied review login remains available.
 
 ADS
-The AdMob feature is embedded but centrally disabled for the initial release. No ads, test ads, UMP consent dialog or advertising SDK initialization occur while the server release switch is off. The app checks this switch at startup and when returning to the foreground; unavailable or failed checks keep ads disabled. The operator may enable the feature later without an app update after completing AdMob setup and Google's approval.
-
-If enabled later, only non-personalised banner ads may appear in Feed and Stats after onboarding. There are no interstitial, rewarded or app-open ad placements. Ads remain absent from onboarding and the local demo and are hidden while sheets or full-screen overlays are open. Google's User Messaging Platform then obtains consent where required; Settings > "Ad consent" ("Werbe-Einwilligung") provides privacy options when Google requires that entry point. The app does not request ATT or provide training data, account IDs or challenge data to AdMob. Ads and SDK-data disclosures are retained because this feature can be enabled remotely.
+The embedded AdMob feature remains centrally disabled. No ads, test ads, UMP consent dialog or advertising SDK initialization occur while the server switch is off. Startup and foreground checks fail closed. It may be enabled later after AdMob setup and Google's approval.
+If enabled, only non-personalised banners appear in Feed and Stats after onboarding. No interstitial, rewarded or app-open ads. Ads stay absent from onboarding and the local demo, and hide under sheets/full-screen overlays. Google's UMP obtains consent where required; Settings > Ad consent provides privacy options when required. The app does not request ATT or supply training data, account IDs or challenge data to AdMob. Ads and SDK-data disclosures remain because the feature can be enabled remotely.
 
 OTHER
-Email and password sign-in; optional push notifications. Profile photos are chosen by the user. Legal and support pages open externally. Support contact: Jonas Nolte, bennyundjoni@gmail.com, +49 178 1479821. The store's Support URL and the contact supplied in App Review Information can also be used for questions.
+Email/password login; optional user-chosen profile photos. Legal/support pages open externally. Support: Jonas Nolte, bennyundjoni@gmail.com, +49 178 1479821.
 <!-- review-notes:end -->
 
 Die Notizen beschreiben den vorgesehenen Release mit produktiven AdMob-IDs
@@ -64,6 +63,6 @@ und ausgeschalteter serverseitiger Freigabe.
 `check_ads_live!` prüft die tatsächlich eingetragenen IDs und verhindert einen
 App-Store-Build mit Testanzeigen. Vor dem Einreichen müssen die Angaben zu
 Werbung und SDK-Daten mit dem tatsächlich hochgeladenen Build übereinstimmen.
-Die Metadaten-Lane reicht nicht automatisch ein. Die getrennte, ausdrücklich
-freigegebene Apple-API-Einreichung von Build 26 ist erfolgt; es wurde nichts
-öffentlich veröffentlicht.
+Die Metadaten-Lane reicht nicht automatisch ein. Einreichungen erfolgen
+getrennt für den ausdrücklich freigegebenen Update-Build und werden in
+[RELEASE.md](RELEASE.md) mit dem zurückgelesenen Store-Status bestätigt.

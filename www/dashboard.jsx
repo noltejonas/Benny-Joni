@@ -268,7 +268,7 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
         <div className="rd-focus-text">
           <div className="rd-focus-sub">
             {ex.isObligatory
-              ? (ex.finished ? tr('erledigt') : tr('einmal diese Woche'))
+              ? (ex.finished ? tr('erledigt') : ex.shareMax === 1 ? tr('einmal diese Woche') : tr('{done} / {total} Durchgänge', { done: ex.myWeek, total: ex.shareMax }))
               : ex.finished ? tr('überall erledigt')
               : ex.todayLeft > 0 ? tr('heute noch {amount}', { amount: fmt(ex.todayLeft) }) : tr('du bist auf Kurs')}
           </div>
@@ -344,7 +344,7 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
               const isFocus = active && ex.key === active.key;
               const fmt = (v) => fmtAmount(ex.minutes, v);
               const sub = ex.isObligatory
-                ? (ex.finished ? tr('erledigt') : tr('einmal diese Woche'))
+                ? (ex.finished ? tr('erledigt') : ex.shareMax === 1 ? tr('einmal diese Woche') : tr('{done} / {total} Durchgänge', { done: ex.myWeek, total: ex.shareMax }))
                 : ex.finished ? tr('{done} diese Woche', { done: fmt(ex.myWeek) })
                 : ex.todayLeft > 0
                   ? tr('{done} diese Woche · heute noch {left}', { done: fmt(ex.myWeek), left: fmt(ex.todayLeft) })
@@ -376,6 +376,32 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
   );
 }
 
+// ─── Insights einer Challenge ───────────────────────────────────────────────
+// Stand pro Wochenziel: eigener Anteil und Tauziehen-Balken aller Seiten.
+// Dieselbe Darstellung in der Schnellansicht (Auge auf „Heute“) und im
+// aufklappbaren Duell-Balken in der Challenge (HomeScreen). rows: PTDashboard.challengeRows.
+function ChallengeInsights({ sides, rows }) {
+  if (!rows.length) return <div className="subtitle" style={{ margin: '16px 0' }}>{tr('Für diese Woche gibt es noch kein Ziel.')}</div>;
+  return (
+    <ul className="db-quick-list">
+      {rows.map(r => (
+        <li key={r.ch.id}>
+          <div className="db-quick-row-head">
+            <span className="db-quick-name">{r.cat?.name}</span>
+            <span className="db-quick-mine mono">
+              {r.isObligatory ? (r.meFinished ? tr('erledigt') : tr('offen'))
+                : tr('du {done}/{total}', { done: fmtAmount(r.minutes, r.myDone), total: fmtAmount(r.minutes, r.share) })}
+            </span>
+          </div>
+          {r.isObligatory
+            ? <div className="db-quick-sub">{tr('{done} von {total} erledigt', { done: r.total, total: r.goal })}</div>
+            : <TugBar sides={sides} values={r.doneBySide} goals={r.sideGoals} minutes={r.minutes} compact />}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ─── Schnellansicht einer Challenge ─────────────────────────────────────────
 function ChallengeQuickSheet({ card, weekStart, daysLeft, onOpen, onClose }) {
   if (!card) return null;
@@ -394,26 +420,7 @@ function ChallengeQuickSheet({ card, weekStart, daysLeft, onOpen, onClose }) {
           title={sides.length === 2 ? tr('Duell') : tr('Rangliste')}
           meta={modeLabel(c.mode)} />
       )}
-      {rows.length ? (
-        <ul className="db-quick-list">
-          {rows.map(r => (
-            <li key={r.ch.id}>
-              <div className="db-quick-row-head">
-                <span className="db-quick-name">{r.cat?.name}</span>
-                <span className="db-quick-mine mono">
-                  {r.isObligatory ? (r.meFinished ? tr('erledigt') : tr('offen'))
-                    : tr('du {done}/{total}', { done: fmtAmount(r.minutes, r.myDone), total: fmtAmount(r.minutes, r.share) })}
-                </span>
-              </div>
-              {r.isObligatory
-                ? <div className="db-quick-sub">{tr('{done} von {total} erledigt', { done: r.total, total: r.goal })}</div>
-                : <TugBar sides={sides} values={r.doneBySide} goals={r.sideGoals} minutes={r.minutes} compact />}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="subtitle" style={{ margin: '16px 0' }}>{tr('Für diese Woche gibt es noch kein Ziel.')}</div>
-      )}
+      <ChallengeInsights sides={sides} rows={rows} />
       <div className="btn-row" style={{ marginTop: 20 }}>
         <button className="btn btn-secondary" onClick={onClose}>{tr('Schließen')}</button>
         <button className="btn" onClick={onOpen}>{tr('Challenge öffnen')}</button>
@@ -422,4 +429,4 @@ function ChallengeQuickSheet({ card, weekStart, daysLeft, onOpen, onClose }) {
   );
 }
 
-Object.assign(window, { TugBar, FocusCarousel, DashboardScreen, ChallengeQuickSheet, ExerciseSlide, fmtAmount });
+Object.assign(window, { TugBar, FocusCarousel, DashboardScreen, ChallengeQuickSheet, ChallengeInsights, ExerciseSlide, fmtAmount, compStatusLine });

@@ -66,16 +66,27 @@ test('parseInviteUrl erkennt Schema, Query und Hash', () => {
   assert.equal(O.parseInviteUrl('http://localhost:8000/?demo=new&join=BJ4K7X'), 'BJ4K7X');
   assert.equal(O.parseInviteUrl('http://localhost:8000/#join=BJ4K7X'), 'BJ4K7X');
   assert.equal(O.parseInviteUrl('http://localhost:8000/?demo=1'), null);
+  // Einladungsseite (ein https-Link, den WhatsApp anklickbar macht)
+  assert.equal(O.parseInviteUrl('https://noltejonas.github.io/Benny-Joni/join.html?code=bj4k7x'), 'BJ4K7X');
+  assert.equal(O.parseInviteUrl('Mitmachen: https://noltejonas.github.io/Benny-Joni/join.html?lang=de&code=BJ4K7X'), 'BJ4K7X');
+  assert.equal(O.parseInviteUrl('https://example.org/join/?code=BJ4K7X'), 'BJ4K7X');
+  assert.equal(O.parseInviteUrl('https://noltejonas.github.io/Benny-Joni/join.html'), null);
+  assert.equal(O.parseInviteUrl('Promo code=HALLO1'), null);
   assert.equal(O.parseInviteUrl('projektterminator://join/'), null);
   assert.equal(O.parseInviteUrl(''), null);
 });
 
-test('inviteLink und inviteText enthalten Code, Name und Link', () => {
+test('inviteLink, inviteUrl und inviteText enthalten Code, Name und genau einen Link', () => {
   assert.equal(O.inviteLink('bj4k7x'), 'projektterminator://join/BJ4K7X');
+  assert.equal(O.inviteUrl('bj4k7x'), 'https://noltejonas.github.io/Benny-Joni/join/?code=BJ4K7X');
+  assert.equal(O.JOIN_URL, `${O.LEGAL.privacy.replace(/datenschutz\.html$/, '')}join/`, 'liegt neben den Rechtstexten');
   const text = O.inviteText({ name: 'Büro-Battle', invite_code: 'BJ4K7X' });
   assert.match(text, /„Büro-Battle“/);
   assert.match(text, /Code: BJ4K7X/);
-  assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
+  // WhatsApp macht nur den ersten Link anklickbar und projektterminator:// nie
+  assert.equal((text.match(/https?:\/\//g) || []).length, 1, text);
+  assert.doesNotMatch(text, /projektterminator:/);
+  assert.ok(text.includes(O.inviteUrl('BJ4K7X')));
   assert.equal(O.normalizeCode(text), 'BJ4K7X', 'die eigene Einladung lässt sich wieder einlesen');
 });
 
@@ -91,32 +102,28 @@ test('App-Name steht im Einladungstext, „Projekt Terminator“ nicht mehr', ()
   assert.doesNotMatch(text, /Terminator/, 'nur das technische Schema darf „terminator“ enthalten');
 });
 
-test('inviteText ohne App-Store-ID: Name statt Link, keine leere Zeile', () => {
-  const { O: o } = load({ APP_STORE_ID: '' });
-  assert.equal(o.APP_STORE_URL, '');
-  const text = o.inviteText({ name: 'Duell', invite_code: 'GTB34L' });
-  assert.deepEqual(text.split('\n'), [
-    `Komm in meine Challenge „Duell“ bei ${o.APP_NAME} 💪`,
-    `Im App Store: ${o.APP_NAME}`,
-    'Code: GTB34L',
-    'Schon installiert? projektterminator://join/GTB34L',
-  ]);
-  assert.doesNotMatch(text, /App laden:|undefined|https?:/);
-  assert.equal(o.normalizeCode(text), 'GTB34L');
+test('inviteText: drei Zeilen, ein Link zur Einladungsseite, mit und ohne App-Store-ID', () => {
+  for (const id of ['', '6741234567']) {
+    const { O: o } = load({ APP_STORE_ID: id });
+    const text = o.inviteText({ name: 'Duell', invite_code: 'gtb34l' });
+    assert.deepEqual(text.split('\n'), [
+      `Komm in meine Challenge „Duell“ bei ${o.APP_NAME} 💪`,
+      'Mitmachen: https://noltejonas.github.io/Benny-Joni/join/?code=GTB34L',
+      'Code: GTB34L',
+    ]);
+    assert.doesNotMatch(text, /undefined|apps\.apple\.com|projektterminator:/);
+    assert.equal(o.normalizeCode(text), 'GTB34L');
+    // Ohne die Link-Zeile findet „Code:“ den Code, ohne die Code-Zeile der Link.
+    const lines = text.split('\n');
+    assert.equal(o.normalizeCode([lines[0], lines[2]].join('\n')), 'GTB34L');
+    assert.equal(o.normalizeCode(lines.slice(0, 2).join('\n')), 'GTB34L');
+  }
 });
 
-test('inviteText mit App-Store-ID: Link zum Laden', () => {
-  const { O: o } = load({ APP_STORE_ID: '6741234567' });
-  assert.equal(o.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
-  const text = o.inviteText({ name: 'Büro-Battle', invite_code: 'bj4k7x' });
-  const lines = text.split('\n');
-  assert.equal(lines[1], 'App laden: https://apps.apple.com/de/app/id6741234567');
-  assert.equal(lines[2], 'Code: BJ4K7X');
-  assert.equal(o.normalizeCode(text), 'BJ4K7X', 'Store-Link stört das Einlesen nicht');
-  // Ohne die letzte Zeile (z. B. abgeschnitten) findet „Code:“ den Code.
-  assert.equal(o.normalizeCode(lines.slice(0, 3).join('\n')), 'BJ4K7X');
-  // Versehentlich mit „id“ oder Leerzeichen eingetragen
+test('App-Store-Link verzeiht „id“ und Leerzeichen', () => {
+  assert.equal(load({ APP_STORE_ID: '6741234567' }).O.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
   assert.equal(load({ APP_STORE_ID: ' id6741234567 ' }).O.APP_STORE_URL, 'https://apps.apple.com/de/app/id6741234567');
+  assert.equal(load({ APP_STORE_ID: '' }).O.APP_STORE_URL, '');
 });
 
 test('Android-Einladung nutzt trotz Apple-ID die Landingpage und bietet keine Apple-Bewertung', () => {
@@ -125,7 +132,7 @@ test('Android-Einladung nutzt trotz Apple-ID die Landingpage und bietet keine Ap
   assert.equal(o.DOWNLOAD_URL, 'https://noltejonas.github.io/Benny-Joni/');
   assert.equal(o.APP_REVIEW_URL, '');
   const text = o.inviteText({ name: 'Duell', invite_code: 'GTB34L' });
-  assert.ok(text.includes(`App laden: ${o.DOWNLOAD_URL}`));
+  assert.ok(text.includes(o.inviteUrl('GTB34L')), 'dieselbe Einladungsseite wie auf iOS');
   assert.doesNotMatch(text, /apps\.apple\.com|itms-apps:|play\.google\.com/);
   assert.equal(o.normalizeCode(text), 'GTB34L');
 });
@@ -212,9 +219,7 @@ function loadEnglish(config = {}) {
   }
   ctx.PTi18n.add('en', {
     'Komm in meine Challenge „{name}“ bei {app} 💪': 'Join my challenge “{name}” on {app} 💪',
-    'App laden: {url}': 'Get the app: {url}',
-    'Im App Store: {app}': 'On the App Store: {app}',
-    'Schon installiert? {link}': 'Already installed? {link}',
+    'Mitmachen: {url}': 'Join here: {url}',
     'Satz': 'Set',
     'Art: {label}': 'Type: {label}',
     'Satz-ID: {id}': 'Set ID: {id}',
@@ -233,9 +238,9 @@ test('englische Einladung lässt sich wieder einlesen, auch ohne Link', () => {
   assert.ok(text.includes(E.APP_NAME), text);
   assert.doesNotMatch(text, /Terminator/);
   assert.match(text, /Code: BJ4K7X/);
-  assert.match(text, /projektterminator:\/\/join\/BJ4K7X/);
+  assert.ok(text.includes(`Join here: ${E.inviteUrl('BJ4K7X')}`), text);
   assert.equal(E.normalizeCode(text), 'BJ4K7X');
-  const withoutLink = text.split('\n').slice(0, -1).join('\n');
+  const withoutLink = text.split('\n').filter(l => !/https?:/.test(l)).join('\n');
   assert.equal(E.normalizeCode(withoutLink), 'BJ4K7X', 'nur über „Code:“');
   // englische Wörter mit sechs Buchstaben („Office“, „Battle“) sind kein Code
   assert.equal(E.normalizeCode('Office Battle is great'), null);
@@ -245,18 +250,13 @@ test('englische Einladung lässt sich wieder einlesen, auch ohne Link', () => {
   assert.equal(E.normalizeCode(O.inviteText({ name: 'Büro-Battle', invite_code: '3A9UQM' })), '3A9UQM');
 });
 
-test('englische Einladung mit und ohne App-Store-ID', () => {
-  const { O: none } = loadEnglish({ APP_STORE_ID: '' });
-  assert.deepEqual(none.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n'), [
-    `Join my challenge “Duel” on ${none.APP_NAME} 💪`,
-    `On the App Store: ${none.APP_NAME}`,
+test('englische Einladung: ein Link, Code-Zeile unverändert', () => {
+  const { O: E } = loadEnglish({ APP_STORE_ID: '' });
+  assert.deepEqual(E.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n'), [
+    `Join my challenge “Duel” on ${E.APP_NAME} 💪`,
+    'Join here: https://noltejonas.github.io/Benny-Joni/join/?code=GTB34L',
     'Code: GTB34L',
-    'Already installed? projektterminator://join/GTB34L',
   ]);
-  const { O: store } = loadEnglish({ APP_STORE_ID: '6741234567' });
-  const lines = store.inviteText({ name: 'Duel', invite_code: 'gtb34l' }).split('\n');
-  assert.equal(lines[1], 'Get the app: https://apps.apple.com/de/app/id6741234567');
-  assert.equal(store.normalizeCode(lines.join('\n')), 'GTB34L');
 });
 
 test('Meldung auf Englisch: Texte übersetzt, IDs unverändert', () => {
@@ -271,7 +271,7 @@ test('Meldung auf Englisch: Texte übersetzt, IDs unverändert', () => {
 
 test('„Code“ im Challenge-Namen verdrängt nicht den echten Code', () => {
   const { O: E } = loadEnglish();
-  const cut = (text) => text.split('\n').slice(0, -1).join('\n'); // ohne Link-Zeile
+  const cut = (text) => text.split('\n').filter(l => !/https?:/.test(l)).join('\n'); // ohne Link-Zeile
   for (const M of [O, E]) {
     for (const name of ['Code Sprint', 'Promo Code: SOMMER', 'code=HALLO1']) {
       const text = M.inviteText({ name, invite_code: 'BJ4K7X' });
@@ -564,6 +564,16 @@ test('weekOneSummary: Reps, aktive Tage, erfüllte Teile und Ergebnis', () => {
 });
 
 // ── Fehlertexte (www/data.js) ───────────────────────────────────────────────
+
+test('weekOneSummary: ein mehrfaches Workout-Ziel zählt erst nach allen eigenen Durchgängen', () => {
+  const weekStart = '2026-10-12';
+  const challenge = { id: 'sally-week', week_start: weekStart, category_id: 'sally', target_reps: 204, target_runs: 2 };
+  const categories = [{ id: 'sally', kind: 'sports', challenge_type: 'bring_sally_up' }];
+  const one = { id: 'run-1', challenge_id: challenge.id, athlete: 'me', reps: 204, created_at: '2026-10-12T12:00:00' };
+  const args = { weekStart, me: 'me', challenges: [challenge], categories, participantCount: 1 };
+  assert.equal(O.weekOneSummary({ ...args, sets: [one] }).sharesHit, 0);
+  assert.equal(O.weekOneSummary({ ...args, sets: [one, { ...one, id: 'run-2', reps: 60 }] }).sharesHit, 1);
+});
 
 const { D } = load();
 const err = (message, code) => Object.assign(new Error(message), code ? { code } : {});

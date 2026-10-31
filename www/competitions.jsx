@@ -49,22 +49,24 @@ function MuLegalFooter({ items, userId }) {
 }
 
 // ─── Challenge-Switcher ─────────────────────────────────────────────────────
+// onSelectAll (ab zwei laufenden Challenges): Filter „Alle Challenges“ für
+// Heute, Feed, Stats und Strafkonto; allSelected markiert ihn als gewählt.
 function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId, onSelect, onSetMain,
-  onCreate, onJoin, onProfile, onSignOut }) {
+  onCreate, onJoin, onProfile, onSignOut, onSelectAll = null, allSelected = false }) {
   const [showArchived, setShowArchived] = React.useState(false);
   const active = competitions.filter(c => !c.archived_at);
   const archived = competitions.filter(c => c.archived_at);
   const row = (c) => {
     const isMain = profile.main_competition_id === c.id;
     return (
-      <div key={c.id} className={`mu-comp-row ${c.id === activeId ? 'active' : ''}`}>
-        <button className="mu-comp-main" onClick={() => onSelect(c.id)}>
+      <div key={c.id} className={`mu-comp-row ${c.id === activeId && !allSelected ? 'active' : ''}`}>
+        <button className="mu-comp-main" onClick={() => onSelect(c.id)} aria-current={c.id === activeId && !allSelected ? 'true' : undefined}>
           <span className="mu-comp-emoji">{c.emoji}</span>
           <span className="mu-comp-text">
             <span className="mu-comp-name">{c.name}</span>
             <span className="mu-comp-meta">{modeLabel(c.mode)}{c.my_role === 'owner' ? ` · ${tr('Ersteller')}` : ''}{c.archived_at ? ` · ${tr('archiviert')}` : ''}</span>
           </span>
-          {c.id === activeId && <span className="mu-comp-check">✓</span>}
+          {c.id === activeId && !allSelected && <span className="mu-comp-check">✓</span>}
         </button>
         {!c.archived_at && (
           <button className={`mu-comp-star ${isMain ? 'on' : ''}`}
@@ -89,6 +91,18 @@ function ChallengeSwitcherSheet({ open, onClose, profile, competitions, activeId
 
       <div className="label" style={{ margin: '18px 0 8px' }}>{tr('Deine Challenges')}</div>
       <div className="mu-comp-list">
+        {onSelectAll && (
+          <div className={`mu-comp-row ${allSelected ? 'active' : ''}`}>
+            <button className="mu-comp-main" onClick={onSelectAll} aria-current={allSelected ? 'true' : undefined}>
+              <span className="mu-comp-emoji" aria-hidden="true">✨</span>
+              <span className="mu-comp-text">
+                <span className="mu-comp-name">{tr('Alle Challenges')}</span>
+                <span className="mu-comp-meta">{tr('Heute, Feed, Stats und Strafkonto zusammen')}</span>
+              </span>
+              {allSelected && <span className="mu-comp-check">✓</span>}
+            </button>
+          </div>
+        )}
         {active.map(row)}
         {!active.length && <div className="subtitle">{tr('Noch keine aktive Challenge.')}</div>}
       </div>

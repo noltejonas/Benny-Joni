@@ -344,6 +344,7 @@
   let db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch (e) { db = null; }
   db = db ? upgrade(db) : seed();
+  for (const p of db.profiles) if (typeof p.kick_enabled !== 'boolean') p.kick_enabled = true;
   for (const competition of db.competitions) competition.work_enabled = false;
   // Nach „Konto löschen“ nichts mehr zurückschreiben (Timer laufen bis zum Neuladen).
   let wiped = false;
@@ -470,6 +471,27 @@
         await later(null);
         const p = db.profiles.find(x => x.id === uid()); Object.assign(p, patch); save(); emitAll(); return clone(p);
       },
+      async setKickEnabled(on) { return base.updateProfile({ kick_enabled: !!on }); },
+      async kickMember(competitionId, recipientId) {
+        await later(null);
+        const sender = uid();
+        const competition = db.competitions.find(c => c.id === competitionId);
+        const active = userId => db.members.some(m => m.competition_id === competitionId && m.user_id === userId && !m.left_at);
+        if (sender === recipientId || !competition || competition.archived_at || !active(sender) || !active(recipientId)
+          || db.user_blocks.some(b => (b.blocker === sender && b.blocked === recipientId) || (b.blocker === recipientId && b.blocked === sender))) {
+          throw new Error(tr('Diese Person ist nicht mehr in deiner Challenge.'));
+        }
+        if (db.profiles.find(p => p.id === recipientId)?.kick_enabled === false) return { sent: false, reason: 'disabled' };
+        // Die Demo simuliert die Zustellung lokal und verschickt keine Mitteilung.
+        const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date());
+        const kicks = db.teammate_kicks || (db.teammate_kicks = []);
+        const today = kicks.filter(k => k.day === day && k.recipient_id === recipientId);
+        if (today.some(k => k.sender_id === sender)) return { sent: false, reason: 'already_sent_today' };
+        if (today.length >= 3) return { sent: false, reason: 'daily_limit' };
+        kicks.push({ sender_id: sender, recipient_id: recipientId, day });
+        save();
+        return { sent: true, demo: true };
+      },
       async saveOnboarding(state) { return base.updateProfile({ onboarding: state }); },
       // Data-URL statt blob:, damit das Bild ein Neuladen übersteht.
       async uploadAvatar(blob) { return base.updateProfile({ avatar_url: await blobToDataUrl(blob) }); },
@@ -556,6 +578,28 @@
           categories: db.categories.map(localizeCategory),
         }));
       },
+      async getFeedAll(ids, since, limit = 300) {
+        const set = new Set(ids);
+        const rows = db.sets.filter(s => set.has(s.competition_id) && s.created_at >= since)
+          .sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+        return later(rows.map(s => {
+          const ch = db.weekly_challenges.find(c => c.id === s.challenge_id);
+          const category = ch && localizeCategory(db.categories.find(c => c.id === ch.category_id));
+          return { ...withAthlete(s), challenge: ch ? { ...normCh(ch), category } : null, category,
+            reactions: db.reactions.filter(r => r.set_id === s.id).map(withAthlete) };
+        }));
+      },
+      async getPenaltyOverview(ids) {
+        const set = new Set(ids);
+        const of = (table) => db[table].filter(x => set.has(x.competition_id));
+        return later({
+          penalties: of('penalties').map(p => ({ ...withAthlete(p), paid_by: p.paid_by_user })),
+          payouts: of('payouts').map(withAthlete),
+          closures: of('week_closures').map(c => ({ competition_id: c.competition_id, week_start: c.week_start })),
+          challengeWeeks: of('weekly_challenges').map(c => ({ competition_id: c.competition_id, week_start: c.week_start })),
+        });
+      },
+      // tables wie data.js; im Demo-Modus meldet jede Änderung einer Challenge.
       onCompetitionsChange(ids, fn) {
         let timer = null;
         const ping = () => { clearTimeout(timer); timer = setTimeout(fn, 120); };
@@ -899,7 +943,8 @@
 
       async getChallengeForWeek(ws) { return later(mine('weekly_challenges').filter(c => c.week_start === ws).map(normCh)); },
       async upsertChallenge(payload) {
-        const row = { category_id: payload.category_id, target_reps: payload.target_reps, chosen_by_user: payload.chosen_by || uid() };
+        const row = { category_id: payload.category_id, target_reps: payload.target_reps, chosen_by_user: payload.chosen_by || uid(),
+          ...(payload.target_runs == null ? {} : { target_runs: window.PTData.workoutTargetRuns(payload) }) };
         let c = payload.id ? db.weekly_challenges.find(x => x.id === payload.id)
           : mine('weekly_challenges').find(x => x.week_start === payload.week_start && x.category_id === payload.category_id);
         // Wie data.js: Übung nicht mehr wechseln, sobald es Sätze gibt.
@@ -996,7 +1041,7 @@
       },
       async closeWeek(ws) {
         if (mine('week_closures').some(x => x.week_start === ws)) throw new Error(tr('Woche bereits abgeschlossen'));
-        db.week_closures.push({ competition_id: cid, week_start: ws, closed_by_user: uid(), created_at: new Date().toISOString() });
+        db.week_closures.push({ competition_id: cid, week_start: ws, closed_by_user: uid(), workout_targets_version: 2, created_at: new Date().toISOString() });
         const { penalties } = await api.previewWeekClose(ws);
         for (const p of penalties) db.penalties.push({ id: newId('p'), competition_id: cid, week_start: ws, user_id: p.athlete, challenge_id: p.challenge_id,
           amount_cents: p.amount_cents, rule_mode: p.rule_mode, paid: false, paid_at: null, paid_by_user: null, note: null, created_at: new Date().toISOString() });

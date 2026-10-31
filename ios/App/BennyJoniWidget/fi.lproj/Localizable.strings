@@ -1,0 +1,21 @@
+/* Kotinäytön widget (suomi). Sovelluksen tekstit tulevat valmiina tilannekuvassa. */
+"widget.name" = "Viikkosi";
+"widget.description" = "Tämän viikon liikkeet ja haasteet yhdellä silmäyksellä.";
+"widget.noData.title" = "Benny & Joni";
+"widget.noData.text" = "Avaa sovellus, niin viikkosi näkyy tässä.";
+"widget.updated %@" = "Päivitetty %@";
+"sample.title" = "Vk 44";
+"sample.daysLeft" = "4 päivää jäljellä";
+"sample.done" = "1/3 tehty";
+"sample.ex1" = "Punnerrukset";
+"sample.ex2" = "Leuanvedot";
+"sample.ex3" = "Kyykyt";
+"sample.line1" = "tänään vielä 20";
+"sample.line2" = "olet aikataulussa";
+"sample.line3" = "tehty";
+"sample.comp1" = "Kaksintaistelu";
+"sample.comp2" = "Kaveriporukka";
+"sample.status1" = "Johdat yhdessä liikkeessä";
+"sample.status2" = "Sija 2/5";
+"sample.exercises" = "Liikkeesi";
+"sample.challenges" = "Haasteesi";

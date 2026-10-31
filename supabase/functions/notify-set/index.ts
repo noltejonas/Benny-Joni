@@ -19,8 +19,10 @@ import {
   type PushKind,
   type PushLang,
   pushLang,
+  rankOvertakenAlert,
   reactionAlert,
   WORKOUT_TYPES,
+  workoutRunsRequired,
 } from "../_shared/push-rules.ts";
 
 // Ein Endpunkt für alle Ereignis-Pushes. Auslöser sind DB-Trigger per pg_net:
@@ -64,6 +66,7 @@ interface Goal {
   id: string;
   week_start: string;
   target_reps: number | null;
+  target_runs?: number | null;
   category: Category | null;
 }
 
@@ -214,7 +217,7 @@ async function setContext(supabase: SupabaseClient, record: Record<string, unkno
   if (!set) return ignored("set_not_found");
   if (!set.user_id || !set.competition_id || !set.challenge_id) return ignored("legacy_record");
 
-  const goalCols = "id, week_start, target_reps, category:category_id(name, competition_id, kind, challenge_type)";
+  const goalCols = "id, week_start, target_reps, target_runs, category:category_id(name, competition_id, kind, challenge_type)";
   const { data: goal } = await supabase.from("weekly_challenges").select(goalCols).eq("id", set.challenge_id).maybeSingle();
   if (!goal) return ignored("challenge_not_found");
   // Nur die laufende Woche: nachgetragene Sätze alter Wochen melden nichts.
@@ -310,7 +313,7 @@ function overtakeJob(ctx: SetContext): Outcome {
 
 // ── 100 %: alle Wochenziele der Challenge geschafft ─────────────────────────
 // Anteil wie in der App (www/dashboard-model.js): Wochenziel geteilt durch die
-// erwartete Besetzung, Pflicht-Workouts ein Durchgang. Meldet nur den Satz,
+// erwartete Besetzung, Pflicht-Workouts gemäß target_runs pro Person. Meldet nur den Satz,
 // mit dem die letzte Lücke zugeht; an alle anderen aktiven Mitglieder.
 function goalJob(ctx: SetContext): Outcome {
   const { set, goals, competition, members } = ctx;
@@ -323,7 +326,7 @@ function goalJob(ctx: SetContext): Outcome {
     const workout = isWorkout(g);
     const own = g.id === set.challenge_id;
     return {
-      share: workout ? 1 : fairShareOf(g.target_reps ?? 0, people),
+      share: workout ? workoutRunsRequired(g) : fairShareOf(g.target_reps ?? 0, people),
       value: workout ? mine.length : mine.reduce((a, s) => a + valueOf(g, s), 0),
       added: own ? (workout ? 1 : valueOf(g, set)) : 0,
     };
@@ -542,16 +545,13 @@ async function rankPush(supabase: SupabaseClient, record: Record<string, unknown
     });
     if (logErr) { skipped++; continue; }
 
-    const english = pushLang(languages[entry.user_id]) === "en";
     jwt ??= await buildApnsJwt({ keyId: APNS.keyId, teamId: APNS.teamId, privateKeyPem: APNS.privateKeyPem });
     const result = await sendToDevices(APNS, jwt, iosTokens, {
       aps: {
-        alert: {
-          title: english ? "🏆 Leaderboard" : "🏆 Rangliste",
-          body: english
-            ? `${entry.sender_name} pushed you down to #${entry.new_rank} in ${entry.category_name}.`
-            : `${entry.sender_name} hat dich bei ${entry.category_name} auf Platz ${entry.new_rank} verdrängt.`,
-        },
+        alert: rankOvertakenAlert({
+          lang: languages[entry.user_id], senderName: entry.sender_name,
+          categoryName: entry.category_name, rank: entry.new_rank,
+        }),
         sound: "default",
       },
       kind: "rank_overtaken",

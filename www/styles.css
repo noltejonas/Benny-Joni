@@ -2800,6 +2800,16 @@ a { color: var(--accent); text-decoration: none; }
 .mu-wrap { flex-wrap: wrap; gap: 6px 12px; }
 /* ── Stats: Ich & Duelle ─────────────────────────────────────────────── */
 .mu-stats-switch { margin-bottom: 0; }
+/* Worauf sich die Stats beziehen: „Ich“ = alle Challenges, sonst die gewählte */
+.stats-scope-note { font-size: 13px; font-weight: 600; color: var(--text-3); margin: -4px 2px 0; }
+.stats-scope-pick {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  height: 40px; padding: 0 12px 0 14px; margin-top: -4px; border: none; border-radius: 999px;
+  background: var(--surface); box-shadow: var(--shadow); color: var(--text);
+  font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.stats-scope-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-scope-pick svg { flex-shrink: 0; transform: rotate(90deg); color: var(--text-3); }
 .mu-duel-pick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 8px; -webkit-overflow-scrolling: touch; }
 .mu-duel-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; flex-shrink: 0;

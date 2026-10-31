@@ -11,7 +11,9 @@
   scrollbar-width: none;
 }
 .fc-track::-webkit-scrollbar { display: none; }
-.fc-slide { flex: 0 0 calc(100% - 40px); scroll-snap-align: center; scroll-snap-stop: always; display: flex; }
+/* min-width: 0, sonst wächst die Karte mit ihrem Inhalt (Namen und Zahlen im
+   Tauziehen-Kopf), sobald etwas getrackt ist. Die feste Breite gilt für alle Zustände. */
+.fc-slide { flex: 0 0 calc(100% - 40px); min-width: 0; scroll-snap-align: center; scroll-snap-stop: always; display: flex; }
 .fc-track.is-single .fc-slide { flex-basis: 100%; }
 /* Alle Karten so hoch wie die höchste, Eintragen bzw. Start sitzt unten */
 .fc-slide > .rd-focus { flex: 1; min-width: 0; }
@@ -98,7 +100,9 @@
 .tw-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .tw-who { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 700; color: var(--text); }
 .tw-who.is-1 { flex-direction: row-reverse; }
-.tw-who b { font-size: 16px; font-weight: 800; color: var(--sc); }
+/* Kürzen darf nur der Name; Bild und Zahl bleiben ganz */
+.tw-who > .pt-avatar, .tw-who > .pt-avatar-stack, .tw-who > b { flex-shrink: 0; }
+.tw-who b { font-size: 16px; font-weight: 800; color: var(--sc); font-variant-numeric: tabular-nums; }
 .tw-name { min-width: 0; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tw-track { position: relative; height: 12px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .tw.is-compact .tw-track { height: 8px; }

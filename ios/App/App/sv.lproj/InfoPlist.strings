@@ -1,0 +1,3 @@
+/* iOS-behörighetsförfrågningar (svenska). */
+"NSCameraUsageDescription" = "Så att du kan ta ett foto till din profilbild.";
+"NSPhotoLibraryUsageDescription" = "Så att du kan välja ett foto från ditt bildbibliotek som profilbild.";

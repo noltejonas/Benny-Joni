@@ -378,6 +378,24 @@ button, input, select, textarea { font-family: inherit; }
   font-size: 13px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums;
 }
 
+/* Aufklappbarer Balken in der Challenge: Antippen zeigt den Stand pro Übung */
+.rd-duel-toggle {
+  display: flex; flex-direction: column; gap: 8px; width: 100%;
+  margin: -6px -8px; padding: 6px 8px; box-sizing: content-box;
+  border: none; border-radius: 16px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background .15s;
+}
+.rd-duel-toggle:active { background: var(--surface-2); }
+.rd-duel-toggle .rd-split-legend { margin-top: 0; }
+.rd-duel-more {
+  align-self: center; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;
+  font-size: 13px; font-weight: 700; color: var(--primary-ink);
+}
+.rd-duel-more svg { transform: rotate(90deg); transition: transform .2s var(--ease); }
+.rd-duel-toggle.is-open .rd-duel-more svg { transform: rotate(-90deg); }
+.rd-duel-details { margin-top: -6px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rd-duel-details .db-quick-list { margin-top: 0; }
+
 /* Rangliste (Jeder gegen jeden) */
 .rd-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .rd-rank li { display: flex; align-items: center; gap: 12px; }
@@ -616,6 +634,8 @@ button, input, select, textarea { font-family: inherit; }
 .lf-title, .lf-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lf-title { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--text); }
 .lf-title strong { font-weight: 800; }
+/* „Alle Challenges“: in welchen Challenges der Eintrag zählt */
+.lf-comps { margin-left: 6px; font-size: 13px; letter-spacing: 1px; }
 .lf-meta { font-size: 13px; line-height: 18px; color: var(--text-3); }
 .lf-note { font-size: 13px; line-height: 18px; color: var(--text-2); font-style: italic; }
 .lf-value { flex-shrink: 0; font-size: 19px; font-weight: 800; color: var(--text); }
@@ -716,6 +736,24 @@ button, input, select, textarea { font-family: inherit; }
 .rd-balance-person-name { font-size: 12px; color: var(--text-3); }
 .rd-balance-person-val { font-size: 16px; font-weight: 800; }
 .rd-balance .btn { width: 100%; }
+/* Strafkonto „Alle Challenges“: Summe oben, eine Zeile pro Challenge */
+.pk-total-split { margin-bottom: 0; }
+.pk-total-icon {
+  width: 32px; height: 32px; border-radius: 999px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--primary-tint); color: var(--primary-ink);
+}
+.pk-list { list-style: none; }
+.pk-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.pk-emoji { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.pk-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pk-name { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-meta { font-size: 13px; color: var(--text-3); }
+.pk-amount { font-size: 16px; font-weight: 800; flex-shrink: 0; }
+.pk-chev { color: var(--text-4); flex-shrink: 0; display: inline-flex; }
 .strafkonto-section { display: flex; flex-direction: column; gap: 12px; margin: 0; }
 .strafkonto-section-label {
   padding: 0 8px; margin: 0;
@@ -975,6 +1013,11 @@ button.st-row:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .st-segmented, .st-team-switch { margin: 0; }
 .st-team-switch { flex-shrink: 0; }
 .st-team-switch button { min-width: 36px; min-height: 32px; padding: 0 10px; }
+.st-member .st-row-text { min-width: 0; }
+.st-member-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 0 16px 12px 66px; }
+.st-kick-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 12px; border: 0; border-radius: 12px; background: var(--primary-tint); color: var(--primary-ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.st-kick-btn:disabled { opacity: .5; cursor: default; }
+.st-kick-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .toggle-switch { flex-shrink: 0; }
 .toggle-switch input:disabled + .toggle-slider { opacity: 0.45; cursor: not-allowed; }

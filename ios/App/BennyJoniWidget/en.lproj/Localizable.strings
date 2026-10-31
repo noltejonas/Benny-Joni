@@ -1,0 +1,21 @@
+/* Home screen widget (English). Texts from the app arrive ready-made in the snapshot. */
+"widget.name" = "Your week";
+"widget.description" = "This week's exercises and challenges at a glance.";
+"widget.noData.title" = "Benny & Joni";
+"widget.noData.text" = "Open the app and your week shows up here.";
+"widget.updated %@" = "Updated %@";
+"sample.title" = "Week 44";
+"sample.daysLeft" = "4 days left";
+"sample.done" = "1 of 3 done";
+"sample.ex1" = "Push-ups";
+"sample.ex2" = "Pull-ups";
+"sample.ex3" = "Squats";
+"sample.line1" = "20 more today";
+"sample.line2" = "you're on track";
+"sample.line3" = "done";
+"sample.comp1" = "Duel";
+"sample.comp2" = "Friends";
+"sample.status1" = "You're ahead in one exercise";
+"sample.status2" = "2nd of 5";
+"sample.exercises" = "Your exercises";
+"sample.challenges" = "Your challenges";

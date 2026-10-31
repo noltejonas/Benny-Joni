@@ -1,4 +1,4 @@
-/* global React, PTData, Sheet, PTPeople, Avatar, Icon, CountUp, tr, trn, trc, PTi18n */
+/* global React, PTData, PTScope, Sheet, PTPeople, Avatar, Icon, CountUp, tr, trn, trc, PTi18n */
 const { useState } = React;
 
 // Cent-Betrag in der App-Sprache: 500 → „5 €“ / „€5“
@@ -25,19 +25,9 @@ function reasonText(p) {
   }
 }
 
-// Kontostand: Strafen minus Einzahlungen, gesamt und pro Person (Cent).
-// openPeople = Personen mit offenem Saldo; 0, wenn insgesamt nichts offen ist.
-// Gemeinsame Rechnung für den Strafkonto-Screen und den Badge am Tab (app.jsx).
-function penaltySummary(penalties = [], payouts = []) {
-  const totalPenalties = penalties.reduce((a, p) => a + (p.amount_cents || 0), 0);
-  const totalPayouts = payouts.reduce((a, p) => a + (p.amount_cents || 0), 0);
-  const potOpen = totalPenalties - totalPayouts;
-  const saldo = {};
-  for (const p of penalties) saldo[p.athlete] = (saldo[p.athlete] || 0) + (p.amount_cents || 0);
-  for (const p of payouts) saldo[p.athlete] = (saldo[p.athlete] || 0) - (p.amount_cents || 0);
-  const openPeople = potOpen > 0 ? Object.values(saldo).filter(v => v > 0).length : 0;
-  return { totalPenalties, totalPayouts, potOpen, saldo, openPeople };
-}
+// Kontostand: Strafen minus Einzahlungen (PTScope.penaltySummary). Dieselbe
+// Rechnung für diesen Screen, die Übersicht über alle Challenges und den Badge am Tab.
+const penaltySummary = (penalties = [], payouts = []) => PTScope.penaltySummary(penalties, payouts);
 
 // Strafregel als ein Satz für Neue (Regelnamen wie in den Einstellungen).
 function obRuleLine(cfg) {
@@ -219,6 +209,88 @@ function StrafkontoScreen({ api, me, members = [], penalties, closures, openClos
           onClose={() => setPayoutEdit(null)}
           onDone={() => { setPayoutEdit(null); onChange?.(); }}/>
       )}
+    </div>
+  );
+}
+
+// ─── Übersicht „Alle Challenges“ ────────────────────────────────────────────
+// overview: PTScope.penaltyOverview (pro Challenge gerechnet, dann summiert).
+// Antippen einer Challenge öffnet ihr Strafkonto (StrafkontoScreen, unverändert).
+function PenaltyOverviewScreen({ me, overview, error, onRetry, onOpen }) {
+  if (!overview) {
+    return error ? (
+      <div className="rd-empty" role="alert">
+        <div className="rd-empty-title">{tr('Konnte nicht laden')}</div>
+        <div className="rd-empty-text">{tr('Gerade klappt es nicht. Versuch es gleich nochmal.')}</div>
+        <button className="btn" onClick={onRetry}>{tr('Erneut versuchen')}</button>
+      </div>
+    ) : <div className="app-loader"><div className="app-loader-spinner" /><div className="app-loader-text">{tr('Lade Daten…')}</div></div>;
+  }
+  const { rows, total } = overview;
+  return (
+    <div className="strafkonto-screen">
+      <div className="strafkonto-header">
+        <div className="title">{tr('Strafkonto')}</div>
+      </div>
+
+      <section className="rd-card rd-balance" aria-label={tr('Kontostand aller Challenges')}>
+        <div className="rd-overline">{tr('Offen in allen Challenges')}</div>
+        <div className="rd-balance-amount mono"><CountUp value={total.potOpen} format={formatEuro} /></div>
+        <div className="rd-balance-sub">
+          {trn(rows.length, '{n} Challenge mit Strafkonto', '{n} Challenges mit Strafkonto')}
+          {total.openWeeks > 0 && ` · ${trn(total.openWeeks, '{n} offener Abschluss', '{n} offene Abschlüsse')}`}
+        </div>
+        <div className="rd-balance-split pk-total-split">
+          <div className="rd-balance-person">
+            <Avatar userId={me} size={32} />
+            <div>
+              <div className="rd-balance-person-name">{tr('Du')}</div>
+              <div className="rd-balance-person-val mono">{total.myOpen > 0 ? formatEuro(total.myOpen) : tr('beglichen')}</div>
+            </div>
+          </div>
+          <div className="rd-balance-person">
+            <span className="pk-total-icon" aria-hidden="true"><Icon name="wallet" size={18} /></span>
+            <div>
+              <div className="rd-balance-person-name">{tr('Strafen gesamt')}</div>
+              <div className="rd-balance-person-val mono">{PTi18n.number(total.penaltyCount)}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="strafkonto-section">
+        <div className="strafkonto-section-label">{tr('Pro Challenge')}</div>
+        <ul className="rd-card rd-list pk-list">
+          {rows.map(r => (
+            <li key={r.c.id}>
+              <button type="button" className="pk-row" onClick={() => onOpen(r.c.id)}
+                aria-label={tr('Strafkonto von {name} öffnen', { name: r.c.name })}>
+                <span className="pk-emoji" aria-hidden="true">{r.c.emoji}</span>
+                <span className="pk-text">
+                  <span className="pk-name">{r.c.name}</span>
+                  <span className="pk-meta">
+                    {r.myOpen > 0 ? tr('du: {amount} offen', { amount: formatEuro(r.myOpen) }) : tr('du: beglichen')}
+                    {r.openWeeks.length > 0 && ` · ${trn(r.openWeeks.length, '{n} Abschluss offen', '{n} Abschlüsse offen')}`}
+                  </span>
+                </span>
+                <span className="pk-amount mono">{r.potOpen > 0 ? formatEuro(r.potOpen) : tr('sauber')}</span>
+                <span className="pk-chev"><Icon name="chevron" size={18} /></span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// Gewählte Challenge ohne Strafkonto (der Tab bleibt, weil andere eins haben;
+// zurück zu „Alle Challenges“ führt der Knopf darüber).
+function PenaltyOffNote({ competition }) {
+  return (
+    <div className="rd-empty">
+      <div className="rd-empty-title">{tr('Kein Strafkonto in {name}', { name: competition.name })}</div>
+      <div className="rd-empty-text">{tr('Das Strafkonto lässt sich in den Einstellungen der Challenge einschalten.')}</div>
     </div>
   );
 }
@@ -452,6 +524,8 @@ function WeekCloseSheet({ weekStart, api, me, onClose, onDone }) {
 }
 
 window.StrafkontoScreen = StrafkontoScreen;
+window.PenaltyOverviewScreen = PenaltyOverviewScreen;
+window.PenaltyOffNote = PenaltyOffNote;
 window.formatEuro = formatEuro;
 window.penaltySummary = penaltySummary;
 window.WeekCloseSheet = WeekCloseSheet;

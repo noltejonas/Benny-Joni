@@ -1,11 +1,160 @@
 # Release mit Fastlane
 
+## Update 1.5.2: eigene Übungen, Workout-Häufigkeit und Arschkicks
+
+Stand 29. Oktober 2026: Backend-Rollout und Einreichungen in beiden Stores
+sind abgeschlossen. Die nativen Artefakte aus Quellstand
+`94e8a8406d85c73705d57deebe4ec955680762b5` (`94e8a84`) sind gebaut und
+geprüft: iOS **1.5.2 (31)** und Android **1.5.2 (Version Code 6)**.
+Eine Freigabe oder Veröffentlichung ist noch nicht bestätigt.
+
+- Eigene Übung eingeben und unten „Speichern“ legt diese Übung an und verwendet
+  ihre ID. Eine zuvor ausgewählte Katalogübung wird dabei nicht mehr übernommen.
+- „Bring Sally Up“ und AMRAP haben eine einstellbare Zahl gespeicherter
+  Durchgänge pro Person und Woche. `target_runs` ist unabhängig von
+  `target_reps` (bisherige Sekunden/Runden). Bestehende Ziele bleiben bei einem
+  Durchgang. Wochenplan, Vorwochen-Vorlage, Fortschritt, Statistik, Rückblicke
+  und alle Strafregeln beachten die neue Häufigkeit. Zusätzliche Durchgänge
+  einer Person ersetzen keinen fehlenden Anteil eines Teammitglieds.
+- Teilnehmerliste: „Arschkick“ sendet einen von drei festen lustigen Sprüchen
+  in der Sprache des Empfängers. `profiles.kick_enabled` lässt sich unter
+  Einstellungen → App → „Arschkicks empfangen“ ausschalten. Die allgemeinen
+  Push-Einstellungen und Blocklisten werden ebenfalls berücksichtigt.
+- Der Server prüft Anmeldung und aktive gemeinsame Challenge. Er erlaubt
+  weltweit über alle gemeinsamen Challenges einen Kick pro Personenpaar und
+  Berliner Kalendertag sowie höchstens drei empfangene Kicks am Tag. Ruhezeit
+  ist 22–7 Uhr Berlin. Unklare Versandfehler belegen den Tagesplatz weiter,
+  um doppelte Benachrichtigungen zu verhindern. Die Zustellung nutzt wie
+  bestehende Pushes APNs/iOS; Android/Web haben noch keine Push-Zustellung.
+- Finnisch und Schwedisch sind in beiden App-Artefakten enthalten,
+  einschließlich Sprachauswahl, Standardübungen und nativer iOS-Rückfragen.
+  Die Store-Listings bleiben auf Deutsch und Englisch.
+
+### Bestätigter Store-Stand für 1.5.2
+
+- **Apple 1.5.2 (31):** Build-Verarbeitung `VALID`; Version und
+  ReviewSubmission `WAITING_FOR_REVIEW`. Eingereicht am
+  `2026-10-28T21:25:21Z`, Submission-ID
+  `fe58f77f-6768-4518-a262-6e38d07d4cbb`, mit genau einem Submission-Item.
+  Release-Typ **`AFTER_APPROVAL`**: Veröffentlichung nach Apples Freigabe.
+  Letzter lesender Readback am 29. Oktober um **00:23:47 Uhr CET/Stockholm**
+  (`2026-10-28T23:23:47Z`) bestätigt diesen Zustand erneut.
+  Belege: `.local/release/update-20261028/apple/submit-result.json` und
+  `submit-readiness-20261028T232347Z.json` im selben Ordner.
+- **Google Play 1.5.2 (Code 6):** Produktion erfolgreich zur Prüfung
+  eingereicht. Der Commit erfolgte am **29. Oktober 2026 um 00:37:23 Uhr
+  CET/Stockholm** (`2026-10-28T23:37:23Z`). Der offizielle lesende
+  `releases.list`-Aufruf ohne Edit bestätigt Code 6 im Produktionstrack als
+  **`RELEASE_LIFECYCLE_STATE_IN_REVIEW`**. Der vorherige Validate-Lauf war
+  erfolgreich. Bundle-SHA-256, DE-/EN-Neuerungen, Länder
+  `AT/CH/DE/FI/SE` und interner Entwurf 6 sind unverändert geprüft;
+  es wurden keine Binärdateien oder Metadaten neu hochgeladen.
+  Commit-Schutz `ERROR_IF_IN_REVIEW`, kein Abbruch einer laufenden Prüfung.
+  Belege: `.local/release/update-20261028/android/fastlane-production-submit-20261028T233714Z-29683.json`
+  und `fastlane-production-validate-20261028T233658Z-29533.json` im selben Ordner.
+
+**Aufgelöste Google-Hürden:** Zuvor war nur der interne Entwurf gültig;
+der Produktionsentwurf enthielt noch kein zugeordnetes Bundle und keine
+Neuerungen. Das Servicekonto erhielt HTTP 403, native Eingaben waren
+unzuverlässig und die Browser-Anmeldung stand aus. Der Nutzer hat danach
+das Produktionsrecht für genau diese App gespeichert. Google ergänzte dabei
+automatisch das abhängige App-Recht zur Verwaltung von Deeplinks; damit
+sind acht statt sechs App-Rechte für genau eine App (`com.bennyjoni.terminator`)
+hinterlegt. Der lesende Console-Abgleich bestätigt acht Rechte und einen
+inaktiven Speichern-Button. Im Rollout wurden keine kontoweiten Rechte
+geändert; ein vollständiger separater Readback aller kontoweiten Rechte
+wurde nicht durchgeführt. Der bestehende Servicekonto-Zugang konnte
+anschließend Validate und Submit ausführen. Diese Hürden sind abgeschlossen.
+Berechtigungsbeleg: `.local/release/update-20261028/android/permissions-saved-app-scope.txt`.
+
+### Produktiv angewendete Migrationen und Functions
+
+Diese drei additiven Migrationen sind im Supabase-Projekt
+`jczyyupxxqrdgbeifcwe` jeweils transaktional angewendet und in
+`supabase_migrations.schema_migrations` registriert:
+
+1. `supabase/migrations/20261028010000_teammate_kicks.sql`
+2. `supabase/migrations/20261028210000_workout_target_runs.sql`
+3. `supabase/migrations/20261028220000_workout_closure_client_guard.sql`
+
+Der letzte Schritt schützt die lokal berechneten Wochenabschlüsse:
+`week_closures.workout_targets_version` hat für vorhandene und alte Clients
+Standardwert 1. Ein alter Client darf eine Woche mit `target_runs > 1`
+nicht abschließen (`P0001`, `workout_update_required`). Beide Einfügepfade
+des neuen Clients senden Version 2. Bestehende Abschlüsse bleiben erhalten.
+
+Deployt und als `ACTIVE` zurückgelesen sind **`notify-set` Version 15**,
+**`ranking-push` Version 9** und **`kick-teammate` Version 1**. Alle drei
+verwenden wie vorgesehen `verify_jwt = false` und authentisieren im Handler.
+Der Kick-Endpunkt prüft den Bearer-Token mit `auth.getUser`; seine
+Reservierungs-/Zustell-RPCs sind nur für `service_role` ausführbar.
+Die heruntergeladenen produktiven Quelldateien stimmen bytegenau mit dem
+Deployment-Stand überein. Unauthentisierte POSTs werden mit 401 und
+nicht unterstützte GETs mit 405 abgewiesen.
+
+Die vorhandenen Secrets und übrigen Functions sind unverändert; insbesondere
+bleibt `slack-agent` Version 5 erhalten. `daily-nudge` war produktiv nicht
+vorhanden und wurde nicht neu eingeführt. Es wurden keine Cronjobs angelegt,
+keine echten Mitteilungen versendet und keine Ranking-Jobs ausgeführt.
+`ads_enabled = false`, Profil-RLS und die bestehenden Kick-RPC-Rechte sind
+unverändert bestätigt. Belege:
+`.local/release/update-20261028/backend/summary.json`, `source-equality.json`,
+`safe-probes.json` und `closure-guard-summary.json`.
+
+### Prüfungen und native Artefakte
+
+Der integrierte Quellstand besteht **302 Tests**, ohne Fehler, mit einem
+vorgesehenen Release-Skip. Darin bestehen alle **38 Push-Tests** einschließlich
+finnischer/schwedischer Texte und der Erfüllung mehrerer Pflicht-Durchgänge.
+Web-Build, native Synchronisierung und die drei Übersetzungsprüfungen sind
+bestanden. Belege: `.local/release/update-20261028/integrated-tests.txt`
+und `native-sync.txt`; die vorherige gezielte Funktions-QA liegt unter
+`.local/qa/update-custom-workouts-kicks/`.
+
+Die Kick- und Workout-Migrationen wurden zweimal mit 19 erfolgreichen
+SQL-Prüfungen in isoliertem PostgreSQL 18.6/PGlite ausgeführt. Der
+Abschluss-Guard besteht weitere 11 SQL-Prüfungen: alter Client bei einem
+Durchgang erlaubt, bei drei Durchgängen abgewiesen, keine falsche Zeile
+angelegt, Version 2 erlaubt sowie Trigger-Reihenfolge und Berechtigungen
+geprüft. Echte parallele Datenbankverbindungen sind damit nicht geprüft.
+Browser-QA bestätigt Custom-Speichern, Sally-Ziel 3 → Fortschritt 2/3,
+Neustart mit erhaltenem Empfangs-Opt-out und lokalen Demo-Kick.
+
+| Artefakt | SHA-256 |
+|---|---|
+| `ios/App/build/fastlane/BennyJoni-1.5.2-31.ipa` | `2fd1be37a0b5e72d83ea3f534ffa5d41fafcb111e0dca8735b4039fea8a0c449` |
+| `.local/release/update-20261028/android/BennyJoni-1.5.2-6.aab` | `5c70640ae4ad993db24b9004a7a1d71ccf8c6da7c0813b8e4956f427f0f694dd` |
+| `.local/release/update-20261028/android/BennyJoni-1.5.2-6.apk` | `e8ca42a84dbea9538b2ef2d74f4b5f8c15076a060dc7a3bb0a99cf01992fa14e` |
+
+Die IPA enthält Build 31, `de/en/fi/sv` und alle vier nativen
+Berechtigungstexte. Ihre Web-Dateien stimmen bytegenau mit dem Build überein.
+Für Android sind Version Code 6, Paketname und Upload-Signatur bestätigt;
+alle 93 gepackten Web-Dateien stimmen bytegenau mit `dist/` überein.
+Belege: `.local/release/update-20261028/apple/artifact-verification.json`
+und `.local/release/update-20261028/android/artifact-verification.json`.
+
+## Ländererweiterung am 28. Oktober 2026
+
+Die vor diesem Update veröffentlichte iOS-Version ist **1.5.1 (30)**.
+Finnland und Schweden sind bei Apple zusätzlich verfügbar (abschließender
+Readback: `AVAILABLE`); die getrennte Google-Play-Länderänderung wurde zur
+Prüfung gesendet. Die zugehörigen Belege liegen unter
+`.local/release/nordic-availability-20261028/`. Der bestätigte
+Einreichungsstand von 1.5.2 steht oben. Der abschließende Google-Readback
+bestätigt die fünf Produktionsländer `AT/CH/DE/FI/SE` unverändert.
+
+## Historischer Launch-Stand vom 21. Oktober 2026
+
+Die folgenden Angaben dokumentieren den damaligen Release 1.4.1 sowie
+seine Prüf- und Gerätebelege. Sie sind keine aktuellen Statusangaben für
+Version 1.5.2.
+
 Stand 21. Oktober 2026: **Beide Stores sind zur Prüfung eingereicht.**
 Google-Review läuft; keine Freigabe oder Veröffentlichung.
 Der Ablauf für weitere Uploads steht in
 [FASTLANE_STORES.md](FASTLANE_STORES.md).
 
-## Bestätigter Store-Stand
+### Bestätigter Store-Stand am 21. Oktober 2026
 
 - Apple **1.4.1 (26)**: Verarbeitung `VALID`, Build 26 ausgewählt,
   Version und ReviewSubmission **`WAITING_FOR_REVIEW`**, Release-Typ
@@ -27,7 +176,7 @@ Der Ablauf für weitere Uploads steht in
   Vorschau: null Fehler, zwei Warnungen (native Symbole/R8-Mapping).
   Beleg: `.local/qa/google-submission-vcode2-20261021/status.json`.
 
-## Werbefreier Launch und geprüfte Artefakte
+### Werbefreier Launch und geprüfte Artefakte vom 21. Oktober 2026
 
 `public.app_release_settings.id = 1` steht produktiv auf
 `ads_enabled = false`; die Migration ist angewendet und registriert.
@@ -50,7 +199,7 @@ Der Gate-Quellstand besteht 234 Tests und einen erwarteten Release-Skip;
 beide produktiven ID-Prüfungen bestehen je 34 Tests. Beide strikten
 Store-Bereitschaftschecks einschließlich Screenshots sind bestanden.
 
-## Tatsächliche Geräte- und Werbetests
+### Tatsächliche Geräte- und Werbetests vom 21. Oktober 2026
 
 - Originales Android-Paket **Code 2**: authentisierter Kaltstart,
   Heute/Feed/Stats, Hintergrund/Vordergrund und Einstellungen bestanden.

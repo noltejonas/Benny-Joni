@@ -1,0 +1,21 @@
+/* Homescreen-Widget (Deutsch). Texte aus der App kommen fertig im Schnappschuss. */
+"widget.name" = "Deine Woche";
+"widget.description" = "Deine Übungen und Challenges dieser Woche auf einen Blick.";
+"widget.noData.title" = "Benny & Joni";
+"widget.noData.text" = "Öffne die App, dann steht hier deine Woche.";
+"widget.updated %@" = "Stand %@";
+"sample.title" = "KW 44";
+"sample.daysLeft" = "noch 4 Tage";
+"sample.done" = "1 von 3 erledigt";
+"sample.ex1" = "Liegestütze";
+"sample.ex2" = "Klimmzüge";
+"sample.ex3" = "Kniebeugen";
+"sample.line1" = "heute noch 20";
+"sample.line2" = "du bist auf Kurs";
+"sample.line3" = "erledigt";
+"sample.comp1" = "Duell";
+"sample.comp2" = "Freundeskreis";
+"sample.status1" = "Du liegst bei einer Übung vorne";
+"sample.status2" = "Platz 2 von 5";
+"sample.exercises" = "Deine Übungen";
+"sample.challenges" = "Deine Challenges";

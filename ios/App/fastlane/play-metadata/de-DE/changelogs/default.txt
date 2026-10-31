@@ -1,1 +1,4 @@
-Fitness-Challenges mit Freunden, gemeinsame Wochenziele, Live-Feed, Statistiken und eine optionale Monatsrangliste. Die App ist auf Deutsch und Englisch verfügbar.
+• Jetzt auch auf Finnisch und Schwedisch.
+• Eigene Übungen werden beim Speichern korrekt angelegt.
+• Für Bring Sally Up und andere Pflicht-Workouts mehrere Durchgänge pro Person und Woche festlegen.
+• Fortschritt, Wochenplan und Auswertung berücksichtigen die gewählte Anzahl.

@@ -1,2 +1,4 @@
-New in 1.5.1:
-• Fixed: saving a new weekly goal works again
+• Now available in Finnish and Swedish.
+• Fixed saving your own exercises.
+• Choose how many Bring Sally Up and other compulsory workout runs each person should complete per week. Progress, weekly plans and results follow your chosen goal.
+• Give your training partners a playful kick to get moving. You can turn off incoming kicks under Settings → App.

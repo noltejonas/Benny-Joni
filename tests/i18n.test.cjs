@@ -17,7 +17,7 @@ function load({ languages, stored } = {}) {
   };
   if (languages) ctx.navigator = { languages, language: languages[0] };
   vm.createContext(ctx);
-  for (const f of ['i18n.js', 'i18n/en.js']) {
+  for (const f of ['i18n.js', ...['en', 'fi', 'sv'].map(lang => `i18n/${lang}.js`)]) {
     vm.runInContext(fs.readFileSync(path.join(WWW, f), 'utf8'), ctx, { filename: f });
   }
   return ctx;
@@ -29,6 +29,9 @@ test('Gerätesprache entscheidet, wenn nichts eingestellt ist', () => {
   assert.equal(load({ languages: ['en-US', 'de-DE'] }).PTi18n.lang, 'en');
   assert.equal(load({ languages: ['de-AT'] }).PTi18n.lang, 'de');
   assert.equal(load({ languages: ['fr-FR', 'de-DE'] }).PTi18n.lang, 'de');
+  assert.equal(load({ languages: ['fi-FI', 'sv-SE'] }).PTi18n.lang, 'fi');
+  assert.equal(load({ languages: ['sv-FI', 'fi-FI'] }).PTi18n.lang, 'sv');
+  assert.equal(load({ languages: ['fr-FR', 'sv_SE'] }).PTi18n.lang, 'sv');
 });
 
 test('unbekannte Gerätesprache fällt auf Englisch, ohne Gerät (Node) auf Deutsch', () => {
@@ -40,6 +43,8 @@ test('Einstellung schlägt Gerätesprache', () => {
   assert.equal(load({ languages: ['en-US'], stored: 'de' }).PTi18n.lang, 'de');
   assert.equal(load({ languages: ['de-DE'], stored: 'en' }).PTi18n.lang, 'en');
   assert.equal(load({ languages: ['de-DE'], stored: 'xx' }).PTi18n.lang, 'de');
+  assert.equal(load({ languages: ['sv-SE'], stored: 'fi' }).PTi18n.lang, 'fi');
+  assert.equal(load({ languages: ['fi-FI'], stored: 'sv' }).PTi18n.lang, 'sv');
 });
 
 test('Format-Region folgt dem Gerät, wenn die Sprache passt', () => {
@@ -50,6 +55,10 @@ test('Format-Region folgt dem Gerät, wenn die Sprache passt', () => {
   assert.equal(load({ languages: ['de', 'de-DE', 'en-DE'], stored: 'en' }).PTi18n.locale, 'en-GB');
   assert.equal(load({ languages: ['en-DE', 'de-DE'] }).PTi18n.locale, 'en-DE');
   assert.equal(load({ languages: ['en'] }).PTi18n.locale, 'en-GB');
+  assert.equal(load({ languages: ['fi-FI'] }).PTi18n.locale, 'fi-FI');
+  assert.equal(load({ languages: ['sv-FI'] }).PTi18n.locale, 'sv-FI');
+  assert.equal(load({ languages: ['de-DE'], stored: 'fi' }).PTi18n.locale, 'fi-FI');
+  assert.equal(load({ languages: ['de-DE'], stored: 'sv' }).PTi18n.locale, 'sv-SE');
 });
 
 // ─── tr / trn / trc ─────────────────────────────────────────────────────────
@@ -102,6 +111,46 @@ test('Euro und Wochentage je Sprache', () => {
   assert.deepEqual(Array.from(de.weekdays()).slice(0, 2), ['Mo', 'Di']);
 });
 
+test('Finnische und schwedische Zahlen und Kalenderformate', () => {
+  const fi = load({ languages: ['fi-FI'] }).PTi18n;
+  const sv = load({ languages: ['sv-SE'] }).PTi18n;
+  assert.equal(fi.number(1234.5).replace(/\s/g, ' '), '1 234,5');
+  assert.equal(sv.number(1234.5).replace(/\s/g, ' '), '1 234,5');
+  assert.equal(fi.day('2026-10-28'), '28.10.2026');
+  assert.equal(sv.day('2026-10-28'), '2026-10-28');
+  assert.deepEqual(Array.from(fi.weekdays()), ['ma', 'ti', 'ke', 'to', 'pe', 'la', 'su']);
+  assert.deepEqual(Array.from(sv.weekdays()), ['mån', 'tis', 'ons', 'tor', 'fre', 'lör', 'sön']);
+  assert.equal(fi.euro(250).replace(/\s/g, ' '), '2,50 €');
+  assert.equal(sv.euro(250).replace(/\s/g, ' '), '2,50 €');
+});
+
+test('Start- und Fehleransicht folgen auch vor i18n.js der gewählten Sprache', () => {
+  const html = fs.readFileSync(path.join(WWW, 'index.html'), 'utf8');
+  const boot = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+    .map(m => m[1]).find(s => s.includes('var LIMIT_MS'));
+  for (const [stored, languages, lang, start, reload] of [
+    [null, ['fi-FI'], 'fi', 'Käynnistetään…', 'Lataa uudelleen'],
+    ['sv', ['fi-FI'], 'sv', 'Startar…', 'Ladda om'],
+    ['constructor', ['fi-FI'], 'fi', 'Käynnistetään…', 'Lataa uudelleen'],
+  ]) {
+    let timeout;
+    const label = {};
+    const root = { innerHTML: '', querySelector: () => ({ addEventListener() {} }) };
+    const ctx = {
+      localStorage: { getItem: () => stored }, navigator: { languages },
+      window: { addEventListener() {} }, location: { reload() {} },
+      document: { documentElement: {}, querySelector: () => label, getElementById: id => id === 'root' ? root : {} },
+      setTimeout: fn => { timeout = fn; },
+    };
+    vm.runInNewContext(boot, ctx);
+    assert.equal(ctx.document.documentElement.lang, lang);
+    assert.equal(label.textContent, start);
+    timeout();
+    assert.ok(root.innerHTML.includes(reload));
+    assert.doesNotMatch(root.innerHTML, /App konnte nicht|The app couldn’t/);
+  }
+});
+
 // ─── Vollständigkeit ────────────────────────────────────────────────────────
 
 const result = check();
@@ -111,10 +160,14 @@ test('tr-Schlüssel sind feste Texte', () => {
   assert.deepEqual(result.problems.filter(p => p.kind === 'dynamic'), [], show(result.problems.filter(p => p.kind === 'dynamic')));
 });
 
-test('jeder Text hat einen englischen Eintrag mit passenden Platzhaltern', () => {
-  const bad = result.problems.filter(p => p.kind !== 'dynamic');
-  assert.equal(bad.length, 0, show(bad));
-});
+for (const lang of ['en', 'fi', 'sv']) {
+  const localized = lang === 'en' ? result : check({ lang });
+  test(`jeder Text hat einen ${lang}-Eintrag mit passenden Platzhaltern`, () => {
+    const bad = localized.problems.filter(p => p.kind !== 'dynamic');
+    assert.equal(bad.length, 0, show(bad));
+    assert.deepEqual(localized.unused, []);
+  });
+}
 
 test('kein deutscher Text ohne tr()', () => {
   assert.equal(result.german.length, 0, show(result.german));

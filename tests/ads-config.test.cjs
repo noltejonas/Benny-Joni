@@ -246,7 +246,7 @@ test('iOS: SKAdNetwork-Liste, keine ATT-Deklaration oder ATT-Anfrage für NPA', 
   assert.equal(new Set(ids).size, ids.length, 'doppelte SKAdNetwork-IDs');
   assert.ok(ids.every((id) => /^[a-z0-9]+\.skadnetwork$/.test(id)));
   assert.equal(plistValue('NSUserTrackingUsageDescription'), null);
-  for (const locale of ['de', 'en']) {
+  for (const locale of ['de', 'en', 'fi', 'sv']) {
     const localized = fs.readFileSync(path.join(ROOT, 'ios/App/App', `${locale}.lproj/InfoPlist.strings`), 'utf8');
     assert.doesNotMatch(localized, /NSUserTrackingUsageDescription/);
   }
