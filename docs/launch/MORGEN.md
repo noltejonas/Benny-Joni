@@ -40,8 +40,8 @@ Freigabe hat:
 2. **DSA-Händlerstatus** (Schritt 2, Account Holder)
 3. **Angaben für Impressum/Datenschutz sowie Support-Adresse und Apple-ID an
    Claude geben**: Claude füllt dann Schritt 5 und 6 und committet.
-4. **GitHub Pages einschalten** (Schritt 7.1: Settings → Pages → Source
-   „GitHub Actions“)
+4. **Rechtsseiten veröffentlichen** (Schritt 7: Dateien nach `Benny-Joni/`
+   im Hosting-Repo `noltejonas/noltejonas.github.io` übernehmen)
 5. **Supabase** (Schritt 8): die vier SQL-Dateien und die Reset-Vorlage. Das
    Supabase-MCP von Claude sieht euer Projekt nicht.
 6. **Archive + Upload in Xcode** (Schritt 9). Signieren und Hochladen sind für
@@ -78,7 +78,7 @@ jede Abweichung ist eine Konstante (Spalte „Wo ändern“):
 |---|---|---|
 | App-Name | „Benny & Joni“, im Store „Benny & Joni: Fitness-Duell“ | `PTOnboarding.APP_NAME` in `www/onboarding-model.js`; Store: `ios/App/fastlane/metadata/de-DE/name.txt` |
 | Werbung in V1 | Nein. AdMob kommt als 1.4.1 (Branch `claude/admob-1.4.1`) | `ADS_ENABLED` in `www/ads.js`, nur im AdMob-Branch |
-| Rechtstexte | GitHub Pages, `https://noltejonas.github.io/Benny-Joni/` | `LEGAL_BASE` in `www/onboarding-model.js` |
+| Rechtstexte | GitHub Pages aus dem Hosting-Repo `noltejonas/noltejonas.github.io` (Ordner `Benny-Joni/`), `https://noltejonas.github.io/Benny-Joni/` | `LEGAL_BASE` in `www/onboarding-model.js` |
 | Veröffentlichung | Manuell nach Freigabe, dazu Expedited Review | App Store Connect, Schritt 11 |
 | Anteil-Regel | Echte Teilnehmerzahl ab 2 Aktiven, sonst erwartete Personen | `SHARE_BASIS` in `www/stats-model.js` und dieselbe Regel im Abschnitt „Anteil (SHARE_BASIS)“ in `supabase/functions/_shared/push-rules.ts` (danach notify-set/daily-nudge neu deployen) |
 | Push | Rivalen-Push ab 10 Wdh./Tag, Ruhezeit 22–7 Uhr, max. 1 pro Tag und Challenge; Tageserinnerung erst ab 22.10. Texte in der Sprache der Empfänger (`profiles.language`, sonst Deutsch) | Secret `RIVAL_THRESHOLD`; Ruhezeit und Texte (`PUSH_TEXT`) in `supabase/functions/_shared/push-rules.ts`; `DRY_RUN` bei daily-nudge |
@@ -107,14 +107,13 @@ erhältlich.
 
 ## 3. Nacht-PR mergen (06:10, B, 5 min)
 
-Die Rechtsseiten werden nur von `main` veröffentlicht, deshalb zuerst mergen.
+Veröffentlicht werden die Rechtsseiten aus dem Stand in `main`, deshalb zuerst mergen.
 
 1. GitHub → Pull Request → **Merge**.
-2. Gleich danach (wer Admin im Repo ist): GitHub → Repo `noltejonas/Benny-Joni`
-   → **Settings → Pages** → „Build and deployment“ → Source **„GitHub
-   Actions“**. Ohne diese Einstellung kann der Workflow nichts veröffentlichen.
-   Der erste Lauf von **legal-pages** direkt nach dem Merge schlägt absichtlich
-   fehl („noch [BITTE AUSFÜLLEN]“), das ist richtig so.
+2. Der Workflow **legal-pages** prüft danach nur: Solange noch
+   „[BITTE AUSFÜLLEN]“ in den Seiten steht, ist er rot, das ist richtig so.
+   Veröffentlicht wird erst in Schritt 7 über das Hosting-Repo
+   `noltejonas/noltejonas.github.io`; dieses Repo hat keine eigene Pages-Site.
 3. Lokal:
    ```bash
    cd <Repo>
@@ -186,7 +185,8 @@ Dazu:
    - `APP_STORE_ID = ''` → `APP_STORE_ID = '<Apple-ID aus Schritt 4>'`
    - `SUPPORT_EMAIL = ''` → `SUPPORT_EMAIL = '<eure Support-Adresse>'`.
      **Ohne Adresse laufen „Melden“ und „Support“ nur auf die Support-Webseite.**
-   - `LEGAL_BASE` nur ändern, wenn ihr nicht GitHub Pages nutzt.
+   - `LEGAL_BASE` nur ändern, wenn die Seiten woanders liegen als unter
+     `https://noltejonas.github.io/Benny-Joni/`.
    ```bash
    grep -n "APP_STORE_ID\|SUPPORT_EMAIL\|LEGAL_BASE" www/onboarding-model.js
    ```
@@ -203,13 +203,18 @@ Dazu:
 
 ## 7. Rechtsseiten veröffentlichen und URLs prüfen (06:50, A, 10 min) – P0
 
-1. Prüfen, dass Settings → Pages → Source auf **„GitHub Actions“** steht
-   (Schritt 3).
-2. GitHub → **Actions** → Workflow **legal-pages**. Er läuft bei jedem Push auf
-   `main`, der `docs/launch/site` ändert (also nach Schritt 5). Lief er vor dem
-   Umstellen der Pages-Quelle oder ist er rot: „Run workflow“ → Branch `main`
-   → Run (Haken „Platzhalter erlauben“ **aus**).
-   Bricht er mit „noch [BITTE AUSFÜLLEN] …“ ab: Schritt 5 ist nicht fertig.
+Die Seiten liegen im Hosting-Repo `noltejonas/noltejonas.github.io`: Der
+Ordner `Benny-Joni/` dort ist eine Kopie von `docs/launch/site`, GitHub Pages
+baut ihn vom Branch `main`. Dieses Repo hat keine eigene Pages-Site.
+
+1. GitHub → **Actions** → Workflow **legal-pages** muss grün sein. Er läuft bei
+   jedem PR und Push auf `main`, der `docs/launch/site` ändert. Rot mit
+   „noch [BITTE AUSFÜLLEN] …“ heißt: Schritt 5 ist nicht fertig.
+2. Die geänderten Dateien aus `docs/launch/site` mit gleichem Pfad nach
+   `Benny-Joni/` im Hosting-Repo committen und pushen. Welche das sind, steht
+   in der Zusammenfassung des legal-pages-Laufs („Website-Abgleich“).
+   Nach dem Pages-Build (1–2 Minuten) meldet ein neuer Lauf („Run workflow“)
+   keine Abweichungen mehr.
 3. Alle vier Seiten und die Startseite müssen mit 200 antworten:
    ```bash
    for p in "" datenschutz.html impressum.html nutzungsbedingungen.html support.html; do
@@ -218,7 +223,7 @@ Dazu:
    ```
 4. Einmal auf dem Handy öffnen und lesen.
 
-Achtung: Wird das Repo auf privat gestellt, schaltet GitHub Pages im
+Achtung: Wird das Hosting-Repo auf privat gestellt, schaltet GitHub Pages im
 Free-Plan ab, und die App-Links laufen ins Leere.
 
 ## 8. Supabase: prüfen, Migrationen einspielen, Reset-Vorlage (06:50, B, 20 min) – P0
@@ -500,7 +505,7 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `www/onboarding-model.js` | `APP_STORE_ID` | `''` | Apple-ID (Ziffern) eintragen | Schritt 6, **P0** |
 | `www/onboarding-model.js` | `APP_STORE_URL` | aus `APP_STORE_ID` | nichts, wird berechnet | – |
 | `www/onboarding-model.js` | `SUPPORT_EMAIL` | `''` | Support-Adresse eintragen | Schritt 6, **P0** |
-| `www/onboarding-model.js` | `LEGAL_BASE` / `LEGAL` | GitHub Pages | nur bei anderem Hosting | – |
+| `www/onboarding-model.js` | `LEGAL_BASE` / `LEGAL` / `JOIN_URL` | GitHub Pages (Hosting-Repo `noltejonas/noltejonas.github.io`) | nur bei anderem Hosting | – |
 | `www/stats-model.js` (+ `_shared/push-rules.ts`) | `SHARE_BASIS` | `'actual'`: echte Teilnehmer ab 2 | nur bei anderer Anteil-Regel | – |
 | `package.json` | `"capacitor:copy:after"` | drin: `node tools/build-web.cjs` | Notlösung siehe `RELEASE.md` | nur bei Build-Problemen |
 | `capacitor.config.json` | `appName` | `Benny & Joni` | – | – |
@@ -522,8 +527,8 @@ Diese Punkte hängen nicht an Apple und laufen parallel zur Prüfung.
 | `support.html` | 2 | Support-E-Mail, Entwurfs-Kasten |
 | `index.html` | 2 | App-Store-Link, Entwurfs-Kasten |
 
-Der Workflow `legal-pages` veröffentlicht erst, wenn keine dieser Stellen und
-kein Entwurfs-Kasten mehr da ist.
+Der Workflow `legal-pages` ist rot, solange eine dieser Stellen oder der
+Entwurfs-Kasten noch da ist. Veröffentlichen erst danach (Schritt 7).
 
 ### Store und Prüfung
 
@@ -621,7 +626,8 @@ Pro Paket: was drin ist, was offen blieb, worauf ihr achten müsst.
     echten Datenflüssen, Impressum, Nutzungsbedingungen mit Null-Toleranz,
     Mindestalter 16 und Strafkonto ohne Zahlungen, Support-FAQ, Startseite).
   - Workflow `.github/workflows/legal-pages.yml` (nur `docs/launch/site`,
-    bricht bei Platzhaltern ab).
+    bricht bei Platzhaltern ab; seit 31.10. reine Prüfung mit Abgleich gegen
+    die Live-Seite, veröffentlicht wird über das Hosting-Repo).
   - Store-Texte in `ios/App/fastlane/metadata/` und
     `docs/launch/STORE_LISTING.md` mit Altersfreigabe und App-Datenschutz;
     alle Zeichenlimits geprüft.
