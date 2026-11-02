@@ -39,6 +39,11 @@ PTi18n.add('sv', {
   "Mitteilungen sind an 🔔": "Notiser är på 🔔",
   "Alles klar. Geht auch später in den Einstellungen.": "Okej. Du kan slå på dem senare i inställningarna.",
   "Woche fixiert – los geht's, {name}!": "Veckan är spikad – nu kör vi, {name}!",
+  "{n} Challenges gestartet – los geht’s!": {
+    "one": "Utmaningen har startat – nu kör vi!",
+    "other": "{n} utmaningar har startat – nu kör vi!"
+  },
+  "Diese Woche läuft schon.": "Den här veckan är redan igång.",
   "{name} ist dabei 🎉": "{name} är med 🎉",
   "Jemand": "Någon",
   "{name} hat geliefert": "{name} har levererat",
@@ -1146,6 +1151,26 @@ PTi18n.add('sv', {
   "Zeit eintragen": "Registrera tid",
   "Satz eintragen": "Registrera set",
   "Schnellansicht: {name}": "Snabbvy: {name}",
+  "{n} %": "{n} %",
+  "Neue Woche starten": "Starta den nya veckan",
+  "Alle Challenges neu starten": "Starta om alla utmaningar",
+  "Challenge neu starten": "Starta om utmaningen",
+  "Vorschlag aus der letzten Woche. Steigerung wählen, Zahlen anpassen, los.": "Förslag från förra veckan. Välj ökning, justera siffrorna, kör.",
+  "Steigerung für alle Übungen": "Ökning för alla övningar",
+  "Gleich": "Samma",
+  "Eigene": "Egen",
+  "Steigerung in Prozent": "Ökning i procent",
+  "{n} Personen": {
+    "one": "{n} person",
+    "other": "{n} personer"
+  },
+  "Min. pro Person": "Min. per person",
+  "{name}: neu pro Person": "{name}: nytt per person",
+  "Alle {n} Challenges starten": "Starta alla {n} utmaningar",
+  "{n} Challenges starten": {
+    "one": "Starta {n} utmaning",
+    "other": "Starta {n} utmaningar"
+  },
   "Farben": "Färger",
   "So funktioniert die Rangliste": "Så fungerar topplistan",
   "Verstanden": "Jag förstår",

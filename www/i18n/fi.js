@@ -39,6 +39,11 @@ PTi18n.add('fi', {
   "Mitteilungen sind an 🔔": "Ilmoitukset ovat käytössä 🔔",
   "Alles klar. Geht auch später in den Einstellungen.": "Selvä. Voit ottaa ne käyttöön myöhemmin asetuksissa.",
   "Woche fixiert – los geht's, {name}!": "Viikko lyöty lukkoon – menoksi, {name}!",
+  "{n} Challenges gestartet – los geht’s!": {
+    "one": "Haaste käynnistetty – menoksi!",
+    "other": "{n} haastetta käynnistetty – menoksi!"
+  },
+  "Diese Woche läuft schon.": "Tämä viikko on jo käynnissä.",
   "{name} ist dabei 🎉": "{name} on mukana 🎉",
   "Jemand": "Joku",
   "{name} hat geliefert": "{name} teki osansa",
@@ -1146,6 +1151,26 @@ PTi18n.add('fi', {
   "Zeit eintragen": "Kirjaa aika",
   "Satz eintragen": "Kirjaa sarja",
   "Schnellansicht: {name}": "Pikanäkymä: {name}",
+  "{n} %": "{n} %",
+  "Neue Woche starten": "Aloita uusi viikko",
+  "Alle Challenges neu starten": "Aloita kaikki haasteet uudelleen",
+  "Challenge neu starten": "Aloita haaste uudelleen",
+  "Vorschlag aus der letzten Woche. Steigerung wählen, Zahlen anpassen, los.": "Ehdotus viime viikon pohjalta. Valitse nosto, säädä lukuja ja menoksi.",
+  "Steigerung für alle Übungen": "Nosto kaikkiin liikkeisiin",
+  "Gleich": "Sama",
+  "Eigene": "Oma",
+  "Steigerung in Prozent": "Nosto prosentteina",
+  "{n} Personen": {
+    "one": "{n} henkilö",
+    "other": "{n} henkilöä"
+  },
+  "Min. pro Person": "Min. per henkilö",
+  "{name}: neu pro Person": "{name}: uusi per henkilö",
+  "Alle {n} Challenges starten": "Aloita kaikki {n} haastetta",
+  "{n} Challenges starten": {
+    "one": "Aloita {n} haaste",
+    "other": "Aloita {n} haastetta"
+  },
   "Farben": "Värit",
   "So funktioniert die Rangliste": "Näin tulostaulu toimii",
   "Verstanden": "Selvä",

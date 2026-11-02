@@ -1184,6 +1184,45 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     [dash.bundle, dash.live, weekStart]
   );
   const dashCelebration = useCelebration(showDashboard ? dashWeekChallenges : [], dash.bundle?.sets || [], me, dash.bundle?.categories || []);
+
+  // Neue Woche für alle Challenges: Challenges ohne Ziel diese Woche mit den
+  // Zielen der Vorwoche als Vorschlag (PTDashboard.restartPlan). × blendet die
+  // Karte bis zur nächsten Woche aus.
+  const [restartOffWeek, setRestartOffWeek] = useState(() => readPref('pt:restart-off', ''));
+  const restartPlan = useMemo(() => (dash.bundle && restartOffWeek !== weekStart
+    ? PTDashboard.restartPlan({ comps: dashComps, bundle: dash.bundle, weekStart,
+      peopleOn: (x, ws) => sharePeopleFor(x.c.mode, PTData.participantsFor(x.members, ws).length) })
+    : []), [dash.bundle, dashComps, weekStart, restartOffWeek, sharePeopleFor]);
+  function dismissRestart() {
+    writePref('pt:restart-off', weekStart);
+    setRestartOffWeek(weekStart);
+  }
+  // picks: [{ competition_id, goals: [{ category_id, target_reps, target_runs }] }].
+  // Jede Challenge für sich: klappt eine nicht, sind die anderen trotzdem gestartet.
+  // Hat jemand anderes die Woche inzwischen gestartet, kommt nichts dazu.
+  async function restartWeek(picks) {
+    const failed = [];
+    let started = 0, running = 0;
+    await Promise.all(picks.map(async (p) => {
+      const a = apiFor(p.competition_id);
+      try {
+        if ((await a.getChallengeForWeek(weekStart)).length) { running++; return; }
+        for (const g of p.goals) {
+          await a.upsertChallenge({ week_start: weekStart, category_id: g.category_id, chosen_by: me,
+            target_reps: g.target_reps, target_runs: g.target_runs });
+        }
+        started++;
+      } catch (e) { failed.push(e); }
+    }));
+    dash.reload();
+    if (picks.some(p => p.competition_id === competition.id)) reload();
+    if (failed.length) { alert(failed[0]?.message || tr('Fehler beim Speichern')); return; }
+    // Abgewählte Challenges bleiben bewusst offen: Karte für diese Woche ausblenden
+    dismissRestart();
+    PTHaptics.tap();
+    setToast(started ? trn(started, 'Challenge gestartet – los geht’s!', '{n} Challenges gestartet – los geht’s!')
+      : tr('Diese Woche läuft schon.'));
+  }
   const daysLeftNow = 7 - PTDashboard.dayIndexInWeek(weekStart);
 
   // ── Wochenabschluss-Feier ───────────────────────────────────────────────
@@ -1747,7 +1786,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             onQuickLog={dashQuickLog}
             onOpenLog={dashOpenLog}
             onStartWorkout={dashOpenLog}
-            onAddGoal={() => setSetupForChallenge({})} />
+            onAddGoal={() => setSetupForChallenge({})}
+            restartPlan={restartPlan} onRestart={restartWeek} onRestartDismiss={dismissRestart} />
         )}
         {multi && ((tab === 'home' && !showDashboard) || (!headerAll && (tab === 'feed' || tab === 'strafkonto'))) && (
           <button type="button" className="db-back" onClick={() => onScope?.('all')}>

@@ -189,5 +189,58 @@
     };
   }
 
-  window.PTDashboard = { leaderIndex, dayIndexInWeek, challengeRows, duelOf, standingOf, buildDashboard, matchingTargets, weekResult };
+  // ── Neue Woche für alle Challenges ───────────────────────────────────
+  // Vorschläge für weekStart aus den Zielen der Vorwoche: jede Challenge, die
+  // in weekStart noch kein Ziel hat, mit ihren Übungen der Vorwoche. Pro Übung
+  // Gesamtziel und Anteil pro Person der Vorwoche. peopleOn(comp, week): auf
+  // wie viele Personen sich ein Ziel dieser Woche verteilt (wie in der App).
+  function restartPlan({ comps, bundle, weekStart, peopleOn }) {
+    const prevWeek = P.addDays(weekStart, -7);
+    const catById = Object.fromEntries((bundle?.categories || []).map(c => [c.id, c]));
+    const people = (x, ws) => Math.max(1, peopleOn ? peopleOn(x, ws) : P.participantsFor(x.members, ws).length);
+    const out = [];
+    for (const x of comps || []) {
+      const own = (bundle?.challenges || []).filter(ch => ch.competition_id === x.c.id);
+      if (own.some(ch => ch.week_start === weekStart)) continue;
+      const prevPeople = people(x, prevWeek);
+      const seen = new Set();
+      const rows = [];
+      for (const ch of own) {
+        const cat = catById[ch.category_id];
+        if (ch.week_start !== prevWeek || !cat || cat.kind === 'work' || seen.has(ch.category_id)) continue;
+        seen.add(ch.category_id);
+        const workout = P.isWorkoutType(cat.challenge_type);
+        const prevTotal = Math.max(1, Math.round(Number(ch.target_reps) || 0));
+        rows.push({
+          key: `${x.c.id}:${ch.category_id}`, category_id: ch.category_id, cat, workout,
+          minutes: P.usesMinutes(cat), prevTotal, prevPeople,
+          prevShare: workout ? P.workoutTargetRuns(ch) : P.fairShareOf(prevTotal, prevPeople),
+        });
+      }
+      if (rows.length) out.push({ c: x.c, people: people(x, weekStart), rows });
+    }
+    return out;
+  }
+
+  // Anteil pro Person um pct Prozent ändern, aufgerundet: jede Steigerung
+  // bringt mindestens eins mehr. Ganzzahlig gerechnet, sonst würde aus
+  // 100 · 1,05 = 105,00000000000001 aufgerundet 106.
+  function bumpShare(share, pct) {
+    const base = Math.max(1, Math.round(Number(share) || 0));
+    const p = Math.round(Number(pct) || 0);
+    return p ? Math.max(1, Math.ceil(base * (100 + p) / 100)) : base;
+  }
+
+  // Wochenziel einer Vorschlagszeile (restartPlan) für den gewählten Anteil
+  // pro Person: Anteil mal Personen. Gleicher Anteil bei gleich vielen Personen
+  // behält das alte Gesamtziel (301 bei zwei Personen wird nicht still zu 302).
+  // Pflicht-Workouts: share sind die Durchgänge pro Person.
+  function restartTarget(row, share, people) {
+    if (row.workout) return { target_reps: row.prevTotal, target_runs: Math.max(1, share) };
+    const total = share === row.prevShare && people === row.prevPeople ? row.prevTotal : share * people;
+    return { target_reps: Math.max(1, total), target_runs: 1 };
+  }
+
+  window.PTDashboard = { leaderIndex, dayIndexInWeek, challengeRows, duelOf, standingOf, buildDashboard, matchingTargets, weekResult,
+    restartPlan, bumpShare, restartTarget };
 })();
