@@ -291,7 +291,160 @@ function ExerciseSlide({ ex, me, onQuick, onLog, onStart }) {
   );
 }
 
-function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal }) {
+// ─── Neue Woche für alle Challenges ─────────────────────────────────────────
+// Vorschläge aus der Vorwoche (PTDashboard.restartPlan): pro Übung Anteil pro
+// Person und Gesamtziel, alt → neu. Die Steigerung gilt für alle Übungen,
+// jede Zahl bleibt einzeln änderbar. onStart(picks) legt alles auf einmal an.
+const WR_PCT_KEY = 'pt:restart-pct'; // zuletzt gewählte Steigerung
+const WR_STEPS = [0, 5, 10];
+const wrPct = (p) => tr('{n} %', { n: p > 0 ? `+${p}` : p < 0 ? `−${-p}` : '±0' });
+function wrReadPct() {
+  try { const v = parseInt(localStorage.getItem(WR_PCT_KEY), 10); return Number.isFinite(v) ? v : 0; } catch (e) { return 0; }
+}
+
+// Zahlenfeld, das man auch ganz leeren kann: der Text bleibt beim Tippen
+// stehen, übernommen wird jede gültige Zahl, beim Verlassen gilt wieder value.
+function WrNumber({ value, onChange, label }) {
+  const [text, setText] = React.useState(String(value));
+  React.useEffect(() => { setText(String(value)); }, [value]);
+  return (
+    <input className="weekfix-input mono" type="number" inputMode="numeric" value={text} aria-label={label}
+      onFocus={e => e.target.select()} onBlur={() => setText(String(value))}
+      onChange={e => { setText(e.target.value); const v = parseInt(e.target.value, 10); if (Number.isFinite(v)) onChange(v); }} />
+  );
+}
+
+function WeekRestartCard({ plan, weekStart, onStart, onDismiss }) {
+  const D = window.PTDashboard;
+  const [pct, setPct] = React.useState(wrReadPct);
+  const [customOpen, setCustomOpen] = React.useState(() => !WR_STEPS.includes(wrReadPct()));
+  const [edits, setEdits] = React.useState({}); // row.key → Anteil pro Person, von Hand
+  const [off, setOff] = React.useState([]);     // abgewählte Challenges
+  const [busy, setBusy] = React.useState(false);
+
+  const choose = (p, custom = false) => {
+    const v = Math.max(-50, Math.min(200, Math.round(p) || 0));
+    setPct(v); setEdits({}); setCustomOpen(custom);
+    try { localStorage.setItem(WR_PCT_KEY, String(v)); } catch (e) {}
+  };
+  const shareOf = (r) => edits[r.key] ?? (r.workout ? r.prevShare : D.bumpShare(r.prevShare, pct));
+  const setShare = (r, v) => setEdits(e => ({ ...e, [r.key]: Math.max(1, Math.min(99999, v)) }));
+  const step = (r, dir) => {
+    const cur = shareOf(r);
+    const s = r.workout ? 1 : cur < 30 ? 1 : cur < 100 ? 5 : 10;
+    setShare(r, dir > 0 ? (Math.floor(cur / s) + 1) * s : (Math.ceil(cur / s) - 1) * s);
+  };
+  const chosen = plan.filter(p => !off.includes(p.c.id));
+
+  async function start() {
+    if (busy || !chosen.length) return;
+    setBusy(true);
+    try {
+      await onStart(chosen.map(p => ({
+        competition_id: p.c.id,
+        goals: p.rows.map(r => ({ category_id: r.category_id, ...D.restartTarget(r, shareOf(r), p.people) })),
+      })));
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <section className="weekfix-card wr-card" aria-label={tr('Neue Woche starten')}>
+      <div className="weekfix-head">
+        <div>
+          <div className="weekfix-label">{tr('Neue Woche')} · {tr('KW {week}', { week: weekNumber(weekStart) })}</div>
+          <div className="weekfix-title">{plan.length > 1 ? tr('Alle Challenges neu starten') : tr('Challenge neu starten')}</div>
+          <div className="weekfix-sub">{tr('Vorschlag aus der letzten Woche. Steigerung wählen, Zahlen anpassen, los.')}</div>
+        </div>
+        {onDismiss && <button className="weekfix-dismiss" aria-label={tr('Später')} onClick={onDismiss}>×</button>}
+      </div>
+
+      <div className="wr-pcts" role="radiogroup" aria-label={tr('Steigerung für alle Übungen')}>
+        {WR_STEPS.map(p => (
+          <button key={p} type="button" role="radio" aria-checked={!customOpen && pct === p}
+            className={`wr-pct${!customOpen && pct === p ? ' is-on' : ''}`} onClick={() => choose(p)}>
+            {p === 0 ? tr('Gleich') : wrPct(p)}
+          </button>
+        ))}
+        <button type="button" role="radio" aria-checked={customOpen}
+          className={`wr-pct${customOpen ? ' is-on' : ''}`} onClick={() => choose(customOpen ? pct : pct || 15, true)}>
+          {customOpen ? wrPct(pct) : tr('Eigene')}
+        </button>
+      </div>
+      {customOpen && (
+        <div className="wr-custom">
+          <button type="button" className="weekfix-step-btn" aria-label={tr('weniger')} onClick={() => choose(pct - 1, true)}>−</button>
+          <WrNumber value={pct} label={tr('Steigerung in Prozent')} onChange={v => choose(v, true)} />
+          <span className="wr-custom-unit">%</span>
+          <button type="button" className="weekfix-step-btn" aria-label={tr('mehr')} onClick={() => choose(pct + 1, true)}>+</button>
+        </div>
+      )}
+
+      <div className="wr-comps">
+        {plan.map(p => {
+          const on = !off.includes(p.c.id);
+          return (
+            <div key={p.c.id} className={`wr-comp${on ? '' : ' is-off'}`}>
+              <button type="button" className="wr-comp-head" aria-pressed={on}
+                onClick={() => setOff(o => (on ? [...o, p.c.id] : o.filter(id => id !== p.c.id)))}>
+                <span className="wr-check" aria-hidden="true">{on && <Icon name="check" size={14} strokeWidth={3} />}</span>
+                <span className="wr-comp-emoji" aria-hidden="true">{p.c.emoji}</span>
+                <span className="wr-comp-name">{p.c.name}</span>
+                <span className="wr-comp-meta">{trn(p.people, '{n} Person', '{n} Personen')}</span>
+              </button>
+              {on && (
+                <ul className="wr-rows">
+                  {p.rows.map(r => {
+                    const share = shareOf(r);
+                    const goal = D.restartTarget(r, share, p.people);
+                    const fmt = (v) => fmtAmount(r.minutes, v);
+                    const delta = r.workout ? 0 : Math.round((share / r.prevShare - 1) * 100);
+                    return (
+                      <li key={r.key} className="wr-row">
+                        <div className="wr-row-head">
+                          <span className="wr-row-name">{r.cat.name}</span>
+                          {r.workout ? <span className="weekfix-pflicht-badge">{tr('PFLICHT')}</span>
+                            : delta !== 0 && <span className={`wr-delta ${delta > 0 ? 'is-up' : 'is-down'}`}>{wrPct(delta)}</span>}
+                        </div>
+                        <div className="wr-line">
+                          <span className="wr-line-label">{r.minutes ? tr('Min. pro Person') : tr('pro Person')}</span>
+                          <span className="wr-old mono">{r.workout ? `${r.prevShare}×` : fmt(r.prevShare)}</span>
+                          <span className="wr-arrow" aria-hidden="true">→</span>
+                          <span className="weekfix-stepper">
+                            <button type="button" className="weekfix-step-btn" disabled={share <= 1}
+                              aria-label={tr('weniger')} onClick={() => step(r, -1)}>−</button>
+                            <WrNumber value={share} label={tr('{name}: neu pro Person', { name: r.cat.name })} onChange={v => setShare(r, v)} />
+                            <button type="button" className="weekfix-step-btn" aria-label={tr('mehr')} onClick={() => step(r, 1)}>+</button>
+                          </span>
+                        </div>
+                        {!r.workout && (
+                          <div className="wr-line is-total">
+                            <span className="wr-line-label">{tr('gesamt')}</span>
+                            <span className="wr-old mono">{fmt(r.prevTotal)}</span>
+                            <span className="wr-arrow" aria-hidden="true">→</span>
+                            <b className="wr-new mono">{fmt(goal.target_reps)}</b>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <button className={`btn weekfix-cta${busy ? ' is-loading' : ''}`} disabled={busy || !chosen.length} onClick={start}>
+        {busy ? tr('Wird gesetzt…') : chosen.length === plan.length && plan.length > 1
+          ? tr('Alle {n} Challenges starten', { n: chosen.length })
+          : trn(chosen.length, '{n} Challenge starten', '{n} Challenges starten')}
+      </button>
+    </section>
+  );
+}
+
+function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal,
+  restartPlan = [], onRestart, onRestartDismiss }) {
   const { cards, exercises, ordered } = model;
   // Erledigte Kacheln ans Ende, damit Blau und Grün nicht durcheinander wechseln
   const items = React.useMemo(() => [...exercises.filter(ex => !ex.finished), ...exercises.filter(ex => ex.finished)]
@@ -299,8 +452,13 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
   const active = items.find(e => e.key === focusKey) || items.find(e => !e.finished) || items[0];
   const finished = exercises.filter(e => e.finished).length;
 
+  const restarting = restartPlan.length > 0 && !!onRestart;
+
   return (
     <>
+      {restarting && (
+        <WeekRestartCard key={weekStart} plan={restartPlan} weekStart={weekStart} onStart={onRestart} onDismiss={onRestartDismiss} />
+      )}
       <section className="rd-section" aria-label={tr('Deine Challenges')}>
         <div className="rd-section-head">
           <h2>{tr('Deine Challenges')}</h2>
@@ -321,7 +479,7 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
               onLog={() => onOpenLog(ex)}
               onStart={() => onStartWorkout(ex)} />
           )} />
-      ) : (
+      ) : restarting ? null : (
         <div className="rd-card rd-empty db-empty">
           <div className="rd-empty-title">{tr('Diese Woche ist noch offen')}</div>
           <div className="rd-empty-text">{tr('Öffne eine Challenge und leg das erste Wochenziel fest.')}</div>
@@ -429,4 +587,4 @@ function ChallengeQuickSheet({ card, weekStart, daysLeft, onOpen, onClose }) {
   );
 }
 
-Object.assign(window, { TugBar, FocusCarousel, DashboardScreen, ChallengeQuickSheet, ChallengeInsights, ExerciseSlide, fmtAmount, compStatusLine });
+Object.assign(window, { TugBar, FocusCarousel, DashboardScreen, WeekRestartCard, ChallengeQuickSheet, ChallengeInsights, ExerciseSlide, fmtAmount, compStatusLine });

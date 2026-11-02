@@ -230,3 +230,66 @@ test('global dashboard shows partial repeated-workout progress across different 
   assert.equal(result.exercises[0].finished, false);
   assert.equal(result.exercises[0].pct, 0.5);
 });
+
+// ─── Neue Woche für alle Challenges ─────────────────────────────────────────
+
+test('bumpShare: Prozent auf den Anteil, aufgerundet, ohne Rundungsfehler', () => {
+  assert.equal(D.bumpShare(100, 0), 100);
+  assert.equal(D.bumpShare(100, 5), 105);
+  assert.equal(D.bumpShare(100, 10), 110);
+  assert.equal(D.bumpShare(150, 5), 158);
+  assert.equal(D.bumpShare(5, 5), 6);         // jede Steigerung bringt mindestens eins
+  assert.equal(D.bumpShare(40, 15), 46);
+  assert.equal(D.bumpShare(150, -10), 135);
+  assert.equal(D.bumpShare(1, -50), 1);
+});
+
+test('restartPlan: Challenges ohne Ziel diese Woche mit den Übungen der Vorwoche', () => {
+  const members = (cid, users) => users.map(u => ({ competition_id: cid, user_id: u, joined_at: '2026-01-01T10:00:00Z' }));
+  const bundle = {
+    categories: cats,
+    challenges: [
+      { id: 'a1', competition_id: 'A', category_id: 'push', week_start: LAST, target_reps: 301 },
+      { id: 'a2', competition_id: 'A', category_id: 'th', week_start: LAST, target_reps: 1, target_runs: 2 },
+      { id: 'a3', competition_id: 'A', category_id: 'code-a', week_start: LAST, target_reps: 300 },
+      { id: 'b1', competition_id: 'B', category_id: 'push', week_start: LAST, target_reps: 200 },
+      { id: 'b2', competition_id: 'B', category_id: 'push', week_start: WEEK, target_reps: 200 },
+      { id: 'c1', competition_id: 'C', category_id: 'bible-a', week_start: '2026-10-05', target_reps: 60 },
+    ],
+  };
+  const comps = [
+    { c: { id: 'A' }, members: members('A', ['me', 'jonas']) },
+    { c: { id: 'B' }, members: members('B', ['me', 'jonas']) },
+    { c: { id: 'C' }, members: members('C', ['me']) },
+  ];
+  const plan = D.restartPlan({ comps, bundle, weekStart: WEEK });
+  // B läuft schon, C hatte letzte Woche nichts, Work fällt raus
+  assert.deepEqual([...plan].map(p => p.c.id), ['A']);
+  const [push, th] = plan[0].rows;
+  assert.equal(plan[0].rows.length, 2);
+  assert.equal(push.prevTotal, 301);
+  assert.equal(push.prevShare, 151);
+  assert.equal(push.prevPeople, 2);
+  assert.equal(th.workout, true);
+  assert.equal(th.prevShare, 2);
+
+  // Gleicher Anteil, gleiche Personen: altes Gesamtziel bleibt
+  assert.deepEqual({ ...D.restartTarget(push, 151, 2) }, { target_reps: 301, target_runs: 1 });
+  // +5 % pro Person mal Personen
+  assert.deepEqual({ ...D.restartTarget(push, D.bumpShare(151, 5), 2) }, { target_reps: 318, target_runs: 1 });
+  // Jemand neu dabei: Anteil bleibt, Gesamtziel wächst mit
+  assert.deepEqual({ ...D.restartTarget(push, 151, 3) }, { target_reps: 453, target_runs: 1 });
+  // Pflicht-Workout: Durchgänge pro Person, Wert bleibt
+  assert.deepEqual({ ...D.restartTarget(th, 3, 2) }, { target_reps: 1, target_runs: 3 });
+});
+
+test('restartPlan: Personen pro Woche aus peopleOn', () => {
+  const bundle = { categories: cats, challenges: [
+    { id: 'a1', competition_id: 'A', category_id: 'push', week_start: LAST, target_reps: 300 },
+  ] };
+  const plan = D.restartPlan({ comps: [{ c: { id: 'A' }, members: [] }], bundle, weekStart: WEEK,
+    peopleOn: (x, ws) => (ws === LAST ? 3 : 4) });
+  assert.equal(plan[0].people, 4);
+  assert.equal(plan[0].rows[0].prevShare, 100);
+  assert.equal(D.restartTarget(plan[0].rows[0], 100, plan[0].people).target_reps, 400);
+});
