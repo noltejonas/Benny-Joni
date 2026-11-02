@@ -1,6 +1,8 @@
 # Monatsrangliste einspielen
 
 > **Seit 24.10.2026: Wochenwertung.** Mit `supabase/migrations/20261024130000_weekly_ranking.sql` gibt es Medaillen pro Woche (Abschluss montags 12 Uhr, Cron `ranking-close-weeks`), Monat, Saison und Ewig zählen die Wochen zusammen. Die Schritte unten bleiben die Grundlage, Details in `docs/HEUTE_UPDATE.md`.
+>
+> **Seit 2.11.2026: Reps statt Punkte.** Mit `supabase/migrations/20261102120000_ranking_reps.sql` ordnet die App alle Ansichten nach Wiederholungen: pro Übung die Summe (bei Bring Sally Up und dem AMRAP der beste Wert), „Gesamt“ die Summe über alle Wiederholungs-Übungen. `ranking_totals` liefert dafür zusätzlich `value`, Saisonsieger kommen aus `season_champions_reps`. Medaillen für die Plätze 1–3 bleiben. Die Datenbank vergibt weiter F1-Punkte, damit ältere App-Versionen funktionieren. Der Abschluss-Push (`ranking-push`) nennt Reps statt Punkte.
 
 Reihenfolge: erst Datenbank, dann Functions, dann App-Build. Die App fällt beim Loggen auf das alte Einfügen zurück, solange die Migration fehlt; der Rangliste-Tab zeigt dann „Rangliste nicht verfügbar“.
 

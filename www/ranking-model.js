@@ -6,7 +6,11 @@
 // - Wert pro Monat: jede log_id einmal; volume = Summe, pro Tag höchstens
 //   max_per_day; best = bester Durchgang, höchstens max_per_day.
 // - Platz: Gleichstand teilt den Platz, der nächste wird übersprungen (1, 1, 3).
-// - Punkte nach F1-Schema für die Plätze 1–10, Medaillen für 1–3.
+// - Medaillen für die Plätze 1–3. Die Datenbank vergibt weiter F1-Punkte für
+//   die Plätze 1–10 (alte App-Versionen); die App ordnet nach Reps.
+// - Reps (Migration ranking_reps): pro Übung die Summe der Werte, bei metric
+//   'best' der beste Wert; gesamt die Summe über alle volume-Übungen. Sekunden
+//   (Bring Sally Up) und Runden (AMRAP) zählen nicht in die Gesamtsumme.
 //
 // Wochenwertung (Migration weekly_ranking): Dieselben Regeln pro Woche
 // (Montag bis Sonntag), Abschluss Montag 12:00. Eine Woche zählt im Monat ihres
@@ -19,6 +23,8 @@
 
   const pointsFor = (rank) => POINTS[rank - 1] || 0;
   const medalFor = (rank) => MEDALS[rank] || null;
+  // Übungen mit metric 'best' (Sekunden, Runden) aus cats; ohne cats keine
+  const bestIds = (cats) => new Set((cats || []).filter((c) => c.metric === 'best').map((c) => c.id));
 
   // ── Monate ('YYYY-MM-01') ────────────────────────────────────────────
   const pad = (n) => String(n).padStart(2, '0');
@@ -181,15 +187,18 @@
   }
 
   // ── Saison & Ewig ────────────────────────────────────────────────────
-  // results: monthly_results-Zeilen { month, category_id, user_id, points, medal }
+  // results: monthly_results-Zeilen { month, category_id, user_id, value, points, medal }
   // Zeilen mit `week` (Wochenwertung) zählen im Monat ihres Donnerstags.
-  function totals(results, { from = null, to = null } = {}) {
+  // value: Summe der Werte, bei metric 'best' (aus cats) der beste.
+  function totals(results, { from = null, to = null, cats = null } = {}) {
+    const best = bestIds(cats);
     const out = {};
     for (const r of results || []) {
       const month = r.month || weekMonth(r.week);
       if ((from && month < from) || (to && month > to)) continue;
       const k = `${r.category_id}|${r.user_id}`;
-      const e = out[k] ||= { category_id: r.category_id, user_id: r.user_id, points: 0, gold: 0, silver: 0, bronze: 0, months: 0 };
+      const e = out[k] ||= { category_id: r.category_id, user_id: r.user_id, value: 0, points: 0, gold: 0, silver: 0, bronze: 0, months: 0 };
+      e.value = best.has(r.category_id) ? Math.max(e.value, r.value || 0) : e.value + (r.value || 0);
       e.points += r.points || 0;
       e.months += 1;
       if (r.medal) e[r.medal] += 1;
@@ -197,13 +206,16 @@
     return Object.values(out);
   }
 
-  // Gesamtwertung: Punkte und Medaillen aller Übungen pro User.
-  // rows: Summen (gold/silver/bronze) oder Monatszeilen (medal bzw. rank)
-  function overall(rows) {
+  // Gesamtwertung: Reps (value über alle volume-Übungen) und Medaillen pro User.
+  // rows: Summen (gold/silver/bronze) oder Wochenzeilen (medal bzw. rank).
+  // cats: für metric 'best', deren Werte nicht mitzählen.
+  function overall(rows, cats = null) {
+    const best = bestIds(cats);
     const byUser = {};
     for (const r of rows) {
       const e = byUser[r.user_id] ||= { ...r, category_id: null, rank: undefined, points: 0, gold: 0, silver: 0, bronze: 0, value: 0 };
-      const medal = r.medal || (r.rank && r.points > 0 ? medalFor(r.rank) : null);
+      const medal = r.medal || (r.rank && r.rank <= 3 ? medalFor(r.rank) : null);
+      if (!best.has(r.category_id)) e.value += r.value || 0;
       e.points += r.points || 0;
       e.gold += r.gold || (medal === 'gold' ? 1 : 0);
       e.silver += r.silver || (medal === 'silver' ? 1 : 0);
@@ -212,20 +224,15 @@
     return Object.values(byUser);
   }
 
-  // Punkte-Tabelle: Punkte, bei Gleichstand teilen sich alle den Platz
-  function pointsTable(rows) {
-    return rankBy(rows.filter((r) => r.points > 0), 'points');
-  }
-
-  // Medaillenspiegel: Gold, dann Silber, dann Bronze, dann Punkte
+  // Medaillenspiegel: Gold, dann Silber, dann Bronze, dann Reps
   function medalTable(rows) {
-    const key = (r) => [r.gold || 0, r.silver || 0, r.bronze || 0, r.points || 0];
+    const key = (r) => [r.gold || 0, r.silver || 0, r.bronze || 0, r.value || 0];
     const cmp = (a, b) => {
       const ka = key(a), kb = key(b);
       for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return kb[i] - ka[i];
       return 0;
     };
-    const sorted = rows.filter((r) => r.points > 0 || r.gold || r.silver || r.bronze).sort(cmp);
+    const sorted = rows.filter((r) => r.value > 0 || r.gold || r.silver || r.bronze).sort(cmp);
     let rank = 0;
     return sorted.map((r, i) => {
       if (i === 0 || cmp(sorted[i - 1], r) !== 0) rank = i + 1;
@@ -233,21 +240,22 @@
     });
   }
 
-  // Saisonsieger pro Übung und gesamt (category_id null), sobald der Dezember
-  // abgeschlossen ist. closedMonths: Liste 'YYYY-MM-01'.
-  function seasonChampions(results, closedMonths) {
+  // Saisonsieger nach Reps pro Übung und gesamt (category_id null), sobald der
+  // Dezember abgeschlossen ist. closedMonths: Liste 'YYYY-MM-01'. Wie
+  // season_champions_reps in der Datenbank.
+  function seasonChampions(results, closedMonths, cats = null) {
     const closed = new Set(closedMonths || []);
     const years = [...new Set((results || []).map((r) => Number((r.month || weekMonth(r.week)).slice(0, 4))))]
       .filter((y) => closed.has(`${y}-12-01`));
     const out = [];
     for (const y of years) {
-      const rows = totals(results, { from: `${y}-01-01`, to: `${y}-12-01` });
-      const cats = [...new Set(rows.map((r) => r.category_id))];
-      const groups = [...cats.map((c) => rows.filter((r) => r.category_id === c)), overall(rows)];
+      const rows = totals(results, { from: `${y}-01-01`, to: `${y}-12-01`, cats });
+      const catIds = [...new Set(rows.map((r) => r.category_id))];
+      const groups = [...catIds.map((c) => rows.filter((r) => r.category_id === c)), overall(rows, cats)];
       for (const g of groups) {
-        const top = Math.max(0, ...g.map((r) => r.points));
+        const top = Math.max(0, ...g.map((r) => r.value));
         if (top <= 0) continue;
-        for (const r of g) if (r.points === top) out.push({ year: y, category_id: r.category_id ?? null, user_id: r.user_id, points: top });
+        for (const r of g) if (r.value === top) out.push({ year: y, category_id: r.category_id ?? null, user_id: r.user_id, value: top });
       }
     }
     return out;
@@ -260,6 +268,13 @@
     if (cat?.challenge_type === 'tom_holland') return trn(v, '{n} Runde', '{n} Runden', { n: PTi18n.number(v) });
     return PTi18n.number(v);
   }
+  // „1.234 Reps“ für die Gesamtwertung
+  const formatReps = (value) => trn(value ?? 0, '{n} Rep', '{n} Reps', { n: PTi18n.number(value ?? 0) });
+  // Reps einer Person aus Wochen- oder Summenzeilen (ohne metric 'best')
+  const repsOf = (rows, cats = null) => {
+    const best = bestIds(cats);
+    return (rows || []).reduce((a, r) => a + (best.has(r.category_id) ? 0 : r.value || 0), 0);
+  };
   // „42 Liegestütze“, „0:12“, „2 Runden“ (für „noch … bis Platz 3“)
   function formatNeed(cat, need) {
     if (cat?.challenge_type === 'bring_sally_up' || cat?.challenge_type === 'tom_holland') return formatValue(cat, need);
@@ -279,7 +294,7 @@
     monthOf, addMonths, monthLabel, closeDeadline, daysLeft,
     weekOf, addWeeks, weekMonth, weekCloseDeadline, weekDaysLeft, startWeek, weekNumberOf, weekLabel, closedMonthsFromWeeks,
     monthValues, weekValues, rankBy, board, hypotheticalRank, gapAbove,
-    totals, overall, pointsTable, medalTable, seasonChampions,
-    formatValue, formatNeed,
+    totals, overall, medalTable, seasonChampions,
+    formatValue, formatNeed, formatReps, repsOf,
   };
 })();

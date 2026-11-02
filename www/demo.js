@@ -661,7 +661,7 @@
       // Wie die Migration weekly_ranking: Summen aus den abgeschlossenen Wochen
       async rankingTotals({ from = null, to = null } = {}) {
         const me = uid();
-        const rows = PTRanking.totals(visibleWeekResults(me), { from, to });
+        const rows = PTRanking.totals(visibleWeekResults(me), { from, to, cats: db.categories });
         return later(rows.map(r => ({ ...r, ...profileFields(me, r.user_id) })));
       },
       async rankingWeek(week) { return later(rankingWeek(uid(), week)); },
@@ -687,7 +687,8 @@
           .sort((a, b) => b.month.localeCompare(a.month) || a.rank - b.rank));
       },
       async seasonChampions() {
-        return later(PTRanking.seasonChampions(visibleWeekResults(uid()), PTRanking.closedMonthsFromWeeks(db.ranking_week_closures.map(c => c.week))));
+        return later(PTRanking.seasonChampions(visibleWeekResults(uid()),
+          PTRanking.closedMonthsFromWeeks(db.ranking_week_closures.map(c => c.week)), db.categories));
       },
       async closeDueMonths() {
         let n = 0;

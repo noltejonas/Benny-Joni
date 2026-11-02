@@ -276,8 +276,10 @@ test('Ranking-Mitteilungen in allen App-Sprachen', () => {
   assert.deepEqual(R.rankOvertakenAlert({ lang: 'sv', senderName: 'Benny', categoryName: 'Liegestütze', rank: 2 }), {
     title: '🏆 Topplista', body: 'Benny gick om dig. Du ligger nu på plats 2 i Armhävningar.',
   });
-  assert.equal(R.rankingTextFor('fi').points(40), '40 pistettä');
-  assert.equal(R.rankingTextFor('fi').points(1), '1 piste');
+  assert.equal(R.rankingTextFor('fi').reps(40).replace(/\s/g, ' '), '40 toistoa');
+  assert.equal(R.rankingTextFor('fi').reps(1), '1 toisto');
+  assert.equal(R.rankingTextFor('de').reps(1234), '1.234 Reps');
+  assert.equal(R.rankingTextFor('en').closedBody('🥇 Pull-ups', R.rankingTextFor('en').reps(1234)), '🥇 Pull-ups · 1,234 reps');
   assert.equal(R.rankingTextFor('fi').rounds(2), '2 kierrosta');
   assert.equal(R.rankingTextFor('sv').closedTitle('oktober'), '🏆 oktober är avslutad');
   assert.equal(R.rankingTextFor('sv').lastDayBody('12 Chins', 2), '12 Chins kvar till plats 2.');

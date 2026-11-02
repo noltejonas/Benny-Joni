@@ -89,49 +89,61 @@ test('Abstand nach oben und Platz ohne Wertung', () => {
   assert.equal(R.hypotheticalRank(rows, 120), 4);
 });
 
-test('Saison/Ewig: Summen, Gesamtwertung, Medaillenspiegel', () => {
+test('Saison/Ewig: Reps-Summen, Gesamtwertung, Medaillenspiegel', () => {
   const results = [
-    { month: '2026-11-01', category_id: 'push', user_id: 'a', points: 25, medal: 'gold' },
-    { month: '2026-11-01', category_id: 'push', user_id: 'b', points: 18, medal: 'silver' },
-    { month: '2026-11-01', category_id: 'th', user_id: 'b', points: 25, medal: 'gold' },
-    { month: '2026-12-01', category_id: 'push', user_id: 'a', points: 18, medal: 'silver' },
-    { month: '2026-12-01', category_id: 'push', user_id: 'b', points: 25, medal: 'gold' },
-    { month: '2027-01-01', category_id: 'push', user_id: 'c', points: 25, medal: 'gold' },
+    { month: '2026-11-01', category_id: 'push', user_id: 'a', value: 300, points: 25, medal: 'gold' },
+    { month: '2026-11-01', category_id: 'push', user_id: 'b', value: 200, points: 18, medal: 'silver' },
+    { month: '2026-11-01', category_id: 'th', user_id: 'b', value: 12, points: 25, medal: 'gold' },
+    { month: '2026-12-01', category_id: 'push', user_id: 'a', value: 250, points: 18, medal: 'silver' },
+    { month: '2026-12-01', category_id: 'push', user_id: 'b', value: 400, points: 25, medal: 'gold' },
+    { month: '2026-12-01', category_id: 'th', user_id: 'b', value: 9, points: 25, medal: 'gold' },
+    { month: '2027-01-01', category_id: 'push', user_id: 'c', value: 900, points: 25, medal: 'gold' },
   ];
-  const season = R.totals(results, { from: '2026-01-01', to: '2026-12-01' });
+  const season = R.totals(results, { from: '2026-01-01', to: '2026-12-01', cats });
   const a = season.find((r) => r.user_id === 'a');
-  assert.deepEqual(plain([a.points, a.gold, a.silver, a.months]), [43, 1, 1, 2]);
-  const all = R.overall(R.totals(results));
-  const table = R.pointsTable(all);
-  assert.deepEqual(plain(table.map((r) => [r.user_id, r.points, r.rank])), [['b', 68, 1], ['a', 43, 2], ['c', 25, 3]]);
+  assert.deepEqual(plain([a.value, a.gold, a.silver, a.months]), [550, 1, 1, 2]);
+  // metric 'best': der beste Wochenwert, keine Summe
+  assert.equal(season.find((r) => r.user_id === 'b' && r.category_id === 'th').value, 12);
+  // Gesamt: nur volume-Übungen, Runden zählen nicht mit
+  const all = R.overall(R.totals(results, { cats }), cats);
+  const table = R.rankBy(all, 'value');
+  assert.deepEqual(plain(table.map((r) => [r.user_id, r.value, r.rank])), [['c', 900, 1], ['b', 600, 2], ['a', 550, 3]]);
   const medals = R.medalTable(all);
   assert.deepEqual(plain(medals.map((r) => r.user_id)), ['b', 'a', 'c']);
-  assert.deepEqual(plain([medals[0].gold, medals[0].silver]), [2, 1]);
+  assert.deepEqual(plain([medals[0].gold, medals[0].silver]), [3, 1]);
 });
 
-test('Gesamtwertung eines Monats leitet Medaillen aus dem Platz ab', () => {
+test('Gesamtwertung einer Woche: Reps ohne best-Übungen, Medaillen aus dem Platz', () => {
   const rows = [
-    { category_id: 'push', user_id: 'a', rank: 1, points: 25 },
-    { category_id: 'th', user_id: 'a', rank: 3, points: 15 },
-    { category_id: 'push', user_id: 'b', rank: 2, points: 18 },
-    { category_id: 'th', user_id: 'b', rank: 11, points: 0 },
+    { category_id: 'push', user_id: 'a', rank: 1, value: 120 },
+    { category_id: 'th', user_id: 'a', rank: 3, value: 14 },
+    { category_id: 'push', user_id: 'b', rank: 2, value: 80 },
+    { category_id: 'sally', user_id: 'b', rank: 11, value: 204 },
   ];
-  const a = R.overall(rows).find((r) => r.user_id === 'a');
-  assert.deepEqual(plain([a.points, a.gold, a.silver, a.bronze]), [40, 1, 0, 1]);
+  const all = R.overall(rows, cats);
+  const a = all.find((r) => r.user_id === 'a');
+  assert.deepEqual(plain([a.value, a.gold, a.silver, a.bronze]), [120, 1, 0, 1]);
   assert.equal(a.rank, undefined, 'Platz wird erst in der Gesamtliste vergeben');
+  assert.equal(all.find((r) => r.user_id === 'b').value, 80, 'Sekunden zählen nicht als Reps');
+  assert.equal(R.repsOf(rows.filter((r) => r.user_id === 'b'), cats), 80);
+  // Ohne Übungsliste zählt alles
+  assert.equal(R.overall(rows).find((r) => r.user_id === 'b').value, 284);
 });
 
-test('Saisonsieger erst nach abgeschlossenem Dezember, auch gesamt', () => {
+test('Saisonsieger nach Reps erst nach abgeschlossenem Dezember, auch gesamt', () => {
   const results = [
-    { month: '2026-11-01', category_id: 'push', user_id: 'a', points: 25, medal: 'gold' },
-    { month: '2026-12-01', category_id: 'push', user_id: 'b', points: 25, medal: 'gold' },
-    { month: '2026-12-01', category_id: 'th', user_id: 'b', points: 25, medal: 'gold' },
+    { month: '2026-11-01', category_id: 'push', user_id: 'a', value: 500 },
+    { month: '2026-12-01', category_id: 'push', user_id: 'b', value: 500 },
+    { month: '2026-12-01', category_id: 'th', user_id: 'b', value: 30 },
+    { month: '2026-12-01', category_id: 'th', user_id: 'a', value: 20 },
   ];
-  assert.deepEqual(plain(R.seasonChampions(results, ['2026-11-01'])), []);
-  const champs = R.seasonChampions(results, ['2026-11-01', '2026-12-01']);
+  assert.deepEqual(plain(R.seasonChampions(results, ['2026-11-01'], cats)), []);
+  const champs = R.seasonChampions(results, ['2026-11-01', '2026-12-01'], cats);
   const push = champs.filter((c) => c.category_id === 'push').map((c) => c.user_id).sort();
   assert.deepEqual(plain(push), ['a', 'b'], 'Gleichstand: beide Sieger');
-  assert.deepEqual(plain(champs.find((c) => c.category_id === null)), { year: 2026, category_id: null, user_id: 'b', points: 50 });
+  // Gesamt ohne Runden: Gleichstand bei 500
+  assert.deepEqual(plain(champs.filter((c) => c.category_id === null).map((c) => c.user_id).sort()), ['a', 'b']);
+  assert.deepEqual(plain(champs.find((c) => c.category_id === 'th')), { year: 2026, category_id: 'th', user_id: 'b', value: 30 });
 });
 
 test('Monate: Beschriftung, Wechsel, Abschluss, Resttage', () => {
@@ -149,6 +161,7 @@ test('Werte anzeigen', () => {
   assert.equal(R.formatValue(cats[1], 204), '3:24');
   assert.equal(R.formatValue(cats[2], 1), '1 Runde');
   assert.equal(R.formatNeed(cats[0], 42), '42 Liegestütze');
+  assert.equal(R.formatReps(1234), '1.234 Reps');
 });
 
 test('Wochen: Montag, Wechsel, Monat des Donnerstags, Abschluss, Resttage', () => {
@@ -180,13 +193,13 @@ test('Wochenwert und Summen aus Wochen nach Monat', () => {
   const v = plain(R.weekValues({ sets, categories: cats, week: '2026-10-19' }));
   assert.deepEqual(v.map((r) => [r.user_id, r.value]), [['a', 80]]);
   const results = [
-    { week: '2026-10-19', category_id: 'push', user_id: 'a', points: 25, medal: 'gold' },
-    { week: '2026-10-26', category_id: 'push', user_id: 'a', points: 18, medal: 'silver' },
-    { week: '2026-11-02', category_id: 'push', user_id: 'a', points: 25, medal: 'gold' },
+    { week: '2026-10-19', category_id: 'push', user_id: 'a', value: 80, points: 25, medal: 'gold' },
+    { week: '2026-10-26', category_id: 'push', user_id: 'a', value: 120, points: 18, medal: 'silver' },
+    { week: '2026-11-02', category_id: 'push', user_id: 'a', value: 100, points: 25, medal: 'gold' },
   ];
   const oct = plain(R.totals(results, { from: OCT, to: OCT }));
-  assert.deepEqual([oct[0].points, oct[0].gold, oct[0].silver, oct[0].months], [43, 1, 1, 2]);
-  assert.equal(R.totals(results)[0].points, 68);
+  assert.deepEqual([oct[0].value, oct[0].gold, oct[0].silver, oct[0].months], [200, 1, 1, 2]);
+  assert.equal(R.totals(results)[0].value, 300);
   assert.deepEqual(plain(R.closedMonthsFromWeeks(['2026-12-21', '2026-12-28'])), ['2026-12-01']);
   assert.deepEqual(plain(R.closedMonthsFromWeeks(['2026-12-21'])), []);
 });

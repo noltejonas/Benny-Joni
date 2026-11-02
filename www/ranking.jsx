@@ -15,7 +15,8 @@ function useSessionPref(key, fallback) {
 
 const rkName = (row) => (row.blocked ? tr('Ausgeblendet') : row.display_name || tr('Unbekannt'));
 const rkProfile = (row) => ({ id: row.user_id, display_name: row.display_name, avatar_url: row.avatar_url, color: row.color });
-const rkPts = (n) => tr('{n} P.', { n: PTi18n.number(n || 0) });
+// Wert einer Zeile: pro Übung im Format der Übung, gesamt als Reps
+const rkScore = (cat, value) => (cat ? PTRanking.formatValue(cat, value) : PTRanking.formatReps(value));
 const rkDate = (d) => PTi18n.date(d, { day: 'numeric', month: 'numeric' });
 
 function RankingAvatar({ row, size = 36 }) {
@@ -52,7 +53,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const [viewPref, setView] = useSessionPref('pt_rk_view', 'week');
   const [catKey, setCatKey] = useSessionPref('pt_rk_cat', 'all');
   const [filter, setFilter] = useSessionPref('pt_rk_filter', 'all');
-  const [sortBy, setSortBy] = React.useState('points');
+  const [sortBy, setSortBy] = React.useState('reps');
   const [month, setMonth] = React.useState(nowMonth);
   const [week, setWeek] = React.useState(nowWeek);
   const [liveRows, setLiveRows] = React.useState(null);
@@ -162,29 +163,30 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const deadline = weekly ? R.weekCloseDeadline(week) : R.closeDeadline(month);
   const counts = weekly ? week >= startWeek : month >= startMonth;  // vor dem Start: Probelauf
   // Medaillen gibt es erst mit dem Abschluss (Woche: Montag 12 Uhr, Monat:
-  // 2. des Folgemonats 12 Uhr); bis dahin sind Plätze und Punkte vorläufig.
+  // 2. des Folgemonats 12 Uhr); bis dahin sind die Plätze vorläufig.
   const closed = !isLive || (counts && new Date() >= deadline);
   const loading = isLive ? !liveRows : !totals[totalsKey];
   const peopleIds = people ? new Set(people.map(p => p.id)) : null;
   const mineOf = (r) => (peopleIds ? r.is_me || peopleIds.has(r.user_id) : r.is_mine);
 
   // ── Zeilen der aktuellen Ansicht ──
+  // Geordnet wird nach Reps: pro Übung ihr Wert, gesamt alle volume-Übungen
+  // zusammen (PTRanking.overall). Sekunden und Runden zählen nur in ihrer Liste.
   let rows = [];
   let myHypo = null;
   if (isLive && liveRows) {
     const counted = liveRows.filter(r => r.counted);
     if (cat) {
-      rows = counted.filter(r => r.category_id === cat.id).map(r => ({ ...r, score: r.value }));
+      rows = counted.filter(r => r.category_id === cat.id);
       myHypo = liveRows.find(r => !r.counted && r.category_id === cat.id) || null;
     } else {
-      // Laufend: Punkte zählen, aber noch keine Medaillen
-      rows = R.overall(closed ? counted : counted.map(r => ({ ...r, rank: null, medal: null })))
-        .filter(r => r.points > 0).map(r => ({ ...r, score: r.points }));
+      // Laufend: noch keine Medaillen
+      rows = R.overall(closed ? counted : counted.map(r => ({ ...r, rank: null, medal: null })), cats);
     }
   } else if (!isLive && totals[totalsKey]) {
-    const base = cat ? totals[totalsKey].filter(r => r.category_id === cat.id) : R.overall(totals[totalsKey]);
-    rows = base.filter(r => r.points > 0).map(r => ({ ...r, score: r.points }));
+    rows = cat ? totals[totalsKey].filter(r => r.category_id === cat.id) : R.overall(totals[totalsKey], cats);
   }
+  rows = rows.filter(r => r.value > 0).map(r => ({ ...r, score: r.value }));
   rows = rows.map(r => ({ ...r, is_mine: mineOf(r) }));
   const globalRank = {};
   for (const r of R.rankBy(rows, 'score')) globalRank[r.user_id] = r.rank;
@@ -208,9 +210,9 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
     } else periodNote = !counts ? tr('Nicht gewertet') : tr('Abgeschlossen');
   } else if (view === 'month') {
     const n = weeksIn(month);
-    periodNote = n ? trn(n, 'Punkte aus {n} abgeschlossenen Woche', 'Punkte aus {n} abgeschlossenen Wochen') : tr('Noch keine Woche abgeschlossen');
-  } else if (view === 'season') periodNote = tr('Punkte {year}', { year: new Date().getFullYear() });
-  else periodNote = tr('Alle Punkte seit dem Start');
+    periodNote = n ? trn(n, 'Aus {n} abgeschlossenen Woche', 'Aus {n} abgeschlossenen Wochen') : tr('Noch keine Woche abgeschlossen');
+  } else if (view === 'season') periodNote = tr('Abgeschlossene Wochen {year}', { year: new Date().getFullYear() });
+  else periodNote = tr('Alle abgeschlossenen Wochen seit dem Start');
 
   // ── Eigene Lage (Werte-Ansicht, eine Übung) ──
   let myLine = null;
@@ -228,11 +230,11 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
 
   const emptyText = isLive
     ? (weekly
-      ? (cat ? tr('Diese Woche hat noch niemand {name} eingetragen.', { name: cat.name }) : tr('Diese Woche gibt es noch keine Punkte.'))
-      : (cat ? tr('Diesen Monat hat noch niemand {name} eingetragen.', { name: cat.name }) : tr('Diesen Monat gibt es noch keine Punkte.')))
+      ? (cat ? tr('Diese Woche hat noch niemand {name} eingetragen.', { name: cat.name }) : tr('Diese Woche hat noch niemand etwas eingetragen.'))
+      : (cat ? tr('Diesen Monat hat noch niemand {name} eingetragen.', { name: cat.name }) : tr('Diesen Monat hat noch niemand etwas eingetragen.')))
     : weekly
-      ? tr('Punkte und Medaillen gibt es, sobald eine Woche abgeschlossen ist (montags um 12 Uhr, erstmals am {date}).', { date: rkDate(R.weekCloseDeadline(startWeek)) })
-      : tr('Punkte gibt es, sobald ein Monat abgeschlossen ist (am 2. des Folgemonats, erstmals am {date}).', { date: rkDate(R.closeDeadline(startMonth)) });
+      ? tr('Hier zählen die abgeschlossenen Wochen (Abschluss montags um 12 Uhr, erstmals am {date}).', { date: rkDate(R.weekCloseDeadline(startWeek)) })
+      : tr('Hier zählen die abgeschlossenen Monate (Abschluss am 2. des Folgemonats, erstmals am {date}).', { date: rkDate(R.closeDeadline(startMonth)) });
 
   const onOpenRow = (r) => setCard({ ...r, category_id: cat?.id || null });
   // Wer gehört zu meinen Leuten, macht aber nicht mit?
@@ -304,7 +306,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
 
       {!isLive && view !== 'month' && (
         <div className="segmented rk-sort">
-          <button className={sortBy === 'points' ? 'active' : ''} onClick={() => setSortBy('points')}>{tr('Punkte')}</button>
+          <button className={sortBy === 'reps' ? 'active' : ''} onClick={() => setSortBy('reps')}>{tr('Reps')}</button>
           <button className={sortBy === 'medals' ? 'active' : ''} onClick={() => setSortBy('medals')}>{tr('Medaillenspiegel')}</button>
         </div>
       )}
@@ -374,15 +376,14 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
           {isLive && !closed && counts && (
             <div className="rk-info-item"><Icon name="timer" size={18} />
               <span>{weekly
-                ? tr('Läuft noch: Plätze und Punkte sind vorläufig. Die Medaillen der Woche gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })
-                : tr('Läuft noch: Plätze und Punkte sind vorläufig. Medaillen gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })}</span>
+                ? tr('Läuft noch: Die Plätze sind vorläufig. Die Medaillen der Woche gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })
+                : tr('Läuft noch: Die Plätze sind vorläufig. Medaillen gibt es mit dem Abschluss am {date} um {time}.', { date: rkDate(deadline), time: PTi18n.time(deadline) })}</span>
             </div>
           )}
-          {weekly && !isLive && (
-            <div className="rk-info-item"><Icon name="trophy" size={18} />
-              <span>{tr('Jede Woche gibt es pro Übung Medaillen für die Plätze 1–3 und Punkte für die Top 10. Hier stehen die abgeschlossenen Wochen zusammengezählt.')}</span>
-            </div>
-          )}
+          <div className="rk-info-item"><Icon name="trophy" size={18} />
+            <span>{tr('Es zählen Wiederholungen: pro Übung deine Summe, bei „Gesamt“ alle Übungen zusammen. Bei Bring Sally Up und dem AMRAP zählt dein bester Durchgang, nur in ihrer eigenen Liste.')}
+              {' '}{weekly ? tr('Medaillen gibt es jede Woche pro Übung für die Plätze 1–3.') : tr('Medaillen gibt es jeden Monat pro Übung für die Plätze 1–3.')}</span>
+          </div>
           <div className="rk-info-item"><Icon name="users" size={18} />
             <span>
               {people
@@ -405,8 +406,9 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
 }
 
 function RankingRow({ r, cat, live, closed = true, globalRank, onOpen }) {
-  // Werte-Ansicht (Woche bzw. Monat) mit Übung: nach Wert, sonst nach Punkten mit
-  // Medaillen. Medaillen erst nach dem Abschluss, vorher nur der (vorläufige) Platz.
+  // Werte-Ansicht (Woche bzw. Monat) mit Übung: Platz mit Medaille, sonst die
+  // gesammelten Medaillen. Medaillen erst nach dem Abschluss, vorher nur der
+  // (vorläufige) Platz. Rechts immer der Wert (pro Übung) bzw. die Reps (gesamt).
   const byValue = live && !!cat;
   return (
     <li className={`rk-row ${r.is_me ? 'is-me' : ''}`} data-me={r.is_me ? '1' : undefined}>
@@ -424,8 +426,7 @@ function RankingRow({ r, cat, live, closed = true, globalRank, onOpen }) {
           )}
         </span>
         <span className="rk-score">
-          <b className="mono">{byValue ? PTRanking.formatValue(cat, r.value) : rkPts(r.points)}</b>
-          {byValue && r.points > 0 && <small className="mono">{rkPts(r.points)}</small>}
+          <b className="mono">{rkScore(cat, r.value)}</b>
         </span>
       </button>
     </li>
@@ -446,9 +447,9 @@ function RankingStickyMe({ r, cat, live, line }) {
     window.addEventListener('scroll', check, { passive: true });
     window.addEventListener('resize', check);
     return () => { window.removeEventListener('scroll', check); window.removeEventListener('resize', check); };
-  }, [r.rank, r.value, r.points, live, cat?.id]);
+  }, [r.rank, r.value, live, cat?.id]);
   if (hidden) return null;
-  const main = live && cat ? PTRanking.formatValue(cat, r.value) : rkPts(r.points);
+  const main = rkScore(cat, r.value);
   return (
     <div className="rk-sticky" aria-hidden="true">
       <span className="rk-rank">{r.rank}</span>
@@ -545,9 +546,9 @@ function RankingLogSheet({ api, cat, onClose, onLogged }) {
 }
 
 // ─── Profilkarte ────────────────────────────────────────────────────────────
-// Trophäenschrank: Medaillen und Punkte aus abgeschlossenen Monaten (dieselben
-// Zahlen wie Saison und Ewig), nach Monat gruppiert, dazu Pokale. live: Zeilen
-// dieser Person im laufenden Monat, nur als „vorläufig“ (noch keine Medaille).
+// Trophäenschrank: Top-10-Plätze und Medaillen aus abgeschlossenen Wochen (bzw.
+// Monaten), nach Monat gruppiert, dazu Pokale. live: Zeilen dieser Person im
+// laufenden Zeitraum, nur als „vorläufig“ (noch keine Medaille).
 function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, month, live = [], liveLabel, onClose, onChanged, onToast }) {
   const [medals, setMedals] = React.useState(null);
   const [reportOpen, setReportOpen] = React.useState(false);
@@ -567,7 +568,6 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
   }, [api, row.user_id, weekly]);
 
   const cups = champions.filter(c => c.user_id === row.user_id);
-  const total = (medals || []).reduce((a, m) => a + (m.points || 0), 0);
   const count = (k) => (medals || []).filter(m => m.medal === k).length;
 
   async function report(reason) {
@@ -597,7 +597,9 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
         <RankingAvatar row={row} size={64} />
         <div>
           <div className="rk-card-name">{isMe ? tr('{name} (du)', { name: row.display_name }) : rkName(row)}</div>
-          <div className="rk-card-sub">{medals ? (weekly ? tr('{points} aus abgeschlossenen Wochen', { points: rkPts(total) }) : tr('{points} aus abgeschlossenen Monaten', { points: rkPts(total) })) : '…'}</div>
+          <div className="rk-card-sub">{medals ? (weekly
+            ? trn(medals.length, '{n} Top-10-Platz aus abgeschlossenen Wochen', '{n} Top-10-Plätze aus abgeschlossenen Wochen')
+            : trn(medals.length, '{n} Top-10-Platz aus abgeschlossenen Monaten', '{n} Top-10-Plätze aus abgeschlossenen Monaten')) : '…'}</div>
         </div>
       </div>
 
@@ -628,9 +630,9 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
                   <span className="rk-trophy-medal is-live">{m.rank}.</span>
                   <span className="rk-trophy-text">
                     <b>{c ? c.name : tr('Übung')}</b>
-                    <span>{tr('vorläufig')} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
+                    <span>{tr('vorläufig')}</span>
                   </span>
-                  <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>
+                  <span className="mono rk-trophy-pts">{c ? PTRanking.formatValue(c, m.value) : m.value}</span>
                 </li>
               );
             })}
@@ -640,7 +642,9 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
 
       <div className="label rk-card-label">{tr('Trophäenschrank')}</div>
       {medals === null ? <div className="rk-empty">…</div>
-        : medals.length === 0 ? <div className="rk-empty">{isMe ? (weekly ? tr('Noch keine Punkte. Die erste abgeschlossene Woche bringt welche.') : tr('Noch keine Punkte. Der erste abgeschlossene Monat bringt welche.')) : tr('Noch keine Punkte.')}</div>
+        : medals.length === 0 ? <div className="rk-empty">{isMe
+          ? (weekly ? tr('Noch leer. Hier landen deine Top-10-Plätze aus abgeschlossenen Wochen.') : tr('Noch leer. Hier landen deine Top-10-Plätze aus abgeschlossenen Monaten.'))
+          : tr('Noch keine Top-10-Platzierung.')}</div>
         : (
           <div className="rk-shelves">
             {[...new Set(medals.map(m => m.month))].map(mon => {
@@ -650,7 +654,7 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
                 <div key={mon} className="rk-shelf">
                   <div className="rk-shelf-head">
                     <b>{PTRanking.monthLabel(mon)}</b>
-                    <span className="mono">{items.filter(m => m.rank <= 3).map(m => RK_MEDAL[m.rank]).join('')} {rkPts(items.reduce((a, m) => a + (m.points || 0), 0))}</span>
+                    <span className="mono">{items.filter(m => m.rank <= 3).map(m => RK_MEDAL[m.rank]).join('')}</span>
                   </div>
                   <ul className="rk-trophies">
                     {items.map((m, i) => {
@@ -660,9 +664,9 @@ function RankingCardSheet({ api, me, row, cats, champions = [], weekly = false, 
                           <span className="rk-trophy-medal">{RK_MEDAL[m.rank] || `${m.rank}.`}</span>
                           <span className="rk-trophy-text">
                             <b>{c ? c.name : tr('Übung')}</b>
-                            <span>{m.week ? `${tr('KW {week}', { week: PTRanking.weekNumberOf(m.week) })} · ` : ''}{tr('Platz {rank}', { rank: m.rank })} · {c ? PTRanking.formatValue(c, m.value) : m.value}</span>
+                            <span>{m.week ? `${tr('KW {week}', { week: PTRanking.weekNumberOf(m.week) })} · ` : ''}{tr('Platz {rank}', { rank: m.rank })}</span>
                           </span>
-                          <span className="mono rk-trophy-pts">{rkPts(m.points)}</span>
+                          <span className="mono rk-trophy-pts">{c ? PTRanking.formatValue(c, m.value) : m.value}</span>
                         </li>
                       );
                     })}
@@ -719,14 +723,15 @@ function lastClosedWeek(settings, now = new Date()) {
 }
 
 // item: { month, rows, cats, label? } (label z. B. „KW 43 · 19.–25.10.“)
+// Reihenfolge nach Reps (ohne Sekunden und Runden), dazu die besten Plätze.
 function MonthRecapCard({ item, me }) {
   const { month, rows, cats } = item;
   const label = item.label || PTRanking.monthLabel(month);
   const catById = Object.fromEntries(cats.map(c => [c.id, c]));
   const byUser = {};
-  for (const r of rows) (byUser[r.user_id] ||= { ...r, items: [], points: 0 }).items.push(r);
-  for (const u of Object.values(byUser)) u.points = u.items.reduce((a, r) => a + r.points, 0);
-  const people = Object.values(byUser).sort((a, b) => b.points - a.points);
+  for (const r of rows) (byUser[r.user_id] ||= { ...r, items: [], reps: 0 }).items.push(r);
+  for (const u of Object.values(byUser)) u.reps = PTRanking.repsOf(u.items, cats);
+  const people = Object.values(byUser).sort((a, b) => b.reps - a.reps);
   return (
     <section className="card rk-recap" aria-label={tr('Rangliste · {month}', { month: label })}>
       <div className="stats-head"><span className="label">{tr('Rangliste · {month}', { month: label })}</span><span className="rk-recap-icon">🏆</span></div>
@@ -739,7 +744,7 @@ function MonthRecapCard({ item, me }) {
               <span>{u.items.sort((a, b) => a.rank - b.rank).slice(0, 3)
                 .map(r => `${RK_MEDAL[r.rank] || `${r.rank}.`} ${catById[r.category_id]?.name || ''}`).join(' · ')}</span>
             </span>
-            <b className="mono">{rkPts(u.points)}</b>
+            <b className="mono">{PTRanking.formatReps(u.reps)}</b>
           </li>
         ))}
       </ul>
