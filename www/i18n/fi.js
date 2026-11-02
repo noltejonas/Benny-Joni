@@ -43,6 +43,7 @@ PTi18n.add('fi', {
     "one": "Haaste käynnistetty – menoksi!",
     "other": "{n} haastetta käynnistetty – menoksi!"
   },
+  "Diese Woche läuft schon.": "Tämä viikko on jo käynnissä.",
   "{name} ist dabei 🎉": "{name} on mukana 🎉",
   "Jemand": "Joku",
   "{name} hat geliefert": "{name} teki osansa",

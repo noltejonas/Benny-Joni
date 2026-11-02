@@ -37,6 +37,7 @@ PTi18n.add('en', {
   'Alles klar. Geht auch später in den Einstellungen.': 'Got it. You can turn them on later in settings.',
   'Woche fixiert – los geht\'s, {name}!': 'Week locked in – let’s go, {name}!',
   '{n} Challenges gestartet – los geht’s!': { one: 'Challenge started – let’s go!', other: '{n} challenges started – let’s go!' },
+  'Diese Woche läuft schon.': 'This week is already running.',
   '{name} ist dabei 🎉': '{name} is in 🎉',
   'Jemand': 'Someone',
   '{name} hat geliefert': '{name} delivered',

@@ -43,6 +43,7 @@ PTi18n.add('sv', {
     "one": "Utmaningen har startat – nu kör vi!",
     "other": "{n} utmaningar har startat – nu kör vi!"
   },
+  "Diese Woche läuft schon.": "Den här veckan är redan igång.",
   "{name} ist dabei 🎉": "{name} är med 🎉",
   "Jemand": "Någon",
   "{name} hat geliefert": "{name} har levererat",

@@ -1199,12 +1199,14 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   }
   // picks: [{ competition_id, goals: [{ category_id, target_reps, target_runs }] }].
   // Jede Challenge für sich: klappt eine nicht, sind die anderen trotzdem gestartet.
+  // Hat jemand anderes die Woche inzwischen gestartet, kommt nichts dazu.
   async function restartWeek(picks) {
     const failed = [];
-    let started = 0;
+    let started = 0, running = 0;
     await Promise.all(picks.map(async (p) => {
       const a = apiFor(p.competition_id);
       try {
+        if ((await a.getChallengeForWeek(weekStart)).length) { running++; return; }
         for (const g of p.goals) {
           await a.upsertChallenge({ week_start: weekStart, category_id: g.category_id, chosen_by: me,
             target_reps: g.target_reps, target_runs: g.target_runs });
@@ -1218,7 +1220,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
     // Abgewählte Challenges bleiben bewusst offen: Karte für diese Woche ausblenden
     dismissRestart();
     PTHaptics.tap();
-    setToast(trn(started, 'Challenge gestartet – los geht’s!', '{n} Challenges gestartet – los geht’s!'));
+    setToast(started ? trn(started, 'Challenge gestartet – los geht’s!', '{n} Challenges gestartet – los geht’s!')
+      : tr('Diese Woche läuft schon.'));
   }
   const daysLeftNow = 7 - PTDashboard.dayIndexInWeek(weekStart);
 
