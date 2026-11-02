@@ -1110,7 +1110,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         const [rows, cats] = await Promise.all([weekly ? api.rankingWeek(week) : api.rankingMonth(month), api.getRankedCategories()]);
         if (off || !rows) return;
         const ids = new Set(memberKey.split(','));
-        const mine = rows.filter(r => r.counted && r.points > 0 && ids.has(r.user_id));
+        // Alle Einträge meiner Leute (nicht nur Top 10): die Feed-Karte ordnet nach Reps
+        const mine = rows.filter(r => r.counted && r.value > 0 && ids.has(r.user_id));
         setMonthRecap(!mine.length ? null : weekly
           ? { kind: 'month', id: `week-${week}`, month: R.weekMonth(week), label: R.weekLabel(week), rows: mine, cats,
             created_at: R.weekCloseDeadline(week).toISOString() }
@@ -1127,9 +1128,9 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             key,
             hero: weekly ? (gold ? tr('WOCHEN{br}GOLD', { br: <br/> }) : tr('PODIUM'))
               : (gold ? tr('MONATS{br}SIEG', { br: <br/> }) : tr('PODIUM')),
-            points: rows.filter(r => r.user_id === me && r.counted).reduce((a, r) => a + r.points, 0),
-            counterLabel: weekly ? tr('Punkte in KW {week}', { week: R.weekNumberOf(week) })
-              : tr('Punkte im {month}', { month: R.monthLabel(month, false) }),
+            reps: R.repsOf(rows.filter(r => r.user_id === me && r.counted), cats),
+            counterLabel: weekly ? tr('Reps in KW {week}', { week: R.weekNumberOf(week) })
+              : tr('Reps im {month}', { month: R.monthLabel(month, false) }),
             subtext: medals.slice(0, 3).map(r => `${emoji[r.rank]} ${catById[r.category_id]?.name || ''}`).join(' · ')
               + (medals.length > 3 ? ` · +${medals.length - 3}` : ''),
           });
@@ -2208,7 +2209,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       )}
 
       {medalCelebration && (
-        <CelebrationOverlay targetReps={medalCelebration.points}
+        <CelebrationOverlay targetReps={medalCelebration.reps}
           hero={medalCelebration.hero} counterLabel={medalCelebration.counterLabel}
           subtext={medalCelebration.subtext}
           onDone={() => { try { localStorage.setItem(medalCelebration.key, '1'); } catch (e) {} setMedalCelebration(null); }} />

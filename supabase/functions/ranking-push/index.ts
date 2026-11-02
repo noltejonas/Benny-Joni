@@ -5,8 +5,9 @@
 //
 // 1. Fällige Wochen abschließen (close_due_weeks, wie der pg_cron-Job; ohne
 //    Migration close_due_months).
-// 2. Abschluss (bis 48 h danach): „KW 43: 🥇 Klimmzüge · 🥉 Dips · 40 Punkte“
-//    an alle mit Punkten, einmal pro Woche bzw. Monat.
+// 2. Abschluss (bis 48 h danach): „KW 43: 🥇 Klimmzüge · 🥉 Dips · 1.234 Reps“
+//    an alle mit einem Top-10-Platz, einmal pro Woche bzw. Monat. Reps: alle
+//    eigenen Werte der volume-Übungen (Sekunden und Runden zählen nicht).
 // 3. Sonntag (bzw. letzter Tag des Monats) ab 18 Uhr: „Dir fehlen 18 Liegestütze
 //    bis Platz 2“, einmal pro Person, nur wenn der Abstand höchstens 20 % des
 //    eigenen Werts ist.
@@ -30,7 +31,7 @@ const LAST_DAY_MAX_GAP = 0.2;
 
 interface Category { id: string; name: string; challenge_type: string; metric: string }
 interface LiveRow { category_id: string; user_id: string; value: number; rank: number; points: number }
-interface ResultRow { category_id: string; user_id: string; rank: number; points: number; medal: string | null }
+interface ResultRow { category_id: string; user_id: string; rank: number; points: number; medal: string | null; value: number | null }
 
 // Vergleich in konstanter Zeit, damit die Antwortzeit nichts über das Secret verrät
 function sameSecret(given: string, expected: string): boolean {
@@ -160,7 +161,18 @@ class Pusher {
   }
 }
 
-// Ergebnis-Push an alle mit Punkten in einem abgeschlossenen Zeitraum
+// Alle Zeilen einer Abfrage, in Seiten zu 1000 (Grenze von PostgREST)
+async function allRows<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await page(from, from + 999);
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+// Ergebnis-Push an alle mit einem Top-10-Platz in einem abgeschlossenen Zeitraum.
+// results: alle Zeilen des Zeitraums, damit die Reps vollständig sind.
 async function closedPush(
   supabase: SupabaseClient, push: Pusher, catById: Record<string, Category>, results: ResultRow[],
   kind: string, day: string, title: (t: Text) => string, extra: Record<string, unknown>,
@@ -168,16 +180,17 @@ async function closedPush(
   const out: Record<string, unknown>[] = [];
   const byUser: Record<string, ResultRow[]> = {};
   for (const r of results) (byUser[r.user_id] ||= []).push(r);
+  for (const [userId, rows] of Object.entries(byUser)) if (!rows.some((r) => r.points > 0)) delete byUser[userId];
   const langs = await languagesOf(supabase, Object.keys(byUser));
   for (const [userId, rows] of Object.entries(byUser)) {
     const t = rankingTextFor(langs[userId]);
     rows.sort((a, b) => a.rank - b.rank);
-    const points = rows.reduce((a, r) => a + r.points, 0);
+    const reps = rows.reduce((a, r) => a + (catById[r.category_id]?.metric === "best" ? 0 : r.value ?? 0), 0);
     const medals = rows.filter((r) => r.medal).slice(0, 3)
       .map((r) => `${MEDAL[r.medal!]} ${t.category(catById[r.category_id]?.name ?? "")}`);
     out.push(await push.once(userId, kind, day, {
       aps: {
-        alert: { title: title(t), body: t.closedBody(medals.join(" · "), t.points(points)) },
+        alert: { title: title(t), body: t.closedBody(medals.join(" · "), t.reps(reps)) },
         sound: "default",
       },
       kind, ...extra,
@@ -191,9 +204,9 @@ async function weekClosedPush(supabase: SupabaseClient, push: Pusher, catById: R
   const { data: closures } = await supabase.from("ranking_week_closures").select("week").gte("closed_at", since);
   const out: Record<string, unknown>[] = [];
   for (const { week } of closures ?? []) {
-    const { data } = await supabase.from("weekly_results").select("category_id, user_id, rank, points, medal")
-      .eq("week", week).gt("points", 0);
-    out.push(...await closedPush(supabase, push, catById, (data ?? []) as ResultRow[],
+    const rows = await allRows<ResultRow>((a, b) => supabase.from("weekly_results")
+      .select("category_id, user_id, rank, points, medal, value").eq("week", week).order("user_id").order("category_id").range(a, b));
+    out.push(...await closedPush(supabase, push, catById, rows,
       "week_closed", week, (t) => t.weekTitle(weekNumber(week)), { week }));
   }
   return out;
@@ -204,9 +217,9 @@ async function monthClosedPush(supabase: SupabaseClient, push: Pusher, catById: 
   const { data: closures } = await supabase.from("month_closures").select("month").gte("closed_at", since);
   const out: Record<string, unknown>[] = [];
   for (const { month } of closures ?? []) {
-    const { data } = await supabase.from("monthly_results").select("category_id, user_id, rank, points, medal")
-      .eq("month", month).gt("points", 0);
-    out.push(...await closedPush(supabase, push, catById, (data ?? []) as ResultRow[],
+    const rows = await allRows<ResultRow>((a, b) => supabase.from("monthly_results")
+      .select("category_id, user_id, rank, points, medal, value").eq("month", month).order("user_id").order("category_id").range(a, b));
+    out.push(...await closedPush(supabase, push, catById, rows,
       "month_closed", month, (t) => t.closedTitle(monthName(t, month)), { month }));
   }
   return out;

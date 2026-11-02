@@ -865,7 +865,11 @@
       async rankingProfile(userId) {
         return check(await client.rpc('ranking_profile', { p_user: userId })) || [];
       },
+      // Saisonsieger nach Reps (Migration ranking_reps); ohne sie die nach Punkten
       async seasonChampions() {
+        const { data, error } = await client.rpc('season_champions_reps');
+        if (!error) return data || [];
+        if (!missingRpc(error)) throw friendlyError(error);
         return check(await client.rpc('season_champions')) || [];
       },
       // ── Wochenwertung (Migration weekly_ranking) ─────────────────────
