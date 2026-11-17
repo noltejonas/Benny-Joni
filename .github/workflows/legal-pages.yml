@@ -1,15 +1,27 @@
-# Veröffentlicht NUR docs/launch/site (Start, Datenschutz, Impressum,
-# Nutzungsbedingungen, Support und die leere, login-geschützte Live-Übersicht)
-# auf GitHub Pages. Nutzerdaten werden erst nach der Adminprüfung geladen:
+# Prüft die öffentliche Website aus docs/launch/site (Start, Datenschutz,
+# Impressum, Nutzungsbedingungen, Support, Einladungsseite join/ und die leere,
+# login-geschützte Live-Übersicht). Er veröffentlicht NICHT.
+#
+# Veröffentlicht wird über das Hosting-Repo noltejonas/noltejonas.github.io:
+# Der Ordner Benny-Joni/ dort ist eine Kopie von docs/launch/site, GitHub Pages
+# baut ihn vom Branch main und liefert ihn unter
 #   https://noltejonas.github.io/Benny-Joni/
-# Die App verlinkt diese Seiten über PTOnboarding.LEGAL (www/onboarding-model.js).
-# Specs und Pläne aus docs/ landen bewusst NICHT auf der Seite.
+# aus. Veröffentlichen heißt also: die geänderte Datei dort nach Benny-Joni/
+# committen (gleicher Pfad). Dieses Repo hat keine eigene Pages-Site; ein
+# Deploy von hier scheitert mit „Get Pages site failed … Not Found“.
+# Ein automatischer Abgleich wäre möglich, bräuchte aber ein Token mit
+# Schreibrecht auf das Hosting-Repo (z. B. ein fein granulares PAT als Secret);
+# das ist bewusst nicht eingerichtet.
 #
-# Einmalig: GitHub → Settings → Pages → Build and deployment → Source „GitHub Actions“.
+# Die App verlinkt diese Seiten über PTOnboarding.LEGAL und JOIN_URL
+# (www/onboarding-model.js). Specs und Pläne aus docs/ landen nicht auf der Seite.
 #
-# Schutz: Stehen in den Seiten noch [BITTE AUSFÜLLEN] oder der Entwurfs-Kasten,
-# bricht der Lauf vor dem Veröffentlichen ab. Nur zum Testen lässt sich das per
-# Hand übergehen: Actions → legal-pages → Run workflow → „Platzhalter erlauben“.
+# 1. Platzhalter: Stehen noch [BITTE AUSFÜLLEN] oder der Entwurfs-Kasten in den
+#    Seiten, ist der Lauf rot. Nur zum Testen per Hand übergehen: Actions →
+#    legal-pages → Run workflow → „Platzhalter erlauben“.
+# 2. Abgleich: Jede Datei wird mit der Live-Seite verglichen. Abweichungen sind
+#    Warnungen, kein Fehler (auf einem PR sind sie normal); die Zusammenfassung
+#    des Laufs listet, was ins Hosting-Repo übernommen werden muss.
 name: legal-pages
 
 on:
@@ -17,6 +29,11 @@ on:
     branches: [main]
     paths:
       - "docs/launch/site/**"
+      - ".github/workflows/legal-pages.yml"
+  pull_request:
+    paths:
+      - "docs/launch/site/**"
+      - ".github/workflows/legal-pages.yml"
   workflow_dispatch:
     inputs:
       allow_placeholders:
@@ -26,20 +43,10 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-# Nie zwei Veröffentlichungen gleichzeitig; eine laufende wird nicht abgebrochen.
-concurrency:
-  group: legal-pages
-  cancel-in-progress: false
 
 jobs:
-  deploy:
+  check:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
 
@@ -51,11 +58,32 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/configure-pages@v6
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: docs/launch/site
-
-      - id: deployment
-        uses: actions/deploy-pages@v5
+      - name: Mit der Live-Seite abgleichen
+        env:
+          BASE: https://noltejonas.github.io/Benny-Joni
+        run: |
+          cd docs/launch/site
+          stale=()
+          while IFS= read -r file; do
+            path="${file#./}"
+            live="$(mktemp)"
+            # ?v= umgeht den Cache des Pages-CDN
+            if ! curl -fsSL --retry 3 --max-time 20 -o "$live" "$BASE/$path?v=$GITHUB_SHA"; then
+              echo "::warning file=docs/launch/site/$path::Fehlt auf der Live-Seite: $BASE/$path"
+              stale+=("$path (fehlt)")
+            elif ! cmp -s "$file" "$live"; then
+              echo "::warning file=docs/launch/site/$path::Weicht von der Live-Seite ab: $BASE/$path"
+              stale+=("$path")
+            fi
+            rm -f "$live"
+          done < <(find . -type f | sort)
+          {
+            echo "## Website-Abgleich"
+            if [ ${#stale[@]} -eq 0 ]; then
+              echo "Alle Dateien aus \`docs/launch/site\` sind live und identisch."
+            else
+              echo "Diese Dateien nach \`Benny-Joni/\` in \`noltejonas/noltejonas.github.io\` übernehmen (gleicher Pfad), sobald sie in \`main\` sind:"
+              echo
+              for p in "${stale[@]}"; do echo "- \`$p\`"; done
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
