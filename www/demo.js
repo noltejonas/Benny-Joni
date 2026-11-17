@@ -105,6 +105,11 @@
       { ...cat('cat-bible-bj', 'Bibellesen', '📖', 'time'), competition_id: 'c-bj' }, // i18n-ignore: Übungsname
       { ...cat('cat-bible-ffa', 'Bibellesen', '📖', 'time'), competition_id: 'c-ffa' }, // i18n-ignore: Übungsname
     ];
+    // Der übrige Übungskatalog (Migration exercise_catalog), ohne Sätze
+    for (const e of window.PTExercises?.LIST || []) {
+      if (e.group === 'workout' || categories.some(c => c.name === e.name)) continue;
+      categories.push(cat(`cat-x-${categories.length}`, e.name, e.emoji, 'sports', 'standard', ['volume', 1000, null]));
+    }
 
     const startOf = (weeksBack) => addDays(monday, -7 * weeksBack);
     const comp = (cid, name, emoji, mode, code, mods, weeksBack, owner) => ({

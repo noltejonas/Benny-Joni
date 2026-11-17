@@ -1,4 +1,4 @@
-/* global React, PTData, PTRanking, PTPeople, Avatar, Icon, Sheet, tr, trn, PTi18n */
+/* global React, PTData, PTRanking, PTPeople, PTExercises, ExercisePicker, ExerciseInfo, Avatar, Icon, Sheet, tr, trn, PTi18n */
 // Rangliste-Tab: Monat (live) · Saison · Ewig, pro Grundübung oder gesamt.
 // Daten über die RPCs der Migration monthly_ranking (bzw. den Demo-Modus),
 // Rechenhilfen in www/ranking-model.js (PTRanking).
@@ -65,6 +65,7 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const [logCat, setLogCat] = React.useState(null);
   const [card, setCard] = React.useState(null);
   const [infoOpen, setInfoOpen] = React.useState(false); // Erklärungen hinter ⓘ statt im Screen
+  const [pickerOpen, setPickerOpen] = React.useState(false); // alle Übungen
   // „Meine Leute“: alle, mit denen ich gerade in einer laufenden Challenge bin
   // (api.myPeople). Fehlt die Liste (offline), gilt is_mine vom Server.
   const [people, setPeople] = React.useState(null);
@@ -194,6 +195,15 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
   const ranked = !isLive && sortBy === 'medals' ? R.medalTable(shown) : R.rankBy(shown, 'score');
   const mine = ranked.find(r => r.is_me) || null;
 
+  // ── Übungs-Chips ──
+  // Mit 30+ Übungen nur die Basics, Übungen mit Einträgen in dieser Ansicht und
+  // die gewählte; der Rest steckt hinter „Alle Übungen“.
+  const dataRows = (isLive ? liveRows : totals[totalsKey]) || [];
+  const withData = new Set(dataRows.filter(r => r.value > 0).map(r => r.category_id));
+  const chipCats = cats
+    .filter(c => withData.has(c.id) || c.id === cat?.id || PTExercises.metaOf(c)?.basic)
+    .sort((a, b) => PTExercises.orderOf(a) - PTExercises.orderOf(b));
+
   // ── Kopf: Zeitraum ──
   const weeksIn = (m) => closedWeeks.filter(w => R.weekMonth(w) === m).length;
   let periodNote = '';
@@ -264,11 +274,16 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
 
       <div className="rk-chips" role="tablist" aria-label={tr('Übung')}>
         <button className={`rk-chip ${!cat ? 'active' : ''}`} onClick={() => setCatKey('all')}>🏆 {tr('Gesamt')}</button>
-        {cats.map(c => (
+        {chipCats.map(c => (
           <button key={c.id} className={`rk-chip ${cat?.id === c.id ? 'active' : ''}`} onClick={() => setCatKey(c.id)}>
             {c.name}
           </button>
         ))}
+        {chipCats.length < cats.length && (
+          <button className="rk-chip rk-chip-more" onClick={() => setPickerOpen(true)}>
+            {tr('Alle {n} Übungen', { n: cats.length })}
+          </button>
+        )}
       </div>
 
       <div className="rk-bar">
@@ -370,8 +385,17 @@ function RankingScreen({ api, me, profile, onProfileSaved, onToast }) {
           onToast={onToast} />}
       </Sheet>
 
+      <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)}>
+        {pickerOpen && <>
+          <h2 className="title" style={{ marginBottom: 14 }}>{tr('Übung wählen')}</h2>
+          <ExercisePicker options={cats} selectedId={cat?.id} allowAdd={false}
+            onPick={(c) => { setCatKey(c.id); setPickerOpen(false); }} />
+        </>}
+      </Sheet>
+
       <Sheet open={infoOpen} onClose={() => setInfoOpen(false)}>
         <h2 className="title" style={{ marginBottom: 16 }}>{tr('So funktioniert die Rangliste')}</h2>
+        {cat && <div style={{ marginBottom: 16 }}><ExerciseInfo cat={cat} /></div>}
         <div className="rk-info">
           {isLive && !closed && counts && (
             <div className="rk-info-item"><Icon name="timer" size={18} />

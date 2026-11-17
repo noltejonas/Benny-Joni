@@ -13,17 +13,28 @@ const declaration = parse(source, { sourceType: 'script', plugins: ['jsx'] }).pr
 const compiled = Babel.transform(source.slice(declaration.start, declaration.end), {
   presets: ['react'], configFile: false, babelrc: false,
 }).code;
+// Die Übungsauswahl (exercise-ui.jsx) wird mitgerendert, damit ihre Karten im Baum stehen.
+const uiSource = fs.readFileSync(path.join(__dirname, '..', 'www/exercise-ui.jsx'), 'utf8');
+const pickerDecl = parse(uiSource, { sourceType: 'script', plugins: ['jsx'] }).program.body
+  .find(node => node.type === 'FunctionDeclaration' && node.id.name === 'ExercisePicker');
+const pickerCompiled = Babel.transform(uiSource.slice(pickerDecl.start, pickerDecl.end), {
+  presets: ['react'], configFile: false, babelrc: false,
+}).code;
+const exercisesSource = fs.readFileSync(path.join(__dirname, '..', 'www/exercises.js'), 'utf8');
 
 const catalog = [
   { id: 'situps', name: 'Sit-ups', kind: 'sports', challenge_type: 'standard' },
   { id: 'sally', name: 'Bring Sally Up', kind: 'sports', challenge_type: 'bring_sally_up' },
+  { id: 'squat', name: 'Kniebeugen', kind: 'sports', challenge_type: 'standard', competition_id: null, ranked: true },
 ];
 
 function mount({ addCategory, existing = null, otherComps = [] } = {}) {
   const slots = [];
   let cursor = 0;
   const React = {
-    createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
+    // ExercisePicker gleich ausführen (Hooks laufen in derselben Reihenfolge mit)
+    createElement: (type, props, ...children) => (type === ctx.ExercisePicker
+      ? type({ ...props, children }) : { type, props: { ...props, children } }),
     Fragment: 'fragment',
     useState(initial) {
       const index = cursor++;
@@ -42,10 +53,12 @@ function mount({ addCategory, existing = null, otherComps = [] } = {}) {
   function Stepper() {}
   function ObAmount() {}
   function Icon() {}
+  function ExerciseThumb() {}
+  function ExerciseInfo() {}
   const copied = [];
   const ctx = {
     React, useState: React.useState,
-    Stepper, ObAmount, Icon, formatWeek: value => value, weekNumber: () => 44, formatDuration: value => String(value),
+    Stepper, ObAmount, Icon, ExerciseThumb, ExerciseInfo, formatWeek: value => value, weekNumber: () => 44, formatDuration: value => String(value),
     GOAL_INPUT_KEY: 'pt:goal-input', UNIT_KIND: { reps: 'sports', minutes: 'time', work: 'work' },
     localStorage: { getItem: () => null, setItem() {} },
     PTi18n: { number: String },
@@ -62,6 +75,8 @@ function mount({ addCategory, existing = null, otherComps = [] } = {}) {
     alert: message => alerts.push(message),
   };
   vm.createContext(ctx);
+  vm.runInContext(exercisesSource, ctx);
+  vm.runInContext(pickerCompiled, ctx);
   vm.runInContext(compiled, ctx);
   const props = {
     api: {
@@ -189,4 +204,22 @@ test('workout count is also copied into another selected challenge', async () =>
   assert.equal(app.copied.length, 1);
   assert.equal(app.copied[0].target_runs, 3);
   assert.equal(app.copied[0].category_id, 'sally');
+});
+
+test('typed synonym of a standard exercise saves the standard exercise instead of a custom one', async () => {
+  const app = mount();
+  app.draft('Squats');
+  const hint = app.nodes().find(node => node.props?.className === 'banner exp-known');
+  assert.ok(hint, 'shows that Kniebeugen already exists');
+  await app.button('Speichern').props.onClick();
+  assert.deepEqual(app.creations, []);
+  assert.equal(app.writes[0]?.category_id, 'squat');
+});
+
+test('a synonym in minutes stays a custom time exercise', async () => {
+  const app = mount();
+  app.draft('Squats');
+  app.button('Minuten').props.onClick(); app.render();
+  await app.button('Speichern').props.onClick();
+  assert.deepEqual(app.creations, [{ name: 'Squats', emoji: '💪', kind: 'time' }]);
 });
