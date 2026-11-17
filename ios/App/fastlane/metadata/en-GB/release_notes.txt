@@ -1,4 +1,8 @@
-• Now available in Finnish and Swedish.
-• Fixed saving your own exercises.
-• Choose how many Bring Sally Up and other compulsory workout runs each person should complete per week. Progress, weekly plans and results follow your chosen goal.
-• Give your training partners a playful kick to get moving. You can turn off incoming kicks under Settings → App.
+• 35 standard exercises: from diamond push-ups to muscle-ups and pistol squats, each with a short how-to and an animated figure. All of them count for the leaderboard.
+• New exercise picker with search and groups (push, pull, legs, core …). Type “Squats” and you get the standard squats, so everyone logs the same exercise.
+• Week trailer: with three or more challenges, the week finale plays as one clip with your record and some cheeky lines.
+• Home screen widget (iOS 17 and later) with your week and open exercises.
+• “All challenges”: Today, Feed, Stats and Penalty pot across all your challenges at a glance.
+• “Start the new week”: restart all challenges with last week’s goals, optionally +5% or +10%.
+• The leaderboard now counts reps instead of points.
+• Invites are a single link that also works in WhatsApp.
