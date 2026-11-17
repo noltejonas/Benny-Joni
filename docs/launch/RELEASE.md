@@ -1,5 +1,38 @@
 # Release mit Fastlane
 
+## Update 1.6.0: Widget, 35 Standard-Übungen und Wochen-Trailer (nur Apple)
+
+Stand 17. November 2026: **Apple 1.6.0 (36) ist zur Prüfung eingereicht.**
+Version und ReviewSubmission `WAITING_FOR_REVIEW`, eingereicht am
+`2026-11-17T21:16:17Z` (22:16 Uhr MEZ), Submission-ID
+`5a1f149f-127e-4db8-8170-267ec4f62aae` mit genau einem Item (Version 1.6.0).
+Release-Typ **`AFTER_APPROVAL`** wie bei 1.5.2: Die Version geht nach Apples
+Freigabe automatisch live. Google Play ist für dieses Update nicht
+angefasst; dort bleibt 1.5.2.
+
+- Inhalt: alles seit 1.5.2 aus `main` (Merge von PR #25): Homescreen-Widget,
+  „Alle Challenges“, „Neue Woche starten“, Rangliste nach Reps, Einladungen
+  als ein Link, 35 Standard-Übungen mit Erklärung und Figur, Wochen-Trailer
+  ab drei Challenges. Die TestFlight-Builds 32–35 von 1.6.0 wurden nie
+  eingereicht.
+- Backend: `20261117120000_exercise_catalog.sql` war vorher schon
+  eingespielt und registriert. Alte App-Versionen funktionieren damit weiter
+  (lange Übungsliste ohne Gruppen).
+- Ablauf: `tools/fastlane.sh release screenshots:false` aus dem Worktree
+  (Build-Nummer automatisch 36), danach `submit-update.rb` mit
+  `--select-build-only` und `--submit`. Neuerungen (de-DE, en-GB),
+  Review-Notizen, Kontakt und Login stimmen per Readback; je vier
+  Screenshots sind unverändert von 1.5.2 übernommen.
+- Prüfungen: `npm test` 349 bestanden (ein vorgesehener Skip),
+  `check-store.cjs --platform=ios --ready` bestanden, Werbe-Gate geprüft
+  (`ads_enabled` bleibt serverseitig aus).
+- IPA `ios/App/build/fastlane/BennyJoni-1.6.0-36.ipa`, SHA-256
+  `d446674afcfe99a245467c9305fc812527a20673000043f3d45c10fbedd6e619`,
+  enthält `exercises.js`, `exercise-ui.js`, `trailer-model.js` und
+  `sounds/trailer.wav`. Apple-Verarbeitung `VALID`.
+- Belege: `.local/release/update-20261117/apple/` (`submit-result.json`,
+  `submit-release-policy.json`, `fastlane-release.private.log`).
+
 ## Update 1.5.2: eigene Übungen, Workout-Häufigkeit und Arschkicks
 
 Stand 29. Oktober 2026: Backend-Rollout und Einreichungen in beiden Stores
