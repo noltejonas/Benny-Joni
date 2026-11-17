@@ -271,17 +271,24 @@
   // Datenbank deutsch. Beim Laden bekommt die Zeile den Namen in der
   // App-Sprache; in die Datenbank geht nie ein übersetzter Name zurück.
   // Eigene Kategorien einer Challenge bleiben, wie sie sind.
+  // Der Übungskatalog (exercises.js) kennt Namen und Regeln aller Standard-
+  // Übungen in der App-Sprache; ohne ihn (Tests) gilt die Liste hier.
   function localizeCategory(row) {
     if (!row || row.competition_id != null) return row;
+    const meta = window.PTExercises?.meta(row.name);
     let name = row.name;
-    switch (row.name) {
-      case 'Liegestütze': name = tr('Liegestütze'); break;
-      case 'Klimmzüge': name = tr('Klimmzüge'); break;
-      case 'Kniebeugen': name = tr('Kniebeugen'); break;
-      case '20-Min-AMRAP': name = tr('20-Min-AMRAP'); break;
+    if (meta) name = meta.label;
+    else {
+      switch (row.name) {
+        case 'Liegestütze': name = tr('Liegestütze'); break;
+        case 'Klimmzüge': name = tr('Klimmzüge'); break;
+        case 'Kniebeugen': name = tr('Kniebeugen'); break;
+        case '20-Min-AMRAP': name = tr('20-Min-AMRAP'); break;
+      }
     }
-    const rule = localizeRule(row.rule);
-    return name === row.name && rule === row.rule ? row : { ...row, name, rule };
+    const rule = row.rule && meta?.rule ? meta.rule : localizeRule(row.rule);
+    // base_name: Name in der Datenbank, Schlüssel für den Übungskatalog
+    return name === row.name && rule === row.rule ? row : { ...row, name, rule, base_name: row.name };
   }
 
   // Ausführungsregeln der Rangliste (categories.rule, Migrationen monthly_ranking

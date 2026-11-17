@@ -341,7 +341,9 @@
 
   // Vorschlag pro Person bis Sonntag; unter der Woche anteilig gekürzt.
   function goalDefault(category, now = Date.now()) {
-    const base = (GOAL_BASE.find(([re]) => re.test(category?.name || '')) || [null, 50])[1];
+    // Standard-Übungen bringen ihren Vorschlag aus dem Katalog mit (exercises.js)
+    const known = (typeof window !== 'undefined' && window.PTExercises?.metaOf(category)?.goal) || null;
+    const base = known || (GOAL_BASE.find(([re]) => re.test(category?.name || '')) || [null, 50])[1];
     return Math.max(10, round5(base * weekProgress(now).daysLeft / 7));
   }
 

@@ -1357,3 +1357,61 @@ button.st-row:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .st-report { align-items: center; }
 .st-report-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .st-link.is-danger { color: var(--danger); }
+
+/* Übungskatalog: Strichfiguren (exercise-ui.jsx) */
+.exfig { display: block; flex: none; color: var(--accent, #ff5a1f); overflow: visible; }
+.exfig line { stroke-linecap: round; stroke-linejoin: round; }
+.exfig-body line, .exfig-limb line { stroke: currentColor; stroke-width: 5.5; }
+.exfig-body .exfig-torso { stroke-width: 7; }
+.exfig-limb.is-back { opacity: 0.38; }
+.exfig-head { fill: currentColor; }
+.exfig-floor { stroke: var(--surface-3, #ddd); stroke-width: 2.5; }
+.exfig-prop, .exfig-prop line { stroke: var(--text-3, #999); stroke-width: 3.5; fill: none; }
+.exfig-box { fill: var(--surface-3, #ddd); stroke: none; }
+.exfig-mark { fill: var(--text-2, #666); }
+.exthumb-emoji { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+
+/* Übungsauswahl beim Wochenziel */
+.exp-search { margin-bottom: 10px; }
+.exp-search .input { width: 100%; }
+.exp-tabs {
+  display: flex; gap: 6px; overflow-x: auto; margin: 0 -20px 12px; padding: 0 20px 2px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.exp-tabs::-webkit-scrollbar { display: none; }
+.exp-tab {
+  flex: none; height: 32px; padding: 0 13px; border: none; border-radius: 999px;
+  background: var(--surface-2); color: var(--text-2); font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.exp-tab.active { background: var(--text); color: var(--bg, #fff); }
+.exp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.exp-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px;
+  min-height: 96px; padding: 10px 6px 9px;
+}
+.exp-card .name { font-size: 12.5px; line-height: 15px; font-weight: 700; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; }
+.exp-card .exfig, .exp-card .exthumb-emoji { margin-bottom: 2px; }
+.exp-card.cat-card-add { justify-content: center; }
+.exp-card.cat-card-add .emoji { font-size: 26px; margin-bottom: 2px; }
+.exp-card:disabled .exfig { opacity: 0.45; }
+.exp-empty { grid-column: 1 / -1; font-size: 14px; color: var(--text-3); padding: 4px 2px; }
+.exp-known { margin-top: 12px; }
+
+/* Erklärung zur gewählten Übung */
+.exinfo {
+  display: flex; gap: 12px; align-items: flex-start; margin-top: 4px; padding: 12px;
+  border-radius: var(--radius, 16px); background: var(--surface-2);
+}
+.exinfo-fig { flex: none; border-radius: 12px; background: var(--surface); padding: 4px; }
+.exinfo-text { min-width: 0; flex: 1; }
+.exinfo-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
+.exinfo-level {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent);
+}
+.exinfo-level.is-3 { background: color-mix(in oklab, #e0245e 16%, transparent); color: #e0245e; }
+.exinfo-how { margin: 6px 0 6px; font-size: 13.5px; line-height: 19px; color: var(--text-2); }
+.exinfo-meta { font-size: 12.5px; line-height: 17px; color: var(--text-2); margin-top: 3px; }
+.exinfo-meta span { font-weight: 700; color: var(--text-3); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.05em; margin-right: 4px; }
+.exinfo.is-compact .exinfo-how { font-size: 13px; line-height: 18px; }
+.rk-chip-more { background: transparent; box-shadow: inset 0 0 0 1.5px var(--surface-3); color: var(--text-2); }

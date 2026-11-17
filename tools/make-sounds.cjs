@@ -1,5 +1,7 @@
-// Erzeugt die Töne in www/sounds/ (WAV, 44,1 kHz, stereo, 16 Bit).
-//   node tools/make-sounds.cjs
+// Erzeugt die Töne in www/sounds/ (WAV, 44,1 kHz, stereo, 16 Bit; der lange
+// Trailer mono mit 22,05 kHz).
+//   node tools/make-sounds.cjs            alle
+//   node tools/make-sounds.cjs trailer    nur den Trailer
 // Alles synthetisch (808-Bass, Riser, Clap, Synth-Akkord, Glitzer, Hall), kein
 // Asset aus fremden Quellen, deshalb reproduzierbar und lizenzfrei. Zufall läuft
 // über einen festen Seed, jeder Lauf ergibt dieselben Dateien.
@@ -151,6 +153,43 @@ function reverb(tr, mix = 0.22) {
   for (let i = 0; i < tr.n; i++) { tr.L[i] += wl[i] * mix * 0.25; tr.R[i] += wr[i] * mix * 0.25; }
 }
 
+// Hi-Hat: sehr kurzes, hochgefiltertes Rauschen
+function hat(tr, at, gain = 0.12, len = 0.045) {
+  const s0 = idx(at), n = idx(len);
+  let p = 0, o = 0;
+  for (let i = 0; i < n && s0 + i < tr.n; i++) {
+    const t = i / RATE;
+    const x = rnd();
+    o = 0.6 * (o + x - p); p = x;
+    const v = o * Math.exp(-t * 90) * gain;
+    tr.L[s0 + i] += v * 0.8; tr.R[s0 + i] += v;
+  }
+}
+
+// Mono mit halber Abtastrate (22,05 kHz) für lange Spuren wie den Trailer:
+// ein Viertel der Dateigröße, als Hintergrund-Beat klingt das genauso.
+function masterMono(tr, { drive = 1.6, fadeOut = 0.08 } = {}) {
+  const half = Math.floor(tr.n / 2);
+  const mono = new Float32Array(half);
+  let peak = 0;
+  for (let i = 0; i < half; i++) {
+    const a = (tr.L[2 * i] + tr.R[2 * i] + tr.L[2 * i + 1] + tr.R[2 * i + 1]) / 4;
+    const fade = Math.min(1, (half - i) / (fadeOut * RATE / 2));
+    mono[i] = Math.tanh(a * drive) * fade;
+    peak = Math.max(peak, Math.abs(mono[i]));
+  }
+  const g = 0.93 / (peak || 1);
+  const rate = RATE / 2;
+  const pcm = Buffer.alloc(half * 2);
+  for (let i = 0; i < half; i++) pcm.writeInt16LE(Math.round(mono[i] * g * 32767), i * 2);
+  const head = Buffer.alloc(44);
+  head.write('RIFF', 0); head.writeUInt32LE(36 + pcm.length, 4); head.write('WAVE', 8);
+  head.write('fmt ', 12); head.writeUInt32LE(16, 16); head.writeUInt16LE(1, 20); head.writeUInt16LE(1, 22);
+  head.writeUInt32LE(rate, 24); head.writeUInt32LE(rate * 2, 28); head.writeUInt16LE(2, 32); head.writeUInt16LE(16, 34);
+  head.write('data', 36); head.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([head, pcm]);
+}
+
 function master(tr, { drive = 1.6 } = {}) {
   let peak = 0;
   for (let i = 0; i < tr.n; i++) {
@@ -231,8 +270,56 @@ const sounds = {
   },
 };
 
+// Wochen-Trailer (www/trailer-model.js, timeline): zwei tiefe Schläge für die
+// Intro-Zeilen (0 und 1,5 s), Riser, Titel-Treffer bei 3 s, ab 4,5 s Beat mit
+// 120 BPM, damit jeder Schnitt (ganze Schläge) auf einem Kick landet. Akkorde
+// c-Moll – As – Es – B, ein Takt (2 s) je Akkord. Das Finale spielt den
+// Siegerton darüber, die App blendet diese Spur dann aus.
+sounds.trailer = () => {
+  seed = 0x7a11e7; // eigener Seed: gleiche Datei, egal welche Töne davor laufen
+  const LEN = 22, BEAT = 0.5, START = 4.5; // reicht für acht Schnitte à 2 s
+  const tr = track(LEN);
+  const braam = (at, chord) => {
+    boom(tr, at, { from: 90, to: 33, decay: 1.6, gain: 1.1 });
+    stab(tr, at, chord, { dur: 1.7, gain: 0.9, open: 0.7 });
+    shimmer(tr, at, 1.2, 0.05);
+  };
+  braam(0, [-24, -21, -17, -12]);
+  braam(1.5, [-28, -24, -21, -16]);
+  riser(tr, 2.0, 3.0, 0.45);
+  boom(tr, 3.0, { from: 170, to: 40, decay: 1.2, gain: 1.2 });
+  clap(tr, 3.0, 0.7);
+  stab(tr, 3.0, [0, 3, 7, 12], { dur: 1.4, gain: 0.5, pumpAt: [3.0] });
+  sparkle(tr, 3.02, [12, 15, 19, 24, 27, 31], { step: 0.05, gain: 0.2, dur: 0.6 });
+  riser(tr, 3.9, START, 0.3);
+  const prog = [[-12, -9, -5, 0], [-16, -12, -9, -4], [-9, -5, -2, 3], [-14, -10, -7, -2]];
+  const bass = [-24, -28, -21, -26];
+  const beats = Math.floor((LEN - START - 0.5) / BEAT);
+  const kicks = [];
+  for (let b = 0; b < beats; b++) {
+    const at = START + b * BEAT;
+    kicks.push(at);
+    boom(tr, at, { from: 150, to: 48, decay: 0.28, gain: 0.9 });
+    if (b % 2 === 1) clap(tr, at, 0.42);
+    hat(tr, at + BEAT / 2, 0.13);
+    if (b % 4 === 0) {
+      const bar = (b / 4) % prog.length;
+      boom(tr, at, { from: 70, to: 440 * Math.pow(2, (bass[bar] - 9) / 12), decay: 0.9, gain: 0.55 });
+      stab(tr, at, prog[bar], { dur: 2.0, gain: 0.28, pumpAt: [at, at + BEAT, at + 2 * BEAT, at + 3 * BEAT] });
+    }
+  }
+  // Ausblenden über die letzten 1,5 s
+  const fadeFrom = idx(LEN - 1.5);
+  for (let i = fadeFrom; i < tr.n; i++) { const k = 1 - (i - fadeFrom) / (tr.n - fadeFrom); tr.L[i] *= k; tr.R[i] *= k; }
+  reverb(tr, 0.22);
+  return masterMono(tr, { drive: 1.6 });
+};
+
+// node tools/make-sounds.cjs [name …] erzeugt nur die genannten Töne
+const only = process.argv.slice(2);
 const out = path.join(__dirname, '..', 'www', 'sounds');
 for (const [name, make] of Object.entries(sounds)) {
+  if (only.length && !only.includes(name)) continue;
   const wav = make();
   fs.writeFileSync(path.join(out, `${name}.wav`), wav);
   console.log(`${name}.wav  ${(wav.length / 1024).toFixed(1)} KB`);

@@ -1,4 +1,4 @@
-/* global React, PTData, PTDashboard, ChallengeInsights, PTOnboarding, ObAmount, TugBar, FocusCarousel, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
+/* global React, PTData, PTExercises, ExercisePicker, ExerciseInfo, PTDashboard, ChallengeInsights, PTOnboarding, ObAmount, TugBar, FocusCarousel, Ring, Icon, MiniRing, CountUp, Sheet, Stepper, Toast, formatRelative, formatWeek, weekNumber, localDay, todayGreeting, formatDuration, PTPeople, Avatar, SideAvatar, sideStyle, totalsBySide, uniqueMaxIndex, sideIndexByUser, tr, trn, trc, PTi18n */
 const { useState, useEffect, useMemo } = React;
 
 // Schnellsatz-Werte pro Person und Übung, lokal gespeichert. Schlüssel ist
@@ -619,7 +619,7 @@ const GOAL_INPUT_KEY = 'pt:goal-input'; // 'person' | 'total'
 const UNIT_KIND = { reps: 'sports', minutes: 'time', work: 'work' };
 
 function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart, existing, participantCount = 2,
-  competitionName = '', usedCategoryIds = [], otherComps = [], onClose, onSaved, onDeleted, onAddCategory }) {
+  competitionName = '', usedCategoryIds = [], recentCategoryIds = [], otherComps = [], onClose, onSaved, onDeleted, onAddCategory }) {
   const people = Math.max(1, participantCount);
   // Keep newly created rows selected until the parent category reload arrives.
   const [addedCategories, setAddedCategories] = useState([]);
@@ -743,7 +743,23 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
     }
   }
 
+  // Eingetippter Name einer Standard-Übung („Squats“): die nehmen, damit alle
+  // dieselbe Übung loggen und sie in der Rangliste zählt.
+  const catalogFor = (text) => {
+    const m = PTExercises.match(text);
+    return m ? categoryOptions.find(c => PTExercises.metaOf(c) === m) || null : null;
+  };
+  const newCatCatalog = showNewCat && newCatUnit === 'reps' ? catalogFor(newCatName) : null;
+  function takeCatalog(c) {
+    setShowNewCat(false);
+    setNewCatName('');
+    setNewCatUnit('reps');
+    pick(c);
+  }
+
   async function createNewCategory() {
+    const known = newCatUnit === 'reps' && catalogFor(newCatName);
+    if (known) { takeCatalog(known); return known; }
     const cat = await api.addCategory(newCatName.trim(), '💪', UNIT_KIND[newCatUnit] || 'sports');
     setAddedCategories(rows => [...rows, cat]);
     setCatId(cat.id);
@@ -786,31 +802,12 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
     } catch (e) {alert(e.message);}
   }
 
-  const groups = [
-    { id: 'sports', label: null, items: categoryOptions.filter(c => (c.kind || 'sports') === 'sports') },
-    { id: 'time', label: tr('⏱️ Zeit'), items: categoryOptions.filter(c => c.kind === 'time') },
-    { id: 'work', label: tr('💻 Work'), items: allowWork ? categories.filter(c => c.kind === 'work') : [] },
-  ];
-  const card = (c) => {
-    const used = isUsed(c.id);
-    return (
-      <div key={c.id} className={`cat-card-wrap ${!showNewCat && catId === c.id ? 'selected' : ''}`}>
-        <button className={`cat-card ${!showNewCat && catId === c.id ? 'selected' : ''}`} disabled={used || busy} onClick={() => pick(c)}
-          aria-label={used ? tr('{name}, hat diese Woche schon ein Ziel', { name: c.name }) : undefined}>
-          <div className="name">{c.name}</div>
-          {used ? <div className="cat-note">{tr('läuft schon')}</div>
-            : PTData.usesMinutes(c) ? <div className="cat-note">{tr('in Minuten')}</div>
-            : c.competition_id && <div className="cat-note">{tr('zählt nicht für die Rangliste')}</div>}
-        </button>
-        {c.competition_id && (
-          <button className="cat-edit" aria-label={tr('Bearbeiten')}
-            onClick={(e) => { e.stopPropagation(); setEditingCat({ ...c }); setShowNewCat(false); }}>
-            ✎
-          </button>
-        )}
-      </div>
-    );
-  };
+  const editButton = (c) => c.competition_id && (
+    <button className="cat-edit" aria-label={tr('Bearbeiten')}
+      onClick={(e) => { e.stopPropagation(); setEditingCat({ ...c }); setShowNewCat(false); }}>
+      ✎
+    </button>
+  );
 
   const unitLabel = minutes
     ? (perPerson ? tr('Minuten pro Person bis Sonntag') : tr('Minuten zusammen bis Sonntag'))
@@ -830,19 +827,11 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
       </div>
 
       <div className="label" style={{ marginBottom: 8 }}>{tr('Übung')}</div>
-      <div className="cat-grid">
-        {groups.map(g => g.items.length > 0 && (
-          <React.Fragment key={g.id}>
-            {g.label && <div className="cat-grid-divider">{g.label}</div>}
-            {g.items.map(card)}
-          </React.Fragment>
-        ))}
-        <button className={`cat-card cat-card-add ${showNewCat ? 'open' : ''}`}
-          disabled={busy} onClick={() => { setShowNewCat((v) => !v); setEditingCat(null); }}>
-          <div className="emoji">＋</div>
-          <div className="name">{tr('Eigene Übung')}</div>
-        </button>
-      </div>
+      <ExercisePicker options={categoryOptions} selectedId={catId} onPick={pick} isUsed={isUsed} busy={busy}
+        recentIds={recentCategoryIds} addOpen={showNewCat} renderExtra={editButton}
+        onToggleAdd={() => { setShowNewCat((v) => !v); setEditingCat(null); }}
+        onSearchAdd={(text) => { setNewCatName(text); setShowNewCat(true); setEditingCat(null); }} />
+      {!showNewCat && !editingCat && selectedCat && <ExerciseInfo cat={selectedCat} compact />}
 
       {editingCat &&
         <div className="new-cat-row">
@@ -867,6 +856,14 @@ function SetupSheet({ api, baseApi, me, categories, allowWork = false, weekStart
             <button role="radio" aria-checked={newCatUnit === 'minutes'} className={newCatUnit === 'minutes' ? 'active' : ''} onClick={() => pickNewUnit('minutes')}>{tr('Minuten')}</button>
             {allowWork && <button role="radio" aria-checked={newCatUnit === 'work'} className={newCatUnit === 'work' ? 'active' : ''} onClick={() => pickNewUnit('work')}>{tr('Work')}</button>}
           </div>
+          {newCatCatalog && (
+            <div className="banner exp-known">
+              <div className="banner-text">
+                {tr('Gibt’s schon als Standard-Übung: {name}. Die zählt auch für die Rangliste.', { name: <b>{newCatCatalog.name}</b> })}
+                {' '}<button type="button" className="btn-link" onClick={() => takeCatalog(newCatCatalog)}>{tr('Nehmen')}</button>
+              </div>
+            </div>
+          )}
           <div className="goal-hint">
             {newCatUnit === 'minutes' ? tr('Für alles, was man nach Zeit misst: Lesen, Planks, Laufen, Dehnen.')
               : newCatUnit === 'work' ? tr('Arbeitszeit mit Projekt und Tool, nur mit Work-Tracking.')

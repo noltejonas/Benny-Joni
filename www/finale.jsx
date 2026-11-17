@@ -1,10 +1,12 @@
-/* global React, PTi18n, PTHaptics, SideAvatar, sideStyle, ObFigure, obFigTall, weekNumber, formatDuration, tr, trn */
+/* global React, PTi18n, PTHaptics, PTTrailer, PTData, SideAvatar, sideStyle, ObFigure, obFigTall, weekNumber, formatDuration, tr, trn */
 // Wochenabschluss: die große Feier, wenn eine Woche vorbei ist (einmal pro
 // Challenge und Woche) oder jemand im Strafkonto „Woche abschließen“ tippt.
 // Ablauf pro Challenge: Blackout mit „KW 43 ist vorbei“ → die Balken laufen um
 // die Wette → Auflösung. Bei einem Sieg machen Benny und Joni Rückwärtssaltos
 // und alles eskaliert; sonst wird trotzdem gefeiert, nur mit anderem Text.
 // results: PTDashboard.weekResult, eine pro Challenge.
+// Ab PTTrailer.TRAILER_MIN Challenges läuft stattdessen ein Trailer (WeekTrailer
+// unten): ein Soundtrack, schnelle Schnitte, eine Bilanz. Einzeln geht weiter.
 
 const FIN_SEEN_KEY = 'pt_finale_seen_v1';
 
@@ -249,8 +251,254 @@ function FinaleStage({ res, isLast, total, index, onNext }) {
   );
 }
 
+// ─── Trailer ab drei Challenges ─────────────────────────────────────────────
+const TRL_MOODS = { win: ['🏆', '👑', '🔥', '💪', '⚡', '🚀', '🥇', '🎉', '💯'], even: ['💪', '🔥', '⚡', '🎬', '🍿'] };
+
+// Ein Ton, der sich weich ausblenden lässt
+function trailerAudio(src, volume = 0.9) {
+  try {
+    const a = new Audio(src);
+    a.volume = volume;
+    a.play().catch(() => {});
+    let fade = null;
+    return {
+      stop(ms = 0) {
+        clearInterval(fade);
+        if (!ms) { a.pause(); return; }
+        const step = a.volume / Math.max(1, ms / 40);
+        fade = setInterval(() => {
+          a.volume = Math.max(0, a.volume - step);
+          if (a.volume <= 0.01) { clearInterval(fade); a.pause(); }
+        }, 40);
+      },
+    };
+  } catch (e) { return { stop() {} }; }
+}
+
+function trailerTick(strong) {
+  const H = window.PTCelebrationHaptics;
+  try {
+    if (H) H.Haptics.impact({ style: strong ? H.ImpactStyle.Heavy : H.ImpactStyle.Light });
+    else if (strong) PTHaptics?.success?.();
+  } catch (e) {}
+}
+
+const trlUnit = (unit) => (unit === 'min' ? tr('Minuten') : unit === 'reps' ? tr('Reps') : tr('Ziele'));
+
+function TrailerCut({ cut, index, total, fmtNum }) {
+  const { r, look, verdict, mood, line } = cut;
+  const me = r.sides[0];
+  const rival = cut.rival != null ? r.sides[cut.rival] : null;
+  const ms = 900;
+  const num = (v) => <FinCount value={v} ms={ms} format={fmtNum(r.unit)} />;
+  const sideName = (s) => (s.isMine && s.userIds.length === 1 ? tr('Du') : s.label);
+  let body;
+  if (look === 'goals') {
+    body = (
+      <div className="trl-big">
+        <div className="trl-big-num mono">{r.goalsHit}<span>/{r.goalsTotal}</span></div>
+        <div className="trl-big-unit">{tr('Ziele')}</div>
+      </div>
+    );
+  } else if (look === 'rank') {
+    body = (
+      <div className="trl-big">
+        <div className="trl-big-num mono">#{r.myRank}</div>
+        <div className="trl-big-unit">{tr('von {n}', { n: r.sides.length })} · {num(cut.mine)} {trlUnit(r.unit)}</div>
+      </div>
+    );
+  } else if (look === 'versus' && rival) {
+    body = (
+      <div className="trl-vs">
+        <div className="trl-vs-side is-me" style={sideStyle(me)}>
+          <SideAvatar side={me} size={72} />
+          <b>{sideName(me)}</b>
+          <span className="mono">{num(cut.mine)}</span>
+        </div>
+        <div className="trl-vs-x">VS{/* i18n-ignore: überall VS */}</div>
+        <div className="trl-vs-side" style={sideStyle(rival)}>
+          <SideAvatar side={rival} size={72} />
+          <b>{sideName(rival)}</b>
+          <span className="mono">{num(cut.rivalTotal)}</span>
+        </div>
+      </div>
+    );
+  } else if (look === 'bars' && rival) {
+    const max = Math.max(1, cut.mine, cut.rivalTotal);
+    body = (
+      <div className="fin-race trl-race">
+        {[[me, cut.mine], [rival, cut.rivalTotal]].map(([s, v]) => (
+          <div key={s.key} className={`fin-lane${s.isMine ? ' is-me' : ''}`} style={sideStyle(s)}>
+            <span className="fin-lane-who"><span className="fin-lane-avatar"><SideAvatar side={s} size={34} /></span>
+              <span className="fin-lane-name">{sideName(s)}</span></span>
+            <span className="fin-lane-track"><i className="trl-grow" style={{ width: `${(v / max) * 100}%` }} /></span>
+            <span className="fin-lane-val mono">{num(v)}</span>
+          </div>
+        ))}
+        <div className="fin-unit">{trlUnit(r.unit)}</div>
+      </div>
+    );
+  } else if (look === 'stamp') {
+    body = <div className="trl-emoji" aria-hidden="true">{r.c.emoji || '💪'}</div>;
+  } else {
+    body = (
+      <div className="trl-big">
+        <div className="trl-big-num mono">{num(cut.mine)}</div>
+        <div className="trl-big-unit">{trlUnit(r.unit)}{rival ? ` · ${tr('{name}: {n}', { name: sideName(rival), n: fmtNum(r.unit)(cut.rivalTotal) })}` : ''}</div>
+      </div>
+    );
+  }
+  return (
+    <div className={`trl-cut trl-in-${index % 5} is-${mood} look-${look}`}>
+      <div className="trl-cut-head">
+        <span className="trl-cut-emoji" aria-hidden="true">{r.c.emoji}</span>
+        <span className="trl-cut-name">{r.c.name}</span>
+      </div>
+      <div className="trl-cut-body">{body}</div>
+      <div className={`trl-stamp is-${mood}`}>{verdict}</div>
+      <p className="trl-line">{line}</p>
+    </div>
+  );
+}
+
+function TrailerFinale({ S, fmtNum, onDone, onReplay, onDetails }) {
+  const { record } = S;
+  return (
+    <div className="trl-finale">
+      <div className="trl-finale-kicker">{tr('Die Bilanz')}</div>
+      {record.competitive ? (
+        <div className="trl-score">
+          <div className="trl-score-cell is-win"><b className="mono"><FinCount value={record.wins} ms={700} /></b><span>{tr('Gewonnen')}</span></div>
+          {record.ties > 0 && <div className="trl-score-cell"><b className="mono"><FinCount value={record.ties} ms={700} /></b><span>{tr('Remis')}</span></div>}
+          <div className="trl-score-cell is-loss"><b className="mono"><FinCount value={record.losses} ms={700} /></b><span>{tr('Verloren')}</span></div>
+        </div>
+      ) : (
+        <div className="trl-score">
+          <div className="trl-score-cell is-win"><b className="mono">{record.goalsHit}/{record.goalsTotal}</b><span>{tr('Ziele')}</span></div>
+        </div>
+      )}
+      <div className="trl-finale-facts">
+        {record.reps > 0 && <div><b className="mono"><FinCount value={record.reps} ms={1400} /></b> {tr('Reps diese Woche')}</div>}
+        {record.competitive && <div><b className="mono">{record.goalsHit}/{record.goalsTotal}</b> {tr('Ziele geschafft')}</div>}
+        {S.mvp && <div>🏆 {tr('Bester Auftritt: {name}', { name: `${S.mvp.r.c.emoji || ''} ${S.mvp.r.c.name}`.trim() })}</div>}
+      </div>
+      <p className="trl-verdict">{S.verdictLine}</p>
+      <p className="trl-tagline">{S.tagline}</p>
+      <div className={`fin-duo${S.big ? ' is-flipping' : ''}`} aria-hidden="true">
+        <span className="fin-fig is-benny"><ObFigure who="benny" pose={S.big ? 'cheer' : 'flex'} tall={obFigTall(104)} /></span>
+        <span className="fin-fig is-joni"><ObFigure who="joni" pose={S.big ? 'cheer' : 'point'} tall={obFigTall(104)} /></span>
+      </div>
+      <button className="fin-next" onClick={onDone}>{tr('Weiter')}</button>
+      <div className="trl-more">
+        <button type="button" onClick={onReplay}>↺ {tr('Nochmal ansehen')}</button>
+        <button type="button" onClick={onDetails}>{tr('Einzeln ansehen')}</button>
+      </div>
+    </div>
+  );
+}
+
+// Steps: 0 Intro-Zeile 1, 1 Intro-Zeile 2, 2 Titel, 3 … 3+n-1 Schnitte, 3+n Finale
+function WeekTrailer({ results, onDone, onDetails }) {
+  const weekStart = results[0]?.weekStart;
+  const fmtNum = React.useCallback((unit) => (v) => (unit === 'min' ? formatDuration(v) : PTi18n.number(v)), []);
+  const S = React.useMemo(() => PTTrailer.script(results, {
+    fmt: (v, unit) => (unit === 'min' ? formatDuration(v) : trn(v, '{n} Rep', '{n} Reps', { n: PTi18n.number(v) })),
+    nextWeek: weekNumber(PTData.addDays(weekStart, 7)),
+  }), [results, weekStart]);
+  const tl = PTTrailer.timeline(S.count);
+  const FINALE = 3 + S.count;
+  const [step, setStep] = React.useState(0);
+  const [run, setRun] = React.useState(0); // Nochmal ansehen
+  const stageRef = React.useRef(null);
+  const bed = React.useRef(null);
+  const reduced = React.useMemo(() => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
+
+  // Zeitplan: alle Schritte ab Start, passend zum Soundtrack
+  React.useEffect(() => {
+    setStep(0);
+    bed.current = trailerAudio('sounds/trailer.wav', 0.85);
+    const at = [0, tl.cold2, tl.title, ...S.cuts.map((_, i) => tl.cuts + i * tl.cut), tl.finale];
+    const timers = at.map((sec, i) => setTimeout(() => setStep(s => Math.max(s, i)), sec * 1000));
+    return () => { timers.forEach(clearTimeout); bed.current?.stop(); };
+  }, [run]);
+
+  const atFinale = step >= FINALE;
+  React.useEffect(() => {
+    if (step >= 3 && step < FINALE) trailerTick(false);
+  }, [step]);
+  // Finale: Soundtrack aus, ein Schlusston, ein Feuerwerk
+  React.useEffect(() => {
+    if (!atFinale) return;
+    bed.current?.stop(500);
+    const sting = trailerAudio(S.big ? 'sounds/victory.wav' : 'sounds/goal-reached.wav', 0.9);
+    const stopH = finaleHaptics(S.big);
+    return () => { sting.stop(); stopH(); };
+  }, [atFinale, run]);
+
+  const emojis = React.useMemo(() => (S.big ? TRL_MOODS.win : TRL_MOODS.even), [S.big]);
+  useFinaleFx(stageRef, atFinale ? (S.big ? 2 : 1) : 0, emojis);
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Tippen spult weiter: Intro → erster Schnitt, Schnitt → nächster
+  const advance = () => { if (!atFinale) setStep(s => (s < 3 ? 3 : s + 1)); };
+  const cutIndex = step - 3;
+  const cut = step >= 3 && !atFinale ? S.cuts[cutIndex] : null;
+  const phase = atFinale ? 'finale' : step < 2 ? 'cold' : step === 2 ? 'title' : 'cut';
+
+  return (
+    <div className="fin trl" role="dialog" aria-modal="true" aria-label={tr('Wochen-Trailer')}>
+      {/* key: „Nochmal ansehen“ startet mit frischer Bühne (Feuerwerk und Scrollstand weg) */}
+      <div key={run} className={`fin-stage trl-stage is-${phase}${cut ? ` mood-${cut.mood}` : ''}${atFinale && S.big ? ' is-big' : ''}${reduced ? ' is-reduced' : ''}`}
+        ref={stageRef} onClick={atFinale ? undefined : advance}>
+        {!atFinale && <div className="trl-letterbox" aria-hidden="true"><i /><i /></div>}
+        {atFinale && <>
+          <div className="cel-flashbang" />
+          <div className="cel-laser-bg" />
+          {['12deg', '-16deg', '8deg'].map((a, i) => (
+            <div key={i} className="cel-laser-beam" style={{ '--top': `${12 + i * 18}%`, '--angle': a, '--delay': `${i * 0.25}s`, '--dur': `${1.5 + i * 0.2}s`, '--color': FIN_COLORS[i * 3 % FIN_COLORS.length] }} />
+          ))}
+        </>}
+
+        <div className="trl-top">
+          <div className="trl-progress" aria-hidden="true">
+            {S.cuts.map((c, i) => (
+              <i key={c.key} className={i < cutIndex || atFinale ? 'is-done' : i === cutIndex ? 'is-now' : ''}
+                style={i === cutIndex ? { animationDuration: `${tl.cut}s` } : undefined} />
+            ))}
+          </div>
+          {!atFinale && <button type="button" className="trl-skip" onClick={(e) => { e.stopPropagation(); setStep(FINALE); }}>{tr('Überspringen')}</button>}
+        </div>
+
+        {phase === 'cold' && (
+          <div className="trl-cold">
+            <p key={step} className="trl-cold-line">{S.cold[step]}</p>
+          </div>
+        )}
+        {phase === 'title' && (
+          <div className="trl-title">
+            <div className="fin-kw">{tr('KW {week}', { week: weekNumber(weekStart) })}</div>
+            <div className="trl-title-sub">{tr('Der Wochen-Trailer')}</div>
+            <div className="cel-shockwave" />
+          </div>
+        )}
+        {cut && <TrailerCut key={`${cut.key}|${run}`} cut={cut} index={cutIndex} total={S.count} fmtNum={fmtNum} />}
+        {atFinale && (
+          <TrailerFinale key={run} S={S} fmtNum={fmtNum} onDone={onDone}
+            onReplay={() => { setRun(n => n + 1); }} onDetails={onDetails} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WeekFinale({ results, onDone }) {
   const [index, setIndex] = React.useState(0);
+  const [single, setSingle] = React.useState(false);
   const res = results[index];
   React.useEffect(() => {
     const prev = document.body.style.overflow;
@@ -258,6 +506,9 @@ function WeekFinale({ results, onDone }) {
     return () => { document.body.style.overflow = prev; };
   }, []);
   if (!res) return null;
+  if (!single && results.length >= PTTrailer.TRAILER_MIN) {
+    return <WeekTrailer results={results} onDone={onDone} onDetails={() => { setIndex(0); setSingle(true); }} />;
+  }
   const next = () => (index + 1 < results.length ? setIndex(index + 1) : onDone());
   return (
     <div className="fin" role="dialog" aria-modal="true" aria-label={tr('Wochenabschluss')}>
@@ -267,4 +518,4 @@ function WeekFinale({ results, onDone }) {
   );
 }
 
-Object.assign(window, { WeekFinale, finaleSeen, markFinaleSeen });
+Object.assign(window, { WeekFinale, WeekTrailer, finaleSeen, markFinaleSeen });

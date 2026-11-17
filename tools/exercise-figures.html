@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- Übungsfiguren prüfen (www/exercises.js): Start und Ende jeder Pose.
+     Server „Figuren-Labor“ (Port 8013), dann /tools/exercise-figures?p=0 … ?p=5 -->
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Übungsfiguren</title>
+<link rel="stylesheet" href="../www/redesign.css">
+<style>html,body{margin:0;max-width:none;width:auto}body{background:#fff;padding:6px;font-family:system-ui} .g{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.c{border:1px solid #ddd;border-radius:8px;padding:4px;text-align:center;font-size:11px;color:#c0392b}
+.c b{display:block;color:#333}</style>
+</head><body>
+<div id="root"></div>
+<script src="../www/vendor/react-18.3.1.production.min.js"></script>
+<script src="../www/vendor/react-dom-18.3.1.production.min.js"></script>
+<script src="../www/vendor/babel-standalone-7.29.0.min.js"></script>
+<script src="../www/i18n.js"></script>
+<script src="../www/exercises.js"></script>
+<script type="text/babel" src="../www/exercise-ui.jsx"></script>
+<script type="text/babel">
+const q = new URLSearchParams(location.search);
+const anim = q.get('anim') === '1';
+function Lab() {
+  const page = +(q.get("p") || 0), per = 6, size = +(q.get("s") || 150);
+  const list = PTExercises.LIST.slice(page * per, page * per + per);
+  return <div className="g" style={{gridTemplateColumns:"repeat(2,1fr)"}}>{list.map(e => (
+    <div className="c" key={e.name}><b>{e.name} ({e.fig})</b>
+      <span style={{display:"flex",justifyContent:"center"}}>
+        <ExerciseFigure fig={e.fig} size={size} phase={0} />
+        <ExerciseFigure fig={e.fig} size={size} phase={1} />
+      </span>
+    </div>))}</div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Lab />);
+</script>
+</body></html>
