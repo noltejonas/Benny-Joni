@@ -1,8 +1,34 @@
 # Release mit Fastlane
 
+## Update 1.6.1 (iOS) und 1.6.0 (Android): Leg Curls
+
+Stand 18. November 2026, 21:18 Uhr MEZ: **beide Stores in Prüfung.**
+
+- **Apple 1.6.1 (37):** Version und ReviewSubmission `WAITING_FOR_REVIEW`,
+  eingereicht am `2026-11-18T20:16:40Z`, Submission-ID
+  `6e720953-f308-4aab-9145-42b233d1dbf0`, ein Item. Release-Typ
+  `AFTER_APPROVAL`. Neuerungen nennen nur die Leg Curls; Screenshots,
+  Review-Notizen, Kontakt und Login per Readback bestätigt.
+  IPA-SHA-256 `d1a2179e250fabd60d34f2540a50c4168ea6df04e06c2c5452064fe63edaf811`.
+  Apple hatte 1.6.0 (36) schon freigegeben (Upload von 1.6.0 (37) lehnte
+  Apple mit „previously approved version [1.6.0]“ ab), deshalb 1.6.1.
+- **Google Play 1.6.0 (Code 7):** Produktion „1.6.0 – Übungen, Trailer &
+  Leg Curls“ mit DE-/EN-Neuerungen (`changelogs/7.txt`), Lebenszyklus
+  `RELEASE_LIFECYCLE_STATE_IN_REVIEW`, Commit am `2026-11-18T20:17:40Z`.
+  Vorher Validate ohne Commit bestanden. Länder und Store-Texte nicht
+  angefasst. AAB-SHA-256
+  `c8ab0870b0550a46c06157c3f00732d709fdef9a980ab1f76f42fefea213a0fa`.
+- **Backend:** `20261118090000_leg_curls.sql` eingespielt und registriert:
+  „Leg Curls“ ist die 36. gewertete Standard-Übung (135 Synonyme), eigene
+  „Leg Curls“ und „Beinbeuger“ (3 Wochen, 8 Sätze) hängen daran.
+- Belege: `.local/release/update-20261117/apple/v161/`,
+  `.local/release/update-20261117/android/` (`submit.private.log`,
+  `readback.txt`).
+
 ## Update 1.6.0: Widget, 35 Standard-Übungen und Wochen-Trailer (nur Apple)
 
 Stand 17. November 2026: **Apple 1.6.0 (36) ist zur Prüfung eingereicht.**
+Am 18. November von Apple freigegeben (siehe 1.6.1 oben).
 Version und ReviewSubmission `WAITING_FOR_REVIEW`, eingereicht am
 `2026-11-17T21:16:17Z` (22:16 Uhr MEZ), Submission-ID
 `5a1f149f-127e-4db8-8170-267ec4f62aae` mit genau einem Item (Version 1.6.0).
