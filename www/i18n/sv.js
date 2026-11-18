@@ -1448,5 +1448,10 @@ PTi18n.add('sv', {
   "{wins} Siege. Die Konkurrenz sucht schon Ausreden.": "{wins} segrar. Konkurrenterna letar redan ursäkter.",
   "Ausgeglichen. Das Universum ist zufrieden.": "Jämnt. Universum är nöjt.",
   "Mehr Niederlagen als Siege. Aber wer zählt schon mit? Ach ja: die App.": "Fler förluster än segrar. Men vem räknar? Jo just det: appen.",
-  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Noll segrar. Men 100 % comebackpotential."
+  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Noll segrar. Men 100 % comebackpotential.",
+
+  // ── exercises.js (Leg Curls) ──
+  "Leg Curls": "Lårcurls",
+  "An der Beinbeuger-Maschine oder ohne Gerät: auf dem Rücken liegen, Fersen auf Handtuch, Socken oder Gymnastikball, Hüfte hoch. Die Fersen zum Po ziehen und langsam wieder strecken.": "I en lårcurlmaskin eller utan redskap: ligg på rygg med hälarna på en handduk, strumpor eller en pilatesboll och höften uppe. Dra hälarna mot rumpan och sträck sedan långsamt ut igen.",
+  "Fersen bis nah an den Po ziehen, dann die Beine wieder ganz strecken.": "Dra hälarna nära rumpan och sträck sedan ut benen helt igen."
 });

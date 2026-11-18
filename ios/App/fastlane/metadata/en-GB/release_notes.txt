@@ -1,4 +1,4 @@
-• 35 standard exercises: from diamond push-ups to muscle-ups and pistol squats, each with a short how-to and an animated figure. All of them count for the leaderboard.
+• 36 standard exercises: from diamond push-ups to muscle-ups, leg curls and pistol squats, each with a short how-to and an animated figure. All of them count for the leaderboard.
 • New exercise picker with search and groups (push, pull, legs, core …). Type “Squats” and you get the standard squats, so everyone logs the same exercise.
 • Week trailer: with three or more challenges, the week finale plays as one clip with your record and some cheeky lines.
 • Home screen widget (iOS 17 and later) with your week and open exercises.
