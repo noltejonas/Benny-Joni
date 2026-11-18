@@ -191,6 +191,13 @@
       rule: tr('Körper bleibt von Knie bis Kopf gerade, langsam bis ganz nach unten.'),
       alias: ['nordic curl', 'nordic hamstring curls', 'nordic hamstring curl', 'nordics'],
     },
+    {
+      name: 'Leg Curls', emoji: '🧦', label: tr('Leg Curls'), group: 'legs', level: 2, goal: 60, fig: 'legCurl', // i18n-ignore: DB-Name
+      how: tr('An der Beinbeuger-Maschine oder ohne Gerät: auf dem Rücken liegen, Fersen auf Handtuch, Socken oder Gymnastikball, Hüfte hoch. Die Fersen zum Po ziehen und langsam wieder strecken.'),
+      muscles: tr('Po, hintere Oberschenkel'),
+      rule: tr('Fersen bis nah an den Po ziehen, dann die Beine wieder ganz strecken.'),
+      alias: ['leg curl', 'beinbeuger', 'beincurls', 'bein curls', 'hamstring curls', 'hamstring curl', 'slider leg curls', 'slider curls'],
+    },
     // ── Core ──
     {
       name: 'Sit-ups', emoji: '🧘', label: tr('Sit-ups'), group: 'core', level: 1, goal: 100, fig: 'situp', basic: true, // i18n-ignore: DB-Name
@@ -453,6 +460,10 @@
       props: [['box', 8, 84, 12, 6]],
       a: { hip: [40, 78], t: -90, h: [44, 101], f: [20, 92], eb: -1, kb: 1 },
       b: { hip: [52, 86], t: -28, h: [86, 92], f: [20, 92], eb: -1, kb: 1 },
+    },
+    legCurl: {
+      a: { hip: [48, 84], t: 172, h: [44, 93], f: [82, 94], eb: 1, kb: -1, ha: 180 },
+      b: { hip: [50, 75], t: 151, h: [44, 93], f: [66, 95], eb: 1, kb: -1, ha: 180 },
     },
     situp: {
       a: { ...lying, h: [38, 84] },
