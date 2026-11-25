@@ -443,14 +443,132 @@ function WeekRestartCard({ plan, weekStart, onStart, onDismiss }) {
   );
 }
 
+// ─── Reihenfolge auf „Heute“ ────────────────────────────────────────────────
+// Challenges und Übungen selbst sortieren: am Griff ziehen oder mit den
+// Pfeilen. Jede Änderung gilt sofort (onChange); „Standard“ nimmt die eigene
+// Reihenfolge zurück. order: { comps: [Challenge-IDs], exercises: [Übungs-Schlüssel] }.
+function moveKey(keys, from, to) {
+  const next = [...keys];
+  const [k] = next.splice(from, 1);
+  next.splice(to, 0, k);
+  return next;
+}
+
+// Eine sortierbare Liste. items: [{ key, emoji, name, meta }]; onMove(von, nach).
+function ReorderList({ items, label, onMove }) {
+  const drag = React.useRef(null);
+  const [dragKey, setDragKey] = React.useState(null);
+  const [dy, setDy] = React.useState(0);
+
+  const start = (e, i) => {
+    const row = e.currentTarget.closest('.ho-row');
+    if (!row || drag.current) return;
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    const next = row.nextElementSibling || row.previousElementSibling;
+    const step = next ? Math.abs(next.getBoundingClientRect().top - row.getBoundingClientRect().top) : row.offsetHeight;
+    drag.current = { index: i, y0: e.clientY, step: step || 1 };
+    setDragKey(items[i].key);
+    setDy(0);
+  };
+  const move = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    const target = Math.max(0, Math.min(items.length - 1, d.index + Math.round((e.clientY - d.y0) / d.step)));
+    if (target !== d.index) {
+      onMove(d.index, target);
+      d.y0 += (target - d.index) * d.step;
+      d.index = target;
+    }
+    setDy(e.clientY - d.y0);
+  };
+  const end = () => { drag.current = null; setDragKey(null); setDy(0); };
+
+  return (
+    <ul className="ho-list" aria-label={label}>
+      {items.map((it, i) => (
+        <li key={it.key} className={`ho-row${dragKey === it.key ? ' is-drag' : ''}`}
+          style={dragKey === it.key ? { transform: `translateY(${dy}px)` } : undefined}>
+          <span className="ho-emoji" aria-hidden="true">{it.emoji}</span>
+          <span className="ho-text">
+            <span className="ho-name">{it.name}</span>
+            {it.meta && <span className="ho-meta" aria-hidden="true">{it.meta}</span>}
+          </span>
+          <button type="button" className="ho-btn" disabled={i === 0} onClick={() => onMove(i, i - 1)}
+            aria-label={tr('{name} nach oben', { name: it.name })}>
+            <Icon name="up" size={18} strokeWidth={2.5} />
+          </button>
+          <button type="button" className="ho-btn" disabled={i === items.length - 1} onClick={() => onMove(i, i + 1)}
+            aria-label={tr('{name} nach unten', { name: it.name })}>
+            <Icon name="down" size={18} strokeWidth={2.5} />
+          </button>
+          <span className="ho-grip" aria-hidden="true"
+            onPointerDown={(e) => start(e, i)} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
+            <Icon name="grip" size={20} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function HomeOrderSheet({ comps, exercises, order, onChange, onClose }) {
+  const compItems = comps.map(c => ({ key: c.id, emoji: c.emoji, name: c.name }));
+  const exItems = exercises.map(ex => ({
+    key: ex.key, emoji: ex.cat?.emoji, name: ex.cat?.name,
+    meta: ex.entries.slice(0, 4).map(e => e.card.c.emoji).join(' '),
+  }));
+  // Gespeichert wird die sichtbare Reihenfolge; Schlüssel, die gerade fehlen
+  // (Übung nicht in dieser Woche, archivierte Challenge), bleiben dahinter.
+  const reorder = (field, items) => (from, to) => {
+    const shown = items.map(x => x.key);
+    const rest = (order[field] || []).filter(k => !shown.includes(k));
+    onChange({ ...order, [field]: [...moveKey(shown, from, to), ...rest] });
+  };
+  const custom = order.comps.length > 0 || order.exercises.length > 0;
+  return (
+    <div className="ho">
+      <h2 className="title" style={{ marginBottom: 4 }}>{tr('Reihenfolge auf Heute')}</h2>
+      <div className="subtitle">{tr('Am Griff ziehen oder mit den Pfeilen verschieben.')}</div>
+      {compItems.length > 1 && (
+        <section className="ho-section">
+          <h3 className="ho-label">{tr('Challenges')}</h3>
+          <ReorderList items={compItems} label={tr('Challenges')} onMove={reorder('comps', compItems)} />
+        </section>
+      )}
+      {exItems.length > 1 && (
+        <section className="ho-section">
+          <h3 className="ho-label">{tr('Übungen')}</h3>
+          <div className="ho-hint">{tr('Erledigte Übungen rutschen weiterhin ans Ende.')}</div>
+          <ReorderList items={exItems} label={tr('Übungen')} onMove={reorder('exercises', exItems)} />
+        </section>
+      )}
+      <div className="btn-row" style={{ marginTop: 20 }}>
+        {custom && <button className="btn btn-secondary" onClick={() => onChange({ comps: [], exercises: [] })}>{tr('Standard')}</button>}
+        <button className="btn" onClick={onClose}>{tr('Fertig')}</button>
+      </div>
+    </div>
+  );
+}
+
 function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, onOpenCard, onOpenChallenge, onQuickLog, onOpenLog, onStartWorkout, onAddGoal,
-  restartPlan = [], onRestart, onRestartDismiss }) {
+  restartPlan = [], onRestart, onRestartDismiss, onSort }) {
   const { cards, exercises, ordered } = model;
   // Erledigte Kacheln ans Ende, damit Blau und Grün nicht durcheinander wechseln
   const items = React.useMemo(() => [...exercises.filter(ex => !ex.finished), ...exercises.filter(ex => ex.finished)]
     .map(ex => ({ ...ex, done: ex.finished })), [exercises]);
   const active = items.find(e => e.key === focusKey) || items.find(e => !e.finished) || items[0];
   const finished = exercises.filter(e => e.finished).length;
+  // Neu sortiert: Kachel-Leiste an den Anfang, sonst rastet sie auf der
+  // bisher sichtbaren Kachel ein und die neue erste bleibt links verdeckt.
+  const compsRef = React.useRef(null);
+  const compsSig = cards.map(card => card.c.id).join('|');
+  const compsSigRef = React.useRef(compsSig);
+  React.useLayoutEffect(() => {
+    if (compsSigRef.current === compsSig) return;
+    compsSigRef.current = compsSig;
+    if (compsRef.current) compsRef.current.scrollLeft = 0;
+  }, [compsSig]);
 
   const restarting = restartPlan.length > 0 && !!onRestart;
 
@@ -463,8 +581,13 @@ function DashboardScreen({ me, model, weekStart, daysLeft, focusKey, onFocus, on
         <div className="rd-section-head">
           <h2>{tr('Deine Challenges')}</h2>
           <span>{tr('KW {week}', { week: weekNumber(weekStart) })} · {daysLeft === 0 ? tr('letzter Tag') : trn(daysLeft, 'noch {n} Tag', 'noch {n} Tage')}</span>
+          {onSort && (cards.length > 1 || exercises.length > 1) && (
+            <button type="button" className="rd-head-icon" onClick={onSort} aria-label={tr('Reihenfolge ändern')}>
+              <Icon name="sort" size={16} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
-        <div className="db-comps">
+        <div className="db-comps" ref={compsRef}>
           {cards.map(card => (
             <CompCard key={card.c.id} card={card} onOpen={() => onOpenChallenge(card)} onPeek={() => onOpenCard(card)} />
           ))}
@@ -587,4 +710,4 @@ function ChallengeQuickSheet({ card, weekStart, daysLeft, onOpen, onClose }) {
   );
 }
 
-Object.assign(window, { TugBar, FocusCarousel, DashboardScreen, WeekRestartCard, ChallengeQuickSheet, ChallengeInsights, ExerciseSlide, fmtAmount, compStatusLine });
+Object.assign(window, { TugBar, FocusCarousel, DashboardScreen, HomeOrderSheet, WeekRestartCard, ChallengeQuickSheet, ChallengeInsights, ExerciseSlide, fmtAmount, compStatusLine });

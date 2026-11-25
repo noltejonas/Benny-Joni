@@ -1448,5 +1448,16 @@ PTi18n.add('sv', {
   "{wins} Siege. Die Konkurrenz sucht schon Ausreden.": "{wins} segrar. Konkurrenterna letar redan ursäkter.",
   "Ausgeglichen. Das Universum ist zufrieden.": "Jämnt. Universum är nöjt.",
   "Mehr Niederlagen als Siege. Aber wer zählt schon mit? Ach ja: die App.": "Fler förluster än segrar. Men vem räknar? Jo just det: appen.",
-  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Noll segrar. Men 100 % comebackpotential."
+  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Noll segrar. Men 100 % comebackpotential.",
+  // Reihenfolge auf „Heute“, Teilübungen des 20-Min-AMRAP
+  "Teil von: {name}": "Del av: {name}",
+  "Zählt auch als {parts}": "Räknas även som {parts}",
+  "{name} nach oben": "Flytta {name} uppåt",
+  "{name} nach unten": "Flytta {name} nedåt",
+  "Reihenfolge auf Heute": "Ordning på Idag",
+  "Am Griff ziehen oder mit den Pfeilen verschieben.": "Dra i handtaget eller använd pilarna.",
+  "Erledigte Übungen rutschen weiterhin ans Ende.": "Klara övningar hamnar fortfarande sist.",
+  "Standard": "Standard",
+  "Fertig": "Klar",
+  "Reihenfolge ändern": "Ändra ordning"
 });

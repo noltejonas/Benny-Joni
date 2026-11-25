@@ -1,4 +1,4 @@
-/* global React, ReactDOM, ExercisePicker, ExerciseInfo, PTExercises, useCelebration, PTData, PTDashboard, DashboardScreen, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTStats, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, obSetDemo, trc, PTi18n, PTBootCache, PTScope, PTWidget, PenaltyOverviewScreen, PenaltyOffNote, fmtAmount, compStatusLine, weekNumber */
+/* global React, ReactDOM, ExercisePicker, ExerciseInfo, PTExercises, useCelebration, PTData, PTDashboard, DashboardScreen, HomeOrderSheet, ChallengeQuickSheet, WeekFinale, finaleSeen, markFinaleSeen, PTStats, PTPeople, Icon, Sheet, Toast, HomeScreen, SetupSheet, LogSheet, TomHollandSheet, BringSallySheet, FeedScreen, HistoryScreen, EmojiPickerSheet, BackfillSheet, todayGreeting, useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, WeekFixCard, buildSides, totalsBySide, uniqueMaxIndex, Avatar, PTOnboarding, PTHaptics, ObScreen, ObAuthFlow, ObProfile, ObStart, CreatePanel, JoinPanel, ObInviteLayer, ObGoalLayer, ObFirstLogLayer, ObCelebrate, ObPushPrimer, PTPush, ObStarterCard, ObInviteCard, ObWeekOne, ChallengeSwitcherSheet, CreateCompetitionSheet, JoinCompetitionSheet, ProfileSheet, tr, trn, obSetDemo, trc, PTi18n, PTBootCache, PTScope, PTWidget, PenaltyOverviewScreen, PenaltyOffNote, fmtAmount, compStatusLine, weekNumber */
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const SUPABASE_URL = "https://jczyyupxxqrdgbeifcwe.supabase.co";
@@ -182,6 +182,38 @@ function loggedToast(value, name, count = 1) {
 const SCOPE_KEY = 'pt:scope';
 function readScope() { try { return sessionStorage.getItem(SCOPE_KEY) === 'one' ? 'one' : 'all'; } catch (e) { return 'all'; } }
 function writeScope(v) { try { sessionStorage.setItem(SCOPE_KEY, v); } catch (e) {} }
+
+// Eigene Reihenfolge auf „Heute“ (HomeOrderSheet): { comps: [Challenge-IDs],
+// exercises: [Übungs-Schlüssel] }. Pro Person auf diesem Gerät, wie
+// Erscheinungsbild und Farben. Ein Event hält App und Challenge-Ansicht gleich.
+const HOME_ORDER_EVENT = 'pt:home-order';
+const homeOrderKey = (userId) => `pt:home-order:${userId}`;
+function readHomeOrder(userId) {
+  const list = (v) => (Array.isArray(v) ? v.filter(k => typeof k === 'string') : []);
+  try {
+    const v = JSON.parse(localStorage.getItem(homeOrderKey(userId)) || 'null');
+    return { comps: list(v?.comps), exercises: list(v?.exercises) };
+  } catch (e) { return { comps: [], exercises: [] }; }
+}
+function useHomeOrder(userId) {
+  const [order, setOrder] = useState(() => readHomeOrder(userId));
+  useEffect(() => {
+    const sync = () => setOrder(readHomeOrder(userId));
+    sync();
+    window.addEventListener(HOME_ORDER_EVENT, sync);
+    return () => window.removeEventListener(HOME_ORDER_EVENT, sync);
+  }, [userId]);
+  const save = useCallback((next) => {
+    const clean = { comps: next?.comps || [], exercises: next?.exercises || [] };
+    try {
+      if (clean.comps.length || clean.exercises.length) localStorage.setItem(homeOrderKey(userId), JSON.stringify(clean));
+      else localStorage.removeItem(homeOrderKey(userId));
+    } catch (e) {}
+    setOrder(clean);
+    window.dispatchEvent(new Event(HOME_ORDER_EVENT));
+  }, [userId]);
+  return [order, save];
+}
 
 // Beim allerersten Dashboard auf diesem Gerät: schon geknackte Gruppenziele
 // nicht nacheinander als Vollbild feiern, nur was ab jetzt geknackt wird.
@@ -558,6 +590,7 @@ function App() {
   // „Alle Challenges“ (Heute, Feed, Stats, Strafkonto) liest aus den Daten aller laufenden Challenges.
   const dash = useDashboardData(api, userId ? competitions : null, userId);
   const openCompetition = useCallback((id) => { setScope('one'); setActiveId(id); }, [setScope]);
+  const [homeOrder] = useHomeOrder(userId);
 
   if (!api) {
     return (
@@ -602,7 +635,7 @@ function App() {
   const sheets = (
     <>
       <ChallengeSwitcherSheet open={sheet === 'switcher'} onClose={() => setSheet(null)}
-        profile={profile} competitions={competitions} activeId={activeId}
+        profile={profile} competitions={PTData.applyOrder(competitions, homeOrder.comps)} activeId={activeId}
         allSelected={PTScope.resolve(scope, dash.live.length) === 'all'}
         onSelectAll={dash.live.length >= 2 ? () => { setScope('all'); setSheet(null); } : null}
         onSelect={(id) => { setScope('one'); setActiveId(id); setSheet(null); }}
@@ -800,9 +833,11 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   const tabRef = React.useRef(tab);
   tabRef.current = tab;
   // Strafkonto-Tab: diese Challenge hat eins oder (bei „Alle“) irgendeine laufende.
+  const [homeOrder, saveHomeOrder] = useHomeOrder(me);
+  const [homeOrderOpen, setHomeOrderOpen] = useState(false);
   const penaltyComps = useMemo(
-    () => PTScope.orderComps(dash.live.filter(c => c.penalties_enabled), profile.main_competition_id),
-    [dash.live, profile.main_competition_id]);
+    () => PTScope.orderComps(dash.live.filter(c => c.penalties_enabled), profile.main_competition_id, homeOrder.comps),
+    [dash.live, profile.main_competition_id, homeOrder.comps]);
   const showPenaltyTab = !!competition.penalties_enabled || (multi && penaltyComps.length > 0);
   useEffect(() => {
     if (tab === 'strafkonto' && !showPenaltyTab) setTab('home');
@@ -1143,8 +1178,8 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
   // ── Dashboard über alle Challenges ──────────────────────────────────────
   const dashComps = useMemo(() => {
     if (!dash.bundle) return [];
-    const mainId = profile.main_competition_id;
-    const order = [...dash.live].sort((a, b) => (b.id === mainId) - (a.id === mainId));
+    // Haupt-Challenge zuerst, außer man hat selbst sortiert (HomeOrderSheet)
+    const order = PTScope.orderComps(dash.live, profile.main_competition_id, homeOrder.comps);
     return order.map(c => {
       const ms = dash.bundle.members.filter(m => m.competition_id === c.id);
       const parts = PTData.participantsFor(ms, weekStart).length;
@@ -1152,10 +1187,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
       // Dashboard, Schnellansicht, Feed und Challenge dieselben Zahlen zeigen.
       return { c, members: ms, sides: buildSides(c, ms, me), participantCount: sharePeopleFor(c.mode, parts) };
     });
-  }, [dash.bundle, dash.live, me, weekStart, profile.main_competition_id, sharePeopleFor]);
+  }, [dash.bundle, dash.live, me, weekStart, profile.main_competition_id, sharePeopleFor, homeOrder.comps]);
   const dashModel = useMemo(
-    () => (dash.bundle && dashComps.length ? PTDashboard.buildDashboard({ me, comps: dashComps, bundle: dash.bundle, weekStart }) : null),
-    [dash.bundle, dashComps, me, weekStart]
+    () => (dash.bundle && dashComps.length
+      ? PTDashboard.buildDashboard({ me, comps: dashComps, bundle: dash.bundle, weekStart, exerciseOrder: homeOrder.exercises })
+      : null),
+    [dash.bundle, dashComps, me, weekStart, homeOrder.exercises]
   );
   const showDashboard = tab === 'home' && scopeAll && !!dashModel;
   // Homescreen-Widget: Schnappschuss aus demselben Modell wie „Heute“, bei jeder
@@ -1788,6 +1825,7 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
             onOpenLog={dashOpenLog}
             onStartWorkout={dashOpenLog}
             onAddGoal={() => setSetupForChallenge({})}
+            onSort={() => setHomeOrderOpen(true)}
             restartPlan={restartPlan} onRestart={restartWeek} onRestartDismiss={dismissRestart} />
         )}
         {multi && ((tab === 'home' && !showDashboard) || (!headerAll && (tab === 'feed' || tab === 'strafkonto'))) && (
@@ -2134,6 +2172,12 @@ function CompetitionApp({ api, competition: initialCompetition, profile, me, ema
         })()}
       </Sheet>
 
+      <Sheet open={homeOrderOpen && !!dashModel} onClose={() => setHomeOrderOpen(false)}>
+        {homeOrderOpen && dashModel && (
+          <HomeOrderSheet comps={dashModel.cards.map(card => card.c)} exercises={dashModel.exercises}
+            order={homeOrder} onChange={saveHomeOrder} onClose={() => setHomeOrderOpen(false)} />
+        )}
+      </Sheet>
       <Sheet open={!!quickCard} onClose={() => setQuickCard(null)}>
         {quickCard && (
           <ChallengeQuickSheet

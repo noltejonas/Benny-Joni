@@ -640,6 +640,7 @@
           db.sets.push(row);
           return row;
         });
+        applyParts(rows[0]);
         save(); emitAll();
         return later(withAthlete(rows[0]));
       },
@@ -891,7 +892,41 @@
         db.sets.push({ ...row, id: newId('s'), competition_id: t.competition_id, challenge_id: t.challenge_id });
       }
     }
+    applyParts(first);
     return first;
+  }
+
+  // Wie der Trigger sync_workout_parts (Migration workout_parts): Ein
+  // Pflicht-Workout mit Teilübungen (20-Min-AMRAP) bekommt pro Teilübung einen
+  // Satz in jedem Wochenziel dieser Übung derselben Woche.
+  const catOfSet = (s) => {
+    const ch = db.weekly_challenges.find(w => w.id === s.challenge_id);
+    return ch && db.categories.find(c => c.id === ch.category_id);
+  };
+  const partRows = (s) => db.sets.filter(x => x.source_log_id === s.log_id && x.user_id === s.user_id);
+  function applyParts(s) {
+    if (s.source_log_id || !(s.reps > 0)) return;
+    const ch = db.weekly_challenges.find(w => w.id === s.challenge_id);
+    const wcat = catOfSet(s);
+    for (const part of window.PTExercises?.partsOf(wcat, s.reps) || []) {
+      const pc = db.categories.find(c => c.competition_id == null && c.name === part.name);
+      if (!pc) continue;
+      const log = `${s.log_id}:${pc.id}`;
+      for (const t of logTargets(s.user_id, pc.id, ch.week_start)) {
+        if (db.sets.some(x => x.log_id === log && x.challenge_id === t.challenge_id)) continue;
+        db.sets.push({ id: newId('s'), challenge_id: t.challenge_id, competition_id: t.competition_id, user_id: s.user_id,
+          reps: part.reps, duration_minutes: null, note: `Teil von: ${wcat.name}`, created_at: s.created_at, // i18n-ignore: steht so in der DB
+          log_id: log, source_log_id: s.log_id });
+      }
+    }
+  }
+  function syncParts(s) {
+    if (s.source_log_id || !(s.reps > 0)) return;
+    const parts = window.PTExercises?.partsOf(catOfSet(s), s.reps) || [];
+    for (const x of partRows(s)) {
+      const part = parts.find(p => p.name === catOfSet(x)?.name);
+      if (part) Object.assign(x, { reps: part.reps, created_at: s.created_at });
+    }
   }
 
   function membersOf(cid) {
@@ -980,11 +1015,13 @@
         const shared = {};
         for (const k of ['reps', 'duration_minutes', 'created_at', 'note']) if (k in rest) shared[k] = rest[k];
         for (const x of db.sets) if (x.log_id === s.log_id && x.user_id === s.user_id && x.id !== s.id) Object.assign(x, shared);
+        if ('reps' in rest || 'created_at' in rest) syncParts(s);
         emit(); emitAll(); return later(withAthlete(s));
       },
       async deleteSet(id) {
         const s = db.sets.find(x => x.id === id);
-        const gone = new Set(db.sets.filter(x => x.id === id || (s && x.log_id === s.log_id && x.user_id === s.user_id)).map(x => x.id));
+        const gone = new Set(db.sets.filter(x => x.id === id || (s && x.log_id === s.log_id && x.user_id === s.user_id)
+          || (s && !s.source_log_id && x.source_log_id === s.log_id && x.user_id === s.user_id)).map(x => x.id));
         db.sets = db.sets.filter(x => !gone.has(x.id)); db.reactions = db.reactions.filter(r => !gone.has(r.set_id)); emit(); emitAll();
       },
       async recentFeed(limit = 50) {

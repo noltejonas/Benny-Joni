@@ -449,6 +449,38 @@
   font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
 }
 .rd-section-head > h2 { margin-right: auto; }
+.rd-section-head .rd-head-icon {
+  flex-shrink: 0; align-self: center; margin-left: -4px;
+  display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: none; border-radius: 999px; background: var(--primary-tint); color: var(--primary-ink); cursor: pointer;
+}
+
+/* ─── Reihenfolge auf „Heute“ (HomeOrderSheet) ─────────────────────────── */
+.ho-section { margin-top: 18px; }
+.ho-label { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+.ho-hint { margin-bottom: 8px; font-size: 13px; color: var(--text-3); }
+.ho-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ho-row {
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 52px;
+  padding: 6px 6px 6px 12px; border-radius: var(--radius-sm); background: var(--surface-2);
+  transition: box-shadow .15s var(--ease);
+}
+.ho-row.is-drag { z-index: 1; box-shadow: var(--shadow); background: var(--surface); }
+.ho-emoji { font-size: 22px; line-height: 1; width: 28px; text-align: center; flex-shrink: 0; }
+.ho-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ho-name { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ho-meta { font-size: 12px; line-height: 16px; }
+.ho-btn {
+  flex-shrink: 0; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: none; border-radius: 999px; background: transparent; color: var(--text-2); cursor: pointer;
+}
+.ho-btn:disabled { opacity: 0.25; cursor: default; }
+.ho-btn:not(:disabled):active { background: var(--track); }
+.ho-grip {
+  flex-shrink: 0; display: inline-grid; place-items: center; width: 40px; height: 40px;
+  color: var(--text-3); cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none;
+}
+.ho-row.is-drag .ho-grip { cursor: grabbing; color: var(--primary-ink); }
 .stats-week-bar.is-wide { grid-template-columns: 50px minmax(0, 1fr) 50px; font-size: 12px; }
 .stats-week-bar .mono, .stats-race-val { white-space: nowrap; }
 .stats-race-row { grid-template-columns: 64px minmax(0, 1fr) 64px; }

@@ -1336,5 +1336,16 @@ PTi18n.add('en', {
   '{wins} Siege. Die Konkurrenz sucht schon Ausreden.': '{wins} wins. The competition is already looking for excuses.',
   'Ausgeglichen. Das Universum ist zufrieden.': 'Even. The universe is pleased.',
   'Mehr Niederlagen als Siege. Aber wer zählt schon mit? Ach ja: die App.': 'More losses than wins. But who’s counting? Oh right: the app.',
-  'Null Siege. Dafür 100 % Comeback-Potenzial.': 'Zero wins. But 100% comeback potential.'
+  'Null Siege. Dafür 100 % Comeback-Potenzial.': 'Zero wins. But 100% comeback potential.',
+  // Reihenfolge auf „Heute“, Teilübungen des 20-Min-AMRAP
+  'Teil von: {name}': 'Part of: {name}',
+  'Zählt auch als {parts}': 'Also counts as {parts}',
+  '{name} nach oben': 'Move {name} up',
+  '{name} nach unten': 'Move {name} down',
+  'Reihenfolge auf Heute': 'Order on Today',
+  'Am Griff ziehen oder mit den Pfeilen verschieben.': 'Drag the handle or use the arrows.',
+  'Erledigte Übungen rutschen weiterhin ans Ende.': 'Finished exercises still move to the end.',
+  'Standard': 'Default',
+  'Fertig': 'Done',
+  'Reihenfolge ändern': 'Change order'
 });

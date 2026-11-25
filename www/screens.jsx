@@ -1197,6 +1197,9 @@ const TH_ROUNDS_KEY  = 'pt_th_rounds';
 const TH_CHALL_KEY   = 'pt_th_challenge_id';
 const TH_DURATION_MS = 20 * 60 * 1000; // 20 minutes
 
+// Teilübungen des 20-Min-AMRAP für n Runden (PTExercises.partsOf)
+const thParts = (n) => window.PTExercises?.partsOf({ name: '20-Min-AMRAP', competition_id: null }, n) || []; // i18n-ignore: DB-Name
+
 function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }) {
   const [rounds, setRounds] = React.useState(() => {
     const saved = localStorage.getItem(TH_ROUNDS_KEY);
@@ -1323,6 +1326,13 @@ function TomHollandSheet({ api, me, challenge, allSets = [], onClose, onLogged }
 
       {timeUp && (
         <div className="th-time-up-banner">{tr('⏰ Zeit ist um! Drücke + für jede fertige Runde.')}</div>
+      )}
+
+      {/* Die Datenbank trägt die Teilübungen in die Wochenziele dieser Übungen ein (workout_parts) */}
+      {rounds > 0 && thParts(rounds).length > 0 && (
+        <div className="th-parts">
+          {tr('Zählt auch als {parts}', { parts: thParts(rounds).map(p => `${PTi18n.number(p.reps)} ${p.label}`).join(' · ') })}
+        </div>
       )}
 
       {/* History: last weeks */}

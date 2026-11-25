@@ -128,6 +128,9 @@
     if (m) return tr('Zeit: {time}', { time: m[1] });
     m = /^(\d+:\d{2}) von (\d+:\d{2})$/.exec(note);
     if (m) return tr('{time} von {total}', { time: m[1], total: m[2] });
+    // Teilsatz eines Pflicht-Workouts (Migration workout_parts): „Teil von: 20-Min-AMRAP“
+    m = /^Teil von: (.+)$/.exec(note);
+    if (m) return tr('Teil von: {name}', { name: window.PTExercises?.meta(m[1])?.label || m[1] });
     return note;
   }
 
@@ -191,6 +194,19 @@
     if (cat.kind === 'work') return `work:${competitionId || cat.competition_id}:${cat.id}`;
     if (cat.competition_id == null) return `cat:${cat.id}`;
     return `own:${cat.kind || 'sports'}:${String(cat.name || '').trim().toLowerCase().replace(/\s+/g, ' ')}`;
+  }
+
+  // Eigene Reihenfolge auf „Heute“ (Challenges, Übungen): Schlüssel aus
+  // `order` in dieser Folge, alles andere dahinter in der bisherigen
+  // Reihenfolge (z. B. eine neu beigetretene Challenge). Ohne eigene
+  // Reihenfolge bleibt die Liste, wie sie ist.
+  function applyOrder(list, order, keyOf = (x) => x.id) {
+    const items = [...(list || [])];
+    if (!order || !order.length) return items;
+    const rank = new Map(order.map((k, i) => [k, i]));
+    return items.map((x, i) => ({ x, i, r: rank.has(keyOf(x)) ? rank.get(keyOf(x)) : Infinity }))
+      .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
+      .map(e => e.x);
   }
 
   // Gemeinsame log_id für einen Satz, der in mehreren Challenges zählt.
@@ -1497,7 +1513,7 @@
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
-    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary,
+    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, applyOrder,
     workoutTargetRuns, workoutRunCount, workoutProgress, workoutPeopleDone,
     friendlyError, appError, clearLocalData, localizeCategory, sportsOnlyBundle, usesMinutes, exerciseKey, newLogId,
   };

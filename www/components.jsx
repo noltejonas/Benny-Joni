@@ -45,6 +45,10 @@ function Icon({ name, size = 24, color = 'currentColor', strokeWidth = 2 }) {
     copy: <><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></>,
     clipboard: <><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h4"/></>,
     shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    sort: <path d="M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4"/>,
+    grip: <path d="M5 8h14M5 12h14M5 16h14"/>,
+    up: <path d="m6 15 6-6 6 6"/>,
+    down: <path d="m6 9 6 6 6-6"/>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}

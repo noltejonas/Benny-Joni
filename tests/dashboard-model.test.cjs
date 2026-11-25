@@ -95,6 +95,29 @@ test('buildDashboard führt gleiche Übungen zusammen und zählt eine log_id ein
   assert.equal(bible.pct, 0);
 });
 
+test('buildDashboard: eigene Reihenfolge der Übungen, offene bleiben vorn', () => {
+  const bundle = {
+    categories: [...cats, { id: 'pull', name: 'Klimmzüge', kind: 'sports', challenge_type: 'standard', competition_id: null, ranked: true }],
+    challenges: [
+      { id: 'a-push', competition_id: 'A', category_id: 'push', week_start: WEEK, target_reps: 100 },
+      { id: 'a-pull', competition_id: 'A', category_id: 'pull', week_start: WEEK, target_reps: 100 },
+      { id: 'b-bible', competition_id: 'B', category_id: 'bible-b', week_start: WEEK, target_reps: 60 },
+    ],
+    sets: [{ challenge_id: 'a-pull', athlete: 'me', reps: 50, log_id: 'L1', created_at: at('2026-10-20') }],
+  };
+  const comps = [
+    { c: { id: 'A', name: 'A' }, sides: duel, participantCount: 2 },
+    { c: { id: 'B', name: 'B' }, sides: [side('me', true)], participantCount: 1 },
+  ];
+  const plain = D.buildDashboard({ me: 'me', comps, bundle, weekStart: WEEK, today: WED });
+  assert.deepEqual(ids(plain.exercises, 'key'), ['cat:push', 'cat:pull', 'own:time:bibellesen']);
+  const bible = 'own:time:bibellesen';
+  const m = D.buildDashboard({ me: 'me', comps, bundle, weekStart: WEEK, today: WED, exerciseOrder: [bible, 'cat:gone', 'cat:pull'] });
+  assert.deepEqual(ids(m.exercises, 'key'), [bible, 'cat:pull', 'cat:push'], 'Unbekanntes (Liegestütze) hinten');
+  // Klimmzüge sind erledigt (50 von 50): in der Liste weiter hinter den offenen
+  assert.deepEqual(ids(m.ordered, 'key'), [bible, 'cat:push', 'cat:pull']);
+});
+
 test('matchingTargets: andere Challenges mit derselben Übung derselben Woche', () => {
   const bundle = {
     categories: cats,

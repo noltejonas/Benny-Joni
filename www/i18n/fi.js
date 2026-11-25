@@ -1448,5 +1448,16 @@ PTi18n.add('fi', {
   "{wins} Siege. Die Konkurrenz sucht schon Ausreden.": "{wins} voittoa. Kilpailijat etsivät jo tekosyitä.",
   "Ausgeglichen. Das Universum ist zufrieden.": "Tasan. Maailmankaikkeus on tyytyväinen.",
   "Mehr Niederlagen als Siege. Aber wer zählt schon mit? Ach ja: die App.": "Enemmän tappioita kuin voittoja. Mutta kuka laskee? Ai niin: sovellus.",
-  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Nolla voittoa. Mutta 100 % paluupotentiaalia."
+  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Nolla voittoa. Mutta 100 % paluupotentiaalia.",
+  // Reihenfolge auf „Heute“, Teilübungen des 20-Min-AMRAP
+  "Teil von: {name}": "Osa: {name}",
+  "Zählt auch als {parts}": "Lasketaan myös: {parts}",
+  "{name} nach oben": "Siirrä {name} ylös",
+  "{name} nach unten": "Siirrä {name} alas",
+  "Reihenfolge auf Heute": "Järjestys Tänään-näkymässä",
+  "Am Griff ziehen oder mit den Pfeilen verschieben.": "Vedä kahvasta tai käytä nuolia.",
+  "Erledigte Übungen rutschen weiterhin ans Ende.": "Tehdyt liikkeet siirtyvät edelleen loppuun.",
+  "Standard": "Oletus",
+  "Fertig": "Valmis",
+  "Reihenfolge ändern": "Muuta järjestystä"
 });

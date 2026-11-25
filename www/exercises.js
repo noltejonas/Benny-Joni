@@ -284,6 +284,9 @@
       muscles: tr('Ganzer Körper'),
       rule: tr('Volle Runden in 20 Minuten: 5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen.'),
       alias: ['amrap', 'tom holland', '20 min amrap'],
+      // Teilübungen pro Runde (DB-Namen). Die Datenbank legt dazu Teilsätze an
+      // (Tabelle workout_parts, Migration 20261125120000_workout_parts.sql).
+      parts: [['Klimmzüge', 5], ['Liegestütze', 10], ['Kniebeugen', 15]], // i18n-ignore: DB-Namen
     },
   ];
 
@@ -329,6 +332,14 @@
     if (!cat) return 'other';
     if (cat.competition_id != null) return 'own';
     return metaOf(cat)?.group || 'other';
+  }
+
+  // Teilübungen eines Pflicht-Workouts für `rounds` Runden:
+  // [{ name (DB), label (App-Sprache), per, reps }]. Andere Übungen: [].
+  function partsOf(cat, rounds = 1) {
+    const m = metaOf(cat);
+    const n = Math.max(0, Math.floor(Number(rounds) || 0));
+    return (m?.parts || []).map(([name, per]) => ({ name, label: meta(name)?.label || name, per, reps: per * n }));
   }
 
   // Sortierung im Katalog: Reihenfolge von LIST, Unbekanntes danach.
@@ -591,7 +602,7 @@
     return f ? { props: f.props || [], marks: f.marks || [], hold: !!f.hold, box: bounds(fig) } : null;
   }
 
-  const api = { GROUPS, LEVELS, LIST, FLOOR, ASPECT, meta, metaOf, match, groupOf, orderOf, search, pose, figure, figs: Object.keys(FIGS), _loose: loose };
+  const api = { GROUPS, LEVELS, LIST, FLOOR, ASPECT, meta, metaOf, match, groupOf, orderOf, partsOf, search, pose, figure, figs: Object.keys(FIGS), _loose: loose };
   root.PTExercises = api;
   if (typeof window !== 'undefined') window.PTExercises = api;
 })();
