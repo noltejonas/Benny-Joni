@@ -1,17 +1,21 @@
-// Prüft die Migration 20261125120000_workout_parts.sql (20-Min-AMRAP zählt in
-// seine Teilübungen) gegen eine eingebettete Postgres (PGlite) mit den dafür
+// Prüft die Migrationen 20261125120000_workout_parts.sql,
+// 20261125200000_workout_parts_rounds.sql und 20261125210000_workout_parts_blocks.sql
+// (20-Min-AMRAP zählt in seine Teilübungen, ein Satz pro Runde, je Übung als
+// Block) gegen eine eingebettete Postgres (PGlite) mit den dafür
 // nötigen Tabellen, sync_log_siblings und log_set wie in Produktion. Läuft nicht
 // mit `npm test` (braucht PGlite); von Hand:
 //   npm i --no-save @electric-sql/pglite@0.2.17
 //   node tests/sql/workout-parts.pglite.mjs
 // Prüft: Nachtrag KW 48 ohne Pushes und nur in laufenden Challenges mit aktiver
-// Mitgliedschaft, neue Einträge, Bearbeiten, Löschen, Cascade, Rechte.
+// Mitgliedschaft, Umbau auf Rundensätze, Zeiten der Runden, neue Einträge,
+// Bearbeiten, Löschen, Cascade, Rechte.
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 
 const ROOT = new URL('../../supabase/migrations/', import.meta.url);
-const MIG = new URL('20261125120000_workout_parts.sql', ROOT);
+const MIGS = ['20261125120000_workout_parts.sql', '20261125200000_workout_parts_rounds.sql', '20261125210000_workout_parts_blocks.sql']
+  .map(f => new URL(f, ROOT));
 const db = new PGlite();
 const q = async (sql, params) => (await db.query(sql, params)).rows;
 const as = async (uid) => db.exec(`select set_config('request.jwt.claim.sub', '${uid}', false)`);
@@ -70,63 +74,93 @@ await q(`select log_set($1, 30)`, [g.c1kz]);
 assert.equal((await q(`select count(*)::int n from sets where log_id = $1`, [a1.log_id]))[0].n, 2, 'AMRAP in C1 und C2');
 const pushesBefore = (await q(`select count(*)::int n from push_calls`))[0].n;
 
-// ─── Migration ──────────────────────────────────────────────────────────────
-await db.exec(fs.readFileSync(MIG, 'utf8'));
+// ─── Migrationen ────────────────────────────────────────────────────────────
+// Erst die Sammelsätze (wie in Produktion am 25.11. eingespielt), dann der Umbau.
+await db.exec(fs.readFileSync(MIGS[0], 'utf8'));
+const lumped = await q(`select count(*)::int n, max(reps)::int m from sets where source_log_id is not null`);
+assert.deepEqual([lumped[0].n, lumped[0].m], [7, 300], 'erste Migration: Sammelsätze');
+await db.exec(fs.readFileSync(MIGS[1], 'utf8'));
+await db.exec(fs.readFileSync(MIGS[2], 'utf8'));
 
-
-const derived = async (uid) => q(`select c.name comp, k.name cat, s.reps, s.note, s.created_at, s.log_id, s.source_log_id
+// Teilsätze pro Person: [Challenge, Übung, Zahl der Sätze, Wiederholungen pro Satz, Summe]
+const summary = async (uid, src = null) => q(`select c.name comp, k.name cat, count(*)::int n, min(s.reps)::int lo, max(s.reps)::int hi, sum(s.reps)::int total
   from sets s join weekly_challenges wc on wc.id = s.challenge_id join categories k on k.id = wc.category_id join competitions c on c.id = s.competition_id
-  where s.user_id = $1 and s.source_log_id is not null order by c.name, k.name`, [uid]);
-let dA = await derived(A);
-assert.deepEqual(dA.map(r => [r.comp, r.cat, r.reps]), [
-  ['C1', 'Klimmzüge', 100], ['C1', 'Liegestütze', 200], ['C2', 'Klimmzüge', 100], ['C2', 'Kniebeugen', 300],
-], 'Nachtrag A: nur laufende Challenges, aktive Mitgliedschaft, ohne Solo/Archiv/Ausgetreten');
-assert.ok(dA.every(r => r.note === 'Teil von: 20-Min-AMRAP'));
-assert.ok(dA.every(r => r.source_log_id === a1.log_id));
-assert.ok(dA.every(r => new Date(r.created_at).toISOString() === '2026-11-23T17:51:43.000Z'), 'Zeit vom AMRAP');
-assert.equal(new Set(dA.filter(r => r.cat === 'Klimmzüge').map(r => r.log_id)).size, 1, 'Klimmzug-Kopien teilen eine log_id');
-assert.equal(new Set(dA.map(r => r.log_id)).size, 3, 'eine log_id pro Teilübung');
-let dB = await derived(B);
-assert.deepEqual(dB.map(r => [r.comp, r.cat, r.reps]), [['Ausgetreten', 'Klimmzüge', 70], ['C1', 'Klimmzüge', 70], ['C1', 'Liegestütze', 140]]);
-assert.equal((await q(`select count(*)::int n from push_calls`))[0].n, pushesBefore, 'Nachtrag ohne Pushes');
-const old = await q(`select count(*)::int n from sets s where s.challenge_id = $1`, [g.oldKz]);
-assert.equal(old[0].n, 0, 'alte Woche bleibt');
-const trig = await q(`select tgenabled from pg_trigger where tgname = 'notify_set_after_insert'`);
-assert.equal(trig[0].tgenabled, 'O', 'Push-Trigger wieder an');
+  where s.user_id = $1 and s.source_log_id is not null and ($2::uuid is null or s.source_log_id = $2::uuid)
+  group by c.name, k.name order by c.name collate "C", k.name collate "C"`, [uid, src]);
+const rows = (list) => list.map(r => [r.comp, r.cat, r.n, r.lo === r.hi ? r.lo : `${r.lo}-${r.hi}`, r.total]);
+
+assert.deepEqual(rows(await summary(A)), [
+  ['C1', 'Klimmzüge', 20, 5, 100], ['C1', 'Liegestütze', 20, 10, 200],
+  ['C2', 'Klimmzüge', 20, 5, 100], ['C2', 'Kniebeugen', 20, 15, 300],
+], 'A: 20 Sätze pro Teilübung statt eines Sammelsatzes, nur laufende Challenges mit aktiver Mitgliedschaft');
+assert.deepEqual(rows(await summary(B)), [
+  ['Ausgetreten', 'Klimmzüge', 14, 5, 70], ['C1', 'Klimmzüge', 14, 5, 70], ['C1', 'Liegestütze', 14, 10, 140],
+]);
+assert.equal((await q(`select count(*)::int n from sets where source_log_id is not null and note is not null`))[0].n, 0, 'keine Notiz');
+assert.equal((await q(`select count(*)::int n from push_calls`))[0].n, pushesBefore, 'beide Nachträge ohne Pushes');
+assert.equal((await q(`select tgenabled from pg_trigger where tgname = 'notify_set_after_insert'`))[0].tgenabled, 'O', 'Push-Trigger wieder an');
+assert.equal((await q(`select count(*)::int n from sets s where s.challenge_id = $1`, [g.oldKz]))[0].n, 0, 'alte Woche bleibt');
+
+// Runden: eigene log_id pro Runde, Kopien in C1/C2 teilen sie; Zeiten im Minutentakt bis zum Eintrag
+const kz = await q(`select s.log_id, s.created_at from sets s where s.source_log_id = $1 and s.challenge_id = $2 order by s.created_at`, [a1.log_id, g.c1kz]);
+assert.equal(new Set(kz.map(r => r.log_id)).size, 20);
+const kzC2 = await q(`select log_id from sets where source_log_id = $1 and challenge_id = $2`, [a1.log_id, g.c2kz]);
+assert.deepEqual(new Set(kzC2.map(r => r.log_id)), new Set(kz.map(r => r.log_id)), 'Kopien einer Runde teilen die log_id');
+// 20 Runden × 3 Übungen = 60 Plätze à 20 s: Klimmzüge zuerst, Kniebeugen zuletzt
+assert.equal(new Date(kz[0].created_at).toISOString(), '2026-11-23T17:32:03.000Z', 'erste Klimmzug-Runde 19:40 vorher');
+assert.equal(new Date(kz[19].created_at).toISOString(), '2026-11-23T17:38:23.000Z', 'letzte Klimmzug-Runde');
+const lastKb = await q(`select max(created_at) t from sets where source_log_id = $1 and challenge_id = $2`, [a1.log_id, g.c2kb]);
+assert.equal(new Date(lastKb[0].t).toISOString(), '2026-11-23T17:51:43.000Z', 'letzte Kniebeugen-Runde = Eintrag');
+// Im Feed hintereinander: alle Klimmzüge, dann alle Liegestütze (C1)
+const seq = await q(`select k.name from sets s join weekly_challenges wc on wc.id = s.challenge_id join categories k on k.id = wc.category_id
+  where s.source_log_id = $1 and s.competition_id = $2 order by s.created_at, s.id`, [a1.log_id, C1]);
+assert.deepEqual(seq.map(r => r.name), [...Array(20).fill('Klimmzüge'), ...Array(20).fill('Liegestütze')], 'je Übung ein Block');
+const perLog = await q(`select count(distinct log_id)::int n from sets where user_id = $1 and source_log_id is not null`, [A]);
+assert.equal(perLog[0].n, 60, '20 Runden × 3 Übungen');
 
 // ─── Live: B loggt 10 Runden ────────────────────────────────────────────────
 await as(B);
 const p0 = (await q(`select count(*)::int n from push_calls`))[0].n;
-const b2 = (await q(`select * from log_set($1, 10, 'Zeit: 20:00')`, [g.c1a]))[0];
-dB = (await derived(B)).filter(r => r.source_log_id === b2.log_id);
-assert.deepEqual(dB.map(r => [r.comp, r.cat, r.reps]), [['Ausgetreten', 'Klimmzüge', 50], ['C1', 'Klimmzüge', 50], ['C1', 'Liegestütze', 100]]);
-assert.equal((await q(`select count(*)::int n from push_calls`))[0].n - p0, 4, 'Push-Trigger für AMRAP und Teilsätze');
+const b2 = (await q(`select * from log_set($1, 10, 'Zeit: 20:00', '2026-11-25T09:00:00Z')`, [g.c1a]))[0];
+assert.deepEqual(rows(await summary(B, b2.log_id)), [
+  ['Ausgetreten', 'Klimmzüge', 10, 5, 50], ['C1', 'Klimmzüge', 10, 5, 50], ['C1', 'Liegestütze', 10, 10, 100],
+]);
+assert.equal((await q(`select count(*)::int n from push_calls`))[0].n - p0, 1 + 30, 'Push-Trigger für AMRAP und jeden Rundensatz');
+// Kurz nach Mitternacht (Berlin): keine Runde rutscht in den Vortag
+const b3 = (await q(`select * from log_set($1, 10, null, '2026-11-24T23:10:00Z')`, [g.c1a]))[0];
+const early = await q(`select min(created_at) t from sets where source_log_id = $1`, [b3.log_id]);
+assert.equal(new Date(early[0].t).toISOString(), '2026-11-24T23:00:00.000Z', 'frühestens 0:00 Uhr Berlin');
+await q(`delete from sets where log_id = $1`, [b3.log_id]);
 
 // ─── Bearbeiten: A ändert 20 → 22 Runden an einer Kopie ────────────────────
 await as(A);
 await q(`update sets set reps = 22 where id = $1`, [a1.id]);
-dA = await derived(A);
-assert.deepEqual(dA.map(r => r.reps), [110, 220, 110, 330]);
+assert.deepEqual(rows(await summary(A)), [
+  ['C1', 'Klimmzüge', 22, 5, 110], ['C1', 'Liegestütze', 22, 10, 220],
+  ['C2', 'Klimmzüge', 22, 5, 110], ['C2', 'Kniebeugen', 22, 15, 330],
+]);
 assert.deepEqual((await q(`select reps from sets where log_id = $1`, [a1.log_id])).map(r => r.reps), [22, 22], 'AMRAP-Kopien synchron');
 // Wie die App: danach die Geschwister per log_id (keine Änderung mehr)
 await q(`update sets set reps = 22 where log_id = $1 and id <> $2`, [a1.log_id, a1.id]);
-assert.deepEqual((await derived(A)).map(r => r.reps), [110, 220, 110, 330]);
-// Datum ändern zieht mit
+assert.equal((await q(`select count(*)::int n from sets where source_log_id = $1`, [a1.log_id]))[0].n, 88);
+// Datum ändern verschiebt die Runden mit
 await q(`update sets set created_at = '2026-11-24T08:00:00Z' where id = $1`, [a1.id]);
-assert.ok((await derived(A)).every(r => new Date(r.created_at).toISOString() === '2026-11-24T08:00:00.000Z'));
+const last = await q(`select max(created_at) t, min(created_at) f from sets where source_log_id = $1`, [a1.log_id]);
+assert.equal(new Date(last[0].t).toISOString(), '2026-11-24T08:00:00.000Z');
+assert.ok(new Date(last[0].f) > new Date('2026-11-24T07:39:00Z'));
 // Notiz ändern lässt Teilsätze in Ruhe
+const before = (await q(`select count(*)::int n from sets where source_log_id = $1`, [a1.log_id]))[0].n;
 await q(`update sets set note = 'x' where id = $1`, [a1.id]);
-assert.ok((await derived(A)).every(r => r.note === 'Teil von: 20-Min-AMRAP'));
+assert.equal((await q(`select count(*)::int n from sets where source_log_id = $1 and note is null`, [a1.log_id]))[0].n, before);
 
-// Teilsatz direkt ändern: nur die Kopien dieser Teilübung
-const kz = (await q(`select id from sets where source_log_id = $1 and challenge_id = $2`, [a1.log_id, g.c1kz]))[0].id;
-await q(`update sets set reps = 90 where id = $1`, [kz]);
-assert.deepEqual((await derived(A)).map(r => [r.cat, r.reps]), [['Klimmzüge', 90], ['Liegestütze', 220], ['Klimmzüge', 90], ['Kniebeugen', 330]]);
+// Rundensatz direkt ändern: nur die Kopien dieser Runde
+const one = (await q(`select id, log_id from sets where source_log_id = $1 and challenge_id = $2 limit 1`, [a1.log_id, g.c1kz]))[0];
+await q(`update sets set reps = 4 where id = $1`, [one.id]);
+assert.deepEqual((await q(`select reps from sets where log_id = $1`, [one.log_id])).map(r => r.reps), [4, 4]);
 assert.deepEqual((await q(`select reps from sets where log_id = $1`, [a1.log_id])).map(r => r.reps), [22, 22], 'AMRAP unberührt');
 
 // Idempotent: nochmal anwenden legt nichts doppelt an
-const again = (await q(`select apply_workout_parts(s) n from sets s where s.log_id = $1`, [a1.log_id])).map(r => r.n);
-assert.deepEqual(again, [0, 0]);
+assert.deepEqual((await q(`select apply_workout_parts(s) n from sets s where s.log_id = $1`, [a1.log_id])).map(r => r.n), [0, 0]);
 
 // Neuer normaler Satz bleibt ohne Teilsätze
 const plain = (await q(`select * from log_set($1, 15)`, [g.c1kz]))[0];
@@ -135,19 +169,20 @@ assert.equal((await q(`select count(*)::int n from sets where source_log_id = $1
 // ─── Löschen ────────────────────────────────────────────────────────────────
 await q(`delete from sets where id = $1`, [a1.id]);
 assert.equal((await q(`select count(*)::int n from sets where log_id = $1`, [a1.log_id]))[0].n, 0, 'AMRAP-Kopien weg');
-assert.equal((await derived(A)).length, 0, 'Teilsätze weg');
-assert.ok((await derived(B)).length > 0, 'B unberührt');
+assert.equal((await summary(A)).length, 0, 'Teilsätze weg');
+assert.ok((await summary(B)).length > 0, 'B unberührt');
 
-// Teilsatz löschen löscht nur seine Kopien, nicht das Workout
+// Rundensatz löschen löscht nur seine Kopien, nicht das Workout
 await as(B);
-const bkz = (await q(`select id from sets where source_log_id = $1 and challenge_id = $2`, [b2.log_id, g.c1kz]))[0].id;
-await q(`delete from sets where id = $1`, [bkz]);
-assert.deepEqual((await derived(B)).filter(r => r.source_log_id === b2.log_id).map(r => r.cat), ['Liegestütze']);
+const bOne = (await q(`select id, log_id from sets where source_log_id = $1 and challenge_id = $2 limit 1`, [b2.log_id, g.c1kz]))[0];
+await q(`delete from sets where id = $1`, [bOne.id]);
+assert.equal((await q(`select count(*)::int n from sets where log_id = $1`, [bOne.log_id]))[0].n, 0, 'beide Kopien der Runde weg');
+assert.equal((await q(`select count(*)::int n from sets where source_log_id = $1`, [b2.log_id]))[0].n, 30 - 2);
 assert.equal((await q(`select count(*)::int n from sets where log_id = $1`, [b2.log_id]))[0].n, 1, 'B-AMRAP bleibt');
 
 // Cascade (Wochenziel des Workouts gelöscht): Teilsätze bleiben
 await q(`delete from weekly_challenges where id = $1`, [g.c1a]);
-assert.ok((await derived(B)).length > 0, 'Cascade nimmt Teilsätze nicht mit');
+assert.ok((await summary(B)).length > 0, 'Cascade nimmt Teilsätze nicht mit');
 
 // Rechte: App darf die Hilfsfunktion nicht aufrufen
 const priv = await q(`select has_function_privilege('authenticated', 'public.apply_workout_parts(public.sets)', 'execute') a,

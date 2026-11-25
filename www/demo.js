@@ -896,9 +896,11 @@
     return first;
   }
 
-  // Wie der Trigger sync_workout_parts (Migration workout_parts): Ein
-  // Pflicht-Workout mit Teilübungen (20-Min-AMRAP) bekommt pro Teilübung einen
-  // Satz in jedem Wochenziel dieser Übung derselben Woche.
+  // Wie der Trigger sync_workout_parts (Migrationen workout_parts und
+  // workout_parts_rounds): Ein Pflicht-Workout mit Teilübungen (20-Min-AMRAP)
+  // bekommt pro Runde und Teilübung einen Satz in jedem Wochenziel dieser
+  // Übung derselben Woche, je Übung als Block (Migration workout_parts_blocks)
+  // gleichmäßig in den 20 Minuten vor dem Eintrag.
   const catOfSet = (s) => {
     const ch = db.weekly_challenges.find(w => w.id === s.challenge_id);
     return ch && db.categories.find(c => c.id === ch.category_id);
@@ -907,26 +909,32 @@
   function applyParts(s) {
     if (s.source_log_id || !(s.reps > 0)) return;
     const ch = db.weekly_challenges.find(w => w.id === s.challenge_id);
-    const wcat = catOfSet(s);
-    for (const part of window.PTExercises?.partsOf(wcat, s.reps) || []) {
+    const rounds = Math.min(s.reps, 100);
+    const end = new Date(s.created_at).getTime();
+    const dayStart = new Date(s.created_at); dayStart.setHours(0, 0, 0, 0);
+    const parts = window.PTExercises?.partsOf(catOfSet(s), 1) || [];
+    const slots = rounds * parts.length;
+    parts.forEach((part, block) => {
       const pc = db.categories.find(c => c.competition_id == null && c.name === part.name);
-      if (!pc) continue;
-      const log = `${s.log_id}:${pc.id}`;
+      if (!pc) return;
       for (const t of logTargets(s.user_id, pc.id, ch.week_start)) {
-        if (db.sets.some(x => x.log_id === log && x.challenge_id === t.challenge_id)) continue;
-        db.sets.push({ id: newId('s'), challenge_id: t.challenge_id, competition_id: t.competition_id, user_id: s.user_id,
-          reps: part.reps, duration_minutes: null, note: `Teil von: ${wcat.name}`, created_at: s.created_at, // i18n-ignore: steht so in der DB
-          log_id: log, source_log_id: s.log_id });
+        for (let i = 1; i <= rounds; i++) {
+          const log = `${s.log_id}:${pc.id}:${i}`;
+          if (db.sets.some(x => x.log_id === log && x.challenge_id === t.challenge_id)) continue;
+          const at = Math.max(dayStart.getTime(), end - (slots - (block * rounds + i)) * (20 * 60000 / slots));
+          db.sets.push({ id: newId('s'), challenge_id: t.challenge_id, competition_id: t.competition_id, user_id: s.user_id,
+            reps: part.per, duration_minutes: null, note: null, created_at: new Date(at).toISOString(),
+            log_id: log, source_log_id: s.log_id });
+        }
       }
-    }
+    });
   }
+  // Runden oder Datum geändert: Rundensätze neu anlegen
   function syncParts(s) {
-    if (s.source_log_id || !(s.reps > 0)) return;
-    const parts = window.PTExercises?.partsOf(catOfSet(s), s.reps) || [];
-    for (const x of partRows(s)) {
-      const part = parts.find(p => p.name === catOfSet(x)?.name);
-      if (part) Object.assign(x, { reps: part.reps, created_at: s.created_at });
-    }
+    if (s.source_log_id || !partRows(s).length) return;
+    const gone = new Set(partRows(s).map(x => x.id));
+    db.sets = db.sets.filter(x => !gone.has(x.id));
+    applyParts(s);
   }
 
   function membersOf(cid) {

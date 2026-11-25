@@ -128,9 +128,6 @@
     if (m) return tr('Zeit: {time}', { time: m[1] });
     m = /^(\d+:\d{2}) von (\d+:\d{2})$/.exec(note);
     if (m) return tr('{time} von {total}', { time: m[1], total: m[2] });
-    // Teilsatz eines Pflicht-Workouts (Migration workout_parts): „Teil von: 20-Min-AMRAP“
-    m = /^Teil von: (.+)$/.exec(note);
-    if (m) return tr('Teil von: {name}', { name: window.PTExercises?.meta(m[1])?.label || m[1] });
     return note;
   }
 

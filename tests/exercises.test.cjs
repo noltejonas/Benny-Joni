@@ -140,10 +140,11 @@ test('partsOf: Wiederholungen pro Teilübung für n Runden, sonst leer', () => {
     [['Pull-ups', 10], ['Push-ups', 20], ['Squats', 30]]);
 });
 
-test('noteText: Teilsatz-Notiz in der App-Sprache', () => {
+test('workoutOfPart: Teilübung gehört zum 20-Min-AMRAP', () => {
+  assert.equal(X.workoutOfPart({ name: 'Klimmzüge', competition_id: null })?.name, '20-Min-AMRAP');
+  assert.equal(X.workoutOfPart({ name: 'Dips', competition_id: null }), null);
+  assert.equal(X.workoutOfPart({ name: 'Klimmzüge', competition_id: 'c1' }), null, 'eigene Übung nicht');
   const en = load('en');
-  assert.equal(en.PTData.noteText('Teil von: 20-Min-AMRAP'), en.tr('Teil von: {name}', { name: en.PTExercises.meta('20-Min-AMRAP').label }));
-  assert.match(en.PTData.noteText('Teil von: 20-Min-AMRAP'), /^Part of: /);
-  assert.equal(ctx.PTData.noteText('Teil von: 20-Min-AMRAP'), 'Teil von: 20-Min-AMRAP');
-  assert.equal(ctx.PTData.noteText('frei'), 'frei');
+  const loc = en.PTData.localizeCategory({ id: 'x', name: 'Kniebeugen', competition_id: null });
+  assert.equal(en.PTExercises.workoutOfPart(loc)?.name, '20-Min-AMRAP');
 });

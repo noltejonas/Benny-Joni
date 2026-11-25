@@ -59,6 +59,22 @@ test('bursts lässt Pflicht-Workouts einzeln', () => {
   assert.equal(out.length, 2);
 });
 
+test('bursts: Rundensätze eines Workouts bilden eine eigene Serie', () => {
+  const rounds = [1, 2, 3].map(i => set('me', 'pull', 5, at(18, 30 + i), { source_log_id: 'AMRAP1' }));
+  const own = set('me', 'pull', 8, at(18, 40));
+  const out = F.bursts([...rounds, own]);
+  assert.deepEqual(plain(out.map(b => [b.count, b.total])), [[1, 8], [3, 15]], 'eigener Satz bleibt getrennt');
+  const two = F.bursts([set('me', 'pull', 5, at(9, 0), { source_log_id: 'A' }), set('me', 'pull', 5, at(9, 1), { source_log_id: 'B' })]);
+  assert.equal(two.length, 2, 'zwei Workouts getrennt');
+  // Ein anderer Satz dazwischen teilt die Runden nicht
+  const mixed = F.bursts([
+    set('me', 'pull', 5, at(10, 0), { source_log_id: 'W' }), set('me', 'sit', 10, at(10, 1)),
+    set('me', 'pull', 5, at(10, 2), { source_log_id: 'W' }), set('jo', 'pull', 7, at(10, 3)),
+    set('me', 'pull', 5, at(10, 4), { source_log_id: 'W' }),
+  ]);
+  assert.deepEqual(plain(mixed.filter(b => b.challenge_id === 'pull' && b.athlete === 'me').map(b => [b.count, b.total])), [[3, 15]]);
+});
+
 test('der Schlüssel einer wachsenden Serie bleibt gleich', () => {
   const a = set('me', 'dips', 5, at(11, 0));
   const before = F.bursts([a]);
