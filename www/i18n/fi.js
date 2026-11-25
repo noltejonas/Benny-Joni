@@ -1448,5 +1448,10 @@ PTi18n.add('fi', {
   "{wins} Siege. Die Konkurrenz sucht schon Ausreden.": "{wins} voittoa. Kilpailijat etsivät jo tekosyitä.",
   "Ausgeglichen. Das Universum ist zufrieden.": "Tasan. Maailmankaikkeus on tyytyväinen.",
   "Mehr Niederlagen als Siege. Aber wer zählt schon mit? Ach ja: die App.": "Enemmän tappioita kuin voittoja. Mutta kuka laskee? Ai niin: sovellus.",
-  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Nolla voittoa. Mutta 100 % paluupotentiaalia."
+  "Null Siege. Dafür 100 % Comeback-Potenzial.": "Nolla voittoa. Mutta 100 % paluupotentiaalia.",
+
+  // ── exercises.js (Leg Curls) ──
+  "Leg Curls": "Reiden koukistukset",
+  "An der Beinbeuger-Maschine oder ohne Gerät: auf dem Rücken liegen, Fersen auf Handtuch, Socken oder Gymnastikball, Hüfte hoch. Die Fersen zum Po ziehen und langsam wieder strecken.": "Reiden koukistuslaitteessa tai ilman välineitä: makaa selällään, kantapäät pyyhkeen, sukkien tai jumppapallon päällä, lantio ylhäällä. Vedä kantapäät kohti pakaroita ja ojenna hitaasti takaisin.",
+  "Fersen bis nah an den Po ziehen, dann die Beine wieder ganz strecken.": "Vedä kantapäät lähelle pakaroita ja ojenna jalat sitten taas kokonaan."
 });
