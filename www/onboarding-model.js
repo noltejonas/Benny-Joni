@@ -16,7 +16,8 @@
   const APP_STORE_URL = STORE_DIGITS ? `https://apps.apple.com/de/app/id${STORE_DIGITS}` : '';
   // Support und Meldungen öffnen eine vorausgefüllte E-Mail an diese Adresse.
   const SUPPORT_EMAIL = 'bennyundjoni@gmail.com';
-  // Rechtstexte auf GitHub Pages (docs/launch/site).
+  // Rechtstexte auf GitHub Pages: Quelle docs/launch/site, ausgeliefert aus dem
+  // Hosting-Repo noltejonas/noltejonas.github.io (Ordner Benny-Joni/).
   const LEGAL_BASE = 'https://noltejonas.github.io/Benny-Joni/';
   const IS_ANDROID = window.Capacitor?.getPlatform?.() === 'android';
   // Bis der Play-Eintrag angelegt ist, führt Android zur Landingpage.
