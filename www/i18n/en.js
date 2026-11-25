@@ -1337,9 +1337,20 @@ PTi18n.add('en', {
   'Ausgeglichen. Das Universum ist zufrieden.': 'Even. The universe is pleased.',
   'Mehr Niederlagen als Siege. Aber wer zählt schon mit? Ach ja: die App.': 'More losses than wins. But who’s counting? Oh right: the app.',
   'Null Siege. Dafür 100 % Comeback-Potenzial.': 'Zero wins. But 100% comeback potential.',
-
   // ── exercises.js (Leg Curls) ──
   'Leg Curls': 'Leg curls',
   'An der Beinbeuger-Maschine oder ohne Gerät: auf dem Rücken liegen, Fersen auf Handtuch, Socken oder Gymnastikball, Hüfte hoch. Die Fersen zum Po ziehen und langsam wieder strecken.': 'On a leg curl machine or without equipment: lie on your back, heels on a towel, socks or an exercise ball, hips up. Pull your heels towards your butt and slowly straighten again.',
-  'Fersen bis nah an den Po ziehen, dann die Beine wieder ganz strecken.': 'Pull your heels close to your butt, then straighten your legs fully again.'
+  'Fersen bis nah an den Po ziehen, dann die Beine wieder ganz strecken.': 'Pull your heels close to your butt, then straighten your legs fully again.',
+
+  // Reihenfolge auf „Heute“, Teilübungen des 20-Min-AMRAP
+  'Teil von: {name}': 'Part of: {name}',
+  'Zählt auch als {parts}': 'Also counts as {parts}',
+  '{name} nach oben': 'Move {name} up',
+  '{name} nach unten': 'Move {name} down',
+  'Reihenfolge auf Heute': 'Order on Today',
+  'Am Griff ziehen oder mit den Pfeilen verschieben.': 'Drag the handle or use the arrows.',
+  'Erledigte Übungen rutschen weiterhin ans Ende.': 'Finished exercises still move to the end.',
+  'Standard': 'Default',
+  'Fertig': 'Done',
+  'Reihenfolge ändern': 'Change order'
 });

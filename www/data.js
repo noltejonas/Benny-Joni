@@ -193,6 +193,19 @@
     return `own:${cat.kind || 'sports'}:${String(cat.name || '').trim().toLowerCase().replace(/\s+/g, ' ')}`;
   }
 
+  // Eigene Reihenfolge auf „Heute“ (Challenges, Übungen): Schlüssel aus
+  // `order` in dieser Folge, alles andere dahinter in der bisherigen
+  // Reihenfolge (z. B. eine neu beigetretene Challenge). Ohne eigene
+  // Reihenfolge bleibt die Liste, wie sie ist.
+  function applyOrder(list, order, keyOf = (x) => x.id) {
+    const items = [...(list || [])];
+    if (!order || !order.length) return items;
+    const rank = new Map(order.map((k, i) => [k, i]));
+    return items.map((x, i) => ({ x, i, r: rank.has(keyOf(x)) ? rank.get(keyOf(x)) : Infinity }))
+      .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
+      .map(e => e.x);
+  }
+
   // Gemeinsame log_id für einen Satz, der in mehreren Challenges zählt.
   function newLogId() {
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -1497,7 +1510,7 @@
       return createAPI(client);
     },
     mondayOf, isoDate, addDays, suggestForWeek, weekTemplateFor, computePenalties, fairShareOf, participantsFor,
-    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary,
+    isWorkoutType, annotateWorkouts, setValue, workoutValueLabel, noteText, workoutSummary, applyOrder,
     workoutTargetRuns, workoutRunCount, workoutProgress, workoutPeopleDone,
     friendlyError, appError, clearLocalData, localizeCategory, sportsOnlyBundle, usesMinutes, exerciseKey, newLogId,
   };

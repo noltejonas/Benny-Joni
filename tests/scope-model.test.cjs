@@ -34,6 +34,15 @@ test('orderComps stellt die Haupt-Challenge nach vorn', () => {
   assert.deepEqual(plain(S.orderComps(list, null).map(c => c.id)), ['a', 'b', 'c']);
 });
 
+test('orderComps: eigene Reihenfolge schlägt die Haupt-Challenge, Neues kommt hinten dran', () => {
+  const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+  assert.deepEqual(plain(S.orderComps(list, 'c', ['b', 'a', 'c', 'd']).map(c => c.id)), ['b', 'a', 'c', 'd']);
+  // d ist neu (fehlt in der Reihenfolge), x gibt es nicht mehr
+  assert.deepEqual(plain(S.orderComps(list, 'c', ['x', 'b', 'a']).map(c => c.id)), ['b', 'a', 'c', 'd']);
+  assert.deepEqual(plain(S.orderComps(list, 'c', []).map(c => c.id)), ['c', 'a', 'b', 'd'], 'ohne eigene Reihenfolge wie bisher');
+  assert.deepEqual(plain(S.orderComps([], null, ['a'])), []);
+});
+
 // ── mergeLogCopies ─────────────────────────────────────────────────────────
 const copy = (id, cid, extra = {}) => ({
   id, athlete: 'me', log_id: 'L1', competition_id: cid, challenge_id: `ch-${cid}`, reps: 10, created_at: at(9, 0), reactions: [], ...extra,

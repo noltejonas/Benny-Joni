@@ -19,9 +19,12 @@
     return liveCount >= 2 && scope !== 'one' ? 'all' : 'one';
   }
 
-  // Haupt-Challenge zuerst, sonst in der gegebenen Reihenfolge.
-  function orderComps(comps = [], mainId = null) {
-    return [...comps].sort((a, b) => (b.id === mainId) - (a.id === mainId));
+  // Haupt-Challenge zuerst, sonst in der gegebenen Reihenfolge. Hat man auf
+  // „Heute“ selbst sortiert (order: Challenge-IDs), gilt diese Reihenfolge;
+  // Challenges, die darin fehlen, kommen dahinter.
+  function orderComps(comps = [], mainId = null, order = []) {
+    const base = [...comps].sort((a, b) => (b.id === mainId) - (a.id === mainId));
+    return window.PTData.applyOrder(base, order);
   }
 
   // sets: Sätze aus mehreren Challenges (getFeedAll). order: Challenge-IDs in

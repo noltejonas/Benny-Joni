@@ -2492,6 +2492,13 @@ a { color: var(--accent); text-decoration: none; }
   text-align: center;
   margin-bottom: 4px;
 }
+.th-parts {
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin: 8px 0 4px;
+}
 
 /* ─── BRING SALLY UP SHEET ───────────────────────────────────────────────── */
 .bsu-done-btn {

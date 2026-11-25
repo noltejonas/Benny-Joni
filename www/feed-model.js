@@ -34,6 +34,8 @@
       && compsSig(prev) === compsSig(s)
       && !prev.workout && !s.workout
       && !prev.note && !s.note
+      // Rundensätze eines Workouts (sets.source_log_id) nur untereinander
+      && (prev.source_log_id || null) === (s.source_log_id || null)
       && (prev.project_tag_id || null) === (s.project_tag_id || null)
       && (prev.tool_tag_id || null) === (s.tool_tag_id || null)
       && dayOf(prev.created_at) === dayOf(s.created_at)
@@ -42,12 +44,18 @@
 
   // Serien aus Sätzen in beliebiger Reihenfolge, neueste zuerst. Der Schlüssel
   // hängt am ersten Satz, damit eine wachsende Serie dieselbe Zeile bleibt.
+  // Rundensätze eines Workouts (source_log_id) bleiben eine Serie, auch wenn
+  // dazwischen ein anderer Satz liegt.
   function bursts(sets) {
     const groups = [];
+    const bySource = new Map();
     let cur = null;
     for (const s of [...sets].sort(asc)) {
+      const src = s.source_log_id ? `${s.athlete}|${s.source_log_id}|${s.challenge_id}|${compsSig(s)}` : null;
+      if (src && bySource.has(src)) { bySource.get(src).push(s); continue; }
       if (cur && groupable(cur[cur.length - 1], s)) cur.push(s);
       else { cur = [s]; groups.push(cur); }
+      if (src) bySource.set(src, cur);
     }
     return groups.map((g) => {
       const first = g[0], last = g[g.length - 1];

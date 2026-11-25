@@ -89,7 +89,9 @@
 
   // comps: [{ c, sides, participantCount }] in Anzeigereihenfolge.
   // bundle: api.getDashboard (Wochenziele, Sätze, Übungen).
-  function buildDashboard({ me, comps, bundle, weekStart, today = new Date() }) {
+  // exerciseOrder: selbst sortierte Übungen (Schlüssel wie exercises[].key);
+  // ohne gilt die Reihenfolge der Challenges.
+  function buildDashboard({ me, comps, bundle, weekStart, today = new Date(), exerciseOrder = [] }) {
     const cards = comps.map(({ c, sides, participantCount }) => {
       const challenges = bundle.challenges.filter(ch => ch.competition_id === c.id && ch.week_start === weekStart);
       const rows = challengeRows({ challenges, categories: bundle.categories, sets: bundle.sets, sides, me, participantCount, today });
@@ -114,7 +116,7 @@
       }
     }
 
-    const exercises = [...groups.values()].map(g => {
+    const exercises = P.applyOrder([...groups.values()].map(g => {
       // Meine Einträge dieser Woche über alle Challenges, jede log_id einmal
       const seen = new Set();
       let myWeek = 0;
@@ -135,7 +137,7 @@
         todayLeft: Math.max(0, ...g.entries.map(e => e.row.myTodayLeft)),
         targets: g.entries.map(e => ({ challenge_id: e.row.ch.id, competition_id: e.card.c.id })),
       };
-    });
+    }), exerciseOrder, e => e.key);
     // Liste: offene zuerst. Die Fokus-Karten behalten die feste Reihenfolge
     // (exercises), damit eine fertige Übung beim Wischen nicht wegspringt.
     const ordered = [...exercises.filter(e => !e.finished), ...exercises.filter(e => e.finished)];

@@ -117,3 +117,39 @@ test('Migrationen kennen dieselben Synonyme wie die App', () => {
     }
   }
 });
+
+// ─── Teilübungen (Migration workout_parts) ─────────────────────────────────
+test('20-Min-AMRAP: Teilübungen in App und Migration gleich', () => {
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '20261125120000_workout_parts.sql'), 'utf8');
+  const block = sql.slice(sql.indexOf('insert into public.workout_parts'), sql.indexOf('on conflict (workout_id, part_id)'));
+  const fromSql = [...block.matchAll(/\('([^']+)', (\d+)\)/g)].map(m => [m[1], Number(m[2])]);
+  assert.ok(block.includes("w.name = '20-Min-AMRAP'"));
+  const amrap = X.meta('20-Min-AMRAP');
+  assert.deepEqual(JSON.parse(JSON.stringify(amrap.parts)), fromSql);
+  for (const [name] of amrap.parts) assert.ok(X.meta(name), `${name} ist eine Standard-Übung`);
+  // Regel und Erklärung nennen dieselben Zahlen
+  assert.ok(amrap.rule.includes('5 Klimmzüge, 10 Liegestütze, 15 Kniebeugen'));
+});
+
+test('partsOf: Wiederholungen pro Teilübung für n Runden, sonst leer', () => {
+  const cat = { name: '20-Min-AMRAP', competition_id: null };
+  assert.deepEqual(JSON.parse(JSON.stringify(X.partsOf(cat, 8).map(p => [p.name, p.reps]))),
+    [['Klimmzüge', 40], ['Liegestütze', 80], ['Kniebeugen', 120]]);
+  assert.equal(X.partsOf({ name: 'Liegestütze', competition_id: null }, 8).length, 0);
+  assert.equal(X.partsOf({ name: '20-Min-AMRAP', competition_id: 'c1' }, 8).length, 0, 'eigene Übung gleichen Namens nicht');
+  assert.equal(X.partsOf(null, 8).length, 0);
+  // Übersetzte Kategorie (localizeCategory legt base_name ab)
+  const en = load('en');
+  const loc = en.PTData.localizeCategory({ id: 'x', name: '20-Min-AMRAP', competition_id: null });
+  assert.deepEqual(JSON.parse(JSON.stringify(en.PTExercises.partsOf(loc, 2).map(p => [p.label, p.reps]))),
+    [['Pull-ups', 10], ['Push-ups', 20], ['Squats', 30]]);
+});
+
+test('workoutOfPart: Teilübung gehört zum 20-Min-AMRAP', () => {
+  assert.equal(X.workoutOfPart({ name: 'Klimmzüge', competition_id: null })?.name, '20-Min-AMRAP');
+  assert.equal(X.workoutOfPart({ name: 'Dips', competition_id: null }), null);
+  assert.equal(X.workoutOfPart({ name: 'Klimmzüge', competition_id: 'c1' }), null, 'eigene Übung nicht');
+  const en = load('en');
+  const loc = en.PTData.localizeCategory({ id: 'x', name: 'Kniebeugen', competition_id: null });
+  assert.equal(en.PTExercises.workoutOfPart(loc)?.name, '20-Min-AMRAP');
+});

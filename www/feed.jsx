@@ -186,6 +186,8 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
   blocked = false, onReport, onToggleBlock, compBadge = null }) {
   const mine = b.athlete === me;
   const note = blocked ? null : PTData.noteText(b.sets[0].note);
+  // Rundensätze eines Pflicht-Workouts (Migration workout_parts_rounds)
+  const partOf = b.sets[0].source_log_id ? window.PTExercises?.workoutOfPart(b.category) : null;
   const showSets = mine || b.count > 1;
   return (
     <div className={`lf-row ${side ? side.cls : 'side-n'}${arriving ? ' is-arriving' : ''}${open ? ' is-open' : ''}${blocked ? ' is-blocked' : ''}`}
@@ -201,6 +203,7 @@ function FeedBurst({ b, me, side, isNew, arriving, open, onToggleOpen, reactions
           <span className="lf-meta">
             {formatRelative(b.created_at)}
             {b.count > 1 && ` · ${trn(b.count, '{n} Satz', '{n} Sätze')}`}
+            {partOf && ` · ${tr('Teil von: {name}', { name: partOf.label })}`}
             {progressLabel && ` · ${progressLabel}`}
             {blocked && ` · ${tr('blockiert')}`}
           </span>
