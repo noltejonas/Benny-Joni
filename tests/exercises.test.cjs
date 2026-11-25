@@ -6,7 +6,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const WWW = path.join(__dirname, '..', 'www');
-const MIGRATION = path.join(__dirname, '..', 'supabase', 'migrations', '20261117120000_exercise_catalog.sql');
+// Migrationen mit Katalog-Übungen (erste: exercise_catalog, danach Nachträge)
+const MIGRATIONS = ['20261117120000_exercise_catalog.sql', '20261118090000_leg_curls.sql']
+  .map(f => path.join(__dirname, '..', 'supabase', 'migrations', f));
+const catalogSql = () => MIGRATIONS.map(f => fs.readFileSync(f, 'utf8')).join('\n');
 
 function load(lang = null) {
   const ctx = { console };
@@ -85,8 +88,8 @@ test('metaOf, groupOf und search arbeiten auch mit übersetzten Namen', () => {
   assert.deepEqual(en.PTExercises.search([squat, lunge], 'kniebeu').map(c => c.id), ['s'], 'deutscher Name findet auch auf Englisch');
 });
 
-test('Migration legt jede neue Übung mit Name und Regel aus dem Katalog an', () => {
-  const sql = fs.readFileSync(MIGRATION, 'utf8');
+test('Migrationen legen jede neue Übung mit Name und Regel aus dem Katalog an', () => {
+  const sql = catalogSql();
   // Schon vor der Migration in der Datenbank (monthly_ranking, rank_crunches, challenge_type)
   const existing = new Set(['Liegestütze', 'Klimmzüge', 'Dips', 'Leg Raises', 'HSPU', 'Sit-ups', 'Crunches', 'Burpees',
     'Bring Sally Up', '20-Min-AMRAP']);
@@ -98,10 +101,12 @@ test('Migration legt jede neue Übung mit Name und Regel aus dem Katalog an', ()
   }
 });
 
-test('Migration kennt dieselben Synonyme wie die App', () => {
-  const sql = fs.readFileSync(MIGRATION, 'utf8');
-  const block = sql.slice(sql.indexOf('insert into exercise_aliases'), sql.indexOf('on conflict (alias)'));
-  const pairs = [...block.matchAll(/\('([^']+)', '([^']+)'\)/g)].map(m => [m[1], m[2]]);
+test('Migrationen kennen dieselben Synonyme wie die App', () => {
+  const pairs = [];
+  for (const sql of MIGRATIONS.map(f => fs.readFileSync(f, 'utf8'))) {
+    const block = sql.slice(sql.indexOf('insert into exercise_aliases'), sql.indexOf('on conflict (alias)'));
+    pairs.push(...[...block.matchAll(/\('([^']+)', '([^']+)'\)/g)].map(m => [m[1], m[2]]));
+  }
   const fromSql = Object.fromEntries(pairs);
   for (const e of X.LIST) {
     for (const n of [e.name, ...(e.alias || [])]) {
