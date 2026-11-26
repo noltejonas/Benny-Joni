@@ -1,5 +1,41 @@
 # Release mit Fastlane
 
+## Update 1.6.2 (iOS) und 1.6.1 (Android): Kacheln sortieren, AMRAP-Teilübungen
+
+Stand 26. November 2026: **iOS 1.6.2 (38) ist live, Android 1.6.1 (Code 8) in Prüfung.**
+
+- Inhalt (PR #27): Reihenfolge auf „Heute“ selbst sortieren (Challenges und
+  Übungen, pro Gerät), 20-Min-AMRAP zählt in Klimmzüge, Liegestütze und
+  Kniebeugen (ein Satz pro Runde), Feed bündelt die Runden pro Übung.
+  Dazu PR #26 (Leg Curls, Release-Stand 1.6.0/1.6.1).
+- **Backend:** `20261125120000_workout_parts.sql`,
+  `20261125200000_workout_parts_rounds.sql` und
+  `20261125210000_workout_parts_blocks.sql` eingespielt und registriert. Die
+  Teilsätze entstehen per Trigger in der Datenbank, wirken also auch für alte
+  App-Versionen. Nachtrag KW 48 (Bennys 20 Runden) ohne Pushes.
+- **Apple 1.6.2 (38):** `tools/fastlane.sh ios release screenshots:false`
+  (Build-Nummer automatisch 38), dann `submit-update-162.rb`
+  `--select-build-only` und `--submit`, Release-Typ `AFTER_APPROVAL`.
+  Eingereicht am `2026-11-25T21:10:58Z` (Submission
+  `0f4fa015-2e19-4535-80cb-c24493642c0f`), Prüfung `COMPLETE`, Version
+  `READY_FOR_SALE` (Readback 26.11.). Das Skript meldete danach
+  `SUBMISSION_HELPER_FAILED` („not in submittable state“): ein zweiter
+  Absende-Versuch auf die schon eingereichte Version, ohne Folgen.
+  IPA-SHA-256 `7d3920f1eb823328de365d00df2df7a1f7b54a8117a8fdd27ab1b0b2d592d4b3`.
+- **Google Play 1.6.1 (Code 8):** AAB mit `tools/android.sh --no-daemon
+  bundleRelease` (Signatur aus `.local/release/android/signing.env`),
+  `submit-production.rb` erst `validate`, dann `submit`. Produktion
+  „1.6.1 – Kacheln sortieren & AMRAP-Teilübungen“,
+  `RELEASE_LIFECYCLE_STATE_IN_REVIEW`; 1.6.0 (Code 7) bleibt bis zur
+  Freigabe live. AAB-SHA-256
+  `083e8032d3d0c7d05cb28df0be45de644a11f6d5ad617bc4dd409097c9f4a297`.
+- Neuerungen: `metadata/*/release_notes.txt` und `play-metadata/*/changelogs/8.txt`.
+- Prüfungen: `npm test` 355 bestanden, `check-store.cjs` iOS und Android
+  bestanden, Signatur des AAB verifiziert.
+- Belege: `.local/release/update-20261125/apple/` (v162),
+  `.local/release/update-20261125/android/` (`validate`/`submit.private.log`,
+  `readback.txt`).
+
 ## Update 1.6.1 (iOS) und 1.6.0 (Android): Leg Curls
 
 Stand 18. November 2026, 21:18 Uhr MEZ: **beide Stores in Prüfung.**

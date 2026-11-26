@@ -1,7 +1,2 @@
-• 36 Standard-Übungen mit Anleitung und animierter Figur, alle in der Rangliste.
-• Neue Übungsauswahl mit Suche und Gruppen.
-• Wochen-Trailer ab drei Challenges mit Bilanz und frechen Sprüchen.
-• „Alle Challenges“: Heute, Feed, Stats und Strafkonto auf einen Blick.
-• „Neue Woche starten“ mit den Zielen der Vorwoche.
-• Die Rangliste zählt Wiederholungen statt Punkte.
-• Einladungen als ein Link, der auch in WhatsApp funktioniert.
+• Kacheln auf „Heute“ sortieren: Challenges und Übungen in deiner Reihenfolge, per Ziehen oder Pfeil.
+• Das 20-Min-AMRAP zählt jetzt auch für Klimmzüge, Liegestütze und Kniebeugen – jede Runde als eigener Satz.
